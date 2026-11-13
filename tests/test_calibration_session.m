@@ -1,4 +1,4 @@
-classdef test_calibration_session < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_calibration_session < matlab.unittest.TestCase
 % TEST_CALIBRATION_SESSION  The interactive calibration steps shared by CALIBRATION_GUI and the
 % PRESTUS Nexus: CALIBRATION_DESIRED_PROFILES, CALIBRATION_FIT, CALIBRATION_EVALUATE,
 % CALIBRATION_SAVE_ENTRY (meta.fit). Synthetic "hydrophone" profiles are the geometric model
@@ -97,7 +97,7 @@ classdef test_calibration_session < matlab.unittest.TestCase
             tc.verifySubstring(msg{2}, 'Fit (unsaved) at the desired depths');
         end
 
-        function test_save_entry_records_the_fit_and_protects_the_shipped_library(tc)
+        function test_save_entry_records_fit_and_protects_shipped_library(tc)
             d0 = tc.Meas.depths_ep_mm(2);
             sel = calibration_desired_profiles(tc.Tran, tc.Meas, d0 - 5);
             fit = calibration_fit(tc.Tran, sel, struct('FitOptions', struct('NStarts', 2), ...

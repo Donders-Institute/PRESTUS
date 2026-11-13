@@ -1,4 +1,4 @@
-classdef test_axisymmetric_phantom < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_axisymmetric_phantom < matlab.unittest.TestCase
 % TEST_AXISYMMETRIC_PHANTOM  Axisymmetric and phantom grid bookkeeping on small synthetic arrays.
 %
 % Covers AXISYMMETRIC_OUTPUT_MODE (2D/3D form of the expansion),
@@ -14,14 +14,6 @@ classdef test_axisymmetric_phantom < matlab.unittest.TestCase
         Dir
     end
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-            addpath(fullfile(repo, 'config'));
-            addpath(fullfile(repo, 'tests', 'fixtures'));
-        end
-    end
 
     methods (TestMethodSetup)
         function make_dir(tc)

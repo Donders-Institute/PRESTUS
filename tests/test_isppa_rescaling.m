@@ -1,4 +1,4 @@
-classdef test_isppa_rescaling < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'water'}) test_isppa_rescaling < matlab.unittest.TestCase
 % TEST_ISPPA_RESCALING  Tests for multi-ISPPA pipeline and ISPPA scaling.
 %
 %   Tests the multi_isppa_pipeline dispatcher and the pressure-scaling logic

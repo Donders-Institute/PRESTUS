@@ -1,4 +1,4 @@
-classdef test_library_conditions < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_library_conditions < matlab.unittest.TestCase
 % TEST_LIBRARY_CONDITIONS  Unit tests for experimental dephased library conditions (issue #124).
 %
 % Synthetic only: no dephased hydrophone measurements exist yet, so the
@@ -16,8 +16,6 @@ classdef test_library_conditions < matlab.unittest.TestCase
     methods (TestClassSetup)
         function setup_paths(tc)
             repo_root = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo_root, 'functions')));
-            addpath(genpath(fullfile(repo_root, 'external')));
             tc.equip = load_equipment_config();
             tc.tran  = tc.equip.trans.CTX_250_001;
             tc.lib   = yaml.loadFile(fullfile(repo_root, 'config', 'calibration', ...

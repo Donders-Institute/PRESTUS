@@ -1,20 +1,9 @@
-classdef test_load_parameters < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_load_parameters < matlab.unittest.TestCase
 % TEST_LOAD_PARAMETERS  Unit tests for load_parameters() config merging.
 %
 %   These tests operate on config_default.yaml only (no SimNIBS/k-Wave needed).
 %   Run with:   results = runtests('tests/test_load_parameters.m');
 
-    methods (TestClassSetup)
-        function add_prestus_path(tc)
-            % Resolve repo root relative to this test file and add functions/
-            test_dir   = fileparts(mfilename('fullpath'));
-            repo_root  = fileparts(test_dir);
-            addpath(genpath(fullfile(repo_root, 'functions')));
-            addpath(genpath(fullfile(repo_root, 'external')));
-            % load_parameters expects to find config_default.yaml on the path
-            addpath(fullfile(repo_root, 'config'));
-        end
-    end
 
     methods (Access = private)
         function override = quiet(~, override)
@@ -179,4 +168,16 @@ classdef test_load_parameters < matlab.unittest.TestCase
 
     end
 
+
+    % sanitize_output_affix
+    methods (Test, TestTags = {'sanitization'})
+
+        function test_affix_desc_prefix_not_doubled(tc)
+            tc.verifyEqual(sanitize_output_affix('desc-foo'), '_desc-foo');
+            tc.verifyEqual(sanitize_output_affix('_foo'), '_desc-foo');
+            tc.verifyEqual(sanitize_output_affix('_desc-foo'), '_desc-foo');
+            tc.verifyEqual(sanitize_output_affix('__'), '');
+        end
+
+    end
 end

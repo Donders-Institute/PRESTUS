@@ -1,4 +1,4 @@
-classdef test_plantus_placement < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}) test_plantus_placement < matlab.unittest.TestCase
 % TEST_PLANTUS_PLACEMENT  Tests for position_transducer_plantus and the
 %                          'plantus' dispatch path in preproc_transducer_placement.
 %
@@ -44,7 +44,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
     % ==================================================================
     %% Validation — missing / invalid configuration
     % ==================================================================
-    methods (Test, TestTags = {'plantus', 'validation'})
+    methods (Test, TestTags = {'unit', 'plantus', 'validation'})
 
         function test_missing_plantus_struct_errors(tc)
             % preproc_transducer_placement with mode='plantus' and no
@@ -200,7 +200,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
     % ==================================================================
     %% Dispatch — preproc_transducer_placement routing
     % ==================================================================
-    methods (Test, TestTags = {'plantus', 'dispatch'})
+    methods (Test, TestTags = {'unit', 'plantus', 'dispatch'})
 
         function test_plantus_mode_routes_to_plantus_code(tc)
             % mode='plantus' must attempt plantus placement (not silently
@@ -235,7 +235,7 @@ classdef test_plantus_placement < matlab.unittest.TestCase
     % ==================================================================
     %% Integration — end-to-end with a mock PlanTUS environment
     % ==================================================================
-    methods (Test, TestTags = {'plantus', 'integration'})
+    methods (Test, TestTags = {'water', 'plantus', 'integration'})
 
         function test_end_to_end_returns_valid_positions(tc)
             % Full flow: synthetic T1, fake mesh, mock PlanTUS wrapper that

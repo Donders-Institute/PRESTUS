@@ -1,4 +1,4 @@
-classdef test_steering_correction < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_steering_correction < matlab.unittest.TestCase
 % TEST_STEERING_CORRECTION  Steering correction of matrix arrays, flat arrays and
 % the matrix Rayleigh model, on synthetic data.
 %
@@ -12,9 +12,6 @@ classdef test_steering_correction < matlab.unittest.TestCase
     methods (TestClassSetup)
         function setup_paths(tc)
             tc.repo_root = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(tc.repo_root, 'functions')));
-            addpath(genpath(fullfile(tc.repo_root, 'external', 'k-wave')));
-            addpath(genpath(fullfile(tc.repo_root, 'external', 'yaml')));
             tc.tmp = tempname; mkdir(tc.tmp);
         end
     end

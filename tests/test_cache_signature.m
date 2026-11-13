@@ -1,4 +1,4 @@
-classdef test_cache_signature < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_cache_signature < matlab.unittest.TestCase
 % TEST_CACHE_SIGNATURE  Reused grid/medium caches must match the run's settings.
 %
 % Covers CACHE_SIGNATURE and CHECK_CACHE_SIGNATURE: which settings are part of
@@ -7,12 +7,6 @@ classdef test_cache_signature < matlab.unittest.TestCase
 %
 %   results = runtests('tests/test_cache_signature.m');
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-        end
-    end
 
     methods (Static, Access = private)
         function p = params()

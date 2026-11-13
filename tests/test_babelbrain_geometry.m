@@ -1,4 +1,4 @@
-classdef test_babelbrain_geometry < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelbrain_geometry < matlab.unittest.TestCase
 % TEST_BABELBRAIN_GEOMETRY  Unit tests for BABELBRAIN_CHECK_GEOMETRY: the
 % BabelBrain backend takes one transducer, with its beam along the grid z axis.
 %

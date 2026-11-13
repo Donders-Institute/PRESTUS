@@ -1,4 +1,4 @@
-classdef test_source_multi_transducer < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'water'}) test_source_multi_transducer < matlab.unittest.TestCase
 % TEST_SOURCE_MULTI_TRANSDUCER  SOURCE_CREATE keeps each transducer's own drive.
 %
 %   Regression test: transducers 2..N were built from transducer 1's settings
@@ -10,7 +10,6 @@ classdef test_source_multi_transducer < matlab.unittest.TestCase
     methods (Test, TestTags = {'source'})
 
         function test_each_transducer_keeps_its_drive(tc)
-            addpath(fullfile(fileparts(mfilename('fullpath')), 'fixtures'));
             p = make_minimal_parameters(fullfile(tempdir, 'prestus_test_source_multi'));
             p.grid.dims = p.grid.default_dims;
             p.io.dir_cache = fullfile(tempdir, 'prestus_test_source_multi');

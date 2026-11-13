@@ -1,4 +1,4 @@
-classdef test_babelbrain_thermal_timing < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelbrain_thermal_timing < matlab.unittest.TestCase
 % TEST_BABELBRAIN_THERMAL_TIMING  Unit tests for the PRESTUS -> BabelBrain thermal timing map.
 %
 % BabelBrain runs Repetitions x (DurationUS on, DurationOff off) and then, with

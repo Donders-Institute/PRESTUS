@@ -1,4 +1,4 @@
-classdef test_cw_source_matrix < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_cw_source_matrix < matlab.unittest.TestCase
 % TEST_CW_SOURCE_MATRIX  Unit tests for functions/source/CWSourceMatrix.m
 %
 % Checks that the lazy rank-2 CW source behaves like the equivalent dense

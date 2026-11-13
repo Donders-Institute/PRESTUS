@@ -1,4 +1,4 @@
-classdef test_uncertainty_nesting < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_uncertainty_nesting < matlab.unittest.TestCase
 % TEST_UNCERTAINTY_NESTING  Job graph of uncertainty mode nested with a
 % multi-ISPPA sweep or an async multi-transducer run (no simulation).
 %

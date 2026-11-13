@@ -1,4 +1,4 @@
-classdef test_babelbrain_weights < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelbrain_weights < matlab.unittest.TestCase
 % TEST_BABELBRAIN_WEIGHTS  EXPORT_BABELBRAIN_WEIGHTS / IMPORT_BABELBRAIN_WEIGHTS
 % against BabelBrain's OptimizedWeightsFile layout.
 %

@@ -1,4 +1,4 @@
-classdef test_thermal_dose < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_thermal_dose < matlab.unittest.TestCase
 % TEST_THERMAL_DOSE  ISO CEM43 increments against analytic values (Sapareto & Dewey 1984).
 %
 %   CEM43 = t[min] * R^(43 - T), R = 0.5 at/above 43 °C, 0.25 for 39–43 °C,
@@ -6,12 +6,6 @@ classdef test_thermal_dose < matlab.unittest.TestCase
 %
 %   results = runtests('tests/test_thermal_dose.m');
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-        end
-    end
 
     methods (Test, TestTags = {'thermal_dose'})
 

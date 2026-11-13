@@ -1,4 +1,4 @@
-classdef test_outputs_follow_recompute < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_outputs_follow_recompute < matlab.unittest.TestCase
 % TEST_OUTPUTS_FOLLOW_RECOMPUTE  A recomputed stage replaces its existing outputs.
 %
 % Regression for io.overwrite_files 'never': a re-run without caches
@@ -7,12 +7,6 @@ classdef test_outputs_follow_recompute < matlab.unittest.TestCase
 %
 %   results = runtests('tests/test_outputs_follow_recompute.m');
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-        end
-    end
 
     methods (Static, Access = private)
         function p = params(mode, recomputed)

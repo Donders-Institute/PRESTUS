@@ -1,4 +1,4 @@
-classdef test_integration_pipeline < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}) test_integration_pipeline < matlab.unittest.TestCase
 % TEST_INTEGRATION_PIPELINE  Smoke/integration tests for full and partial pipeline runs.
 %
 %   These tests require demo input data (Ernie template or equivalent).
@@ -38,8 +38,6 @@ classdef test_integration_pipeline < matlab.unittest.TestCase
         function resolve_paths(tc)
             test_dir      = fileparts(mfilename('fullpath'));
             tc.repo_root  = fileparts(test_dir);
-            addpath(genpath(fullfile(tc.repo_root, 'functions')));
-            addpath(fullfile(tc.repo_root, 'config'));
         end
     end
 
@@ -72,7 +70,7 @@ classdef test_integration_pipeline < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% Level 1: config loading (no data needed — prerequisite always runs)
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'smoke_config'})
+    methods (Test, TestTags = {'head', 'smoke_config'})
 
         function test_tutorial_config_loads(tc)
             cfg = fullfile(tc.repo_root, 'config', 'config_tutorial.yaml');
@@ -91,7 +89,7 @@ classdef test_integration_pipeline < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% Level 2: head preprocessing (segmentation + medium masks)
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'smoke_head'})
+    methods (Test, TestTags = {'head', 'smoke_head'})
 
         function test_segmentation_file_exists(tc)
             % Verify the expected charm output is present for this subject
@@ -134,7 +132,7 @@ classdef test_integration_pipeline < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% Level 3: full acoustic pipeline
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'smoke_acoustic'})
+    methods (Test, TestTags = {'acoustic', 'smoke_acoustic'})
 
         function test_acoustic_output_file_created(tc)
             p = tc.params;
@@ -174,7 +172,7 @@ classdef test_integration_pipeline < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% Level 4: thermal pipeline (requires completed acoustic run)
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'smoke_thermal'})
+    methods (Test, TestTags = {'thermal', 'smoke_thermal'})
 
         function test_thermal_output_file_created(tc)
             p = tc.params;

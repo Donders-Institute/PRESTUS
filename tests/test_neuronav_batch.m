@@ -1,4 +1,4 @@
-classdef test_neuronav_batch < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_neuronav_batch < matlab.unittest.TestCase
 % TEST_NEURONAV_BATCH  Multi-subject Localite ingestion: scan, label map, naming, batch.
 %
 % Synthetic study in a temp folder: 2 subjects × 2 sessions, each with a

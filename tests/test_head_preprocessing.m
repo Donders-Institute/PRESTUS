@@ -1,4 +1,4 @@
-classdef test_head_preprocessing < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_head_preprocessing < matlab.unittest.TestCase
 % TEST_HEAD_PREPROCESSING  Unit tests for head preprocessing helpers.
 %
 %   Tests functions that operate on synthetic segmentation volumes —
@@ -131,4 +131,32 @@ classdef test_head_preprocessing < matlab.unittest.TestCase
 
     end
 
+
+    % smooth_img: replicate padding
+    methods (Test, TestTags = {'smooth_img'})
+
+        function test_gaussian_constant_volume_edges_preserved(tc)
+            img = ones(16, 16, 16);
+            out = smooth_img(img, 3, 1, 0, "gaussian");
+            tc.verifyEqual(size(out), size(img));
+            tc.verifyEqual(out, img, 'AbsTol', 1e-10);
+        end
+
+        function test_box_constant_volume_edges_preserved(tc)
+            img = ones(16, 16, 16);
+            out = smooth_img(img, 3, 1, 0, "box");
+            tc.verifyEqual(size(out), size(img));
+            tc.verifyEqual(out, img, 'AbsTol', 1e-10);
+        end
+
+        function test_binary_mask_touching_border_survives_threshold(tc)
+            % A slab filling the lower half of the volume touches the border;
+            % zero padding used to erode it at the faces after thresholding.
+            img = zeros(16, 16, 16);
+            img(:, :, 1:8) = 1;
+            out = smooth_img(img, 3, 1, 0.5, "gaussian");
+            tc.verifyTrue(all(out(:, :, 1:6) == 1, 'all'));
+        end
+
+    end
 end

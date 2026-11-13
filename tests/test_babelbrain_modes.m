@@ -1,4 +1,4 @@
-classdef test_babelbrain_modes < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelbrain_modes < matlab.unittest.TestCase
 % TEST_BABELBRAIN_MODES  PRESTUS run modes combined with acoustic_backend /
 % thermal_backend 'babelbrain', checked without BabelBrain, a GPU or data.
 %

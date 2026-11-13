@@ -1,4 +1,4 @@
-classdef test_transform < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_transform < matlab.unittest.TestCase
 % TEST_TRANSFORM  Unit tests for functions/transform/
 %
 %   Run with:   results = runtests('tests/test_transform.m');
@@ -125,4 +125,46 @@ classdef test_transform < matlab.unittest.TestCase
 
     end
 
+
+    % convert_final_to_MNI_simnibs
+    methods (Test, TestTags = {'mni'})
+
+        function test_native_mni_warp_keeps_voxel_position(tc)
+            tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            % Identity warp on a 20^3 MNI grid (origin -10 mm); input grid
+            % with origin -5 mm. A voxel at world (2,3,4) mm must land on
+            % MNI voxel (13,14,15), 1-based.
+            m2m = fullfile(tmp, 'm2m_sub-001');
+            mkdir(fullfile(m2m, 'toMNI'));
+            n = 20;
+            [i, j, k] = ndgrid(0:n-1, 0:n-1, 0:n-1);
+            warp = single(cat(4, i - 10, j - 10, k - 10));
+            write_nii_1mm(fullfile(m2m, 'toMNI', 'MNI2Conform_nonl'), warp, -10);
+            write_nii_1mm(fullfile(m2m, 'toMNI', 'final_tissues_MNI'), zeros(n, n, n, 'uint8'), -10);
+            vol = zeros(n, n, n, 'single');
+            vol(8, 9, 10) = 1;
+            in = write_nii_1mm(fullfile(tmp, 'in'), vol, -5);
+            out = fullfile(tmp, 'out_MNI.nii.gz');
+            convert_final_to_MNI_simnibs(in, m2m, out, struct(), ...
+                'method', 'native', 'interpolation_order', 0);
+            res = niftiread(out);
+            [~, idx] = max(res(:));
+            [a, b, c] = ind2sub(size(res), idx);
+            tc.verifyEqual([a b c], [13 14 15]);
+        end
+
+    end
+end
+
+function f = write_nii_1mm(base, vol, origin_mm)
+% 1 mm isotropic NIfTI whose 0-based voxel [0 0 0] sits at origin_mm on each axis.
+    niftiwrite(vol, base);
+    info = niftiinfo([base '.nii']);
+    T = eye(4);
+    T(4, 1:3) = origin_mm;
+    info.Transform = affine3d(T);
+    info.TransformName = 'Sform';   % 'None' would drop the affine on write
+    niftiwrite(vol, base, info, 'Compressed', true);
+    delete([base '.nii']);
+    f = [base '.nii.gz'];
 end

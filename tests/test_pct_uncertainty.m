@@ -1,4 +1,4 @@
-classdef test_pct_uncertainty < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_pct_uncertainty < matlab.unittest.TestCase
 % TEST_PCT_UNCERTAINTY  Pseudo-CT in uncertainty mode: only the default variant
 % maps the skull, and the skull properties a pseudo-CT run will model can be
 % predicted without simulating.

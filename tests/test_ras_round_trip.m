@@ -1,4 +1,4 @@
-classdef test_ras_round_trip < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_ras_round_trip < matlab.unittest.TestCase
 % TEST_RAS_ROUND_TRIP  RAS <-> voxel against the NIfTI header itself (audit item I1).
 %
 % Writes a NIfTI with an oblique, non-isotropic sform, reads it back with
@@ -21,8 +21,6 @@ classdef test_ras_round_trip < matlab.unittest.TestCase
 
     methods (TestClassSetup)
         function write_nifti(tc)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
             tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
             Rx = rotx_deg(17); Rz = rotz_deg(-11); Ry = roty_deg(6);
             A = eye(4);

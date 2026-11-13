@@ -1,4 +1,4 @@
-classdef test_babelbrain_insitu_isppa < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelbrain_insitu_isppa < matlab.unittest.TestCase
 % TEST_BABELBRAIN_INSITU_ISPPA  Unit tests for the Isppa handed to BabelBrain thermal.
 %
 % BabelBrain's BHTE normalises the field to max p^2/(2*rho*c) inside the brain,

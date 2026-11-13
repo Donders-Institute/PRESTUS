@@ -1,4 +1,4 @@
-classdef test_helper < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_helper < matlab.unittest.TestCase
 % TEST_HELPER  Unit tests for functions/helper/
 %
 %   Run with:   results = runtests('tests/test_helper.m');
@@ -269,4 +269,25 @@ classdef test_helper < matlab.unittest.TestCase
 
     end
 
+
+    % resolve_jwave_pml_size
+    methods (Test, TestTags = {'jwave_pml'})
+
+        function test_auto_uses_longest_wavelength(tc)
+            pml_water = resolve_jwave_pml_size('auto', 3e5, 1500, 0.75e-3);
+            pml_skull = resolve_jwave_pml_size('auto', 3e5, 2450, 0.75e-3);
+            tc.verifyEqual(pml_water, ceil(2.5 * (1500/3e5) / 0.75e-3));
+            tc.verifyEqual(pml_skull, ceil(2.5 * (2450/3e5) / 0.75e-3));
+            tc.verifyGreaterThan(pml_skull, pml_water);
+        end
+
+        function test_auto_clamped_to_range(tc)
+            tc.verifyEqual(resolve_jwave_pml_size('auto', 3e5, 2450, 0.1e-3), 40);
+        end
+
+        function test_numeric_passthrough(tc)
+            tc.verifyEqual(resolve_jwave_pml_size(17, 3e5, 2450, 0.75e-3), 17);
+        end
+
+    end
 end

@@ -1,4 +1,4 @@
-classdef test_group < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_group < matlab.unittest.TestCase
 % TEST_GROUP  Group-level helpers (functions/group) on synthetic inputs.
 %
 % Covers CHANGEM_VECTORIZED (label relabelling), DISCOVER_GROUP_SUBJECTS
@@ -14,12 +14,6 @@ classdef test_group < matlab.unittest.TestCase
         Dir
     end
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-        end
-    end
 
     methods (TestMethodSetup)
         function make_dir(tc)

@@ -1,4 +1,4 @@
-classdef test_neuronav_io < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_neuronav_io < matlab.unittest.TestCase
 % TEST_NEURONAV_IO  Localite I/O: folder layout, path keys and pose selection.
 %
 % Self-contained: builds synthetic Localite TriggerMarkers exports with known

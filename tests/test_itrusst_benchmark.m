@@ -1,4 +1,4 @@
-classdef test_itrusst_benchmark < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'itrusst'}) test_itrusst_benchmark < matlab.unittest.TestCase
 % TEST_ITRUSST_BENCHMARK  ITRUSST intercomparison benchmark 1 (water; bowl and piston sources).
 %
 % Runs benchmarks PH1-BM1-SC1 and -SC2 of Aubry et al. (2022), "Benchmark problems for
@@ -58,12 +58,6 @@ classdef test_itrusst_benchmark < matlab.unittest.TestCase
 
     methods (TestClassSetup)
         function load_reference(tc)
-            here = fileparts(mfilename('fullpath'));
-            repo = fileparts(here);
-            addpath(genpath(fullfile(repo, 'functions')));
-            addpath(genpath(fullfile(repo, 'external')));
-            addpath(fullfile(here, 'fixtures'));
-
             data = getenv('PRESTUS_ITRUSST_DATA');
             tc.assumeNotEmpty(data, 'PRESTUS_ITRUSST_DATA not set — skipping ITRUSST benchmark.');
             tc.Reference    = load_reference_field(tc, data, 1);

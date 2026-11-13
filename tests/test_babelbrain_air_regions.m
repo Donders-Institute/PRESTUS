@@ -1,4 +1,4 @@
-classdef test_babelbrain_air_regions < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelbrain_air_regions < matlab.unittest.TestCase
 % TEST_BABELBRAIN_AIR_REGIONS  Air mask written for BabelBrain's pseudoCT path (issue #102).
 %
 % Runs _write_air_regions from run_babelbrain_case.py on a synthetic CT:

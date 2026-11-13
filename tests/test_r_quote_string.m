@@ -1,4 +1,4 @@
-classdef test_r_quote_string < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_r_quote_string < matlab.unittest.TestCase
 % TEST_R_QUOTE_STRING  Unit tests for r_quote_string (R string-literal injection defense).
 %
 % Context: position_transducer_tus_entry.m generates a small R script by

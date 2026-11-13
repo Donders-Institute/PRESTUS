@@ -1,4 +1,4 @@
-classdef test_multitransducer_fov < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_multitransducer_fov < matlab.unittest.TestCase
 % TEST_MULTITRANSDUCER_FOV  Partial acoustic FOV and field combination with several transducers
 %
 %   acoustic_grid_fov       - coherent coupling: the FOV box holds every beam and

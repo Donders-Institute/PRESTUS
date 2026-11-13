@@ -1,4 +1,4 @@
-classdef test_shell_quote_arg < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_shell_quote_arg < matlab.unittest.TestCase
 % TEST_SHELL_QUOTE_ARG  Unit tests for shell_quote_arg (command-injection defense).
 %
 % Context: PRESTUS shells out to SimNIBS/pydeface/ANTs/BabelBrain/jwave via

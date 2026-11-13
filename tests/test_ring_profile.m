@@ -1,4 +1,4 @@
-classdef test_ring_profile < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_ring_profile < matlab.unittest.TestCase
 % TEST_RING_PROFILE  Within-ring velocity profile: geometry, fit, library round trip.
 %
 % Analytical only (no k-Wave); uses the real equipment YAMLs.
@@ -13,8 +13,6 @@ classdef test_ring_profile < matlab.unittest.TestCase
 
     methods (TestClassSetup)
         function setup(tc)
-            root = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(root, 'functions'))); addpath(genpath(fullfile(root, 'external')));
             tc.Equip = load_equipment_config();
             tc.Tran  = tc.Equip.trans.CTX_500_026;
             tc.Tmp   = tempname; mkdir(tc.Tmp);

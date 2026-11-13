@@ -1,4 +1,4 @@
-classdef test_transducer_library < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_transducer_library < matlab.unittest.TestCase
 % TEST_TRANSDUCER_LIBRARY  Unit tests for transducer serial resolution.
 %
 % Tests resolve_transducer_from_serial, the serial→geometry→library
@@ -19,8 +19,6 @@ classdef test_transducer_library < matlab.unittest.TestCase
         function setup_paths(tc)
             test_dir       = fileparts(mfilename('fullpath'));
             tc.repo_root   = fileparts(test_dir);
-            addpath(genpath(fullfile(tc.repo_root, 'functions')));
-            addpath(genpath(fullfile(tc.repo_root, 'external')));
             tc.equip_param  = load_equipment_config();
             tc.library_path = fullfile(tc.repo_root, 'config', 'calibration');
         end

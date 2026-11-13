@@ -1,4 +1,4 @@
-classdef test_water_baseline_box < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_water_baseline_box < matlab.unittest.TestCase
 % TEST_WATER_BASELINE_BOX  The free-water baseline on the beam box equals the full-grid one
 %
 % 2D k-Wave (MATLAB, CPU, seconds): a focused arc in water on a grid much

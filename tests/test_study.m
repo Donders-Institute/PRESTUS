@@ -1,4 +1,4 @@
-classdef test_study < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_study < matlab.unittest.TestCase
 % TEST_STUDY  Unit tests for the study (multi-subject) setup and group analysis.
 %
 %   Covers the study manifest reader, key/value config overrides (also via
@@ -265,6 +265,39 @@ classdef test_study < matlab.unittest.TestCase
             tc.verifyEqual(numel(strfind(txt, 'Section failed')), 0);
             tc.verifyEmpty(strfind(txt, 'id="compare"'), 'no comparison with a single condition');
         end
+    end
+
+    % study_read_manifest
+    methods (Test, TestTags = {'study'})
+
+        function test_manifest_keeps_labels_and_serials_as_text(tc)
+            f = fullfile(tc.tmp, 'manifest.tsv');
+            fid = fopen(f, 'w');
+            fprintf(fid, '# comment line\n');
+            fprintf(fid, 'subject_id\tplacement.localite.target\ttransducer.serial\ttransducer.target_isppa_wcm2\n');
+            fprintf(fid, '1\tno\t001\t30\n');
+            fclose(fid);
+            m = study_read_manifest(f);
+            ov = m.overrides{1};
+            tc.verifyEqual(ov{1, 2}, 'no');
+            tc.verifyEqual(ov{2, 2}, '001');
+            tc.verifyEqual(ov{3, 2}, 30);
+        end
+
+        function test_manifest_error_reports_file_line(tc)
+            f = fullfile(tc.tmp, 'manifest.tsv');
+            fid = fopen(f, 'w');
+            fprintf(fid, '# comment\n\nsubject_id\tcondition\n1\tA\textra\n');
+            fclose(fid);
+            try
+                study_read_manifest(f);
+                tc.verifyFail('Expected tooManyCells error');
+            catch ME
+                tc.verifyEqual(ME.identifier, 'study_read_manifest:tooManyCells');
+                tc.verifySubstring(ME.message, 'line 4');
+            end
+        end
+
     end
 end
 

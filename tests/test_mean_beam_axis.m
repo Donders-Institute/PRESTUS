@@ -1,4 +1,4 @@
-classdef test_mean_beam_axis < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_mean_beam_axis < matlab.unittest.TestCase
 % TEST_MEAN_BEAM_AXIS  Unit tests for MEAN_BEAM_AXIS (grid.mode = 'focal_axis'
 % orientation for several transducers).
 %

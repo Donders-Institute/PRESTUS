@@ -1,4 +1,4 @@
-classdef test_launchers < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_launchers < matlab.unittest.TestCase
 % TEST_LAUNCHERS  Dispatch logic of CALIBRATION_PIPELINE_START and a headless-safe PRESTUS_GUI smoke test.
 %
 % CALIBRATION_PIPELINE_START: unknown platform errors; 'matlab' calls
@@ -19,14 +19,6 @@ classdef test_launchers < matlab.unittest.TestCase
         StubDir
     end
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-            addpath(genpath(fullfile(repo, 'external')));
-            addpath(fullfile(repo, 'config'));
-        end
-    end
 
     methods (TestMethodSetup)
         function make_dir(tc)

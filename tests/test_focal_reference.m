@@ -1,4 +1,4 @@
-classdef test_focal_reference < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_focal_reference < matlab.unittest.TestCase
 % TEST_FOCAL_REFERENCE  Unit tests for the calibration.focal_reference convention
 % (FOCAL_REFERENCE_TO_FRAC, COMPUTE_FLHM_CENTER, COMPUTE_FOCAL_METRICS).
 %
@@ -105,6 +105,38 @@ classdef test_focal_reference < matlab.unittest.TestCase
 
     end
 
+
+    % plot_axial_profile: beam direction
+    methods (Test, TestTags = {'focal_reference'})
+
+        function test_minus_z_beam_gives_positive_depths(tc)
+            tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            % Transducer on the high-z face, beam travelling towards low z.
+            [p, Ipa, P, masks] = axial_profile_inputs(tmp);
+            exitplane_pos = [5 5 36];
+            focus_pos     = [5 5 16];
+            plot_axial_profile(Ipa, P, masks, p, exitplane_pos, focus_pos, focus_pos);
+
+            T = readtable(axial_csv(p));
+            d = T.depth_from_exit_plane_mm;
+            tc.verifyEqual(d(16), 20 * p.grid.resolution_mm, 'AbsTol', 1e-9);   % focus 20 vox deep
+            tc.verifyEqual(d(36), 0, 'AbsTol', 1e-9);                          % exit plane
+            tc.verifyLessThan(d(40), 0);                                       % behind transducer
+        end
+
+        function test_plus_z_beam_unchanged(tc)
+            tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            [p, Ipa, P, masks] = axial_profile_inputs(tmp);
+            exitplane_pos = [5 5 5];
+            focus_pos     = [5 5 25];
+            plot_axial_profile(Ipa, P, masks, p, exitplane_pos, focus_pos, focus_pos);
+
+            T = readtable(axial_csv(p));
+            d = T.depth_from_exit_plane_mm;
+            tc.verifyEqual(d, ((1:40)' - 5) * p.grid.resolution_mm, 'AbsTol', 1e-9);
+        end
+
+    end
 end
 
 % ====================================================================== %
@@ -120,4 +152,22 @@ function [Ipa, mask] = gaussian_volume()
     [x, y, z] = ndgrid(1:21, 1:21, 1:60);
     Ipa  = 10 * exp(-((x-11).^2 + (y-11).^2) / (2*2^2) - (z-30).^2 / (2*6^2));
     mask = true(size(Ipa));
+end
+
+function [p, Ipa, P, masks] = axial_profile_inputs(out_dir)
+    p = struct();
+    p.grid.resolution_mm = 0.5;
+    p.medium_properties = struct('water', struct(), 'brain', struct());
+    p.io.dir_img       = out_dir;
+    p.io.output_affix  = '_test';
+    p.subject_id       = 1;
+    p.simulation.medium = 'water';
+    Ipa   = rand(9, 9, 40);
+    P     = rand(9, 9, 40) * 1e5;
+    masks = ones(9, 9, 40);
+end
+
+function f = axial_csv(p)
+    f = fullfile(p.io.dir_img, sprintf('sub-%03d_%s_axial_profile%s.csv', ...
+        p.subject_id, p.simulation.medium, p.io.output_affix));
 end

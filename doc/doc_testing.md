@@ -6,9 +6,9 @@ PRESTUS is tested at five levels, from checks that take seconds and run on every
 |---|---|---|---|---|---|
 | 0 Static | Docs match the code, the site builds, the Nexus works | see [Level 0](#level-0-static-checks) | Python | ~2 min | CI, every push |
 | 1 Unit | Every function's logic, incl. config, placement, scaling, caches, HPC parsing, reports | `run_all_tests('unit')` | MATLAB | ~15 min (macOS, checkout on a network drive; less on a local disk) | CI, every push |
-| 2 Physics | The solver path reproduces analytic and published reference fields | `run_all_tests('physics')`, `('itrusst')` | MATLAB (+ ITRUSST data) | ~10 min (2D) | CI weekly; 3D on a GPU node before a release |
 | 3 Pipeline | Whole pipeline on synthetic and real data, numbers stable against a reference | `run_all_tests('water')` … `('demo_golden')` | k-Wave CPU; SimNIBS outputs; demo data | 10 min – hours | before a release |
 | 4 Backends | jwave / BabelBrain agree with k-Wave; Nexus ↔ MATLAB round trip | `runtests('tests/test_jwave.m')` etc. | conda envs, GPU, MATLAB | 10–60 min | after backend or environment changes |
+| 2 Physics | The solver path reproduces analytic and published reference fields | `run_all_tests('physics')`, `('itrusst')` | MATLAB (+ ITRUSST data) | ~5 min CPU (2D), plus the unit tests, which `run_all_tests('physics')` also runs | CI weekly; 3D on a GPU node before a release |
 
 ---
 
@@ -26,14 +26,14 @@ mkdocs build --strict -d /tmp/prestus-site        # site builds without warnings
 
 ---
 
-## Level 1: unit tests
+## Level 1: Unit Tests
 
 ```matlab
 cd tests
 run_all_tests          % same as run_all_tests('unit')
 ```
 
-No data, SimNIBS, k-Wave simulation or GPU is needed. `test_suite_wiring` fails if a `tests/test_*.m` file is neither part of a level nor listed as standalone in `run_all_tests.m`, so new tests cannot be forgotten.
+No data, SimNIBS, k-Wave simulation or GPU is needed. A failed test prints its full diagnostic; a skipped test prints why it was skipped.
 
 | Area | Files |
 |---|---|
@@ -46,10 +46,10 @@ No data, SimNIBS, k-Wave simulation or GPU is needed. `test_suite_wiring` fails 
 | Head model | `test_head_preprocessing`, `test_integration_headpreproc`, `test_deface_m2m` |
 | Thermal | `test_thermal_parameters`, `test_thermal_dose` (ISO CEM43 against Sapareto & Dewey values) |
 | Backends (logic only) | `test_babelbrain_insitu_isppa`, `test_babelbrain_thermal_timing`, `test_babelbrain_air_regions` (needs Python with numpy/scipy/nibabel; skipped otherwise) |
-| HPC | `test_hpc_job_report`, `test_parse_memory_tags`, `test_hpc_submit_parsing` |
+| HPC | `test_hpc_job_report`, `test_parse_memory_tags`, `test_hpc_submit` |
 | Security | `test_shell_quote_arg`, `test_r_quote_string`, `test_run_command`, `test_command_injection` |
 | Nexus MATLAB session | `test_nexus_bridge` (`nexus_bridge` protocol and allow-list, `nexus_neuronav` and `nexus_calibration` on synthetic data) |
-| Helpers, reports, regressions | `test_helper`, `test_numerical_fixes`, `test_reports`, `test_audit_fixes`, `test_suite_wiring` |
+| Helpers, reports, suite wiring | `test_helper`, `test_reports`, `test_suite_wiring` |
 
 ---
 
@@ -81,7 +81,7 @@ These check numbers, not just that code runs. Both use a focused bowl in lossles
 For the piston, every on-axis near-field maximum has the same amplitude (2 p₀), so the focal pressure and position are taken beyond half the near-field distance (a²/2λ), which leaves only the last axial maximum.
 
 ```matlab
-run_all_tests('physics')       % unit + test_physics_water (2D axisymmetric), ~10 min CPU
+run_all_tests('physics')       % unit + test_physics_water (2D axisymmetric, ~5 min CPU)
 setenv('PRESTUS_ITRUSST_DATA', '/path/to/INTERCOMPARISON-PH1-DATA-V1.0')
 run_all_tests('itrusst')       % 2D BM1 bowl + piston, 3D BM1 bowl
 run_all_tests('physics_3d')    % 3D O'Neil check
@@ -180,10 +180,16 @@ cd nexus && python -m pytest -q      # includes the MATLAB round trip when MATLA
 
 ---
 
-## Adding tests
+## Rules for New Tests
 
-- **New function or fix** → a `methods (Test)` block in the matching `test_*.m` (or a new file following the same `matlab.unittest.TestCase` pattern). Add a new file to a level in `run_all_tests.m`; `test_suite_wiring` fails otherwise.
+- **New function or fix** → a `methods (Test)` block in the `test_*.m` of the function's area; a new file only for a new area. `run_all_tests` finds every test class in `tests/` and runs a test at the levels its level tag belongs to (`prestus_test_levels.m`). Give each class the shared path fixture and one level tag, and add no `addpath` of its own:
+
+    ```matlab
+    classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_x < matlab.unittest.TestCase
+    ```
+
+    A file that spans levels tags each `methods (Test, TestTags = {...})` block instead; `standalone` marks tests no level runs. `test_suite_wiring` fails for a test without exactly one level tag.
 - **Anything that changes numbers** → extend a physics benchmark, or the golden metrics, so the change is visible.
-- **New pipeline stage** → a tagged method in `test_integration_pipeline.m` and, if it warrants it, a level in `run_all_tests.m`.
+- **New pipeline stage** → a tagged method in `test_integration_pipeline.m` and, if it warrants it, a level in `prestus_test_levels.m`.
 - **New demo subject or placement mode** → extend `test_integration_demo.m` with a private loader like `load_demo_config`.
 - Tests write only to `tempdir` (or `PRESTUS_DEMO_DATA/sim_outputs`) and skip, not fail, when optional data or tools are missing (`assume*`).

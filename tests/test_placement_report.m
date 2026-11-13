@@ -1,4 +1,4 @@
-classdef test_placement_report < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_placement_report < matlab.unittest.TestCase
 % TEST_PLACEMENT_REPORT  Tests for generate_placement_report and the PlanTUS
 %                        criteria evaluation (plantus_evaluation.py).
 %

@@ -1,4 +1,4 @@
-classdef test_coherent_drive_calibration < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_coherent_drive_calibration < matlab.unittest.TestCase
 % TEST_COHERENT_DRIVE_CALIBRATION  Unit tests for COHERENT_DRIVE_CALIBRATION:
 % each transducer's drive is set to its own ISPPA target before a coherent run.
 % The free-water simulation is replaced by a model: ISPPA ∝ amplitude² of the

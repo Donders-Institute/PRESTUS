@@ -1,4 +1,4 @@
-classdef test_telemetry < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_telemetry < matlab.unittest.TestCase
 % TEST_TELEMETRY  Opt-in telemetry: consent handling, non-interactive path, no network without consent.
 %
 % Covers TELEMETRY_SETUP (recorded decision -> silent; SLURM/PBS job or
@@ -28,12 +28,6 @@ classdef test_telemetry < matlab.unittest.TestCase
         WebLog      % file the stub appends requests to
     end
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-        end
-    end
 
     methods (TestMethodSetup)
         function isolate(tc)

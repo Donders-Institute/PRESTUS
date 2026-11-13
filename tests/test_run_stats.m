@@ -1,4 +1,4 @@
-classdef test_run_stats < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_run_stats < matlab.unittest.TestCase
 % TEST_RUN_STATS  Unit tests for functions/helper/run_stats
 %
 % run_stats collects what a run simulated and appends one JSON line to

@@ -1,10 +1,9 @@
-classdef test_config_tutorial < matlab.unittest.TestCase
-% TEST_CONFIG_TUTORIAL  config_tutorial.yaml loads through LOAD_PARAMETERS with its positions (audit B4).
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_config_tutorial < matlab.unittest.TestCase
+% TEST_CONFIG_TUTORIAL  config_tutorial.yaml loads through LOAD_PARAMETERS with its positions.
 %
-% The tutorial config once nested trans_pos/focus_pos under
-% transducer.position, a path nothing reads, so the positions were silently
-% lost. test_audit_fixes checks the raw YAML; this test checks the merged
-% parameters that SIMPLE_MAIN and the pipeline actually receive.
+% Checks the merged parameters that SIMPLE_MAIN and the pipeline receive
+% (positions at transducer level, settings merged) and that the files the
+% raw YAML names exist.
 %
 %   results = runtests('tests/test_config_tutorial.m');
 
@@ -15,9 +14,6 @@ classdef test_config_tutorial < matlab.unittest.TestCase
     methods (TestClassSetup)
         function load_tutorial(tc)
             repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-            addpath(genpath(fullfile(repo, 'external')));
-            addpath(fullfile(repo, 'config'));
             addpath(fullfile(repo, 'config', 'equipment'));
             % The tutorial's anat/SimNIBS paths are placeholders: missing-path
             % warnings are expected here.
@@ -71,4 +67,17 @@ classdef test_config_tutorial < matlab.unittest.TestCase
 
     end
 
+
+    % Raw tutorial YAML
+    methods (Test, TestTags = {'config_tutorial'})
+
+        function test_matrix_shape_file_exists(tc)
+            repo = fileparts(fileparts(mfilename('fullpath')));
+            cfg = yaml.loadFile(fullfile(repo, 'config', 'config_tutorial.yaml'), ...
+                'ConvertToArray', true);
+            f = cfg.transducer.matrix.matrix_shape.extract_from_file.file_path;
+            tc.verifyTrue(isfile(fullfile(repo, 'config', 'equipment', f)));
+        end
+
+    end
 end

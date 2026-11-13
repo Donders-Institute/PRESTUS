@@ -1,4 +1,4 @@
-classdef test_config_upgrade < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_config_upgrade < matlab.unittest.TestCase
 % TEST_CONFIG_UPGRADE  Conversion of config keys from PRESTUS v0.5.0 onwards.
 %
 % Covers UPGRADE_CONFIG_KEYS and CONFIG_DEPRECATIONS: the default configs of
@@ -20,8 +20,6 @@ classdef test_config_upgrade < matlab.unittest.TestCase
         function add_paths(tc)
             tc.Repo = fileparts(fileparts(mfilename('fullpath')));
             tc.Fixtures = fullfile(tc.Repo, 'tests', 'fixtures', 'config_history');
-            addpath(genpath(fullfile(tc.Repo, 'functions')));
-            addpath(genpath(fullfile(tc.Repo, 'external')));
         end
     end
 

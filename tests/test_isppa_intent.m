@@ -1,4 +1,4 @@
-classdef test_isppa_intent < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_isppa_intent < matlab.unittest.TestCase
 % TEST_ISPPA_INTENT  The run states which free-water ISPPA it models.
 %
 % Covers ISPPA_INTENT (target vs. the calibration ISPPA of the drive) and the
@@ -9,12 +9,6 @@ classdef test_isppa_intent < matlab.unittest.TestCase
 %
 %   results = runtests('tests/test_isppa_intent.m');
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-        end
-    end
 
     methods (Static, Access = private)
         function p = params(target, cal, default)

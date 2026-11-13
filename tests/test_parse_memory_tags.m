@@ -1,4 +1,4 @@
-classdef test_parse_memory_tags < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_parse_memory_tags < matlab.unittest.TestCase
 % TEST_PARSE_MEMORY_TAGS  Unit tests for functions/helper/parse_memory_tags
 %
 %   Run with:   results = runtests('tests/test_parse_memory_tags.m');

@@ -1,4 +1,4 @@
-classdef test_transducer_placement < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}) test_transducer_placement < matlab.unittest.TestCase
 % TEST_TRANSDUCER_PLACEMENT  Tests for preproc_transducer_placement dispatch.
 %
 %   Manual-mode tests run without any data files. Localite-mode tests
@@ -14,7 +14,7 @@ classdef test_transducer_placement < matlab.unittest.TestCase
     end
 
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'placement', 'manual'})
+    methods (Test, TestTags = {'unit', 'placement', 'manual'})
 
         function test_manual_mode_is_passthrough(tc)
             % trans_pos and focus_pos must be unchanged after manual placement
@@ -115,7 +115,7 @@ classdef test_transducer_placement < matlab.unittest.TestCase
     end
 
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'placement', 'localite'})
+    methods (Test, TestTags = {'head', 'placement', 'localite'})
 
         function test_localite_matrix_to_positions_identity(tc)
             % localite_matrix_to_positions with an identity translation should

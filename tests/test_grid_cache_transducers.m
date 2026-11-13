@@ -1,4 +1,4 @@
-classdef test_grid_cache_transducers < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_grid_cache_transducers < matlab.unittest.TestCase
 % TEST_GRID_CACHE_TRANSDUCERS  LOAD_GRID_CACHE_FILE keeps a run's own transducer
 % settings when it reuses another run's grid: only the grid-space positions
 % come from the cache.
@@ -12,7 +12,6 @@ classdef test_grid_cache_transducers < matlab.unittest.TestCase
     methods (Test, TestTags = {'cache'})
 
         function test_caller_settings_cached_positions(tc)
-            addpath(fullfile(fileparts(mfilename('fullpath')), 'fixtures'));
             tmp = tempname; mkdir(tmp);
             tc.addTeardown(@() rmdir(tmp, 's'));
             p = make_minimal_parameters(tmp);
@@ -49,7 +48,6 @@ classdef test_grid_cache_transducers < matlab.unittest.TestCase
         function test_cached_bilateral_positions(tc)
             % An axisymmetric grid cache also restores the bilateral snapshot
             % that the axisymmetric expansion and the thermal stage read.
-            addpath(fullfile(fileparts(mfilename('fullpath')), 'fixtures'));
             tmp = tempname; mkdir(tmp);
             tc.addTeardown(@() rmdir(tmp, 's'));
             p = make_minimal_parameters(tmp);
@@ -78,7 +76,6 @@ classdef test_grid_cache_transducers < matlab.unittest.TestCase
             % The grid stage's outputs come from the cache; the run's other
             % grid settings stay (a partial FOV on a full-grid run's cache, or
             % none for a job reading a back-projected field).
-            addpath(fullfile(fileparts(mfilename('fullpath')), 'fixtures'));
             tmp = tempname; mkdir(tmp);
             tc.addTeardown(@() rmdir(tmp, 's'));
             p = make_minimal_parameters(tmp);

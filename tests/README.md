@@ -22,5 +22,6 @@ run_all_tests('demo_golden')   % key metrics vs. stored reference
 
 From a shell (CI): `matlab -batch "cd tests; run_all_tests('unit')"`.
 
-Every new `test_*.m` must be added to a level in `run_all_tests.m` (or its list of
-standalone suites); `test_suite_wiring` fails otherwise.
+Tests are selected by level tag (`prestus_test_levels.m`): give a new test class
+`SharedTestFixtures = {prestus_paths}` and one level tag, e.g. `TestTags = {'unit'}`;
+`test_suite_wiring` fails for a test without exactly one level tag.

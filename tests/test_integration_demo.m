@@ -1,4 +1,4 @@
-classdef test_integration_demo < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}) test_integration_demo < matlab.unittest.TestCase
 % TEST_INTEGRATION_DEMO  Integration tests using real demo data (sub-009).
 %
 %   Uses a standardised test-data root outside the PRESTUS repository.
@@ -38,9 +38,6 @@ classdef test_integration_demo < matlab.unittest.TestCase
         function resolve_paths(tc)
             test_dir     = fileparts(mfilename('fullpath'));
             tc.repo_root = fileparts(test_dir);
-            addpath(genpath(fullfile(tc.repo_root, 'functions')));
-            addpath(fullfile(tc.repo_root, 'config'));
-            addpath(genpath(fullfile(tc.repo_root, 'external')));
         end
     end
 

@@ -1,4 +1,4 @@
-classdef test_physics_water < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}) test_physics_water < matlab.unittest.TestCase
 % TEST_PHYSICS_WATER  Free-water acoustic benchmarks of the full PRESTUS pipeline.
 %
 % A single-element focused bowl in lossless water (the ITRUSST BM1 source: ROC
@@ -50,15 +50,6 @@ classdef test_physics_water < matlab.unittest.TestCase
             'threed', struct('focus_mm', 1.0, 'peak_rel', 0.05, 'length_rel', 0.10))
     end
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            here = fileparts(mfilename('fullpath'));
-            repo = fileparts(here);
-            addpath(genpath(fullfile(repo, 'functions')));
-            addpath(genpath(fullfile(repo, 'external')));
-            addpath(fullfile(here, 'fixtures'));
-        end
-    end
 
     %% Axisymmetric
     methods (Test, TestTags = {'physics_axisym'})

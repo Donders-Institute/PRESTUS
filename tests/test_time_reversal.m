@@ -1,4 +1,4 @@
-classdef test_time_reversal < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_time_reversal < matlab.unittest.TestCase
 % TEST_TIME_REVERSAL  Unit tests for the time-reversal / reciprocity functions
 %
 % Synthetic fields only (no k-Wave run): free-space Green's functions over the

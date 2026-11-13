@@ -1,16 +1,9 @@
-classdef test_matrix_transducer < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_matrix_transducer < matlab.unittest.TestCase
 % TEST_MATRIX_TRANSDUCER  Unit tests for matrix-array geometry options (issue #114)
 % and transducer markers outside the plotted image (issue #130).
 %
 %   results = runtests('tests/test_matrix_transducer.m');
 
-    methods (TestClassSetup)
-        function setup_paths(tc) %#ok<MANU>
-            repo_root = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo_root, 'functions')));
-            addpath(genpath(fullfile(repo_root, 'external', 'k-wave')));
-        end
-    end
 
     methods (Test)
 

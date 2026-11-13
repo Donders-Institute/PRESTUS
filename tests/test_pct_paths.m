@@ -1,4 +1,4 @@
-classdef test_pct_paths < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_pct_paths < matlab.unittest.TestCase
 % TEST_PCT_PATHS  Pseudo-CT location: GET_PCT_DIR and FIND_PSEUDOCT_DIR.
 %
 % The pseudo-CT goes to <path.pct>/sub-NNN, or <parent of path.seg>/pct/sub-NNN

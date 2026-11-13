@@ -1,4 +1,4 @@
-classdef test_integration_water < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'water'}) test_integration_water < matlab.unittest.TestCase
 % TEST_INTEGRATION_WATER  End-to-end water pipeline integration test.
 %
 %   Runs the full prestus_pipeline with simulation.medium = 'water' using a
@@ -15,7 +15,6 @@ classdef test_integration_water < matlab.unittest.TestCase
 
     methods (TestMethodSetup)
         function setup(tc)
-            addpath(fullfile(fileparts(mfilename('fullpath')), 'fixtures'));
             tc.SimPath = fullfile(tempdir, sprintf('prestus_water_test_%s', ...
                                   datestr(now, 'yyyymmdd_HHMMSS')));
             mkdir(tc.SimPath);

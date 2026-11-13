@@ -1,4 +1,4 @@
-classdef test_babelbrain < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'standalone'}) test_babelbrain < matlab.unittest.TestCase
 % TEST_BABELBRAIN  Staged integration tests for the PRESTUS–BabelBrain backend.
 %
 % Covers five progressively deeper stages:

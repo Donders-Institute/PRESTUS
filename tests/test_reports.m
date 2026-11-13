@@ -1,4 +1,4 @@
-classdef test_reports < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_reports < matlab.unittest.TestCase
 % TEST_REPORTS  Unit/smoke tests for the HTML report generators.
 %
 %   Covers the report enhancements: the new safety metrics (TIC, ΔT-from-37),
@@ -193,6 +193,18 @@ classdef test_reports < matlab.unittest.TestCase
             iMI = strfind(txt, 'MI (transcranial)'); iTIC = strfind(txt, 'Cranial TI (TIC)');
             tc.verifyTrue(iMI(1) > iDash(1) && iMI(1) < iOther(1), 'MI should be in the Safety dashboard');
             tc.verifyTrue(iTIC(1) > iOther(1), 'TIC should be in the Other section');
+        end
+
+    end
+
+    % html_utils escaping
+    methods (Test, TestTags = {'reports'})
+
+        function test_script_json_cannot_close_script_block(tc)
+            j = html_utils.script_json(struct('label', '</script><script>alert(1)</script>'));
+            tc.verifyEmpty(strfind(j, '</'));
+            tc.verifyEqual(jsondecode(j).label, '</script><script>alert(1)</script>');
+            tc.verifyEqual(html_utils.escape('a''b'), 'a&#39;b');
         end
 
     end

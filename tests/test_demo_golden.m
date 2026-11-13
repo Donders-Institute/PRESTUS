@@ -1,4 +1,4 @@
-classdef test_demo_golden < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}) test_demo_golden < matlab.unittest.TestCase
 % TEST_DEMO_GOLDEN  Compare demo-subject key metrics with a stored reference.
 %
 % The demo tests (test_integration_demo, tags demo_acoustic / demo_thermal)
@@ -35,8 +35,6 @@ classdef test_demo_golden < matlab.unittest.TestCase
 
     methods (TestClassSetup)
         function setup(tc)
-            here = fileparts(mfilename('fullpath'));
-            addpath(genpath(fullfile(fileparts(here), 'functions')));
             tc.DataRoot = getenv('PRESTUS_DEMO_DATA');
             tc.assumeNotEmpty(tc.DataRoot, 'PRESTUS_DEMO_DATA not set — skipping golden metrics.');
         end

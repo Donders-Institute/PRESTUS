@@ -1,4 +1,4 @@
-classdef test_deface_m2m < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_deface_m2m < matlab.unittest.TestCase
 % TEST_DEFACE_M2M  Unit tests for preproc_deface_m2m.
 %
 %   Tests use a temporary fake m2m folder and a stub pydeface binary —

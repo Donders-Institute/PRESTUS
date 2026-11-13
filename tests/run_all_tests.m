@@ -1,11 +1,11 @@
 %% RUN_ALL_TESTS  Entry point for the PRESTUS test suite.
 %
-%   Usage (from repo root or tests/ folder):
+%   Usage (from the tests/ folder, or with it on the path):
 %
 %     run_all_tests              % unit tests only (default)
 %     run_all_tests('unit')      % same as above
 %     run_all_tests('water')     % unit + water pipeline (no MRI/SimNIBS needed)
-%     run_all_tests('head')      % water + smoke_config + smoke_head
+%     run_all_tests('head')      % water + full placement + smoke_config + smoke_head
 %     run_all_tests('acoustic')  % head + smoke_acoustic
 %     run_all_tests('all')       % full suite including thermal
 %     run_all_tests('physics')   % unit + free-water physics benchmarks (2D axisymmetric,
@@ -33,417 +33,104 @@
 %   Environment variables (for demo levels):
 %     PRESTUS_DEMO_DATA   — path to prestus_testdata root folder
 %
-%   The script exits with a non-zero status on any failure, making it
-%   suitable for CI:
+%   Tests are selected by level tag (PRESTUS_TEST_LEVELS): every test class in
+%   tests/ is found automatically. Failures print the full test diagnostics.
+%   The function errors on any failure, making it suitable for CI:
 %     matlab -batch "run_all_tests"
+%
+%   results = run_all_tests(...) also returns the TestResult array.
+%
+% See also: PRESTUS_TEST_LEVELS, PRESTUS_PATHS, TEST_SUITE_WIRING
 
-function run_all_tests(level)
+function results = run_all_tests(level)
 
-    if nargin < 1
-        level = 'unit';
+    arguments
+        level (1,:) char = 'unit'
     end
 
-    % Flush MATLAB's function cache so tests always run against the files
-    % currently on disk, not a version loaded earlier in the session.
+    import matlab.unittest.TestRunner
+    import matlab.unittest.TestSuite
+    import matlab.unittest.selectors.HasTag
+    import matlab.unittest.plugins.DiagnosticsRecordingPlugin
+
     clear functions %#ok<CLFUNC>
 
-    % Any test that exercises prestus_pipeline() (water/head/acoustic/all,
-    % physics, demo levels) emits telemetry like a real run would; tag it
-    % 'technical' so test pass/fail rates are reported separately from
-    % deployment usage (see telemetry_run_type.m).
     orig_run_type = getenv('PRESTUS_RUN_TYPE');
     setenv('PRESTUS_RUN_TYPE', 'technical');
-    restore_run_type = onCleanup(@() setenv('PRESTUS_RUN_TYPE', orig_run_type)); %#ok<NASGU>
+    restore_run_type = onCleanup(@() setenv('PRESTUS_RUN_TYPE', orig_run_type));
 
-    % ---- Resolve paths ------------------------------------------------
-    here      = fileparts(mfilename('fullpath'));
-    repo_root = fileparts(here);
-    addpath(genpath(fullfile(repo_root, 'functions')));
-    addpath(fullfile(repo_root, 'config'));
-    addpath(genpath(fullfile(repo_root, 'external')));
-    addpath(fullfile(here, 'fixtures'));
-
-    % ---- Select test files and tags by level --------------------------
-    unit_suites = [ ...
-        testsuite(fullfile(here, 'test_helper.m')), ...
-        testsuite(fullfile(here, 'test_thermal_parameters.m')), ...
-        testsuite(fullfile(here, 'test_transform.m')), ...
-        testsuite(fullfile(here, 'test_load_parameters.m')), ...
-        testsuite(fullfile(here, 'test_head_preprocessing.m')), ...
-        testsuite(fullfile(here, 'test_deface_m2m.m')), ...
-        testsuite(fullfile(here, 'test_hpc_job_report.m')), ...
-        testsuite(fullfile(here, 'test_run_stats.m')), ...
-        testsuite(fullfile(here, 'test_parse_memory_tags.m')), ...
-        testsuite(fullfile(here, 'test_shell_quote_arg.m')), ...
-        testsuite(fullfile(here, 'test_r_quote_string.m')), ...
-        testsuite(fullfile(here, 'test_run_command.m')), ...
-        testsuite(fullfile(here, 'test_command_injection.m')), ...
-        testsuite(fullfile(here, 'test_audit_fixes.m')), ...
-        testsuite(fullfile(here, 'test_focal_reference.m')), ...
-        testsuite(fullfile(here, 'test_neuronav_io.m')), ...
-        testsuite(fullfile(here, 'test_neuronav_batch.m')), ...
-        testsuite(fullfile(here, 'test_nexus_bridge.m')), ...
-        testsuite(fullfile(here, 'test_calibration_session.m')), ...
-        testsuite(fullfile(here, 'test_numerical_fixes.m')), ...
-        testsuite(fullfile(here, 'test_cw_source_matrix.m')), ...
-        testsuite(fullfile(here, 'test_time_reversal.m')), ...
-        testsuite(fullfile(here, 'test_water_baseline_box.m')), ...
-        testsuite(fullfile(here, 'test_elastic_backend.m')), ...
-        testsuite(fullfile(here, 'test_reports.m')), ...
-        testsuite(fullfile(here, 'test_study.m')), ...
-        testsuite(fullfile(here, 'test_placement_report.m')), ...
-        testsuite(fullfile(here, 'test_placement_paths.m')), ...
-        testsuite(fullfile(here, 'test_pct_paths.m')), ...
-        testsuite(fullfile(here, 'test_pct_density_calibration.m')), ...
-        testsuite(fullfile(here, 'test_matrix_transducer.m')), ...
-        testsuite(fullfile(here, 'test_steering_correction.m')), ...
-        testsuite(fullfile(here, 'test_library_conditions.m')), ...
-        testsuite(fullfile(here, 'test_uncertainty_medium_config.m')), ...
-        testsuite(fullfile(here, 'test_pct_uncertainty.m')), ...
-        testsuite(fullfile(here, 'test_babelbrain_air_regions.m')), ...
-        testsuite(fullfile(here, 'test_transducer_library.m')), ...
-        testsuite(fullfile(here, 'test_ring_profile.m')), ...
-        testsuite(fullfile(here, 'test_transducer_model.m'), 'Tag', 'model'), ...
-        testsuite(fullfile(here, 'test_babelbrain_insitu_isppa.m')), ...
-        testsuite(fullfile(here, 'test_babelbrain_thermal_timing.m')), ...
-        testsuite(fullfile(here, 'test_integration_headpreproc.m')), ...
-        testsuite(fullfile(here, 'test_plantus_placement.m'), 'Tag', 'validation'), ...
-        testsuite(fullfile(here, 'test_plantus_placement.m'), 'Tag', 'dispatch'), ...
-        testsuite(fullfile(here, 'test_isppa_policy.m')), ...
-        testsuite(fullfile(here, 'test_isppa_intent.m')), ...
-        testsuite(fullfile(here, 'test_outputs_follow_recompute.m')), ...
-        testsuite(fullfile(here, 'test_grid_mm_to_voxel.m')), ...
-        testsuite(fullfile(here, 'test_config_layering.m')), ...
-        testsuite(fullfile(here, 'test_config_upgrade.m')), ...
-        testsuite(fullfile(here, 'test_cache_signature.m')), ...
-        testsuite(fullfile(here, 'test_stage_sidecars.m')), ...
-        testsuite(fullfile(here, 'test_thermal_dose.m')), ...
-        testsuite(fullfile(here, 'test_hpc_submit_parsing.m')), ...
-        testsuite(fullfile(here, 'test_placement_positions.m')), ...
-        testsuite(fullfile(here, 'test_multitransducer_fov.m')), ...
-        testsuite(fullfile(here, 'test_mean_beam_axis.m')), ...
-        testsuite(fullfile(here, 'test_babelbrain_geometry.m')), ...
-        testsuite(fullfile(here, 'test_babelbrain_weights.m')), ...
-        testsuite(fullfile(here, 'test_coherent_drive_calibration.m')), ...
-        testsuite(fullfile(here, 'test_grid_cache_transducers.m')), ...
-        testsuite(fullfile(here, 'test_axisymmetric_phantom.m')), ...
-        testsuite(fullfile(here, 'test_uncertainty_nesting.m')), ...
-        testsuite(fullfile(here, 'test_stage_drivers.m')), ...
-        testsuite(fullfile(here, 'test_telemetry.m')), ...
-        testsuite(fullfile(here, 'test_group.m')), ...
-        testsuite(fullfile(here, 'test_medium.m')), ...
-        testsuite(fullfile(here, 'test_ras_round_trip.m')), ...
-        testsuite(fullfile(here, 'test_config_tutorial.m')), ...
-        testsuite(fullfile(here, 'test_launchers.m')), ...
-        testsuite(fullfile(here, 'test_babelbrain_modes.m')), ...
-        testsuite(fullfile(here, 'test_suite_wiring.m'))];
-
-    % Standalone suites, run with runtests directly because they need a
-    % BabelBrain / jwave Python environment or a GPU (doc_testing.md):
-    %   test_babelbrain.m, test_jwave.m
-    % test_suite_wiring checks that every tests/test_*.m appears in this file.
-
-    % Slower checks that still need no data: optimiser fits, the mocked
-    % PlanTUS subprocess run (skipped without Python 3) and a two-transducer
-    % kWaveArray source build.
-    extended_suites = [ ...
-        testsuite(fullfile(here, 'test_transducer_model.m'), 'Tag', 'fit'), ...
-        testsuite(fullfile(here, 'test_plantus_placement.m'), 'Tag', 'integration'), ...
-        testsuite(fullfile(here, 'test_source_multi_transducer.m'))];   % k-Wave source build, ~30 s
-
-    integration_file  = fullfile(here, 'test_integration_pipeline.m');
-    water_test_file   = fullfile(here, 'test_integration_water.m');
-    isppa_test_file   = fullfile(here, 'test_isppa_rescaling.m');
-    placement_test_file = fullfile(here, 'test_transducer_placement.m');
-    demo_test_file    = fullfile(here, 'test_integration_demo.m');
-    physics_test_file = fullfile(here, 'test_physics_water.m');
-    itrusst_test_file = fullfile(here, 'test_itrusst_benchmark.m');
-    golden_test_file  = fullfile(here, 'test_demo_golden.m');
-
-    switch lower(level)
-        case 'unit'
-            suites = [unit_suites, ...
-                      testsuite(placement_test_file, 'Tag', 'manual')];
-        case 'water'
-            suites = [unit_suites, extended_suites, ...
-                      testsuite(placement_test_file, 'Tag', 'manual'), ...
-                      testsuite(water_test_file), ...
-                      testsuite(isppa_test_file)];
-        case 'head'
-            suites = [unit_suites, extended_suites, ...
-                      testsuite(placement_test_file), ...
-                      testsuite(water_test_file), ...
-                      testsuite(isppa_test_file), ...
-                      testsuite(integration_file, 'Tag', 'smoke_config'), ...
-                      testsuite(integration_file, 'Tag', 'smoke_head')];
-        case 'acoustic'
-            suites = [unit_suites, extended_suites, ...
-                      testsuite(placement_test_file), ...
-                      testsuite(water_test_file), ...
-                      testsuite(isppa_test_file), ...
-                      testsuite(integration_file, 'Tag', 'smoke_config'), ...
-                      testsuite(integration_file, 'Tag', 'smoke_head'), ...
-                      testsuite(integration_file, 'Tag', 'smoke_acoustic')];
-        case 'all'
-            suites = [unit_suites, extended_suites, ...
-                      testsuite(placement_test_file), ...
-                      testsuite(water_test_file), ...
-                      testsuite(isppa_test_file), ...
-                      testsuite(integration_file)];
-        case 'demo_inputs'
-            suites = testsuite(demo_test_file, 'Tag', 'demo_inputs');
-        case 'demo_config'
-            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_config')];
-        case 'demo_localite'
-            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_config'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_localite')];
-        case 'demo_pct'
-            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_pct')];
-        case 'demo_head'
-            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_config'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_localite'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_pct'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_head')];
-        case 'demo_acoustic'
-            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_config'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_localite'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_pct'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_head'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_acoustic')];
-        case 'demo_thermal'
-            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_config'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_acoustic'), ...
-                      testsuite(demo_test_file, 'Tag', 'demo_thermal')];
-        case 'physics'
-            suites = [unit_suites, ...
-                      testsuite(physics_test_file, 'Tag', 'physics_axisym')];
-        case 'physics_3d'
-            suites = testsuite(physics_test_file, 'Tag', 'physics_3d');
-        case 'itrusst'
-            suites = testsuite(itrusst_test_file);
-        case 'demo_golden'
-            suites = [testsuite(demo_test_file, 'Tag', 'demo_inputs'), ...
-                      testsuite(golden_test_file)];
-        case 'slurm_live'
-            suites = testsuite(fullfile(here, 'test_hpc_job_report.m'), 'Tag', 'slurm_live');
-        otherwise
-            error('Unknown level ''%s''. Use: unit | water | head | acoustic | all | physics | physics_3d | itrusst | slurm_live | demo_inputs | demo_config | demo_localite | demo_pct | demo_head | demo_acoustic | demo_thermal | demo_golden', level);
+    levels = prestus_test_levels();
+    level = lower(level);
+    if ~isKey(levels, level)
+        error('run_all_tests:unknownLevel', 'Unknown level ''%s''. Use one of: %s', ...
+              level, strjoin(levels.keys, ' | '));
     end
 
-    % ---- Run ----------------------------------------------------------
-    % Suppress warnings that are expected/irrelevant during testing
+    tags = levels(level);
+    selector = HasTag(tags{1});
+    for k = 2:numel(tags)
+        selector = selector | HasTag(tags{k});
+    end
+    suite = TestSuite.fromFolder(fileparts(mfilename('fullpath')), selector);
+
     prev_warn = warning('off', 'prestus:toolboxDefault');
     warning('off', 'prestus:noSimNIBS');
+    restore_warn = onCleanup(@() warning(prev_warn));
 
-    runner  = matlab.unittest.TestRunner.withNoPlugins();
-    results = runner.run(suites);
+    runner = TestRunner.withNoPlugins();
+    runner.addPlugin(DiagnosticsRecordingPlugin());
+    results = runner.run(suite);
 
-    warning(prev_warn);
+    print_summary(results, level);
 
-    % ---- Per-test output ----------------------------------------------
-    descriptions = build_descriptions();
-
-    fprintf('\n========================================\n');
-    fprintf('  PRESTUS test suite — level: %s\n', upper(level));
-    fprintf('========================================\n');
-
-    for i = 1:numel(results)
-        r    = results(i);
-        name = r.Name;
-
-        % Strip "classdef/method" → "method" for display
-        parts = strsplit(name, '/');
-        method = parts{end};
-
-        % Look up human-readable description; fall back to method name
-        if isKey(descriptions, method)
-            label = descriptions(method);
-        else
-            label = method;
-        end
-
-        % Failed before Incomplete: an error marks a test both failed and
-        % incomplete, and must show as FAIL, not SKIP.
-        if r.Passed
-            status = 'PASS';
-        elseif r.Failed
-            status = 'FAIL';
-        else
-            status = 'SKIP';
-        end
-
-        fprintf('  [%s]  %s\n', status, label);
-
-        if r.Failed && isfield(r.Details, 'DiagnosticRecord') && ~isempty(r.Details.DiagnosticRecord)
-            for d = r.Details.DiagnosticRecord
-                if ~isempty(d.Exception)
-                    fprintf('         -> %s\n', d.Exception.message);
-                end
-            end
-        end
-    end
-
-    % ---- Summary ------------------------------------------------------
-    n_pass = sum([results.Passed]);
     n_fail = sum([results.Failed]);
-    n_skip = sum([results.Incomplete] & ~[results.Failed]);   % errors count as failed only
-
-    fprintf('----------------------------------------\n');
-    fprintf('  Passed: %d   Failed: %d   Skipped: %d\n', n_pass, n_fail, n_skip);
-    fprintf('========================================\n\n');
-
     if n_fail > 0
         error('run_all_tests:failures', '%d test(s) failed.', n_fail);
     end
-
+    if nargout == 0
+        clear results
+    end
 end
 
-% =========================================================================
-function m = build_descriptions()
-% Returns a containers.Map of test method name → human-readable description.
-    keys = {
-        % --- test_load_parameters ---
-        'test_default_config_loads',                'Default config loads without error'
-        'test_top_level_keys_present',              'Default config contains all required top-level sections'
-        'test_simulation_defaults',                 'simulation.medium / code_type / precision / interactive defaults are correct'
-        'test_modules_defaults',                    'Module enable flags match documented defaults'
-        'test_grid_defaults',                       'Grid resolution, PML size, and kWaveArray defaults are correct'
-        'test_hpc_defaults',                        'HPC wait_checks and wait_for_job defaults are correct'
-        'test_study_config_overrides_default',      'Study-config override replaces default value (medium -> water)'
-        'test_override_does_not_clobber_unrelated_fields', 'Override does not disturb unrelated fields (grid resolution)'
-        'test_output_affix_sanitized',              'output_affix with illegal chars is sanitized to alphanumeric/underscore'
-        'test_output_affix_valid_passthrough',      'Valid output_affix passes through unchanged'
-        % --- test_helper ---
-        'test_round_if_integer_exact',              'round_if_integer: exact integer value rounds correctly'
-        'test_round_if_integer_within_tolerance',   'round_if_integer: near-integer within tolerance is accepted'
-        'test_round_if_integer_array',              'round_if_integer: element-wise rounding works for [1.0, 2.0]'
-        'test_round_if_integer_non_integer_errors', 'round_if_integer: non-integer input raises an error'
-        'test_find_min_factor_power_of_two',        'find_min_factor: prefers 128 (power of 2) over primes in [120,130]'
-        'test_find_min_factor_single_element_range','find_min_factor: single-value range returns that value'
-        'test_find_min_factor_returns_value_in_range','find_min_factor: result falls within the requested range'
-        'test_get_crop_dims_single_voxel',          'get_crop_dims: single-voxel mask with margin gives correct bounds'
-        'test_get_crop_dims_cuboid_object',         'get_crop_dims: cuboid mask with margin gives correct min/max corners'
-        'test_get_crop_dims_grid_size_consistent',  'get_crop_dims: returned size equals max - min + 1'
-        'test_masked_max_3d_known_location',        'masked_max_3d: finds correct value and voxel index in full mask'
-        'test_masked_max_3d_mask_excludes_true_max','masked_max_3d: mask excludes true global max, returns in-mask max'
-        'test_charm_seg_labels_returns_struct',     'charm_seg_labels: returns a struct'
-        'test_charm_seg_labels_expected_fields',    'charm_seg_labels: has all expected tissue fields'
-        'test_charm_seg_labels_values',             'charm_seg_labels: numeric label values are correct'
-        'test_flhm_symmetric_gaussian',             'get_flhm_center_position: Gaussian at 0 gives centre = 0'
-        'test_flhm_shifted_gaussian',               'get_flhm_center_position: Gaussian at 10 gives centre = 10'
-        'test_cast_struct_single_level',            'cast_struct: top-level numeric fields cast to target type'
-        'test_cast_struct_nested',                  'cast_struct: nested numeric fields cast to target type'
-        'test_cast_struct_preserves_non_numeric',   'cast_struct: non-numeric fields (char) are left unchanged'
-        'test_get_xyz_mesh_size',                   'get_xyz_mesh: output has N_vox rows and 3 columns'
-        'test_get_xyz_mesh_range',                  'get_xyz_mesh: coordinate ranges span [1, dim] for each axis'
-        'test_zip_fields_order',                    'zip_fields: interleaves fieldnames and values in order'
-        'test_subset_fields_copies_requested',      'subset_fields: copies only the requested fields'
-        % --- test_thermal_parameters ---
-        'test_duty_cycle',                          'thermal_parameters: duty cycle = pd / pri'
-        'test_prf',                                 'thermal_parameters: pulse repetition frequency = 1 / pri'
-        'test_pulses_per_train',                    'thermal_parameters: pulse count per train = ptd / pri'
-        'test_ptri_repetitions',                    'thermal_parameters: PTRI repetition count = ptrd / ptri'
-        'test_on_off_steps_sum_to_pri',             'thermal_parameters: ON + OFF step durations sum to PRI'
-        'test_non_integer_pulses_per_train_errors', 'thermal_parameters: non-integer pulse count raises an error'
-        % --- test_transform ---
-        'test_ras_to_grid_identity_affine',         'ras_to_grid: identity affine gives the 1-based index RAS + 1'
-        'test_ras_to_grid_translation',             'ras_to_grid: translation affine applies correct grid offset'
-        'test_ras_to_grid_column_input',            'ras_to_grid: column-vector RAS input returns row output'
-        'test_grid_to_ras_inverts_ras_to_grid',     'grid_to_ras: inverse of ras_to_grid (1-based voxels)'
-        'test_convention_matches_niftiread',        'RAS <-> voxel matches the niftiread array (bright-voxel check)'
-        'test_nifti_affine_from_1based',            'nifti_affine_from_1based: 1-based grid affine -> NIfTI header affine'
-        'test_ensure_ras_plus_keeps_world_position','ensure_ras_plus: reorientation keeps voxels at their RAS position'
-        'test_ensure_ras_plus_vox_map',             'ensure_ras_plus: vox_map carries input voxel indices to the RAS+ grid'
-        'test_radial_expand_output_size',           'radialExpand2DTo3D: output volume is [2Nr x 2Nr x C]'
-        'test_radial_expand_symmetry',              'radialExpand2DTo3D: output is symmetric (transposition invariant)'
-        % --- test_transducer_placement ---
-        'test_manual_mode_is_passthrough',          'placement (manual): trans_pos and focus_pos are unchanged'
-        'test_default_mode_is_manual',              'placement (no field): defaults to manual passthrough'
-        'test_unknown_mode_errors',                 'placement: unknown mode string raises an error'
-        'test_localite_missing_file_errors',        'placement (localite): missing file/path raises an error'
-        'test_localite_matrix_to_positions_identity','localite_matrix_to_positions: identity translation round-trips correctly'
-        'test_localite_xml_parse_returns_valid_positions','position_transducer_localite: real XML returns finite non-zero positions'
-        % --- test_isppa_rescaling ---
-        'test_multi_isppa_runs_without_error',      'multi_isppa_pipeline: completes for two targets without error'
-        'test_output_csv_created_per_target',       'multi_isppa_pipeline: one output CSV written per ISPPA target'
-        'test_intensity_scales_with_target',        'multi_isppa_pipeline: focal Isppa ratio matches target ratio (+-20%)'
-        'test_each_output_isppa_positive',          'multi_isppa_pipeline: focal Isppa is positive for each target'
-        'test_acoustic_cache_reused',               'multi_isppa_pipeline: acoustic cache .mat is written by Stage 1'
-        'test_single_target_passthrough',           'multi_isppa_pipeline: scalar target_isppa raises an error'
-        % --- test_hpc_job_report ---
-        'test_report_has_expected_fields',          'hpc_job_report: struct has all required fields'
-        'test_carbon_calculation_cpu_only',         'hpc_job_report: CPU-only carbon estimate is positive and plausible'
-        'test_carbon_calculation_with_gpu',         'hpc_job_report: GPU jobs have non-zero energy_gpu_kwh > energy_cpu_kwh'
-        'test_custom_carbon_params',                'hpc_job_report: doubling carbon_intensity exactly doubles co2e_g'
-        'test_memory_efficiency_ratio',             'hpc_job_report: memory_efficiency = MaxRSS / requested_mem'
-        'test_time_efficiency_ratio',               'hpc_job_report: time_efficiency = elapsed / requested_timelimit'
-        'test_report_file_created',                 'hpc_job_report: writes <sub>_job<ID>_report.txt to log_dir'
-        'test_report_file_contains_key_fields',     'hpc_job_report: report file contains key metric field names'
-        'test_no_report_file_when_log_dir_empty',   'hpc_job_report: empty log_dir skips file write without error'
-        'test_failed_job_does_not_error',           'hpc_job_report: FAILED job state does not throw an error'
-        'test_qsub_produces_nan_metrics_with_warning','hpc_job_report: qsub path warns and returns NaN metrics'
-        'test_log_cgroup_peak_preferred_when_larger','hpc_job_report: job-log cgroup peak used when above sacct MaxRSS'
-        'test_sacct_wins_when_larger',              'hpc_job_report: sacct MaxRSS used when above the logged cgroup peak'
-        'test_pipeline_log_read_without_log_dir',   'hpc_job_report: io.log_file alone supplies the memory fields'
-        'test_no_logs_leaves_fields_nan',           'hpc_job_report: no memory lines leaves log fields NaN, falls back to sacct'
-        % --- test_parse_memory_tags ---
-        'test_empty_text_returns_nan',              'parse_memory_tags: empty text gives NaN fields'
-        'test_tags_are_kept_apart',                 'parse_memory_tags: [memory] and [memory_bb] peaks parsed separately'
-        'test_cgroup_peak_is_max_over_both_tags',   'parse_memory_tags: cgroup peak is the max over both tags'
-        'test_duplicate_sources_are_idempotent',    'parse_memory_tags: repeated lines (pipeline + SLURM log) change nothing'
-        'test_nan_values_are_skipped',              'parse_memory_tags: NaN/nan values are ignored'
-        'test_summary_and_unrelated_lines_ignored', 'parse_memory_tags: [memory_summary] and other lines are not parsed'
-        'test_string_input',                        'parse_memory_tags: accepts string input'
-        'test_live_slurm_job_report',               'hpc_job_report (live): submits real sleep job, waits, checks sacct metrics and report file'
-        % --- test_reports ---
-        'test_risk_limits_has_new_metrics',         'get_risk_limits: includes riseT37_* and TIC'
-        'test_compute_tic_valid',                   'compute_tic: finite positive TIC for a valid transducer'
-        'test_compute_tic_missing_aperture_is_nan', 'compute_tic: NaN when aperture is unavailable'
-        'test_embed_image_dims_finds_slices',       'embed_image_dims: embeds _x/_y/_z slice images (3D)'
-        'test_embed_image_dims_no_dim_file',        'embed_image_dims: embeds the single no-dim image (2D)'
-        'test_config_dump_prunes_large_arrays',     'build_config_dump: prunes large numeric arrays'
-        'test_subject_report_generates',            'generate_simulation_report: builds HTML with new sections, no failures'
-        'test_methods_text_is_manuscript_ready',    'generate_simulation_report: Methods text has copy buttons, inline values, references'
-        'test_methods_text_babelbrain_matches_bridge', 'generate_simulation_report: BabelBrain Methods text states fluid bone, PRESTUS properties, Q correction'
-        'test_methods_text_jwave_states_resolved_pml', 'generate_simulation_report: jwave Methods text states the resolved PML thickness'
-        'test_group_report_generates_and_flags',    'generate_group_report: analysis panel + flags one over-limit subject'
-        % --- test_integration_demo (demo_inputs) ---
-        'test_t1_exists',                           'demo inputs: sub-009 T1w NIfTI is present in BIDS folder'
-        'test_ute_exists',                          'demo inputs: sub-009 UTE NIfTI is present in BIDS folder'
-        'test_segmentation_exists',                 'demo inputs: sub-009 final_tissues.nii.gz is present in m2m folder'
-        'test_localite_xml_exists',                 'demo inputs: TriggerMarkers XML exists under localite/sub-009/ses-02'
-        'test_heuristic_coord_file_exists',         'demo inputs: heuristic coord JSON is present for sub-009'
-        'test_heuristic_coord_file_valid',          'demo inputs: coord JSON has required fields mni_target_mm (3-element) and target_name'
-        'test_pct_pseudoCT_exists',                 'demo inputs: pseudoCT.nii.gz is present (pct/sub-009, or legacy m2m folder)'
-        'test_pct_ute_reg_exists',                  'demo inputs: registered UTE (T2_reg.nii.gz or legacy UTE_reg.nii.gz) is present in m2m folder'
-        'test_mni_transforms_exist',                'demo inputs: toMNI/ folder with Conform2MNI_nonl.nii.gz is present'
-        % --- test_integration_demo (demo_config) ---
-        'test_manual_config_loads',                 'demo config (manual): loads without error; placement.mode=manual; 10 elements'
-        'test_localite_config_loads',               'demo config (localite): loads without error; placement.mode=localite; enabled=1'
-        'test_heuristic_config_loads',              'demo config (heuristic): loads without error; 3-element mni_target_mm injected from JSON'
-        'test_t1_pattern_resolves',                 'demo config: t1_pattern resolves to an existing file for sub-009'
-        % --- test_integration_demo (demo_localite) ---
-        'test_localite_xml_parses',                 'demo localite: TriggerMarkers XML parses to finite trans/focus voxel positions'
-        'test_neuronav_select_finds_session',        'demo localite: neuronav_select_localite finds ses-02 data for sub-009'
-        % --- test_integration_demo (demo_pct) ---
-        'test_pct_enabled_config_loads',            'demo pct: config with pct.enabled=1 loads correctly'
-        'test_pseudoCT_nifti_readable',             'demo pct: pseudoCT.nii.gz is a readable 3-D NIfTI volume'
-        'test_ute_reg_nifti_readable',              'demo pct: UTE_reg.nii.gz is a readable 3-D NIfTI volume'
-        % --- test_integration_demo (demo_head) ---
-        'test_preproc_head_manual',                 'demo head (manual): preproc_head completes; medium_masks and grid.dims present'
-        'test_medium_masks_label_range_manual',     'demo head (manual): medium_mask labels fall within [0, n_layers]'
-        'test_preproc_head_pct',                    'demo head (pct): preproc_head with pct.enabled=1 returns non-empty pseudoCT crop'
-        % --- test_integration_demo (demo_acoustic) ---
-        'test_acoustic_output_created_manual',      'demo acoustic (manual): intensity_orig_coord NIfTI created after full pipeline'
-        % --- test_integration_demo (demo_thermal) ---
-        'test_thermal_output_created_manual',       'demo thermal (manual): cem43_orig_coord NIfTI created after thermal pipeline'
-    };
+function print_summary(results, level)
+    fprintf('\n========================================\n');
+    fprintf('  PRESTUS test suite — level: %s\n', upper(level));
+    fprintf('========================================\n');
+    for r = reshape(results, 1, [])
+        if r.Passed
+            fprintf('  [PASS]  %s\n', r.Name);
+        elseif r.Failed
+            fprintf('  [FAIL]  %s\n', r.Name);
+            for d = r.Details.DiagnosticRecord
+                if ~strcmp(d.Event, 'DiagnosticLogged')
+                    fprintf('%s\n', indent(d.Report));
+                end
+            end
+        else
+            fprintf('  [SKIP]  %s\n', r.Name);
+            reason = r.Details.DiagnosticRecord;
+            reason = reason(strcmp({reason.Event}, 'AssumptionFailed'));
+            if ~isempty(reason)
+                fprintf('          -> %s\n', first_line(reason(1)));
+            end
+        end
+    end
+    fprintf('----------------------------------------\n');
+    fprintf('  Passed: %d   Failed: %d   Skipped: %d\n', sum([results.Passed]), ...
+            sum([results.Failed]), sum([results.Incomplete] & ~[results.Failed]));
+    fprintf('========================================\n\n');
+end
 
-    m = containers.Map(keys(:,1), keys(:,2));
+function s = indent(txt)
+    s = regexprep(strtrim(txt), '(^|\n)', '$1          ');
+end
+
+function s = first_line(rec)
+    % The user-supplied assumption message, else the first report line
+    txt = {rec.TestDiagnosticResults.DiagnosticText};
+    lines = strtrim(splitlines(string(strjoin(txt, newline))));
+    if isempty(lines) || all(lines == "")
+        lines = strtrim(splitlines(string(rec.Report)));
+    end
+    s = char(lines(find(lines ~= "", 1)));
 end

@@ -1,4 +1,4 @@
-classdef test_run_command < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_run_command < matlab.unittest.TestCase
 % TEST_RUN_COMMAND  Unit tests for run_command.m / run_shell_script.m.
 %
 % Context: run_command() replaces system(cmd_string) with

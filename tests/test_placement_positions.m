@@ -1,4 +1,4 @@
-classdef test_placement_positions < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_placement_positions < matlab.unittest.TestCase
 % TEST_PLACEMENT_POSITIONS  JSON sidecar of resolved positions (WRITE_PLACEMENT_POSITIONS).
 %
 % The placement stage writes sub-XXX_placement<affix>.json for every mode;
@@ -10,12 +10,6 @@ classdef test_placement_positions < matlab.unittest.TestCase
         Dir
     end
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-        end
-    end
 
     methods (TestMethodSetup)
         function make_dir(tc)

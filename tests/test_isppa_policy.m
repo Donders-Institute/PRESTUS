@@ -1,4 +1,4 @@
-classdef test_isppa_policy < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_isppa_policy < matlab.unittest.TestCase
 % TEST_ISPPA_POLICY  When the free-water baseline runs, and when a target ISPPA can be met.
 %
 % Covers NEEDS_WATER_BASELINE (modules.run_water_baseline = 1 | 'auto' | 0),
@@ -9,12 +9,6 @@ classdef test_isppa_policy < matlab.unittest.TestCase
 %
 %   results = runtests('tests/test_isppa_policy.m');
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-        end
-    end
 
     methods (Static, Access = private)
         function p = params(mode, target)

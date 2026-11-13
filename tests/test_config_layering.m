@@ -1,4 +1,4 @@
-classdef test_config_layering < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_config_layering < matlab.unittest.TestCase
 % TEST_CONFIG_LAYERING  Toolbox → project → study config layering and key checks.
 %
 % Covers LOAD_PARAMETERS' three-layer merge (toolbox default, project copy of
@@ -17,8 +17,6 @@ classdef test_config_layering < matlab.unittest.TestCase
     methods (TestClassSetup)
         function add_paths(tc)
             tc.Repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(tc.Repo, 'functions')));
-            addpath(genpath(fullfile(tc.Repo, 'external')));
         end
     end
 

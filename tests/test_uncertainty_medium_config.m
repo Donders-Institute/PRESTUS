@@ -1,4 +1,4 @@
-classdef test_uncertainty_medium_config < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_uncertainty_medium_config < matlab.unittest.TestCase
 % TEST_UNCERTAINTY_MEDIUM_CONFIG  Which medium YAML each uncertainty variant uses.
 %
 %   Run with:   results = runtests('tests/test_uncertainty_medium_config.m');

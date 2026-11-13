@@ -1,4 +1,4 @@
-classdef test_elastic_backend < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_elastic_backend < matlab.unittest.TestCase
 % TEST_ELASTIC_BACKEND  Elastic (shear-wave) skull backend: acoustic_backend 'kwave_elastic'.
 %
 % Covers MEDIUM_ELASTIC_PROPERTIES (Pichardo et al. 2017 shear mapping, density
@@ -9,13 +9,6 @@ classdef test_elastic_backend < matlab.unittest.TestCase
 %
 %   results = runtests('tests/test_elastic_backend.m');
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-            addpath(genpath(fullfile(repo, 'external', 'k-wave', 'k-Wave')));
-        end
-    end
 
     methods (Static, Access = private)
         function p = params()

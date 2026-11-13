@@ -1,4 +1,4 @@
-classdef test_pct_density_calibration < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_pct_density_calibration < matlab.unittest.TestCase
 % TEST_PCT_DENSITY_CALIBRATION  pct.density_calibration for mapping_density 'k-plan'.
 %
 % Empty selects k-Plan's default table (results unchanged from the former

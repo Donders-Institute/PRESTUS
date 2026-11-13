@@ -1,4 +1,4 @@
-classdef test_transducer_model < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}) test_transducer_model < matlab.unittest.TestCase
 % TEST_TRANSDUCER_MODEL  Unit tests for the static transducer model and its fit.
 %
 % Tags:
@@ -14,14 +14,11 @@ classdef test_transducer_model < matlab.unittest.TestCase
 
     methods (TestClassSetup)
         function setup_paths(tc)
-            repo_root = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo_root, 'functions')));
-            addpath(genpath(fullfile(repo_root, 'external')));
             tc.equip_param = load_equipment_config();
         end
     end
 
-    methods (Test, TestTags = {'model'})
+    methods (Test, TestTags = {'unit', 'model'})
 
         function test_transfer_matrix_matches_rayleigh(tc)
             tran = tc.equip_param.trans.CTX_250_001;
@@ -135,7 +132,7 @@ classdef test_transducer_model < matlab.unittest.TestCase
         end
     end
 
-    methods (Test, TestTags = {'fit'})
+    methods (Test, TestTags = {'water', 'fit'})
 
         function test_recovers_synthetic_static_model(tc)
             tran = tc.equip_param.trans.CTX_250_001;
@@ -173,4 +170,56 @@ classdef test_transducer_model < matlab.unittest.TestCase
             prof = struct('depths_ep_mm', depths, 'z_ep_mm', z_ep, 'I', I);
         end
     end
+
+    % phase_optimization_annulus_full_curve
+    methods (Test, TestTags = {'unit', 'phase_optimization'})
+
+        function test_row_and_column_targets_give_same_error(tc)
+            p = annular_params();
+            phase = zeros(1, p.transducer.annular.elem_n);
+            velocity = 0.02;
+            axial_col = (1:0.5:100)';
+            target = 0.5 + 0.01 * axial_col;          % arbitrary non-zero target
+
+            err_col = phase_optimization_annulus_full_curve(phase, p, velocity, ...
+                axial_col, target, 0, [10 90], 0);
+            err_row = phase_optimization_annulus_full_curve(phase, p, velocity, ...
+                axial_col, target', 0, [10 90], 0);
+            err_all_row = phase_optimization_annulus_full_curve(phase, p, velocity, ...
+                axial_col', target', 0, [10 90], 0);
+
+            tc.verifyTrue(isscalar(err_col) && isfinite(err_col));
+            tc.verifyEqual(err_row, err_col, 'RelTol', 1e-12);
+            tc.verifyEqual(err_all_row, err_col, 'RelTol', 1e-12);
+        end
+
+        function test_unknown_forward_model_raises_clear_error(tc)
+            % The output used to be named `error`, shadowing error() so this
+            % branch crashed with "used before defined" instead of its message.
+            p = annular_params();
+            p.calibration.forward_model = 'bogus';
+            tc.verifyError(@() phase_optimization_annulus_full_curve( ...
+                zeros(1, 4), p, 0.02, (1:100)', ones(100, 1)), ?MException);
+            try
+                phase_optimization_annulus_full_curve(zeros(1, 4), p, 0.02, (1:100)', ones(100, 1));
+            catch e
+                tc.verifySubstring(e.message, 'unknown forward_model');
+            end
+        end
+
+    end
+end
+
+function p = annular_params()
+    % CTX_250_026 geometry (config/equipment/CTX_250_026.yaml)
+    p = struct();
+    p.transducer.freq_hz = 250e3;
+    p.transducer.annular.elem_n         = 4;
+    p.transducer.annular.elem_id_mm     = [0.0, 30.1788, 42.1388, 51.1088];
+    p.transducer.annular.elem_od_mm     = [29.62, 41.58, 50.55, 57.94];
+    p.transducer.annular.curv_radius_mm = 62.94;
+    p.transducer.annular.dist_geom_ep_mm = 52.38;
+    p.medium_properties.water.sound_speed = 1500;
+    p.medium_properties.water.density     = 994;
+    p.calibration.forward_model = 'oneil';
 end

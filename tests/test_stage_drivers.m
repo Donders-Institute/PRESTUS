@@ -1,4 +1,4 @@
-classdef test_stage_drivers < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_drivers < matlab.unittest.TestCase
 % TEST_STAGE_DRIVERS  Stage drivers on tiny synthetic inputs (no subject data, no GPU).
 %
 % Covers THERMAL_SIMULATION (k-Wave diffusion on a 16^3 homogeneous brain grid
@@ -23,10 +23,6 @@ classdef test_stage_drivers < matlab.unittest.TestCase
 
     methods (TestClassSetup)
         function add_paths(tc)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-            addpath(genpath(fullfile(repo, 'external')));
-            addpath(fullfile(repo, 'config'));
             tc.applyFixture(matlab.unittest.fixtures.SuppressedWarningsFixture( ...
                 {'prestus:toolboxDefault', 'prestus:noSimNIBS', 'prestus:missingCharm'}));
         end

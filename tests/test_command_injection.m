@@ -1,4 +1,4 @@
-classdef test_command_injection < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_command_injection < matlab.unittest.TestCase
 % TEST_COMMAND_INJECTION  End-to-end command-injection regression tests.
 %
 % Context: BabelBrain PRs #137/#139 reported that os.system() calls built
@@ -148,6 +148,31 @@ classdef test_command_injection < matlab.unittest.TestCase
             tc.verifyFalse(isfile(tc.Sentinel), ...
                 'Malicious T1 filename must not execute shell commands via charm invocation');
             tc.verifyTrue(isfile(charm_log), 'charm stub should still have been invoked');
+        end
+
+    end
+
+    % MATLAB code injection
+    methods (Test, TestTags = {'security'})
+
+        function test_matlab_escape_quotes_round_trip(tc)
+            p = '/data/O''Brien/sub-001; delete(''x'')';
+            tc.verifyEqual(eval(['''' matlab_escape_quotes(p) '''']), p);
+        end
+
+        function test_phase_expression_arithmetic_only(tc)
+            tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            tr.annular = struct('elem_id_mm', [0 10], 'elem_od_mm', [9 20], 'elem_n', 2, ...
+                'curv_radius_mm', 60, 'dist_geom_ep_mm', 50, 'elem_p_amp', 1);
+            tr.annular.elem_phase_deg = {0, '274*pi/180'};
+            out = validate_annular_transducer(tr, 1);
+            tc.verifyEqual(out.annular.elem_phase_deg, [0 274*pi/180], 'AbsTol', 1e-12);
+
+            sentinel = fullfile(tmp, 'PWNED');
+            tr.annular.elem_phase_deg = {0, sprintf('fclose(fopen(''%s'',''w''))', sentinel)};
+            tc.verifyError(@() validate_annular_transducer(tr, 1), ...
+                'validate_annular_transducer:badPhaseExpression');
+            tc.verifyFalse(isfile(sentinel));
         end
 
     end

@@ -1,4 +1,4 @@
-classdef test_thermal_parameters < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_thermal_parameters < matlab.unittest.TestCase
 % TEST_THERMAL_PARAMETERS  Unit tests for thermal_parameters()
 %
 %   Run with:   results = runtests('tests/test_thermal_parameters.m');

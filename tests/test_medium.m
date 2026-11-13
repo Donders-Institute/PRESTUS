@@ -1,4 +1,4 @@
-classdef test_medium < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_medium < matlab.unittest.TestCase
 % TEST_MEDIUM  Tissue label -> medium property assignment (functions/medium).
 %
 % MEDIUM_SETUP on a tiny synthetic label volume (one slab per tissue of
@@ -21,9 +21,6 @@ classdef test_medium < matlab.unittest.TestCase
     methods (TestClassSetup)
         function add_paths(tc)
             tc.Repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(tc.Repo, 'functions')));
-            addpath(genpath(fullfile(tc.Repo, 'external')));
-            addpath(fullfile(tc.Repo, 'config'));
             tc.applyFixture(matlab.unittest.fixtures.SuppressedWarningsFixture( ...
                 {'prestus:toolboxDefault', 'prestus:noSimNIBS', 'prestus:missingCharm'}));
             tc.Cfg = yaml.loadFile(fullfile(tc.Repo, 'config', 'config_default.yaml'), ...
@@ -223,6 +220,9 @@ classdef test_medium < matlab.unittest.TestCase
             p = use_coefficients(medium_params());
             p.medium_properties.brain.absorption_coeff = -1;
             masks = slab_masks(p);
+            tc.verifyError(@() quiet_medium_setup(p, masks), 'medium_setup:badAbsorptionCoeff');
+        end
+
         function test_coefficient_without_attenuation_stays_finite(tc)
             % alpha_coeff 0: the fraction map is 0 without absorption and 1
             % with it (which warns), never Inf or NaN
@@ -245,9 +245,6 @@ classdef test_medium < matlab.unittest.TestCase
             tc.verifyEqual(db_cm_mhz_to_np_m(0.59, 500e3, 1.2), ...
                 0.59 * 0.5^1.2 * 100 / (20*log10(exp(1))), 'RelTol', 1e-12);
             tc.verifyEqual(db_cm_mhz_to_np_m([1 2], 2e6, [1 2]), [2 8] * 100 / (20*log10(exp(1))), 'RelTol', 1e-12);
-        end
-
-            tc.verifyError(@() quiet_medium_setup(p, masks), 'medium_setup:badAbsorptionCoeff');
         end
 
         function test_cache_signature_keeps_the_set_absorption_field(tc)

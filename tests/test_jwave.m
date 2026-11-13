@@ -1,4 +1,4 @@
-classdef test_jwave < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'standalone'}) test_jwave < matlab.unittest.TestCase
 % TEST_JWAVE  Compare jwave Helmholtz and k-Wave acoustic backends via the PRESTUS pipeline.
 %
 % Runs the same water simulation through both backends on a small grid and
@@ -59,11 +59,6 @@ classdef test_jwave < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     methods (TestClassSetup)
         function classSetup(tc)
-            % Ensure fixtures directory is on the path when the test is run directly.
-            here = fileparts(mfilename('fullpath'));
-            addpath(fullfile(here, 'fixtures'));
-
-            % Resolve CPU Python env — skip the whole class if jwave is not importable.
             [cpu_bin, err] = test_jwave.resolve_python_bin(getenv('JWAVE_PYTHON'), 'JWAVE_PYTHON');
             tc.assumeEmpty(err, err);
             [status, ~] = system(sprintf('"%s" -c "import jwave" 2>/dev/null', cpu_bin));

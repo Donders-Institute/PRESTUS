@@ -1,5 +1,5 @@
 %% 
-classdef test_hpc_job_report < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}) test_hpc_job_report < matlab.unittest.TestCase
 % TEST_HPC_JOB_REPORT  Unit tests for functions/hpc/hpc_job_report
 %
 % Tests use a mock sacct that injects known output via $PATH prepending,
@@ -89,7 +89,7 @@ classdef test_hpc_job_report < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% Struct fields
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'hpc_job_report', 'struct'})
+    methods (Test, TestTags = {'unit', 'hpc_job_report', 'struct'})
 
         function test_report_has_expected_fields(tc)
             % A completed job should produce a struct with all key fields.
@@ -117,7 +117,7 @@ classdef test_hpc_job_report < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% Carbon calculation
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'hpc_job_report', 'carbon'})
+    methods (Test, TestTags = {'unit', 'hpc_job_report', 'carbon'})
 
         function test_carbon_calculation_cpu_only(tc)
             % 1 hour, 4 CPUs, no GPU, 4 GB peak memory
@@ -175,7 +175,7 @@ classdef test_hpc_job_report < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% Cost calculation
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'hpc_job_report', 'cost'})
+    methods (Test, TestTags = {'unit', 'hpc_job_report', 'cost'})
 
         function test_no_cost_for_default_profile(tc)
             % Non-Snellius parameters should yield NaN cost
@@ -285,7 +285,7 @@ classdef test_hpc_job_report < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% Resource efficiency
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'hpc_job_report', 'efficiency'})
+    methods (Test, TestTags = {'unit', 'hpc_job_report', 'efficiency'})
 
         function test_memory_efficiency_ratio(tc)
             % Requested 64 GB, used 8 GB → efficiency = 8/64 = 0.125
@@ -314,7 +314,7 @@ classdef test_hpc_job_report < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% Report file
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'hpc_job_report', 'file'})
+    methods (Test, TestTags = {'unit', 'hpc_job_report', 'file'})
 
         function test_report_file_created(tc)
             tc.write_mock_sacct( ...
@@ -355,7 +355,7 @@ classdef test_hpc_job_report < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% Memory from job logs ([memory] / [memory_bb] lines)
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'hpc_job_report', 'memory_log'})
+    methods (Test, TestTags = {'unit', 'hpc_job_report', 'memory_log'})
 
         function test_log_cgroup_peak_preferred_when_larger(tc)
             % cgroup peak 10.5 GB in the SLURM log > sacct MaxRSS 4 GB
@@ -517,7 +517,7 @@ classdef test_hpc_job_report < matlab.unittest.TestCase
     % ------------------------------------------------------------------ %
     %% Graceful degradation
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'hpc_job_report', 'robustness'})
+    methods (Test, TestTags = {'unit', 'hpc_job_report', 'robustness'})
 
         function test_failed_job_does_not_error(tc)
             % sacct returns FAILED state — report should still be produced

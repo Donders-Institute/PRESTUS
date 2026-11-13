@@ -1,4 +1,4 @@
-classdef test_stage_sidecars < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_sidecars < matlab.unittest.TestCase
 % TEST_STAGE_SIDECARS  Starting a run from prior stage outputs via their sidecars.
 %
 % Covers the sidecar helpers (WRITE_SIDECAR, READ_SIDECAR, FIND_SIDECAR,
@@ -14,12 +14,6 @@ classdef test_stage_sidecars < matlab.unittest.TestCase
         TmpDir
     end
 
-    methods (TestClassSetup)
-        function add_paths(~)
-            repo = fileparts(fileparts(mfilename('fullpath')));
-            addpath(genpath(fullfile(repo, 'functions')));
-        end
-    end
 
     methods (TestMethodSetup)
         function setup(tc)

@@ -1,4 +1,4 @@
-classdef test_placement_paths < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_placement_paths < matlab.unittest.TestCase
 % TEST_PLACEMENT_PATHS  Placement output locations and run-record reuse.
 %
 % GET_PLACEMENT_DIR / PLACEMENT_RUN_DIR resolve <path.placement or

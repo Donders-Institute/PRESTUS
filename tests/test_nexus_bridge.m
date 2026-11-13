@@ -1,4 +1,4 @@
-classdef test_nexus_bridge < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_nexus_bridge < matlab.unittest.TestCase
 % TEST_NEXUS_BRIDGE  The MATLAB side of the PRESTUS Nexus: NEXUS_BRIDGE (file protocol,
 % allow-list, errors), NEXUS_NEURONAV on a synthetic Localite study, NEXUS_CALIBRATION on
 % synthetic profiles of a shipped transducer, and NEURONAV_CHECK_TARGET_MAP.
