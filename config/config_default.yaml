@@ -351,10 +351,10 @@ placement:
                               # Negative = bowl rear centre is on the housing side relative to the matrix origin.
                               # Only used when transducer geometry fields are absent and tracker_to_bowl_mm is not set.
     tracker_to_bowl_mm: []  # Explicit measured offset (mm) from the Localite 4×4 matrix origin to the bowl rear centre
-                            # (the geometric axis point at the back of the housing; bowl_pos in k-Wave makeBowl).
+                            # (the bowl apex on the beam axis, i.e. trans_pos; bowl_pos in k-Wave makeBowl).
                             # Negative = bowl rear centre is on the housing/tracker side (away from head).
                             # When set, overrides both the geometry-derived value and reference_distance_mm.
-                            # See doc_placement_neuronav.md §"Localite matrix origin" for how to determine this value.
+                            # See doc_placement_neuronav_coordinates.md §"Transducer offset (tracker_to_bowl_mm)" for how to determine this value.
   heuristic:
     mni_target_mm: []    # [x y z] MNI coordinate of the sonication target (required for mode='heuristic')
     target_name: ''      # Label string for the target, used in output filenames (required for mode='heuristic')

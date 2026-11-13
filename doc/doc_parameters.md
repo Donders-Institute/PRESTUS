@@ -391,7 +391,7 @@ See [doc_placement_neuronav.md](doc_placement_neuronav.md).
     | `session_folder_pattern` | Wildcard that a folder between `loc_folder` and the marker files must match. | `'*'` | e.g. `'Session_2024*'`. |
     | `expected_segment_length` | Pulses per TriggerMarkers series. | `80` | Series off by more than 20 pulses are dropped; `[]` keeps all. |
     | `voxel_size` | Voxel size for `position_dev_vox` in the series statistics [mm]. | `0.9` | Does not affect positions. |
-    | `reference_distance_mm` | Distance from tracker to transducer exit plane [mm]. | `15` | Fallback when transducer geometry and `tracker_to_bowl_mm` are absent. |
+    | `reference_distance_mm` | Fallback offset from the Localite matrix origin to the bowl rear centre, along the beam axis [mm]. | `15` | Used only when `tracker_to_bowl_mm` is empty and the transducer has no scalar `curv_radius_mm` and `dist_geom_ep_mm`. Same sign convention as `tracker_to_bowl_mm`. |
     | `tracker_to_bowl_mm` | Measured offset from the Localite matrix origin to the bowl rear centre [mm]. | `[]` | Overrides geometry and `reference_distance_mm`. |
 
 #### `neuronav`

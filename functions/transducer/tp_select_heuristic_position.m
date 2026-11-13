@@ -125,8 +125,8 @@ target_pos_grid = floor(table2array(best_trans_pos(1, ["targ_x", "targ_y", "targ
 % IMPORTANT: Assumes that localite planning image has
 % canonical_affine_transform applied! Always visually check coordinates ...
 
-trans_pos_localite = round(trans_pos_grid .* img_header.PixelDimensions(1:3), 2);
-target_pos_localite = round(target_pos_grid .* img_header.PixelDimensions(1:3), 2);
+trans_pos_localite = grid_to_localite_mm(trans_pos_grid, img_header);
+target_pos_localite = grid_to_localite_mm(target_pos_grid, img_header);
 
 %% Convert to RAS+ physical coordinates (mm)
 

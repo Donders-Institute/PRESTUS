@@ -363,6 +363,7 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `export_brainsight_trajectory`          | Write a Brainsight version-14 trajectory file. |
+| `grid_to_localite_mm`                   | Voxel indices to coordinates in the Localite planning image |
 | `localite_matrix_to_positions`          | Convert a Localite 4×4 matrix to voxel positions. |
 | `neuronav_apply_deformation`            | Map segmentation-space RAS coordinates through a SimNIBS coordinate field |
 | `neuronav_build_deformation_cache`      | Precompute nearest-valid-voxel lookup for a SimNIBS coordinate field |

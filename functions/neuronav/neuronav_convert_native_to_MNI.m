@@ -59,7 +59,6 @@ function [trans_ras_seg, ...
     plan_affine = t1plan_info.Transform.T;
     seg_affine = t1seg_info.Transform.T;
     warp_affine = warp_info.Transform.T;
-    mni_affine = mni_info.Transform.T;
 
     % --- Min/max voxel for the target MNI image (used for the side_order clamp below) ---
     min_voxel_mni = [1 1 1 1]';                   % 1-based indexing (MATLAB convention)
@@ -122,7 +121,6 @@ function [trans_ras_seg, ...
         end
         
         % [5] Convert clamped voxel positions back to RAS mm
-        tmp  = (mni_affine' * [trans_mni_pos(i,:) 1]')';
-        trans_mni_ras(i,:)  = tmp(1:3); clear tmp;
+        trans_mni_ras(i,:) = grid_to_ras(trans_mni_pos(i,:), mni_info);
     end
 end

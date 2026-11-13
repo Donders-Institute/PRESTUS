@@ -15,9 +15,9 @@ RAS (Right-Anterior-Superior) mm is the entry-point space in PRESTUS. Localite m
 |------|------|-------|-------------|
 | Simulation grid | voxels (1-based) | `grid` | k-Wave internal space. Axes align with the T1 after preprocessing (rotation to focal axis etc.). Not tied to anatomy unless a planning image is loaded. |
 | Subject / scanner space | mm | `ras_plus` | RAS mm in the subject's native scanner frame. PRESTUS's entry-point space: Localite markers and external coordinates arrive in RAS mm and are converted to T1 voxels via `ras_to_grid()`. |
-| Localite planning image | mm | `ras_plus` (adjusted header) | Subject space expressed via the diagonal affine written by `canonical_affine_transform`. Voxel-to-world mapping is `world = voxel * voxel_size_mm` (no rotation). See [Localite placement](doc_placement_heuristic.md#save-localite-planning-image). |
 | MNI space | mm | `mni` | MNI152 standard space, standard world-mm convention (negative X = left, positive X = right, the same laterality sense as RAS). The template's voxel *array* is stored in LAS order, but going through the NIfTI affine (as `ras_to_grid()`/`transform_coordinates()` do) accounts for that. See [MNI voxel storage order vs. world-mm laterality](#mni-voxel-storage-order-vs-world-mm-laterality). |
-| MNI voxel | voxels (1-based) | *(unnamed)* | Integer indices into an MNI template volume (e.g. 181×217×181). Convert via the template's NIfTI affine. |
+| Localite planning image | mm | `ras_plus` (adjusted header) | Subject space expressed via the diagonal affine written by `canonical_affine_transform`. Voxel-to-world mapping is `world = (voxel − 1) × voxel_size_mm` for 1-based PRESTUS voxels (no rotation). See [Save Localite planning image](doc_placement_heuristic.md#localite-planning-image). |
+| MNI voxel | voxels (1-based) | *(unnamed)* | Integer indices into an MNI template volume (e.g. 182×218×182 for [SimNIBS](https://simnibs.github.io/simnibs/)'s `toMNI/final_tissues_MNI.nii.gz`). Convert via the template's NIfTI affine. |
 
 ## Coordinate flow for patient (layered) simulations
 
@@ -70,7 +70,7 @@ Neuronavigation software (e.g. Localite TMS Navigator) writes a planning T1 with
 affine = diag([voxel_size_mm, voxel_size_mm, voxel_size_mm, 1])
 ```
 
-The "RAS mm" values stored in Localite XML trigger matrices are therefore **planning-image space coordinates** (`world = voxel × voxel_size_mm`), not scanner-isocenter-relative RAS mm. `ras_to_grid()` called with the planning T1 header inverts this back to voxel indices (`voxel = localite_mm / voxel_size_mm`).
+The "RAS mm" values stored in Localite XML trigger matrices are therefore **planning-image space coordinates** (`world = voxel_0 × voxel_size_mm`, with `voxel_0` the 0-based NIfTI index), not scanner-isocenter-relative RAS mm. `ras_to_grid()` called with the planning T1 header inverts this back to the 1-based PRESTUS voxel (`voxel = round(localite_mm / voxel_size_mm) + 1`).
 
 !!! warning "Do not re-project Localite coordinates using the SimNIBS m2m T1 header"
     The m2m T1 (`m2m_{sub_id}/T1.nii.gz`) has a full world-space affine (non-zero origin, possible small rotation). Calling `ras_to_grid(localite_mm, simnibs_t1_header)` applies the wrong inverse affine and shifts positions by tens of millimetres.

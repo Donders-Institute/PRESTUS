@@ -41,7 +41,7 @@ nii_original = niftiinfo(nii_in_path);
 fprintf('Original affine:\n'); disp(nii_original.Transform.T);
 
 %% Create new diagonal affine matrix for Localite compatibility
-% [sx 0  0  0 ]    LOCALITE: world_x = voxel_x * sx
+% [sx 0  0  0 ]    LOCALITE: world_x = voxel_x * sx   (0-based voxel; MATLAB index - 1)
 % [0  sy 0  0 ]    LOCALITE: world_y = voxel_y * sy  
 % [0  0  sz 0 ]    LOCALITE: world_z = voxel_z * sz
 % [0  0  0  1 ]
@@ -57,6 +57,9 @@ fprintf('Mapping: [voxel_x, voxel_y, voxel_z] → [%.1f*vx, %.1f*vy, %.1f*vz] mm
 %% Create output NIfTI structure
 nii_out = nii_in;
 nii_out.Transform.T = affine_new;
+% niftiwrite ignores Transform when TransformName is 'None' (input without
+% sform/qform code); force an sform so the diagonal affine is written.
+nii_out.TransformName = 'Sform';
 nii_out.Filename = output_path;
 nii_out.ImageSize = size(img_data);  % Preserve dimensions
 

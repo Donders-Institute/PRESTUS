@@ -33,6 +33,10 @@ sz = size(img);  % Get image dimensions [Nx Ny Nz]
 if ~isfield(parameters, 'min_focal_distance_mm')
     parameters.min_focal_distance_mm = parameters.transducer(1).focal_distance_bowl;  % Default to bowl geometry
 end
+if isempty(parameters.min_focal_distance_mm)
+    error('prestus:heuristic:noFocalDistance', ...
+        'Heuristic placement needs transducer.focal_distance_ep (or focal_distance_bowl).');
+end
 
 outer_sphere_3d = []; outer_sphere = [];  % Pre-allocate for while loop
 while numel(find(outer_sphere)) < 1  % Expand until sphere intersects skull exterior (img==0)

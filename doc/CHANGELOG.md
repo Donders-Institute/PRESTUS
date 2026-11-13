@@ -106,14 +106,18 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Fixed: PlanTUS interactive mode hung, did not find its own output, and crashed with a single calibration point; PlanTUS target masks failed on integer T1s
 - Fixed: automatic Localite placement (`placement.localite.file` empty) always errored; file mode now honours `position` / `target`
 - Fixed: `focal_distance_calculation` failed for Localite and PlanTUS placements
+- Fixed: heuristic placement without `transducer.focal_distance_ep` / `focal_distance_bowl` never finished; it now stops with a message
+- ⚠️ **Fixed:** the heuristic placement's Localite mm export (`loc_*_mm`) was one voxel high along each axis; re-export heuristic positions before entering them in Localite
+- Fixed: Localite placement with empty transducer geometry stopped with a dimension error instead of using `placement.localite.reference_distance_mm`
 
 #### Neuronavigation (Localite)
 - Batch ingestion (`neuronav_ingest_batch`), session inventory, target-label maps (`neuronav.target_labels`) and target-name suggestions from planned targets
-- Multi-target extraction toolkit documented as its own module; `neuronav_resolve_target` resolves targets over four confidence tiers, including a study-supplied lookup (`neuronav_read_target_lookup`)
+- `neuronav_resolve_target` resolves targets over four confidence tiers, including a study-supplied lookup (`neuronav_read_target_lookup`)
 - Multi-coil ingestion via `neuronav.coil_map`
 - New `path.localite_*` and `placement.localite.*` keys in `config_default.yaml`; `placement.localite.session_folder_pattern` is now applied
 - `placement.localite.target` / `.position` take one entry per transducer for bilateral setups
 - ⚠️ **Fixed:** series QC statistics `rotation_dev_rad` and `position_dev_mm` were wrong (the latter in voxels); sidecar JSONs written before carry the old values
+- ⚠️ **Fixed:** `neuronav_convert_native_to_MNI` returned transducer MNI positions one MNI voxel (1 mm) off along each axis; recompute MNI transducer positions taken from it
 - Fixed: GUMMarkers files with `InstrumentMarker` elements failed to parse; T1 lookup in the conversion functions; `neuronav_convert_MNI_to_native` / `neuronav_convert_native_to_MNI` read an old path key
 
 #### Head model & pseudo-CT
