@@ -29,8 +29,9 @@ function convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_out
 %   Calls the subject2mni CLI. An optional LD_LIBRARY_PATH export is
 %   prepended when parameters.hpc.ld_library_path is set. Because SimNIBS
 %   appends '_MNI' to the output filename, each result is renamed to the
-%   requested path. On Unix/macOS with multiple inputs, all processes are
-%   launched in parallel and polled until completion (timeout: 1 hour).
+%   requested path. Inputs are converted one after another in the foreground.
+%   Each exit status and output file is checked, and any failure raises
+%   PRESTUS:MNIConversionFailed listing the volumes and subject2mni output.
 %
 % Use as:
 %   convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_output_img, parameters)
@@ -101,30 +102,25 @@ function convert_simnibs(input_list, output_list, n, m2m_folder, parameters, opt
         simnibs_names{k} = strrep(output_list{k}, '.nii.gz', '_MNI.nii.gz');
     end
 
-    % run_command invokes subject2mni directly via argv, no shell at all --
-    % input_list/output_list/m2m_folder reach the process as literal
-    % argument values regardless of their contents.
-    if n > 1 && ~ispc
-        for k = 1:n
-            run_command({subject2mni_bin, '--in', input_list{k}, '--out', output_list{k}, ...
-                '--m2mpath', m2m_folder, '--interpolation_order', num2str(options.interpolation_order)}, ...
-                'Env', env_overrides, 'Background', true);
+    % Each conversion runs in the foreground and is checked. Background runs
+    % discard their output and cannot report a failure, so a missing volume used
+    % to end the job as "completed". run_command invokes subject2mni directly via
+    % argv, so input/output/m2m paths reach the process as literal arguments.
+    failed = {};
+    for k = 1:n
+        [status, cmdout] = run_command({subject2mni_bin, '--in', input_list{k}, ...
+            '--out', output_list{k}, '--m2mpath', m2m_folder, ...
+            '--interpolation_order', num2str(options.interpolation_order)}, ...
+            'Env', env_overrides);
+        if status ~= 0 || ~isfile(simnibs_names{k})
+            failed{end+1} = sprintf('%s (exit %d): %s', input_list{k}, status, ...
+                strtrim(char(cmdout))); %#ok<AGROW>
         end
-        t0 = tic;
-        while toc(t0) < 3600
-            if all(cellfun(@isfile, simnibs_names)); break; end
-            pause(5);
-        end
-        if ~all(cellfun(@isfile, simnibs_names))
-            warning('PRESTUS:MNITimeout', ...
-                'convert_final_to_MNI_simnibs: timed out waiting for subject2mni outputs.');
-        end
-    else
-        for k = 1:n
-            run_command({subject2mni_bin, '--in', input_list{k}, '--out', output_list{k}, ...
-                '--m2mpath', m2m_folder, '--interpolation_order', num2str(options.interpolation_order)}, ...
-                'Env', env_overrides);
-        end
+    end
+    if ~isempty(failed)
+        error('PRESTUS:MNIConversionFailed', ...
+            'subject2mni failed for %d of %d volumes:\n  %s', numel(failed), n, ...
+            strjoin(failed, sprintf('\n  ')));
     end
 
     for k = 1:n
