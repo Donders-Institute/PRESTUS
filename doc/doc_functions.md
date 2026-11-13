@@ -466,6 +466,7 @@ The following documents the functions provided in PRESTUS.
 | `get_risk_limits`                       | Return ITRUSST consensus non-significant risk limits |
 | `html_utils`                            | Static HTML utility methods for PRESTUS report generation |
 | `preview_report_styles`                 | Report test mode: re-render an existing subject output folder in every skin (no re-simulation) into a sandbox folder with a side-by-side index.html. |
+| `read_metrics_table`                    | Read a per-run metrics CSV with current column names |
 | `report_scripts`                        | Shared inline JavaScript for PRESTUS HTML reports. |
 | `report_styles`                         | Alternative visual skins for the HTML reports (instrument / classic / compact / paper), selected via `modules.report_style`. |
 | `risk_color`                            | Return a colour string based on a value relative to an ITRUSST risk limit |

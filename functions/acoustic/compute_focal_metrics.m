@@ -34,9 +34,8 @@ function fm = compute_focal_metrics(acoustic_Ipa, peak_Isppa, region_mask, trans
 %                   (e.g. results.Isppa_brain or results.Isppa_after_exit_plane)
 %   region_mask   - logical (:,:,:), valid voxels for focal zone computation
 %                   (brain mask for layered; after-exit-plane mask for free-field)
-%   trans_pos     - [1×3] reference point in grid voxels for the *_dist_mm
-%                   outputs.  acoustic_analysis passes the bowl apex, so the
-%                   *_dist_mm fields are apex-referenced (legacy convention).
+%   trans_pos     - [1×3] bowl apex in grid voxels, the reference of the
+%                   *_bowl_mm outputs.
 %                   Exit-plane distances are derived by the caller from the
 %                   returned *_vox positions (which are frame-agnostic).
 %   res_mm        - scalar grid resolution [mm/voxel]
@@ -49,15 +48,15 @@ function fm = compute_focal_metrics(acoustic_Ipa, peak_Isppa, region_mask, trans
 % Output:
 %   fm  struct with fields (all linear dimensions in mm, volumes in mm³):
 %     peak_pos_vox          [1×3] voxel coords of spatial-peak intensity
-%     peak_dist_mm          scalar distance of peak from reference point [mm]
+%     peak_bowl_mm          scalar distance of peak from the bowl apex [mm]
 %     mask_3dB              logical (:,:,:) — I ≥ Isppa/2 within region_mask
 %     mask_6dB              logical (:,:,:) — I ≥ Isppa/4 within region_mask
 %     vol_3dB_mm3           volume of −3 dB region [mm³]
 %     vol_6dB_mm3           volume of −6 dB region [mm³]
 %     centroid_3dB_vox      [1×3] voxel coords of centroid of −3 dB region
-%     centroid_3dB_dist_mm  distance from reference point to −3 dB centroid [mm]
+%     centroid_3dB_bowl_mm  distance from the bowl apex to −3 dB centroid [mm]
 %     flhm_center_vox       [1×3] voxel coords of the FLHM centre (on-axis)
-%     flhm_center_dist_mm   distance from reference point to the FLHM centre [mm]
+%     flhm_center_bowl_mm   distance from the bowl apex to the FLHM centre [mm]
 %     flhm_span_mm          axial focal length at half maximum, at the
 %                           configured focal_reference threshold [mm]
 %     flhm_truncated        true if the FLHM span hit the grid boundary
@@ -103,7 +102,7 @@ end
     nd = ndims(acoustic_Ipa);
     fm.peak_pos_vox   = [Ix, Iy, Iz];
     fm.peak_pos_vox   = fm.peak_pos_vox(1:nd);
-    fm.peak_dist_mm   = norm((fm.peak_pos_vox - trans_pos) .* res_mm);
+    fm.peak_bowl_mm   = norm((fm.peak_pos_vox - trans_pos) .* res_mm);
 
     % Build −3 dB and −6 dB masks
     fm.mask_3dB = acoustic_Ipa >= peak_Isppa / 2 & region_mask;  % I ≥ Imax/2
@@ -122,7 +121,7 @@ end
     else
         fm.centroid_3dB_vox     = fm.peak_pos_vox;
     end
-    fm.centroid_3dB_dist_mm = norm((fm.centroid_3dB_vox - trans_pos) .* res_mm);
+    fm.centroid_3dB_bowl_mm = norm((fm.centroid_3dB_vox - trans_pos) .* res_mm);
 
     % FLHM centre along the beam axis (last grid dimension).  Extract the
     % on-axis line through the peak, walk outward from the peak while the
@@ -154,7 +153,7 @@ end
 
     fm.flhm_center_vox = fm.peak_pos_vox;
     fm.flhm_center_vox(beam_dim) = mid_idx;
-    fm.flhm_center_dist_mm = norm((fm.flhm_center_vox - trans_pos) .* res_mm);
+    fm.flhm_center_bowl_mm = norm((fm.flhm_center_vox - trans_pos) .* res_mm);
     fm.flhm_span_mm        = (hi - lo) * res_mm;
     fm.flhm_truncated      = (lo == 1) || (hi == n_ax);
 end

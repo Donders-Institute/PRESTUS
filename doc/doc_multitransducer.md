@@ -119,7 +119,7 @@ The Nexus placement viewer draws every transducer's FOV box.
 - Simulations without a skull or layered setup (e.g. `medium: water`) only model the first transducer.
 - `kWaveArray` mode supports multiple transducers only in non-axisymmetric mode (`grid.axisymmetric = 1` is single-transducer). Matrix-type transducers in `kWaveArray` mode assume a +Z beam axis; see [Transducer geometry](doc_transducer.md#beam-axis-constraint).
 - **Different carrier frequencies**: time step and PPW (`source_sensor_setup`) use the *highest* frequency; Mechanical Index (`acoustic_analysis`) uses the *lowest* frequency, which never underestimates MI = p / √f; with `io.save_p_complex: true`, one `*_p_complex_<freq>Hz.mat` is written per frequency.
-- Exit-plane metrics (focal distance, `max_Isppa_after_exit_plane`, `real_focal_distance`) refer to the first transducer only.
+- Exit-plane metrics (`real_focal_distance_ep_mm`, `real_focal_distance_bowl_mm`, `max_Isppa_after_exit_plane`) refer to the first transducer only.
 - Focal-plane heating plots show only the first transducer's focal plane. Always inspect the 3D `maxT` and `CEM43` NIfTI volumes for a complete safety assessment.
 - Post-hoc water-only simulations are not implemented for multiple transducers.
 - The PRESTUS **BabelBrain backend** (`acoustic_backend` / `thermal_backend: babelbrain`) supports one transducer per run. Multi-transducer runs need `kwave` or `jwave` with `thermal_backend: kwave`. See [BabelBrain: Geometry limits](doc_babelbrain.md#geometry-limits).

@@ -195,6 +195,18 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_report
             tc.verifyTrue(iTIC(1) > iOther(1), 'TIC should be in the Other section');
         end
 
+        function test_read_metrics_table_renames_apex_column(tc)
+            % Earlier CSVs name the apex-referenced peak distance
+            % real_focal_distance_mm; readers see real_focal_distance_bowl_mm
+            f = fullfile(tc.tmp, 'sub-001_layered.csv');
+            writetable(table(1, 61.5, 50.9, 'VariableNames', ...
+                {'subject_id', 'real_focal_distance_mm', 'real_focal_distance_ep_mm'}), f);
+            t = read_metrics_table(f);
+            tc.verifyFalse(ismember('real_focal_distance_mm', t.Properties.VariableNames));
+            tc.verifyEqual(t.real_focal_distance_bowl_mm, 61.5);
+            tc.verifyEqual(t.real_focal_distance_ep_mm, 50.9);
+        end
+
     end
 
     % html_utils escaping

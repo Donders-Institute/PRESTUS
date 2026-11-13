@@ -44,7 +44,7 @@ try
     csv_table = [];
     if isfield(parameters.io, 'filename_table') && isfile(parameters.io.filename_table)
         try
-            csv_table = readtable(parameters.io.filename_table, 'VariableNamingRule', 'preserve');
+            csv_table = read_metrics_table(parameters.io.filename_table);
         catch
             csv_table = [];
         end
@@ -1532,7 +1532,7 @@ function html = build_simulation_summary(csv_table, parameters, is_layered)
     % different locations — label them so readers don't conflate
     % target-position with peak-position.
     html = [html summary_card('Ipa at target (nominal)', csv_value(csv_table, 'Ipa_target'), 'W/cm²')];
-    html = [html summary_card('Focal distance (peak, apex-ref.)', csv_value(csv_table, 'real_focal_distance_mm'), 'mm')];
+    html = [html summary_card('Focal distance (peak, apex-ref.)', csv_value(csv_table, 'real_focal_distance_bowl_mm'), 'mm')];
     html = [html summary_card('Focal distance (peak, exit-plane-ref.)', csv_value(csv_table, 'real_focal_distance_ep_mm'), 'mm')];
     html = [html summary_card('Isppa at peak', csv_value(csv_table, 'Isppa'), 'W/cm²')];
 
@@ -2054,13 +2054,13 @@ function html = build_focal_zone_table(csv_table)
 % nominal-target and peak-location numbers above so the three concepts
 % (target, peak, focal-zone extent) are never conflated in the report.
     rows = {
-        'Peak location, apex-referenced',  'real_focal_distance_mm',       'mm';
+        'Peak location, apex-referenced',  'real_focal_distance_bowl_mm',       'mm';
         'Peak location, exit-plane-ref.',  'real_focal_distance_ep_mm',    'mm';
         'FLHM centre (manufacturer-style focal distance), apex-ref.', 'focal_flhm_center_bowl_mm', 'mm';
         'FLHM centre (manufacturer-style focal distance), exit-plane-ref.', 'focal_flhm_center_ep_mm', 'mm';
         '−3 dB focal zone volume',         'focal_vol_3dB_mm3',            'mm³';
         '−6 dB focal zone volume',         'focal_vol_6dB_mm3',            'mm³';
-        '−3 dB centroid, apex-referenced', 'focal_centroid_3dB_dist_mm',   'mm';
+        '−3 dB centroid, apex-referenced', 'focal_centroid_3dB_bowl_mm',   'mm';
         '−3 dB centroid, exit-plane-ref.', 'focal_centroid_3dB_ep_mm',     'mm';
     };
 
@@ -2381,7 +2381,7 @@ end
 
 function cols = get_acoustic_columns_water()
     cols = {'subject_id', 'freq_Hz', 'Isppa', 'Isppa_after_exitplane', ...
-            'Psptp', 'Ptp_target', 'real_focal_distance_mm', ...
+            'Psptp', 'Ptp_target', 'real_focal_distance_bowl_mm', ...
             'Ipa_target', 'Ipa_target_radius'};
 end
 
@@ -2465,7 +2465,7 @@ function html = build_toc(parameters, is_layered, extra_html)
     worst = 'green';
     try
         if isfield(parameters.io, 'filename_table') && isfile(parameters.io.filename_table)
-            csv_table = readtable(parameters.io.filename_table, 'VariableNamingRule', 'preserve');
+            csv_table = read_metrics_table(parameters.io.filename_table);
             if is_layered
                 limits = get_risk_limits(is_layered);
             else

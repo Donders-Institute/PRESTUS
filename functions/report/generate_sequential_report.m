@@ -125,7 +125,7 @@ try
         d.csv = [];
         if ~isempty(csv_path) && isfile(csv_path)
             try
-                d.csv = readtable(csv_path, 'VariableNamingRule', 'preserve');
+                d.csv = read_metrics_table(csv_path);
             catch
                 d.csv = [];
             end
@@ -558,7 +558,7 @@ function html = build_acoustic_overview(run_data, run_labels, is_layered, max_ni
 
     % --- Comparison table ---
     acoustic_cols = {'MI_tc', 'Isppa', 'Isppa_brain', 'Isppa_skull', 'Isppa_skin', ...
-                     'MI_brain', 'Psptp_brain', 'real_focal_distance_mm', 'Ipa_target'};
+                     'MI_brain', 'Psptp_brain', 'real_focal_distance_bowl_mm', 'Ipa_target'};
     limits = get_risk_limits(is_layered);
 
     % Collect all values upfront so we can compute column maxima

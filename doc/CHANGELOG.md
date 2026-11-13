@@ -204,6 +204,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Reports redesigned (`modules.report_style`: `instrument` default, `classic`, `compact`, `paper`); `preview_report_styles` re-renders an output folder in every skin
 - Manuscript-ready Methods section with copy buttons and stated tissue properties
 - Report shows the calibration provenance of the transducer (library entry, k-Wave-verified or analytical only)
+- ⚠️ **Changed:** focal-distance columns name their reference: `real_focal_distance_mm` → `real_focal_distance_bowl_mm` (bowl apex), next to `real_focal_distance_ep_mm` (exit plane). Reports and the Nexus read older CSVs; update your own scripts that read `real_focal_distance_mm`
 - Safety dashboards flag peak pressure against a 2 MPa limit and show `MI` and `MItc` side by side
 - Run statistics in `<path.sim>/run_stats.jsonl`, used for resource estimates in the Nexus and `python -m prestus_nexus.estimate`
 - Fixed: Methods references for Martin et al. (2024), Pichardo et al. (2017) and Aubry et al. (2025) had wrong details; regenerate reports to update them

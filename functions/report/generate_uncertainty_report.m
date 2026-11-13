@@ -57,7 +57,7 @@ try
             sprintf('sub-%03d_%s%s.csv', subject_id, medium, variant_affixes{v}));
         if isfile(csv_path)
             try
-                tables{v} = readtable(csv_path, 'VariableNamingRule', 'preserve');
+                tables{v} = read_metrics_table(csv_path);
             catch
                 tables{v} = [];
             end
@@ -411,11 +411,11 @@ function html = build_acoustic_section(tables, variants, variant_affixes, parame
     % Summary range table
     if is_layered
         key_metrics = {'Isppa', 'Isppa_brain', 'Isppa_skull', 'Isppa_skin', ...
-                       'real_focal_distance_mm', 'MI_brain', 'MI_skull', 'MI_skin', 'MI_tc', ...
+                       'real_focal_distance_bowl_mm', 'MI_brain', 'MI_skull', 'MI_skin', 'MI_tc', ...
                        'Ipa_target', 'halfmax_ISPPA_volume_brain_mm3'};
     else
         key_metrics = {'Isppa', 'Isppa_after_exitplane', 'Psptp', 'Ptp_target', ...
-                       'real_focal_distance_mm', 'Ipa_target'};
+                       'real_focal_distance_bowl_mm', 'Ipa_target'};
     end
 
     html = [html '<h3>Key Acoustic Metrics</h3>'];
