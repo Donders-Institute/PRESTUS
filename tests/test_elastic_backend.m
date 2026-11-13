@@ -170,6 +170,15 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_elasti
             tc.verifyEqual(char(p.elastic.shear_mapping), 'pichardo');
         end
 
+        function test_config_overrides_cpp_mlx_to_matlab_cpu(tc)
+            % The Apple GPU backend has no gpuArray: the elastic override must land on matlab_cpu
+            o = struct('acoustic_backend', 'kwave_elastic');
+            o.simulation = struct('debug', 0, 'code_type', 'cpp_mlx');
+            o.grid = struct('axisymmetric', 0);
+            p = tc.verifyWarning(@() load_parameters(o), 'prestus:elasticNoCpp');
+            tc.verifyEqual(char(p.simulation.code_type), 'matlab_cpu');
+        end
+
         function test_config_rejects_axisymmetric(tc)
             o = struct('acoustic_backend', 'kwave_elastic');
             o.simulation = struct('debug', 0);

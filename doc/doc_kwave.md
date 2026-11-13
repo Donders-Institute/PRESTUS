@@ -16,6 +16,7 @@
 | `matlab_gpu` | MATLAB with GPU acceleration via `DataCast` | Parallel Computing Toolbox |
 | `cpp_cpu` | `kspaceFirstOrder3DC` wraps the C++ binary `kspaceFirstOrder-OMP` | The binary from [k-Wave downloads](http://www.k-wave.org/download.php) |
 | `cpp_gpu` | `kspaceFirstOrder3DG` wraps the C++/CUDA binary `kspaceFirstOrder-CUDA`, offloading computation to NVIDIA GPUs | A CUDA-capable Nvidia GPU and the binary from [k-Wave downloads](http://www.k-wave.org/download.php) |
+| `cpp_mlx` | `kspaceFirstOrder3DG` wraps the C++/[MLX](https://github.com/ml-explore/mlx) binary `kspaceFirstOrder-MLX`, offloading computation to the Apple Silicon GPU | An Apple Silicon Mac (macOS 14 or later) and the binary with `mlx.metallib`, built as described below |
 
 ??? note "Details: compiling the CUDA binary for your GPU"
     To use C++ with GPU support you may need to recompile the binary for your GPU version (for example the A100 GPUs on the Donders HPC).
@@ -27,6 +28,21 @@
     - Place the updated binary into `PRESTUS/external/k-Wave/binaries/`
 
 ## Elastic skull model (shear waves)
+??? note "Building the MLX binary (macOS)"
+    `cpp_mlx` is experimental and has not been validated on a PRESTUS head simulation. It runs the acoustic simulation on the Apple GPU; thermal simulations run on the CPU. Axisymmetric grids fall back to `matlab_cpu`, and `kwave_elastic` runs with `matlab_cpu`, because the port has no solver for either.
+
+    The binary is the MLX port of the k-Wave CUDA solver by S. Pichardo ([kspacefirstorder-unified, pull request 31](https://github.com/waltsims/kspacefirstorder-unified/pull/31)). Building it needs [CMake](https://cmake.org/) and [Xcode](https://developer.apple.com/xcode/) with the [Metal](https://developer.apple.com/metal/) Toolchain (`xcodebuild -downloadComponent MetalToolchain`).
+
+    ```bash
+    git clone --branch MLX-k-Wave-binary https://github.com/ProteusMRIgHIFU/kspacefirstorder-unified.git
+    cd kspacefirstorder-unified
+    cmake -S repos/kspaceFirstOrder-mlx-darwin -B build/mlx-darwin \
+      -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DKWAVE_BUNDLE_DEPS=ON
+    cmake --build build/mlx-darwin --parallel
+    ```
+
+    Copy `kspaceFirstOrder-MLX` and `mlx.metallib` from `build/mlx-darwin` into `PRESTUS/external/k-wave/k-Wave/binaries/`. The two files must stay side by side, because the binary loads `mlx.metallib` from its own folder.
+
 
 `acoustic_backend: kwave_elastic` runs k-Wave's `pstdElastic3D` / `pstdElastic2D` instead of `kspaceFirstOrder*`, so the skull supports shear as well as compressional waves. The motivation is Gao et al. (2026), who compared fluid and elastic k-Wave skull models against hydrophone scans through an ex vivo skull at normal and 40° incidence for shallow (cortical) foci. In those scans the fluid skull model overestimated the intracranial pressure by ~40 % on average and the −6 dB focal area by up to 170 %. The elastic model was also less sensitive to small transducer position errors.
 

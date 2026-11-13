@@ -18,7 +18,7 @@ Parameters are organised in nested structs that map directly to YAML keys. `conf
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `medium` | Simulation medium type. | `'layered'` | `water` / `layered` / `phantom`. Mandatory. |
-| `code_type` | k-Wave backend. | `'matlab_gpu'` | `matlab_cpu` / `matlab_gpu` / `cpp_cpu` / `cpp_gpu`. See [k-Wave](doc_kwave.md). |
+| `code_type` | k-Wave backend. | `'matlab_gpu'` | `matlab_cpu` / `matlab_gpu` / `cpp_cpu` / `cpp_gpu` / `cpp_mlx`. See [k-Wave](doc_kwave.md). |
 | `precision` | Computational precision for acoustic and thermal simulations. | `'single'` | `single` / `double` |
 | `interactive` | Interactive mode with prompts and evolving plots. | `0` | `1 = yes`, `0 = no`. If `0`, see `overwrite_files`. |
 | `debug` | Verbose debug mode with additional intermediate outputs. | `0` | `1 = yes`, `0 = no` |

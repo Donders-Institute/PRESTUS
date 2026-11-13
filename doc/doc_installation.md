@@ -12,8 +12,8 @@
 | MATLAB R2023b | Everything | MathWorks. More recent versions can cause issues on HPCs with GPUs. |
 | PRESTUS with its submodules (k-Wave 1.4.1, export_fig, FEX-minimize, xml2struct) | Everything | The recursive clone below |
 | SimNIBS 4 | Head simulations (segmentation with `charm`) | [SimNIBS installation](#simnibs-installation) |
-| k-Wave C++ binaries | `cpp_cpu` and `cpp_gpu` code types | [Optional: C++ binaries](#optional-c-binaries) |
 | Python environments | BabelBrain or jwave backends, PlanTUS and TUS_entry placement, the Nexus | [Optional components](#optional-components) |
+| k-Wave C++ binaries | `cpp_cpu`, `cpp_gpu` and `cpp_mlx` code types | [k-Wave C++ binaries](#k-wave-c-binaries) |
 
 ## Install PRESTUS
 
@@ -132,7 +132,7 @@ The Nexus runs where you edit configs and needs a display; the others run where 
 
 ### Optional: C++ binaries
 
-For the `cpp_cpu` and `cpp_gpu` code types, download the C++ binaries from the [k-Wave website](http://www.k-wave.org/download.php) and place them in `k-Wave/binaries/` ([k-Wave instructions](http://www.k-wave.org/documentation/kspaceFirstOrder3DC.php)). Compiling and selecting binaries is described in [k-Wave](doc_kwave.md).
+Only the `cpp_cpu` and `cpp_gpu` code types need these optional binaries: download the C++ binaries from the [k-Wave website](http://www.k-wave.org/download.php) and place them in `k-Wave/binaries/` ([k-Wave instructions](http://www.k-wave.org/documentation/kspaceFirstOrder3DC.php)). The [kspacefirstorder-unified](https://github.com/waltsims/kspacefirstorder-unified) repository is an alternative source for the same C++ code (OpenMP and CUDA variants, with macOS support). It also hosts the MLX port for Apple Silicon GPUs, which the `cpp_mlx` code type needs and which is not on the k-Wave website. Compiling and selecting binaries is described in [k-Wave](doc_kwave.md).
 
 ### Optional: PlanTUS dependencies
 

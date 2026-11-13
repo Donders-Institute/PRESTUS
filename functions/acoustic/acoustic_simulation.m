@@ -3,7 +3,7 @@ function [sensor_data] = acoustic_simulation(kgrid, medium, source, sensor, inpu
 %
 % Selects and calls the appropriate k-Wave solver function based on
 % parameters.simulation.code_type ('matlab_cpu', 'matlab_gpu', 'cpp_cpu',
-% 'cpp_gpu') and grid dimensionality (2D, 2D axisymmetric, or 3D). With
+% 'cpp_gpu', 'cpp_mlx') and grid dimensionality (2D, 2D axisymmetric, or 3D). With
 % acoustic_backend 'kwave_elastic', hands off to ACOUSTIC_SIMULATION_ELASTIC
 % (pstdElastic2D/3D, shear waves in the skull). Strips
 % thermal-only medium fields before passing to k-Wave, sets DataCast/precision
@@ -43,6 +43,7 @@ end
 %   2: MATLAB GPU code 'matlab_gpu'
 %   3: C++ CPU code 'cpp_cpu'
 %   4: C++ GPU code 'cpp_gpu'
+%   5: C++ Apple Silicon GPU code 'cpp_mlx' (kspaceFirstOrder-MLX)
 
 % Disable k-Wave's PlotSim when not interactive, when using C++ backends
 % (which run out-of-process), or when the PRESTUS GUI is open.  The GUI is
@@ -51,14 +52,14 @@ end
 % planeplot to draw into the wrong window.  Command-line interactive runs
 % (no GUI) are unaffected and still receive the real-time animation.
 gui_open   = ~isempty(findall(0, 'Tag', 'prestus_gui'));
-cpp_backend = ismember(parameters.simulation.code_type, {'cpp_cpu', 'cpp_gpu'});
+cpp_backend = ismember(parameters.simulation.code_type, {'cpp_cpu', 'cpp_gpu', 'cpp_mlx'});
 if ~parameters.simulation.interactive || gui_open || cpp_backend
     input_args.PlotSim = false;
     if parameters.simulation.interactive
         if gui_open
             disp('Interactive acoustic visualization is disabled when the PRESTUS GUI is open.');
         elseif cpp_backend
-            disp('Interactive acoustic visualization is not available for C++ backends (cpp_cpu/cpp_gpu).');
+            disp('Interactive acoustic visualization is not available for C++ backends (cpp_cpu/cpp_gpu/cpp_mlx).');
         end
     end
 end
@@ -163,6 +164,52 @@ switch parameters.simulation.code_type
          sensor_data = kspaceFirstOrder3DG(kgrid, medium, source, sensor, input_args_cell{:});
       end
       
+   case 'cpp_mlx'
+
+      if numel(parameters.grid.dims) == 2 && isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
+         % kspaceFirstOrder-MLX is a port of the CUDA solver, which has no axisymmetric
+         % geometry; use the MATLAB solver on the CPU (no gpuArray on macOS).
+         warn('kspaceFirstOrder-MLX does not support axisymmetric simulations. Falling back to matlab_cpu (kspaceFirstOrderAS).');
+         as_args = zip_fields(rmfield(input_args, intersect(fieldnames(input_args), ...
+             {'SaveToDisk','DataName','DataPath','DeleteData','FunctionName','DeviceNum','NumThreads','BinaryName'})));
+         as_args_cast = [as_args, {'DataCast', char(parameters.simulation.precision)}];
+         sensor_data = kspaceFirstOrderAS(kgrid, medium, source, sensor, as_args_cast{:}, 'RadialSymmetry', 'WSWA-FFT');
+      else
+         % The user supplies the binary, as for the other C++ backends: both files
+         % must sit in k-Wave's binaries folder (MLX loads mlx.metallib from the
+         % folder of the executable).
+         mlx_dir = getkWavePath('binaries');
+         for f = {'kspaceFirstOrder-MLX', 'mlx.metallib'}
+            if ~isfile(fullfile(mlx_dir, f{1}))
+               error('prestus:mlxBinaryMissing', ...
+                  ['code_type cpp_mlx needs %s in %s. Build kspaceFirstOrder-MLX for Apple ' ...
+                   'Silicon and copy it and mlx.metallib there (see doc_kwave.md).'], f{1}, mlx_dir);
+            end
+         end
+
+         % Force precision for C++ HDF5 compatibility
+         medium  = cast_struct(medium, parameters.simulation.precision);
+         source  = cast_struct(source, parameters.simulation.precision);
+         sensor  = cast_struct(sensor, parameters.simulation.precision);
+
+         h5_dir = kwave_scratch_dir;
+         input_args.SaveToDisk = char(fullfile(h5_dir, ...
+           sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
+           parameters.simulation.medium, parameters.io.output_affix)));
+         input_args.DataName = sprintf('kwave_sub-%03d%s', parameters.subject_id, parameters.io.output_affix);
+         input_args.DataPath = h5_dir;
+         input_args.DeleteData = true;
+         if numel(parameters.grid.dims) == 3
+            input_args.FunctionName = 'kspaceFirstOrder3D';
+         else
+            input_args.FunctionName = 'kspaceFirstOrder2D';
+         end
+         % One Apple GPU: no device number or thread count (those are CUDA / OpenMP options).
+         input_args.BinaryName = 'kspaceFirstOrder-MLX';
+         input_args_cell = zip_fields(input_args);
+         sensor_data = kspaceFirstOrder3DG(kgrid, medium, source, sensor, input_args_cell{:});
+      end
+
    case 'matlab_gpu'
 
       input_args.DataCast = ['gpuArray-', char(parameters.simulation.precision)];
@@ -191,7 +238,7 @@ switch parameters.simulation.code_type
       
    otherwise
 
-      error('Unsupported code_type: %s. Supported options: matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu', parameters.simulation.code_type);
+      error('Unsupported code_type: %s. Supported options: matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu, cpp_mlx', parameters.simulation.code_type);
 
 end
 

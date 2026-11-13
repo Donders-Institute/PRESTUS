@@ -86,6 +86,10 @@ end
             warning('acoustic_simulation_elastic:noCpp', ...
                 'No C++/CUDA elastic solver in k-Wave; running pstdElastic with matlab_gpu instead.');
             code_type = 'matlab_gpu';
+        case 'cpp_mlx'
+            warning('acoustic_simulation_elastic:noCpp', ...
+                'No MLX elastic solver in k-Wave; running pstdElastic with matlab_cpu instead.');
+            code_type = 'matlab_cpu';
         case 'cpp_cpu'
             warning('acoustic_simulation_elastic:noCpp', ...
                 'No C++ elastic solver in k-Wave; running pstdElastic with matlab_cpu instead.');
@@ -96,7 +100,7 @@ end
         case 'matlab_gpu', input_args.DataCast = ['gpuArray-', precision];
         case 'matlab_cpu', input_args.DataCast = precision;
         otherwise
-            error('Unsupported code_type: %s. Supported options: matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu', code_type);
+            error('Unsupported code_type: %s. Supported options: matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu, cpp_mlx', code_type);
     end
     % Options of the fluid solvers that pstdElastic does not accept
     input_args = rmfield(input_args, intersect(fieldnames(input_args), ...

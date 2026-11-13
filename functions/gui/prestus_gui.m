@@ -301,7 +301,7 @@ end
 
         lbl(gl, 3, 1, '* Code backend');
         drp(gl, 3, 2, 'simulation.code_type', ...
-            {'matlab_gpu','matlab_cpu','cpp_gpu','cpp_cpu'}, 'matlab_gpu');
+            {'matlab_gpu','matlab_cpu','cpp_gpu','cpp_cpu','cpp_mlx'}, 'matlab_gpu');
 
         lbl(gl, 4, 1, 'Precision');
         drp(gl, 4, 2, 'simulation.precision', {'single','double'}, 'single');

@@ -24,6 +24,7 @@ simulation:
                         #   MATLAB GPU code 'matlab_gpu'
                         #   C++ CPU code 'cpp_cpu'
                         #   C++ GPU code 'cpp_gpu'
+                        #   C++ Apple Silicon GPU code 'cpp_mlx' (macOS; kspaceFirstOrder-MLX)
   precision: 'single' # Computational precision for both acoustic and thermal simulations
   interactive: 0      # Run in interactive mode (ask for user input when necessary, plot evolving figures)
   debug: 0            # Activate debug mode with additional intermediate outputs?
