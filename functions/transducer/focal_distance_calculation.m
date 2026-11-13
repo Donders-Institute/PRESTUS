@@ -45,12 +45,7 @@ for ti = 1:numel(parameters.transducer)
     end
     focal_distance_offset = 0;
     if ~isempty(tr_type) && isfield(tr, tr_type)
-        type_tr = tr.(tr_type);
-        if isfield(type_tr, 'curv_radius_mm') && isfield(type_tr, 'dist_geom_ep_mm') && ...
-                ~isempty(type_tr.curv_radius_mm) && ~isempty(type_tr.dist_geom_ep_mm) && ...
-                isfinite(type_tr.curv_radius_mm)
-            focal_distance_offset = type_tr.curv_radius_mm - type_tr.dist_geom_ep_mm;
-        end
+        focal_distance_offset = annular_bowl_depth_mm(tr.(tr_type));
     end
     tr.focal_distance_offset = focal_distance_offset;
 

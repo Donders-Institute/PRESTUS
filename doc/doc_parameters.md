@@ -253,7 +253,7 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 | `condition` | **Experimental, not validated.** Dephased library condition (`conditions.<label>` in the library entry). | Replaces the focal-depth lookup; `focal_distance_ep` defaults to the condition's nominal setpoint. See [Dephased conditions](doc_transducer_library.md#dephased-conditions-experimental). |
 | `trans_pos` | Transducer position (XYZ, bowl apex). | T1 voxels by default; RAS+ or MNI mm via `placement.manual.coordinate_space`. |
 | `focus_pos` | Focus (target) position (XYZ). | T1 voxels by default; RAS+ or MNI mm via `placement.manual.coordinate_space`. |
-| `focal_distance_ep` | Focal depth setting: the depth the device is set to focus at, from the exit plane [mm]. | For annular arrays it selects the library phases and drive, so the simulated focus lands here whatever the `trans_pos`→`focus_pos` distance (the planned target depth). Empty = derived from that distance (`focal_distance_calculation`). |
+| `focal_distance_ep` | Focal depth setting: the depth the device is set to focus at, from the exit plane [mm]. | For annular arrays it selects the library phases and drive, so the simulated focus lands here whatever the `trans_pos`→`focus_pos` distance (the planned target depth). Empty = that distance minus `focal_distance_offset` (`focal_distance_calculation`). |
 | `focal_distance_bowl` | Focal depth setting from the bowl apex [mm]. | `focal_distance_ep` + bowl-to-exit-plane offset; set either. |
 | `focal_distance_offset` | Offset between transducer bowl and exit plane [mm]. | **Derived** from `curv_radius_mm − dist_geom_ep_mm`. Not set by user. |
 
@@ -361,6 +361,7 @@ See [doc_placement.md](doc_placement.md).
 | `mode` | Placement mode. | `'manual'` | `'manual'`, `'localite'`, `'heuristic'`, `'mni'`, `'plantus'` or `'tus_entry'`. |
 | `report` | Write the stand-alone placement report `sub-XXX_placement_<mode>.html` to `io.dir_reports`. | `true` | See [placement report](doc_placement.md#placement-report). |
 | `reuse` | When to reuse a recorded heuristic, PlanTUS or TUS_entry run (`placement_run.json` in its run folder). | `'auto'` | `'auto'`: reuse it when its settings match, else run again; `'always'`: require it (mismatch per `io.cache_signature_check`); `'never'`: always run. Independent of `io.overwrite_files`. See [Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs). |
+| `skin_gap_mm` | Gap between scalp and transducer exit plane along the beam axis [mm]. | `5` | e.g. a gel pad. Used by heuristic, MNI, PlanTUS and TUS_entry placement and by their [time-reversal pose search](doc_time_reversal.md); manual and Localite poses keep their own gap. The exit plane lies `curv_radius_mm − dist_geom_ep_mm` in front of the bowl apex. |
 
 #### `placement.manual`
 
@@ -438,7 +439,6 @@ See [doc_placement_mni.md](doc_placement_mni.md).
     |---|---|---|---|
     | `trans_pos_mm` | Desired transducer (scalp entry) position [MNI mm]. | `[]` | Required for `mode='mni'`. Converted with the linear (12dof) transform, then snapped to scalp. |
     | `focus_pos_mm` | Focus / target position [MNI mm]. | `[]` | Required for `mode='mni'`. Converted with the nonlinear (nonl) transform, like the heuristic target. |
-    | `skin_gap_mm` | Standoff from scalp to transducer along the focal axis [mm]. | `5` | Default matches the heuristic's gap. |
 
 #### `placement.plantus`
 
@@ -456,7 +456,6 @@ See [doc_placement_plantus.md](doc_placement_plantus.md).
     | `mni_target_mm` | Target [MNI mm]. | `[]` | Empty = use `transducer.focus_pos` (voxels). |
     | `focal_distance_list` | Focal distances from the calibration [mm]. | `[]` | Required. Set the eligible and optimal skin–target distance. |
     | `flhm_list` | Focal length at half maximum per entry of `focal_distance_list` [mm]. | `[]` | Required. |
-    | `additional_offset_mm` | Extra standoff between skin and exit plane [mm]. | `0` | e.g. gel pad. |
     | `max_angle_deg` | Maximum transducer tilt [deg]. | `10` | |
     | `mask_radius_mm` | Radius of the spherical target mask [mm]. | `2` | |
     | `min_distance_mm` | Smallest eligible skin–target distance [mm]. | `[]` | `[]` = `min(focal_distance_list) − max(flhm_list)`. For a steerable array, set it and `max_distance_mm` to the steering range; the default margin otherwise admits spots the focus cannot reach. |
@@ -676,7 +675,6 @@ See [Time reversal](doc_time_reversal.md).
     | `placement_search.enabled` | Score transducer poses around the planned one on the same reverse run. | `false` | Curved annular transducers, 3D. Suggestions only: the acoustic run keeps the planned pose. |
     | `placement_search.max_angle_deg` | Largest tilt of the beam direction from the planned one [deg]. | `20` | Poses lie on an orbit around the target, against the scalp. |
     | `placement_search.angle_step_deg` | Angular step of the candidate directions [deg]. | `2.5` | |
-    | `placement_search.standoff_mm` | Scalp to exit-plane distance [mm]. | `[]` | `[]` = that of the planned pose. |
     | `placement_search.aim_iterations` | Re-aim at target − predicted shift this many times. | `2` | `0` = geometric aim only. |
     | `placement_search.jitter_mm` | Also score the planned pose with its apex moved by these distances [mm], aimed at the target. | `[]` | One or more, e.g. `0.5` (the local search users often run with forward simulations) or `[0.5 1 2 5]`. Rows of kind `jitter`, distance in column `jitter_mm`. |
     | `placement_search.jitter_mode` | How `jitter_mm` moves the apex. | `'grid'` | `'grid'`: ± along each grid axis, as when editing voxel coordinates (6 poses per distance; the bowl is not re-seated, so beyond ~1 mm it can cut into or lift off the scalp). `'scalp'`: slid over the scalp perpendicular to the planned beam in 8 directions and re-seated against the scalp (8 poses per distance). |

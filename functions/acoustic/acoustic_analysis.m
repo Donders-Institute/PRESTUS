@@ -262,9 +262,9 @@ end
     %     focal_distance_bowl, and the legacy real_focal_distance_mm.
     %   * EXIT PLANE: manufacturer specs (FLHM centre), focal_distance_ep, and
     %     the O'Neill/Rayleigh analytical convention.
-    % The exit plane sits a bowl depth (sagitta = curv_radius_mm - dist_geom_ep_mm,
-    % also stored as focal_distance_offset) in front of the apex, along the beam
-    % axis toward the focus.
+    % The exit plane sits curv_radius_mm - dist_geom_ep_mm (focal_distance_offset;
+    % not the rim sagitta for library devices) in front of the apex, along the
+    % beam axis toward the focus.
     if isfield(tr, tr.type)
         bowl_depth_vox = annular_bowl_depth_mm(tr.(tr.type)) / parameters.grid.resolution_mm;
     else

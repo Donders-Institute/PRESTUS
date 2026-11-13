@@ -64,7 +64,7 @@ is_flat = ~isfinite(tr.(tr.type).curv_radius_mm);
 if strcmp(tr.type, 'annular')
     dist_to_exit_plane_mm = annular_bowl_depth_mm(tr.annular);
 else
-    dist_to_exit_plane_mm = tr.(tr.type).curv_radius_mm - tr.(tr.type).dist_geom_ep_mm;
+    dist_to_exit_plane_mm = annular_bowl_depth_mm(tr.(tr.type));
 end
 dist_to_exit_plane_vox = round(dist_to_exit_plane_mm / parameters.grid.resolution_mm);
 ex_plane_x_simple = trans_pos(2) - 1 + dist_to_exit_plane_vox;  % Rectangle method

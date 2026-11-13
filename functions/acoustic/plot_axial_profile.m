@@ -10,8 +10,8 @@ function plot_axial_profile(acoustic_Ipa, acoustic_pressure, medium_masks, ...
 % The axial-distance origin is the transducer EXIT PLANE (not the bowl apex),
 % so distances match the target focal_distance_ep and the O'Neill/Rayleigh
 % analytical convention.  The caller (acoustic_analysis) passes the exit-plane
-% voxel position, which is the bowl apex shifted toward the focus by the bowl
-% depth (sagitta = curv_radius_mm - dist_geom_ep_mm).
+% voxel position, which is the bowl apex shifted toward the focus by
+% curv_radius_mm - dist_geom_ep_mm (ANNULAR_BOWL_DEPTH_MM).
 %
 % The intensity panel also shows the free-water on-axis intensity of the
 % transducer settings used in the simulation, as a check of the realised

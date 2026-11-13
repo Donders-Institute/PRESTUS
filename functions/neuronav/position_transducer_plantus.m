@@ -60,7 +60,6 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
 % Optional configuration (parameters.placement.plantus):
 %   mni_target_mm           - [1×3] MNI target coordinate [mm]
 %   mask_radius_mm          - Sphere radius for target mask [mm] (default 2)
-%   additional_offset_mm    - Standoff between skin and exit plane [mm] (default 0)
 %   max_angle_deg           - Max transducer tilt [degrees] (default 10)
 %   min_distance_mm         - Skin–target distance window and optimum [mm]
 %   max_distance_mm           used for eligibility and the distance criterion.
@@ -416,14 +415,13 @@ function tx_yaml = build_plantus_yaml(parameters, focal_dist_list, flhm_list, ta
     % plane_offset: gap between radiating surface and exit plane
     % = curv_radius_mm - dist_geom_ep_mm (same geometry used in localite mode)
     plane_offset = 0;
-    if isfield(td, 'annular') && isfield(td.annular, 'curv_radius_mm') && ...
-            isfield(td.annular, 'dist_geom_ep_mm')
-        plane_offset = td.annular.curv_radius_mm - td.annular.dist_geom_ep_mm;
+    if isfield(td, 'annular')
+        plane_offset = annular_bowl_depth_mm(td.annular);
     end
 
-    additional_offset = 0;
-    if isfield(pt, 'additional_offset_mm') && ~isempty(pt.additional_offset_mm)
-        additional_offset = pt.additional_offset_mm;
+    additional_offset = 5;      % gap between skin and exit plane (placement.skin_gap_mm)
+    if isfield(parameters.placement, 'skin_gap_mm') && ~isempty(parameters.placement.skin_gap_mm)
+        additional_offset = parameters.placement.skin_gap_mm;
     end
 
     max_angle = 10;

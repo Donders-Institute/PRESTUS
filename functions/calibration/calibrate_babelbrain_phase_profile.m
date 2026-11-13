@@ -62,7 +62,7 @@ end
     rho      = parameters.medium_properties.water.density;
 
     % Exit-plane <-> bowl offset: bowl distance = ep distance + (curv_radius - dist_geom_ep)
-    bowl_off_mm = an.curv_radius_mm - an.dist_geom_ep_mm;
+    bowl_off_mm = annular_bowl_depth_mm(an);
     focal_ep_mm = tr.focal_distance_ep;
 
     if ~isfield(opts, 'eval_max_mm') || isempty(opts.eval_max_mm)

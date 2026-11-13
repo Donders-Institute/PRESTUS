@@ -102,7 +102,7 @@ function [rp, info] = fit_ring_profile(tran, prof, options)
 
     % Uniform sub-ring transfer matrix on the fitted z range
     tr_u = ring_profile_transducer(tran, struct('n_sub', M));
-    off  = a.curv_radius_mm - a.dist_geom_ep_mm;
+    off  = annular_bowl_depth_mm(a);
     z    = prof.z_ep_mm(:); sel = z >= skip;
     H    = axial_transfer_matrix(rmfield_ann(tr_u, 'elem_weight'), z(sel) + off, 1500, 994, fwd);
     area = (tr_u.transducer.annular.elem_od_mm.^2 - tr_u.transducer.annular.elem_id_mm.^2);

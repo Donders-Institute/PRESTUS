@@ -53,7 +53,7 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
     %
     % PRESTUS models the transducer as a bowl whose anchor point (trans_pos /
     % bowl_pos in k-Wave's makeBowl) is the centre of the rear surface of the
-    % bowl — the geometric axis point at the back of the housing. The offset
+    % bowl, i.e. the bowl apex on the beam axis (not the housing). The offset
     % below maps the Localite matrix origin (column 4) to that point.
     %
     % Priority order:
@@ -85,10 +85,12 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
         td_type = '';
         if isfield(td, 'type'), td_type = td.type; end
 
-        if ~isempty(td_type) && isfield(td, td_type) && ...
-           isfield(td.(td_type), 'curv_radius_mm') && isfield(td.(td_type), 'dist_geom_ep_mm')
-            % Assumes matrix origin = exit plane; bowl rear centre is behind it
-            reference_dist = -(td.(td_type).curv_radius_mm - td.(td_type).dist_geom_ep_mm);
+        has_geom = ~isempty(td_type) && isfield(td, td_type) && ...
+            isfield(td.(td_type), 'curv_radius_mm') && isfield(td.(td_type), 'dist_geom_ep_mm') && ...
+            isscalar(td.(td_type).curv_radius_mm) && isscalar(td.(td_type).dist_geom_ep_mm);
+        if has_geom
+            % Assumes matrix origin = exit plane; bowl rear centre is behind it (flat element: 0)
+            reference_dist = -annular_bowl_depth_mm(td.(td_type));
         elseif isfield(lc, 'reference_distance_mm') && ~isempty(lc.reference_distance_mm)
             reference_dist = lc.reference_distance_mm;
         else
@@ -100,7 +102,7 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
         end
     end
 
-    % --- Focal distance (exit plane → acoustic focus, along beam axis) ---
+    % --- Focal distance (bowl apex → acoustic focus, along beam axis) ---
     parameters = focal_distance_calculation(parameters);
     focal_dist = parameters.transducer(1).focal_distance_bowl;
 

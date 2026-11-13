@@ -18,7 +18,7 @@ placement:
 The search converts the target to subject space with SimNIBS tools, finds candidate positions on the skull by expanding a sphere, scores each candidate (target distance, intersection with skin, mean and variance of the distances to skin and skull), optionally removes positions over the ears, and selects one position by the criteria below. Candidates and the selected position are written to the [placement run folder](doc_outputs.md#where-outputs-live), `<path.placement>/sub-XXX/heuristic/<target_name>/`; a copy of the selected position also goes to `path.localite_export` when set. All parameters: [overview](doc_parameters.md#placementheuristic).
 
 ??? note "Details: functions"
-    `transducer_positioning` runs the search; `transducer_positioning_start` calls it. Candidate positions come from an expanding sphere on the skull. For each candidate it computes the intersection proportion between the transducer and skin, mean and variance of the distances to skin and skull, and the geometric focus and exit plane positions.
+`transducer_positioning` runs the search; `transducer_positioning_start` calls it. Candidate positions come from an expanding sphere on the skull. For each candidate it computes the intersection proportion between the transducer and skin, mean and variance of the distances to skin and skull, and the geometric focus and exit plane positions. Each candidate's exit plane lies `placement.skin_gap_mm` (default 5 mm) off the scalp.
 
 ## Candidate table
 

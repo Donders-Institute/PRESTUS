@@ -205,7 +205,7 @@ For the selected vertex, PlanTUS computes the beam direction and the transducer 
     For the selected vertex *v*:
 
     1. **Beam direction**: the negated skin normal if it intersects the target (`x_v > 0`), otherwise the negated skin-to-target vector. Both are unit vectors pointing into the head.
-    2. **Transducer centre**: `transducer_centre = skin_coordinate_v − (plane_offset + additional_offset) × beam_direction`. `plane_offset` is the distance from radiating surface to exit plane; `additional_offset` is the gel pad / standoff thickness.
+    2. **Transducer centre**: `transducer_centre = skin_coordinate_v − (plane_offset + additional_offset) × beam_direction`. `plane_offset` is the distance from the bowl apex to the exit plane (`curv_radius_mm − dist_geom_ep_mm`); `additional_offset` is `placement.skin_gap_mm`, the gap between skin and exit plane.
     3. **Localite position matrix** (`PlanTUS.create_Localite_position_matrix`): column 3 = `transducer_centre`, column 0 = `beam_direction`, columns 1–2 by Gram–Schmidt.
 
 ### 7  PRESTUS reads the output

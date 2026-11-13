@@ -320,8 +320,9 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
     % TUS_entry's "Scalp_coordinates" is the point on the scalp surface where
     % the trajectory exits. In PRESTUS convention, trans_pos is the bowl
     % rear-centre. We apply the same focal-distance offset used in localite mode:
-    % the transducer sits at the scalp entry point, offset outward along the
-    % trajectory direction by the standoff (curv_radius_mm - dist_geom_ep_mm).
+    % the exit plane sits placement.skin_gap_mm outward from the scalp entry
+    % point along the trajectory, and the apex a further
+    % curv_radius_mm - dist_geom_ep_mm behind it.
     %
     % Direction vector: from target centroid toward scalp entry (unit vector in
     % voxel space, scaled by pixel dimensions).
@@ -334,13 +335,22 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
     % Focal distance in mm (use mean of list if available)
     focal_dist_mm = get_focal_distance(parameters);
 
-    % trans_pos = scalp entry + dir_hat * standoff (in voxel space)
-    standoff_mm = get_standoff(parameters);
-    trans_pos_mm_world = scalp_vox .* ps + dir_hat * standoff_mm;
+    % exit plane = scalp entry + dir_hat * skin gap; trans_pos = exit plane + dir_hat * apex-to-exit-plane depth
+    skin_gap_mm = 5;
+    if isfield(parameters.placement, 'skin_gap_mm') && ~isempty(parameters.placement.skin_gap_mm)
+        skin_gap_mm = parameters.placement.skin_gap_mm;
+    end
+    exit_mm_world = scalp_vox .* ps + dir_hat * skin_gap_mm;
+    td = parameters.transducer(1);
+    apex_to_ep_mm = 0;
+    if isfield(td, 'type') && isfield(td, td.type)
+        apex_to_ep_mm = annular_bowl_depth_mm(td.(td.type));
+    end
+    trans_pos_mm_world = exit_mm_world + dir_hat * apex_to_ep_mm;
     trans_pos = round(trans_pos_mm_world ./ ps);
 
-    % focus_pos = scalp entry - dir_hat * focal_distance (stepping inward)
-    focus_pos_mm_world = scalp_vox .* ps - dir_hat * focal_dist_mm;
+    % focus_pos = exit plane - dir_hat * focal_distance (stepping inward)
+    focus_pos_mm_world = exit_mm_world - dir_hat * focal_dist_mm;
     focus_pos = round(focus_pos_mm_world ./ ps);
 
     % ── Convert to RAS ────────────────────────────────────────────────────────
@@ -463,31 +473,20 @@ function d = get_opt(s, field, default)
 end
 
 function focal_dist_mm = get_focal_distance(parameters)
-% Return focal distance in mm: prefer calibrated list, fall back to geometry.
+% Return the focal distance from the exit plane (= scalp entry) in mm:
+% focal_distance_ep (FOCAL_DISTANCE_CALCULATION has already derived it from
+% focal_distance_bowl), else the geometric focus.
     td = parameters.transducer(1);
-    if isfield(td, 'annular') && isfield(td.annular, 'focal_distance_mm')
-        focal_dist_mm = mean(td.annular.focal_distance_mm);
+    if isfield(td, 'focal_distance_ep') && ~isempty(td.focal_distance_ep)
+        focal_dist_mm = mean(td.focal_distance_ep);
         return;
     end
-    if isfield(td, 'focal_distance_mm') && ~isempty(td.focal_distance_mm)
-        focal_dist_mm = mean(td.focal_distance_mm);
-        return;
-    end
-    if isfield(td, 'annular') && isfield(td.annular, 'curv_radius_mm')
-        focal_dist_mm = td.annular.curv_radius_mm;
+    if isfield(td, 'annular') && isfield(td.annular, 'dist_geom_ep_mm') && ~isempty(td.annular.dist_geom_ep_mm)
+        focal_dist_mm = td.annular.dist_geom_ep_mm;
         return;
     end
     error('PRESTUS:tus_entry:noFocalDist', ...
         ['Cannot determine focal distance. ' ...
-         'Set transducer.focal_distance_mm or transducer.annular.focal_distance_mm.']);
+         'Set transducer.focal_distance_ep or transducer.annular.dist_geom_ep_mm.']);
 end
 
-function standoff_mm = get_standoff(parameters)
-% Standoff = distance from bowl rear centre to exit plane (same as PlanTUS).
-    td = parameters.transducer(1);
-    standoff_mm = 0;
-    if isfield(td, 'annular') && isfield(td.annular, 'curv_radius_mm') && ...
-            isfield(td.annular, 'dist_geom_ep_mm')
-        standoff_mm = td.annular.curv_radius_mm - td.annular.dist_geom_ep_mm;
-    end
-end

@@ -83,6 +83,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - ⚠️ **Fixed:** in coherent multi-transducer runs, transducers 2..N were built from transducer 1's drive, phases, geometry and frequency; re-run coherent multi-transducer acoustics (single-transducer, async, sequential and BabelBrain runs are unaffected)
 - Fixed: flat matrix arrays (`is_curved: false`) failed; `extract_from_file.file_path` accepts absolute paths outside the MATLAB path
 - ⚠️ **Fixed:** without `focal_distance_ep` or `focal_distance_bowl`, the focal distance derived from voxel `trans_pos` / `focus_pos` rounded the T1 voxel size to whole mm (0.8 or 0.9 mm read as 1 mm, focal distance 11–25 % too long); rerun such runs on non-1 mm or anisotropic T1s
+- ⚠️ **Fixed:** curved matrix arrays without `dist_geom_ep_mm` put the exit plane at the bowl apex; it is now derived from the aperture as for annular arrays. Rerun curved matrix runs that left `dist_geom_ep_mm` empty
 - ⚠️ **Fixed:** `transducer.trans_pos_mm` / `focus_pos_mm` mapped 0 mm to the invalid voxel 0; they are now measured from the centre of voxel 1 (`round(mm / resolution_mm) + 1`). Subtract one voxel (`resolution_mm`) from configs that compensated for the old mapping
 
 #### Placement
@@ -99,6 +100,8 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - ⚠️ **Fixed:** configured voxel positions ignored the reorientation of a non-RAS+ planning T1; rerun runs whose T1 is not stored RAS+
 - ⚠️ **Fixed:** Localite placement used the transposed instrument matrix (transducer at the image origin); rerun Localite placements in file mode and via `placement.localite.enabled` (the multi-target toolkit was not affected)
 - ⚠️ **Fixed:** with `tracker_to_bowl_mm` / `reference_distance_mm` set, and always in PlanTUS mode, the focus was too shallow by `curv_radius_mm − dist_geom_ep_mm`; PlanTUS placements computed before this fix have a focus that is too shallow by that amount
+- ⚠️ **Fixed:** TUS_entry placement ignored `focal_distance_ep` and put `focus_pos` `curv_radius_mm` below the scalp entry; rerun TUS_entry placements
+- ⚠️ **Changed:** all placement modes use one exit plane, `curv_radius_mm − dist_geom_ep_mm` in front of the bowl apex (as BabelBrain), and one gap to the scalp, `placement.skin_gap_mm` (default 5 mm; replaces `placement.mni.skin_gap_mm` and `placement.plantus.additional_offset_mm`). Heuristic and MNI placements measured their 5 mm gap from the bowl rim, so their transducers now sit by the rim-to-exit-plane distance further from the head (about 2 mm for a CTX-500); PlanTUS and TUS_entry placements had no gap and now sit 5 mm further out. Recorded placement runs are not reused; set `placement.skin_gap_mm: 0` to keep earlier PlanTUS and TUS_entry positions
 - ⚠️ **Changed:** PlanTUS skull thickness is now a placement criterion (`weight_skull_thickness` had no effect); with the default weights, placements can change
 - Fixed: PlanTUS interactive mode hung, did not find its own output, and crashed with a single calibration point; PlanTUS target masks failed on integer T1s
 - Fixed: automatic Localite placement (`placement.localite.file` empty) always errored; file mode now honours `position` / `target`
@@ -138,7 +141,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Time axis and steady state configurable: `grid.steady_state_transits`, `grid.steady_state_num_periods`, `grid.source_ppp`, `grid.sim_time_us`; PML and band-limiting options `grid.pml_size_range`, `grid.pml_alpha`, `grid.bli_tolerance`, `grid.bli_upsampling_rate`
 - Lower memory use for CW sources on `matlab_cpu` / `matlab_gpu`, also on axisymmetric grids
 - Axial-profile plot with tissue bands and the free-water O'Neil and k-Wave profiles; CSV gains `freewater_oneil_Wcm2` / `freewater_kwave_Wcm2`
-- Time reversal (`time_reversal.enabled`, *draft*): one reverse simulation per target gives refocusing phases, aberration metrics and a ranking of candidate poses; `placement_search.jitter_mm` takes several distances, and `jitter_mode: scalp` slides the pose over the scalp and re-seats it
+- Time reversal (`time_reversal.enabled`, *draft*): one reverse simulation per target gives refocusing phases, aberration metrics and a ranking of candidate poses; `placement_search.jitter_mm` takes several distances, and `jitter_mode: scalp` slides the pose over the scalp and re-seats it; candidate poses keep `placement.skin_gap_mm` (heuristic, MNI, PlanTUS, TUS_entry) or the planned pose's gap
 - Pulse amplitude ramps in thermal simulations (`timing.pulse_ramp_dur`, `timing.pulse_ramp_shape`: `linear` | `tukey`)
 - New thermal metrics `riseT37_brain` / `riseT37_skull` / `riseT37_skin` (rise from 37 °C); new output columns `MI` (free water) and `Psptp`
 - ⚠️ **Fixed:** MI was computed from peak positive pressure instead of peak rarefaction pressure (IEC 62359); rerun acoustic analysis to update MI

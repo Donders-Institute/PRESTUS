@@ -26,7 +26,7 @@ end
 
     mode = char(mode);
     sig = struct();
-    sig.signature_version = 1;
+    sig.signature_version = 2;      % 2: exit plane from dist_geom_ep_mm, placement.skin_gap_mm
     sig.mode = mode;
     sig.subject_id = parameters.subject_id;
     s = parameters.placement.(mode);
@@ -39,6 +39,9 @@ end
         s = rmfield(s, 'interactive');
     end
     sig.settings = s;
+    if isfield(parameters.placement, 'skin_gap_mm')
+        sig.skin_gap_mm = parameters.placement.skin_gap_mm;
+    end
     t = parameters.transducer;
     for f = {'trans_pos', 'focus_pos', 'trans_pos_ras', 'focus_pos_ras', ...
              'target_isppa_wcm2', 'tx_calibration'}

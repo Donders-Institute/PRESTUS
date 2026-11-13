@@ -65,9 +65,14 @@ function mesh = tp_candidate_mesh(img, target, parameters, pixel_size)
     trans_pos_coords = coord_mesh.xyz(close_enough_idx, :);  % [N_cand x 3]
 
     %--- Transducer axis + geometry --------------------------------------
-    % Shared scalp-standoff geometry (skin_gap_mm = 5, the heuristic default)
+    % Shared scalp-standoff geometry (exit plane placement.skin_gap_mm off the scalp)
+    skin_gap_mm = 5;
+    if isfield(parameters.placement, 'skin_gap_mm') && ~isempty(parameters.placement.skin_gap_mm)
+        skin_gap_mm = parameters.placement.skin_gap_mm;
+    end
     [shifted_trans_pos_coords, geom_focus_pos_all, ex_plane_pos_all, norm_v] = ...
-        transducer_scalp_geometry(trans_pos_coords, target, parameters.transducer(1), pixel_size, 5);
+        transducer_scalp_geometry(trans_pos_coords, target, parameters.transducer(1), pixel_size, ...
+                                  skin_gap_mm);
 
     all_masks_indx     = find(img > 0);
     max_od_mm          = max(parameters.transducer(1).(parameters.transducer(1).type).elem_od_mm);

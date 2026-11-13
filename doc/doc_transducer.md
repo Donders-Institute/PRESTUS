@@ -70,7 +70,7 @@ In `water` simulations with annular arrays, the placement is determined from the
 
 The figure shows the PRESTUS definitions for annular transducer distances. Specify one of the two fields. Without either, PRESTUS computes a geometric distance from `trans_pos` and `focus_pos`, if both are set.
 
-- `focal_distance_ep`: expected distance from the transducer exit plane to the stimulation focus (mm). This often corresponds to the focal depth setting of the driving system or the transducer calibration.
+- `focal_distance_ep`: expected distance from the transducer exit plane to the stimulation focus (mm). This often corresponds to the focal depth setting of the driving system or the transducer calibration ([BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain)'s TPO distance). The exit plane lies `curv_radius_mm − dist_geom_ep_mm` in front of the bowl apex; `dist_geom_ep_mm` is BabelBrain's `NaturalOutPlaneDistance`.
 - `focal_distance_bowl`: expected distance from the transducer bowl to the stimulation focus (mm). Computed internally from `focal_distance_ep`, `dist_geom_ep_mm` and `curv_radius_mm`.
 
 ## Annular array

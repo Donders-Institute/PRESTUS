@@ -134,6 +134,17 @@ classdef (SharedTestFixtures = {prestus_paths}) test_transducer_placement < matl
             tc.verifyEqual(p_out.transducer(1).focal_distance_ep, expected_bowl - offset, 'AbsTol', 1e-4);
         end
 
+        function test_flat_element_exit_plane_is_finite(tc)
+            % Flat element: no bowl depth, the face is the exit plane
+            flat = struct('curv_radius_mm', Inf, 'dist_geom_ep_mm', Inf, 'elem_od_mm', 20);
+            tc.verifyEqual(annular_bowl_depth_mm(flat), 0);
+            tr = struct('type', 'annular', 'annular', flat);
+            [tp, ~, ep] = transducer_scalp_geometry([10 10 40], [10 10 10], tr, 1, 2);
+            tc.verifyTrue(all(isfinite(ep)), 'Exit plane must be finite for a flat element');
+            tc.verifyEqual(ep, tp, 'AbsTol', 1e-9);
+            tc.verifyEqual(tp, [10 10 42], 'AbsTol', 1e-9);   % 2 mm skin gap, no bowl depth
+        end
+
         function test_localite_missing_file_errors(tc)
             % Localite mode with no file and no path.localite must raise an error
             p = make_placement_parameters();

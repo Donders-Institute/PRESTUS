@@ -107,7 +107,7 @@ end
         ps = cfg.placement_search;
         find_poses = @(c, it, allow) reciprocity_pose_candidates(c.parameters, c.masks, ...
             parameters.transducer(it), c.trans(it, :), c.focus(it, :), 'MaxAngle', ps.max_angle_deg, ...
-            'AngleStep', ps.angle_step_deg, 'StandoffMm', ps.standoff_mm, 'JitterMm', ps.jitter_mm, ...
+            'AngleStep', ps.angle_step_deg, 'StandoffMm', search_skin_gap_mm(parameters), 'JitterMm', ps.jitter_mm, ...
             'JitterMode', jitter_mode(ps), 'AllowOutside', allow);
         searchable = arrayfun(@(t) strcmp(t.type, 'annular') && isfinite(t.annular.curv_radius_mm), ...
             parameters.transducer);
@@ -217,6 +217,18 @@ end
 function m = jitter_mode(ps)
     m = 'grid';
     if isfield(ps, 'jitter_mode') && ~isempty(ps.jitter_mode), m = char(ps.jitter_mode); end
+end
+
+function gap = search_skin_gap_mm(parameters)
+% Scalp-to-exit-plane gap of the candidate poses: placement.skin_gap_mm for
+% the placement modes that apply it; [] (the planned pose's own gap) for
+% manual and Localite poses
+    gap = [];
+    pl = parameters.placement;
+    if isfield(pl, 'mode') && ismember(char(pl.mode), {'heuristic', 'mni', 'plantus', 'tus_entry'})
+        gap = 5;
+        if isfield(pl, 'skin_gap_mm') && ~isempty(pl.skin_gap_mm), gap = pl.skin_gap_mm; end
+    end
 end
 
 function base = base_context(parameters, kwave_medium, medium_masks, trans_rows, focus_rows, planimg, fov_state)

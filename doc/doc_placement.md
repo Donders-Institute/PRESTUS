@@ -5,7 +5,7 @@
     - **When you need it:** Every head simulation. Free-water simulations need no target.
     - **Before you start:** The T1w planning image; most modes also need a SimNIBS segmentation.
 
-PRESTUS works with the transducer (`transducer.trans_pos`) and the target (`transducer.focus_pos`) as voxels of the T1w planning image. The transducer coordinate is the bowl apex, not the exit plane of a curved transducer. You can enter both points directly (in voxels, subject RAS mm or MNI mm), or let a placement mode derive them.
+PRESTUS works with the transducer (`transducer.trans_pos`) and the target (`transducer.focus_pos`) as voxels of the T1w planning image. The transducer coordinate is the bowl apex, not the exit plane of a curved transducer. All modes put the exit plane `curv_radius_mm − dist_geom_ep_mm` in front of the apex ([BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain)'s `FocalLength − NaturalOutPlaneDistance`) and, where they place the transducer on the scalp, leave `placement.skin_gap_mm` (default 5 mm) between scalp and exit plane. You can enter both points directly (in voxels, subject RAS mm or MNI mm), or let a placement mode derive them.
 
 ## Choosing a placement mode
 

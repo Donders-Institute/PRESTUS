@@ -98,7 +98,7 @@ MATLAB cannot read RDS files directly. To filter ranked candidates in PRESTUS (e
 
 TUS_entry operates in the native voxel space of the input masks. **Use the same T1 as the reference for both SimNIBS segmentation and PRESTUS placement.**
 
-`trans_pos` is derived from the `Scalp_coordinates` returned by TUS_entry by stepping outward along the trajectory by the transducer standoff (`curv_radius_mm − dist_geom_ep_mm`), the same offset applied in Localite and PlanTUS modes. `focus_pos` is derived by stepping inward from the scalp entry by `focal_distance_mm` (mean of the calibrated list if available, else the geometric focal distance).
+The exit plane lies `placement.skin_gap_mm` (default 5 mm) outward from the `Scalp_coordinates` returned by TUS_entry, along the trajectory. `trans_pos` lies a further `curv_radius_mm − dist_geom_ep_mm` outward, the offset used by all placement modes. `focus_pos` is derived by stepping inward from the exit plane by `transducer.focal_distance_ep` (or `focal_distance_bowl` minus the apex-to-exit-plane offset, as `focal_distance_calculation` converts it; if neither is set, the geometric focus `dist_geom_ep_mm`).
 
 ## Output files
 

@@ -34,8 +34,8 @@ function parameters = preproc_transducer_placement(parameters)
 %               point is converted with the linear (12dof) transform because it
 %               lies outside the brain where the nonlinear warp is unreliable.
 %               The transducer is then snapped to the nearest scalp voxel and
-%               offset outward by placement.mni.skin_gap_mm (default 5 mm) using
-%               the same standoff geometry as the heuristic (no search).
+%               offset outward so its exit plane lies placement.skin_gap_mm off
+%               the scalp, as in the heuristic (no search).
 %
 %   'plantus'   Call the external PlanTUS tool (Lueckel et al., Mainz) to
 %               optimise transducer placement against five geometric objectives:
@@ -491,8 +491,8 @@ function parameters = run_mni_placement(parameters)
 % SimNIBS transform, identical to the heuristic. The transducer point lies
 % outside the brain, so it is converted with the linear (12dof) transform
 % (where the nonlinear warp is unreliable), then snapped to the nearest scalp
-% voxel and offset outward by skin_gap_mm using the heuristic's standoff
-% geometry (transducer_scalp_geometry). No search is performed.
+% voxel and offset outward by placement.skin_gap_mm using the heuristic's
+% standoff geometry (transducer_scalp_geometry). No search is performed.
 
     % Validate required config
     if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'mni')
@@ -509,8 +509,8 @@ function parameters = run_mni_placement(parameters)
                'for mode=''mni''.']);
     end
     skin_gap_mm = 5;
-    if isfield(mni, 'skin_gap_mm') && ~isempty(mni.skin_gap_mm)
-        skin_gap_mm = mni.skin_gap_mm;
+    if isfield(parameters.placement, 'skin_gap_mm') && ~isempty(parameters.placement.skin_gap_mm)
+        skin_gap_mm = parameters.placement.skin_gap_mm;
     end
 
     % Load segmentation image + header (same source as the heuristic)

@@ -524,6 +524,7 @@ The following documents the functions provided in PRESTUS.
 | `annular_bowl_depth_mm`                 | Distance from the transducer position (bowl apex) to the exit plane |
 | `annular_geometric_phases`              | Ring phases that steer a curved annular array to a point, in water |
 | `convert_to_element_pos`                | Generate element positions for matrix transducers |
+| `exit_plane_depth_mm`                   | Distance from the bowl apex to the exit plane used for placement |
 | `extract_element_pos`                   | Read matrix transducer element positions from file |
 | `focal_distance_calculation`            | Compute expected focal distances for (multi-)transducer setup. |
 | `get_arc`                               | Generates the coordinates of an arc in 2D space. |

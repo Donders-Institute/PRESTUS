@@ -383,7 +383,7 @@ is_annular_calib = isfield(tr, 'annular') && ...
 if isfield(tr, 'focal_distance_offset') && ~isempty(tr.focal_distance_offset)
     bowl_off_mm = tr.focal_distance_offset;
 elseif isfield(tr, 'annular') && all(isfield(tr.annular, {'curv_radius_mm','dist_geom_ep_mm'}))
-    bowl_off_mm = tr.annular.curv_radius_mm - tr.annular.dist_geom_ep_mm;
+    bowl_off_mm = annular_bowl_depth_mm(tr.annular);
 else
     bowl_off_mm = 0;
 end

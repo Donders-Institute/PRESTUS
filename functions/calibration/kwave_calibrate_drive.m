@@ -82,7 +82,7 @@ function [lib, report, sims] = kwave_calibrate_drive(lib, prof, options)
     key = tran_serial;
     if ~isempty(ds_serial); key = [tran_serial '_' ds_serial]; end
     tran = equip.trans.(tran_serial);
-    bowl_offset = tran.transducer.annular.curv_radius_mm - tran.transducer.annular.dist_geom_ep_mm;
+    bowl_offset = annular_bowl_depth_mm(tran.transducer.annular);
 
     in_prof = @(d) any(abs(prof.depths_ep_mm - d) < 0.5);
     depths  = opt(options, 'Depths', rd(arrayfun(in_prof, rd) & isfinite(ramp)));

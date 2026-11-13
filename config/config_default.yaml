@@ -221,7 +221,7 @@ transducer:
 
   trans_pos: []              # Transducer position (bowl apex) [T1 voxels by default; see placement.manual.coordinate_space]
   focus_pos: []              # Stimulation target position [T1 voxels by default; see placement.manual.coordinate_space]
-  focal_distance_ep: []      # Focal depth setting: depth the device is set to focus at, from the exit plane [mm]; [] = trans_pos→focus_pos distance
+  focal_distance_ep: []      # Focal depth setting: depth the device is set to focus at, from the exit plane [mm]; [] = trans_pos→focus_pos distance minus focal_distance_offset
   focal_distance_bowl: []    # Focal depth setting from the bowl apex [mm]
   focal_distance_offset: []  # Offset between bowl and exit plane [mm] [DERIVED]
   
@@ -321,6 +321,9 @@ placement:
                     #   'auto'   reuse it when its settings match, else run the placement again |
                     #   'always' require it (mismatch handled per io.cache_signature_check) |
                     #   'never'  always run the placement. Independent of io.overwrite_files.
+  skin_gap_mm: 5    # Gap between scalp and transducer exit plane along the beam axis [mm] (e.g. gel pad),
+                    #   for heuristic, mni, plantus and tus_entry placement and their time-reversal pose search. The exit plane is
+                    #   curv_radius_mm - dist_geom_ep_mm in front of the bowl apex (BabelBrain's SkinDistance).
   manual:
     coordinate_space: 'voxel' # Space of transducer.trans_pos / focus_pos in mode='manual':
                               #   'voxel' (1-based T1 voxel indices) |
@@ -368,14 +371,12 @@ placement:
     expand_step: 0.01
   mni:
     # Direct placement from MNI coordinates. The transducer point is snapped to the
-    # nearest scalp voxel and offset outward by skin_gap_mm using the same geometry
+    # nearest scalp voxel and offset outward by placement.skin_gap_mm using the same geometry
     # as the heuristic; the focus is used as-is. Requires a SimNIBS m2m_sub-XXX folder.
     trans_pos_mm: []     # [x y z] desired transducer (scalp entry) position in MNI mm (required for mode='mni')
                          # Converted with the LINEAR (12dof) MNI->subject transform (it is outside the brain).
     focus_pos_mm: []     # [x y z] focus / target position in MNI mm (required for mode='mni')
                          # Converted with the NONLINEAR (nonl) transform, like the heuristic target.
-    skin_gap_mm: 5       # standoff from scalp to transducer along the focal axis [mm]
-                         # (default 5 = same gap as the heuristic placement)
 
   plantus:
     # --- Paths (required) ---
@@ -393,8 +394,6 @@ placement:
     flhm_list: []             # [1×N] full-width at half-maximum focal length [mm] for each entry
                               # in focal_distance_list (same calibration report).
     # --- Geometry (optional; defaults derived from transducer equipment config) ---
-    additional_offset_mm: 0   # Extra stand-off between skin and transducer exit plane [mm]
-                              # (e.g., coupling gel pad or water-filled cone).
     max_angle_deg: 10         # Maximum allowed transducer tilt angle [degrees].
     min_distance_mm: []       # Skin–target distance window [mm] for eligibility; [] = min(focal_distance_list) - max(flhm_list).
     max_distance_mm: []       # [] = max(focal_distance_list) + max(flhm_list). Set both for a steerable array.
@@ -602,7 +601,6 @@ time_reversal:
     enabled: false          # Score transducer poses around the planned one on the same reverse run (curved annular, 3D); suggestions only
     max_angle_deg: 20       # Largest tilt of the beam direction from the planned one (orbit around the target) [deg]
     angle_step_deg: 2.5     # Angular step of the candidate directions [deg]
-    standoff_mm: []         # Scalp to exit-plane distance [mm]; [] = that of the planned pose
     aim_iterations: 2       # Aberration-corrected aim: re-aim at target - predicted shift this many times (0 = geometric aim only)
     jitter_mm: []           # Also score the planned pose with its apex moved by these distances [mm], aimed at the target (e.g. [0.5 1 2 5]); [] = none
     jitter_mode: 'grid'     # How jitter_mm moves the apex: 'grid' (+- along each grid axis, as when editing voxel coordinates; 6 poses per distance) | 'scalp' (slid over the scalp perpendicular to the beam in 8 directions, re-seated against the scalp; 8 poses per distance)

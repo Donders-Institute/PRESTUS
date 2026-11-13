@@ -200,7 +200,7 @@ function model = fit_transducer_model(tran, prof, options)
     ann    = tran.transducer.annular;
     n_elem = ann.elem_n;
     f_hz   = tran.transducer.freq_hz;
-    bowl_offset = ann.curv_radius_mm - ann.dist_geom_ep_mm;
+    bowl_offset = annular_bowl_depth_mm(ann);
 
     %% Channel groups -------------------------------------------------------
     grp = o.ChannelGroups;

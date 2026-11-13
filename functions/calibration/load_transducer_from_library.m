@@ -160,7 +160,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     %% Focal distance bookkeeping
     parameters.transducer.focal_distance_ep   = focal_distance_ep;
     parameters.transducer.focal_distance_bowl = focal_distance_ep + ...
-        (tran.transducer.annular.curv_radius_mm - tran.transducer.annular.dist_geom_ep_mm);
+        annular_bowl_depth_mm(tran.transducer.annular);
     parameters.transducer.tx_calibration.isppa_wcm2        = desired_intensity;
     parameters.transducer.tx_calibration.focal_depth_ep_mm = focal_distance_ep;
     parameters.transducer.tx_calibration.condition         = condition;

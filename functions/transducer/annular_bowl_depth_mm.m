@@ -1,8 +1,11 @@
 function depth_mm = annular_bowl_depth_mm(geom)
 % ANNULAR_BOWL_DEPTH_MM  Distance from the transducer position (bowl apex) to the exit plane
 %
-% The bowl depth (sagitta) is curv_radius_mm - dist_geom_ep_mm. A flat element
-% (curv_radius_mm = Inf) has no depth: its face is the exit plane.
+% The depth is curv_radius_mm - dist_geom_ep_mm (focal_distance_offset). It
+% equals the rim sagitta only when dist_geom_ep_mm was derived from the
+% aperture (VALIDATE_ANNULAR_TRANSDUCER); library entries can place the exit
+% plane in front of the rim (CTX_250_001: 10.56 vs 7.06 mm). A flat element (curv_radius_mm = Inf) has no
+% depth: its face is the exit plane.
 %
 % Use as:
 %   depth_mm = annular_bowl_depth_mm(tr.annular)

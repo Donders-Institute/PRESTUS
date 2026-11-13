@@ -85,7 +85,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
             'Transducer %i; Missing curv_radius_mm field for matrix transducer. Please specify radius of curvature.', t_i);
 
         % Calculate distance to transducer plane if not provided
-        if ~isfield(matrix_tr, 'dist_geom_ep_mm')
+        if ~isfield(matrix_tr, 'dist_geom_ep_mm') || isempty(matrix_tr.dist_geom_ep_mm)
             assert(matrix_tr.curv_radius_mm > matrix_tr.outer_diameter_mm/2, ...
                 'Transducer %i; curv_radius_mm must exceed aperture radius.', t_i);
 

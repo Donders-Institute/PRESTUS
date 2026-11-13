@@ -104,7 +104,7 @@ function [lib, report, out] = calibration_transducer(...
              'virtual transducer, scale its drive from a free-water simulation instead.'], combo);
     end
     tran = equip.trans.(tran_serial);
-    bowl_offset = tran.transducer.annular.curv_radius_mm - tran.transducer.annular.dist_geom_ep_mm;
+    bowl_offset = annular_bowl_depth_mm(tran.transducer.annular);
 
     %% Measured profiles -------------------------------------------------------
     depths = reshape(desired_focal_distance_ep, 1, []);

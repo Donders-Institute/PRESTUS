@@ -79,7 +79,7 @@ end
     tr.focus_pos = focus;
     offset = 0;
     if isfield(tr.annular, 'dist_geom_ep_mm') && ~isempty(tr.annular.dist_geom_ep_mm)
-        offset = tr.annular.curv_radius_mm - tr.annular.dist_geom_ep_mm;
+        offset = annular_bowl_depth_mm(tr.annular);
     end
     tr.focal_distance_ep   = norm(focus - apex) - offset;
     tr.focal_distance_bowl = [];

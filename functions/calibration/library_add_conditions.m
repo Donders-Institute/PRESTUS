@@ -63,7 +63,7 @@ function [lib, report] = library_add_conditions(lib, tran, conds, options)
 
     ann    = tran.transducer.annular;
     n_elem = ann.elem_n;
-    ep_to_bowl = ann.curv_radius_mm - ann.dist_geom_ep_mm;
+    ep_to_bowl = annular_bowl_depth_mm(ann);
 
     % Axial grid: the measured positions when scoring, else 0..1.5 ROC
     if ~isempty(o.Profile)

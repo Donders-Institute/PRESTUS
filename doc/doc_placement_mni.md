@@ -1,5 +1,6 @@
 # MNI Transducer Placement
 
+A transducer site and target given in MNI coordinates let one plan apply to every subject, but each subject's simulation needs both points in its own anatomy. `placement.mode: 'mni'` converts both points to the subject's T1 grid, snaps the transducer to the scalp and sets its exit plane `placement.skin_gap_mm` (default 5 mm) off the scalp; no search is performed, so the result is deterministic. The [heuristic](doc_placement_heuristic.md) mode, by contrast, takes only an MNI target and searches the scalp for a transducer position.
 !!! note "At a glance"
     - **What:** Placement from a transducer position and a target given in MNI coordinates.
     - **When you need it:** When you know both points in template space, e.g. a group target and a standard scalp position.
@@ -13,7 +14,7 @@ placement:
   mni:
     trans_pos_mm: [-52,  -8,  58]   # desired transducer (scalp entry) in MNI mm
     focus_pos_mm: [-29,  -6,   7]   # focus / target in MNI mm
-    skin_gap_mm:  5                 # standoff from scalp along the focal axis [mm]
+  skin_gap_mm: 5                    # gap between scalp and exit plane [mm]
 ```
 
 A SimNIBS `m2m_sub-XXX` folder (under `path.seg`) is required: the conversion relies on `final_tissues.nii.gz` and the SimNIBS coordinate transforms.
@@ -29,7 +30,7 @@ A SimNIBS `m2m_sub-XXX` folder (under `path.seg`) is required: the conversion re
 
 2. **Snap to scalp.** The converted transducer voxel is snapped to the nearest scalp voxel, so a slightly off MNI entry coordinate still lands on the head surface.
 
-3. **Standoff.** The transducer is offset outward from the scalp along the focal axis (target → scalp) by `skin_gap_mm + dist_tp_to_ep`, where `dist_tp_to_ep` is the bowl-to-exit-plane distance derived from the transducer geometry. The default `skin_gap_mm = 5` reproduces the heuristic's gap.
+3. **Standoff.** The transducer is offset outward from the scalp along the focal axis (target → scalp) so that its exit plane lies `placement.skin_gap_mm` (default 5 mm) off the scalp, as in the heuristic. The bowl apex sits a further `curv_radius_mm − dist_geom_ep_mm` behind the exit plane.
 
 The resolved `trans_pos` / `focus_pos` (T1 grid voxels) are written into every configured transducer, and a QC overlay is saved. Downstream simulation is unchanged.
 
