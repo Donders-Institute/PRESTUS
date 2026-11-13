@@ -13,7 +13,7 @@ function pct_create_pseudoCT()
     local sub_id="$1"        # Subject ID (without 'sub-')
     local path_simnibs="$2"  # Path to SimNIBS folder
     local path_matlab="$3"   # Path to MATLAB executable (e.g., "/opt/matlab/R2022b/bin/matlab")
-    local skullmapping=${4:-"kosciessa"}  # Algorithm for linear skull mapping ["miscouridou"; "carpino"; "wiesinger"; "treeby"; "kosciessa" (default); "custom:<slope>:<intercept>"]
+    local skullmapping=${4:-"kosciessa"}  # Algorithm for linear skull mapping ["miscouridou"; "carpino" (deprecated); "wiesinger"; "treeby"; "kosciessa" (default); "custom:<slope>:<intercept>"]
     local debug=${5:-"1"}    # Save intermediate images [yes: "1" (default); no: "0"]
     local path_fun="${6:-$(dirname "$(realpath "$0")")}" # Path to PRESTUS/functions; specify when used in HPC job [default: Use path to this function]
     local path_pct_out="${7:-}"  # pCT output directory; empty = <parent of path_simnibs>/pct/sub-<id> (as get_pct_dir.m)

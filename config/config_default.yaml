@@ -540,7 +540,7 @@ headmodel:
 
 pct:
   enabled: 0                    # Use (p)CT (if available) to inform skull medium properties
-  skull_mapping: 'kosciessa'    # UTE→HU linear mapping algorithm: miscouridou/carpino/wiesinger/treeby/kosciessa/custom
+  skull_mapping: 'kosciessa'    # UTE→HU linear mapping algorithm: miscouridou/wiesinger/treeby/kosciessa/custom (carpino: deprecated)
   custom_slope: []              # skull_mapping 'custom': HU = custom_slope * normalised UTE + custom_intercept
   custom_intercept: []          # (skull voxels; soft tissue 42 HU, air -1000 HU as for the other mappings)
   debug: 1                      # Keep intermediate images in pseudoCT/ subfolder (0 to delete)

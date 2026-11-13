@@ -31,6 +31,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 >
 > **Deprecated / removed:**
 > - `path.localite` (use `path.localite_raw` / `path.localite_export`) and `placement.localite.markertype` (detected from the files) are deprecated
+> - `pct.skull_mapping: carpino` is deprecated; use `kosciessa`, or `custom` with `custom_slope: -2194`, `custom_intercept: 2236`
 > - `prestus_group_start` and `create_group_MNI_plots` are deprecated; `prestus_group_start` runs `prestus_group_report_start`
 > - `launch_web_alignment` and the browser alignment viewer are removed; use the Nexus placement viewer
 
@@ -117,6 +118,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - `headmodel.reuse_across_placements` (default `false`) builds the smoothed head model once per subject and only rotates and crops it for each placement; in rotated grid modes the smoothing then precedes the rotation, so results differ slightly
 - New skull property mappings: `air-tissue` density, `webb` sound speed and attenuation, `pichardo` and `mcdannold` sound speed and attenuation
 - `pct.skull_mapping: custom` with `pct.custom_slope` / `pct.custom_intercept`
+- `pct.skull_mapping: carpino` is deprecated (`prestus:pct:deprecatedSkullMapping`); `custom` with slope -2194 and intercept 2236 gives the same line
 - `pct.density_calibration` selects the HU→density table of `mapping_density: k-plan` (`kplan_default`, `ucl_lowdose_80kvp`, `cph2025`, or a CSV); default `''` keeps results unchanged. PRESTUS warns when `treeby` is not paired with `ucl_lowdose_80kvp`
 - `pct_skullmapping_fit` exposes the `kosciessa` histogram fit and its settings
 - `pct_predict_skull_properties` predicts the skull properties a pseudo-CT run will model, without simulating

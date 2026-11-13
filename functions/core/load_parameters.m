@@ -407,6 +407,15 @@ function parameters = load_parameters(varargin)
         end
     end
 
+    %% Deprecated pseudo-CT skull mapping
+    if isfield(parameters, 'pct') && isfield(parameters.pct, 'skull_mapping') && ...
+            strcmpi(char(string(parameters.pct.skull_mapping)), 'carpino')
+        warning('prestus:pct:deprecatedSkullMapping', ...
+            ['pct.skull_mapping ''carpino'' is deprecated and will be removed in a future release. ' ...
+             'Use ''kosciessa'', or reproduce it with skull_mapping ''custom'', ' ...
+             'custom_slope -2194 and custom_intercept 2236.']);
+    end
+
     %% [DEBUG] Summary of requested parameters
     % With debugging off, the parameters are saved to the log at the
     % start of pipeline execution (see path_log_setup).
