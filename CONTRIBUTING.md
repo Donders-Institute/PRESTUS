@@ -31,6 +31,7 @@ Keep the docs and the changelog short; they are read by users, not reviewers.
 
 - **Changelog** (`doc/CHANGELOG.md`): one line per change, grouped by area (`#### Calibration`, `#### Placement`, ...), as in v0.6.1. Say what changed for the user, not how or why. Mark fixes that change results with ⚠️ **Fixed:** and add the one consequence a user must act on (e.g. "rerun X"). No `Docs:`/`Tests:` lines, no function internals, no rationale; those belong in the commit message and pull request.
 - **Doc pages** (`doc/doc_*.md`): describe current behaviour as tasks (what to set, what to run, what you get). No history ("used to", "was"), no fix narratives, no test names, no implementation details a user does not act on (put those in code comments or `doc_architecture.md`). Explain a topic once and link to it. Prefer a short example over a paragraph.
+- **Detail boxes**: put detail a user may need in `??? note "Title"`, and material only someone changing the code needs (internal functions, data structures, implementation steps) in `??? developer "Title"`. Developer boxes and the Developers nav section show only when the reader turns on *Developer* in the header.
 
 ## How to Submit Changes
 - Create a new branch for your feature or fix.

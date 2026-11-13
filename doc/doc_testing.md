@@ -1,18 +1,30 @@
 # Testing
 
-PRESTUS is tested at five levels, from checks that take seconds and run on every change to benchmarks that need a GPU or a real subject and run before a release. The MATLAB tests use [`matlab.unittest`](https://www.mathworks.com/help/matlab/matlab-unit-test-framework.html) and live in `tests/`; the Nexus tests use pytest and live in `nexus/tests/`. `run_all_tests(level)` runs a MATLAB level and fails (non-zero exit under `matlab -batch`) when any test fails.
+PRESTUS is tested at five levels, from checks that take seconds and run on every change to benchmarks that need a GPU or a real subject and run before a release. This page tells you which level a change needs, what data, hardware and time each level takes, and how to add a test.
+
+On this page:
+
+- [Level 0: Static Checks](#level-0-static-checks): the doc, parameter, link and Nexus checks that run on every push.
+- [Level 1: Unit Tests](#level-1-unit-tests): data-free tests of each function's logic, grouped by area.
+- [Level 2: Physics Benchmarks](#level-2-physics-benchmarks): free-water fields against the [O'Neil](https://doi.org/10.1121/1.1906542) solution and the [ITRUSST](https://itrusst.org/) benchmarks, with their tolerances.
+- [Level 3: Pipeline Tests](#level-3-pipeline-tests): the whole pipeline on synthetic water, a segmented subject and the demo subject, with golden metrics.
+- [Level 4: Backends and the Nexus Round Trip](#level-4-backends-and-the-nexus-round-trip): [jwave](https://github.com/ucl-bug/jwave) and [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) against [k-Wave](https://github.com/ucl-bug/k-wave), and Nexus configs loaded in MATLAB.
+- [Release Checklist](#release-checklist): the tests to run before tagging a release.
+- [Rules for New Tests](#rules-for-new-tests): where a new test goes and the rules it follows.
+
+The [MATLAB](https://www.mathworks.com/products/matlab.html) tests use [`matlab.unittest`](https://www.mathworks.com/help/matlab/matlab-unit-test-framework.html) and live in `tests/`; the Nexus tests use [pytest](https://docs.pytest.org/) and live in `nexus/tests/`. `run_all_tests(level)` runs a MATLAB level and fails (non-zero exit under `matlab -batch`) when any test fails.
 
 | Level | What it guarantees | Command | Needs | Time | Runs |
 |---|---|---|---|---|---|
-| 0 Static | Docs match the code, the site builds, the Nexus works | see [Level 0](#level-0-static-checks) | Python | ~2 min | CI, every push |
+| 0 Static | Docs match the code, the site builds, the Nexus works | see [Level 0](#level-0-static-checks) | [Python](https://www.python.org/) | ~2 min | CI, every push |
 | 1 Unit | Every function's logic, incl. config, placement, scaling, caches, HPC parsing, reports | `run_all_tests('unit')` | MATLAB | ~15 min (macOS, checkout on a network drive; less on a local disk) | CI, every push |
-| 3 Pipeline | Whole pipeline on synthetic and real data, numbers stable against a reference | `run_all_tests('water')` … `('demo_golden')` | k-Wave CPU; SimNIBS outputs; demo data | 10 min – hours | before a release |
-| 4 Backends | jwave / BabelBrain agree with k-Wave; Nexus ↔ MATLAB round trip | `runtests('tests/test_jwave.m')` etc. | conda envs, GPU, MATLAB | 10–60 min | after backend or environment changes |
 | 2 Physics | The solver path reproduces analytic and published reference fields | `run_all_tests('physics')`, `('itrusst')` | MATLAB (+ ITRUSST data) | ~5 min CPU (2D), plus the unit tests, which `run_all_tests('physics')` also runs | CI weekly; 3D on a GPU node before a release |
+| 3 Pipeline | Whole pipeline on synthetic and real data, numbers stable against a reference | `run_all_tests('water')` … `('demo_golden')` | k-Wave CPU; [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html) outputs; demo data | 10 min – hours | before a release |
+| 4 Backends | jwave / BabelBrain agree with k-Wave; Nexus ↔ MATLAB round trip | `runtests('tests/test_jwave.m')` etc. | [conda](https://docs.conda.io/) envs, GPU, MATLAB | 10–60 min | after backend or environment changes |
 
 ---
 
-## Level 0: static checks
+## Level 0: Static Checks
 
 ```bash
 python tests/docs/gen_function_index.py --check   # doc_functions.md lists every function
@@ -44,8 +56,8 @@ No data, SimNIBS, k-Wave simulation or GPU is needed. A failed test prints its f
 | Placement & neuronavigation | `test_transducer_placement` (tag `manual`), `test_plantus_placement` (tags `validation`, `dispatch`), `test_neuronav_io`, `test_neuronav_batch`, `test_placement_report`, `test_placement_positions` |
 | Coordinates | `test_transform` |
 | Head model | `test_head_preprocessing`, `test_integration_headpreproc`, `test_deface_m2m` |
-| Thermal | `test_thermal_parameters`, `test_thermal_dose` (ISO CEM43 against Sapareto & Dewey values) |
-| Backends (logic only) | `test_babelbrain_insitu_isppa`, `test_babelbrain_thermal_timing`, `test_babelbrain_air_regions` (needs Python with numpy/scipy/nibabel; skipped otherwise) |
+| Thermal | `test_thermal_parameters`, `test_thermal_dose` (ISO CEM43 against [Sapareto & Dewey](https://doi.org/10.1016/0360-3016(84)90379-1) values) |
+| Backends (logic only) | `test_babelbrain_insitu_isppa`, `test_babelbrain_thermal_timing`, `test_babelbrain_air_regions` (needs Python with [numpy](https://numpy.org/)/[scipy](https://scipy.org/)/[nibabel](https://nipy.org/nibabel/); skipped otherwise) |
 | HPC | `test_hpc_job_report`, `test_parse_memory_tags`, `test_hpc_submit` |
 | Security | `test_shell_quote_arg`, `test_r_quote_string`, `test_run_command`, `test_command_injection` |
 | Nexus MATLAB session | `test_nexus_bridge` (`nexus_bridge` protocol and allow-list, `nexus_neuronav` and `nexus_calibration` on synthetic data) |
@@ -53,11 +65,11 @@ No data, SimNIBS, k-Wave simulation or GPU is needed. A failed test prints its f
 
 ---
 
-## Level 2: physics benchmarks
+## Level 2: Physics Benchmarks
 
 These check numbers, not just that code runs. Both use a focused bowl in lossless water (the ITRUSST BM1 source: ROC 64 mm, aperture 64 mm, 500 kHz, 60 kPa) run through `prestus_pipeline`.
 
-**`test_physics_water`** — against the analytic O'Neil solution (k-Wave `focusedBowlONeil`), no data needed:
+**`test_physics_water`**: against the analytic O'Neil solution (k-Wave `focusedBowlONeil`), no data needed:
 
 | Check | Tolerance (2D axisymmetric) |
 |---|---|
@@ -69,7 +81,7 @@ These check numbers, not just that code runs. Both use a focused bowl in lossles
 | A target ISPPA on an uncalibrated transducer is met in water | 2 % |
 | With `run_water_baseline: 0`, an unmet target stops the run | error `prestus:isppa:noBaseline` |
 
-**`test_itrusst_benchmark`** — benchmarks PH1-BM1-SC1 (focused bowl) and PH1-BM1-SC2 (20 mm plane piston, a [flat annular element](doc_transducer.md#flat-elements)) of [Aubry et al. (2022)](https://doi.org/10.1121/10.0013426): the pressure amplitude in the central plane against the published k-Wave reference (60 points per wavelength). Download `INTERCOMPARISON-PH1-DATA-V1.0` from [Zenodo](https://doi.org/10.5281/zenodo.6020543) and set `PRESTUS_ITRUSST_DATA` to it; the test skips otherwise.
+**`test_itrusst_benchmark`**: benchmarks PH1-BM1-SC1 (focused bowl) and PH1-BM1-SC2 (20 mm plane piston, a [flat annular element](doc_transducer.md#flat-elements)) of [Aubry et al. (2022)](https://doi.org/10.1121/10.0013426): the pressure amplitude in the central plane against the published k-Wave reference (60 points per wavelength). Download `INTERCOMPARISON-PH1-DATA-V1.0` from [Zenodo](https://doi.org/10.5281/zenodo.6020543) and set `PRESTUS_ITRUSST_DATA` to it; the test skips otherwise.
 
 | Metric | Bowl: tolerance (2D) | Bowl: result 2026-10-02 | Piston: tolerance (2D) | Piston: result 2026-10-02 |
 |---|---|---|---|---|
@@ -93,17 +105,17 @@ The 3D variants (tags `physics_3d`, `itrusst_3d`; ~6 M voxels at 0.5 mm) belong 
 
 ---
 
-## Level 3: pipeline tests
+## Level 3: Pipeline Tests
 
-### Synthetic water pipeline
+### Synthetic Water Pipeline
 
 ```matlab
 run_all_tests('water')     % unit + slower unit checks + 3D water pipeline + multi-ISPPA
 ```
 
-`test_integration_water` runs the full pipeline with `simulation.medium: water` on a small 3D grid (CPU k-Wave), `test_isppa_rescaling` the multi-ISPPA pipeline. The level also runs the slower data-free checks: `test_transducer_model` tag `fit` (optimiser) and `test_plantus_placement` tag `integration` (mocked PlanTUS subprocess; needs Python 3). Fixture: `fixtures/make_minimal_parameters.m` (single-element bowl, drive level, no target ISPPA), `fixtures/make_synthetic_segmentation.m`.
+`test_integration_water` runs the full pipeline with `simulation.medium: water` on a small 3D grid (CPU k-Wave), `test_isppa_rescaling` the multi-ISPPA pipeline. The level also runs the slower data-free checks: `test_transducer_model` tag `fit` (optimiser) and `test_plantus_placement` tag `integration` (mocked [PlanTUS](https://github.com/mlueckel/PlanTUS) subprocess; needs Python 3). Fixture: `fixtures/make_minimal_parameters.m` (single-element bowl, drive level, no target ISPPA), `fixtures/make_synthetic_segmentation.m`.
 
-### Subject smoke tests
+### Subject Smoke Tests
 
 `test_integration_pipeline` reaches checkpoints on a SimNIBS-segmented subject; each level includes the ones above it:
 
@@ -118,9 +130,9 @@ export PRESTUS_TEST_DATA=/path/to/demo/data      # folder containing m2m_sub-001
 export PRESTUS_DEMO_CONFIG=/path/to/config.yaml   # optional; default config/config_tutorial.yaml
 ```
 
-### Demo subject (all placement modes)
+### Demo Subject (All Placement Modes)
 
-`test_integration_demo` uses demo subject sub-009 (SimNIBS segmentation, UTE-derived pseudo-CT, Localite data) in a folder outside the repository, `PRESTUS_DEMO_DATA` (check its layout with `setup_demo_data('/path/to/prestus_testdata')`):
+`test_integration_demo` uses demo subject sub-009 (SimNIBS segmentation, UTE-derived pseudo-CT, [Localite](https://www.localite.de/) data) in a folder outside the repository, `PRESTUS_DEMO_DATA` (check its layout with `setup_demo_data('/path/to/prestus_testdata')`):
 
 ```
 prestus_testdata/
@@ -148,7 +160,7 @@ prestus_testdata/
 
 ---
 
-## Level 4: backends and the Nexus round trip
+## Level 4: Backends and the Nexus Round Trip
 
 | File | Checks | Needs |
 |---|---|---|
@@ -170,7 +182,7 @@ cd nexus && python -m pytest -q      # includes the MATLAB round trip when MATLA
 
 ---
 
-## Before a release
+## Release Checklist
 
 1. CI green (levels 0–1, and the latest weekly physics run).
 2. `run_all_tests('itrusst')` and `run_all_tests('physics_3d')` on the GPU node.

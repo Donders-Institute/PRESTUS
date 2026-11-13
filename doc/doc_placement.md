@@ -1,43 +1,50 @@
 # Transducer Placement
 
+The transducer position decides where the beam enters the head, which part of the skull it crosses and where the focus lies relative to the target, so it shapes every acoustic and thermal result of a head simulation. This page covers how PRESTUS obtains the transducer and focus positions: entered by hand, or derived by one of several placement modes that share one exit-plane geometry.
+
+On this page:
+
+- [Choosing a Placement Mode](#choosing-a-placement-mode): the modes, what each optimises and what each needs.
+- [Placement Report](#placement-report): the HTML report written after placement.
+- [Manual Coordinate Selection](#manual-coordinate-selection): entering positions in voxels, RAS mm or MNI mm.
+
 !!! note "At a glance"
-    - **What:** How PRESTUS gets the transducer and focus positions of a head simulation: entered by hand, or derived by a placement mode (`placement.mode`).
     - **When you need it:** Every head simulation. Free-water simulations need no target.
-    - **Before you start:** The T1w planning image; most modes also need a SimNIBS segmentation.
+    - **Before you start:** The T1w planning image; most modes also need a [SimNIBS](https://simnibs.github.io/simnibs/) segmentation.
 
 PRESTUS works with the transducer (`transducer.trans_pos`) and the target (`transducer.focus_pos`) as voxels of the T1w planning image. The transducer coordinate is the bowl apex, not the exit plane of a curved transducer. All modes put the exit plane `curv_radius_mm − dist_geom_ep_mm` in front of the apex ([BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain)'s `FocalLength − NaturalOutPlaneDistance`) and, where they place the transducer on the scalp, leave `placement.skin_gap_mm` (default 5 mm) between scalp and exit plane. You can enter both points directly (in voxels, subject RAS mm or MNI mm), or let a placement mode derive them.
 
-## Choosing a placement mode
+## Choosing a Placement Mode
 
 | Mode | Primary objective | Requires |
 |------|------------------|----------|
 | `manual` | User-specified | Coordinates in config (T1 voxels, RAS+ mm or MNI mm) |
-| `localite` | Recorded neuronavigation pose | Localite XML |
+| `localite` | Recorded neuronavigation pose | [Localite](https://www.localite.de/en/) XML |
 | `mni` | Transducer and focus given in MNI mm; transducer snapped to the scalp | SimNIBS `m2m_sub-XXX` folder |
 | `heuristic` | Skull-surface proximity to MNI target | SimNIBS segmentation |
-| `plantus` | Beam–target overlap + skull acoustics | SimNIBS mesh + PlanTUS install |
-| `tus_entry` | Transducer-scalp coupling geometry | Scalp mask + TUS_entry R install |
+| `plantus` | Beam–target overlap + skull acoustics | SimNIBS mesh + [PlanTUS](https://github.com/mlueckel/PlanTUS) install |
+| `tus_entry` | Transducer-scalp coupling geometry | Scalp mask + [TUS_entry](https://github.com/CyrilAtkinson/TUS_entry) [R](https://www.r-project.org/) install |
 
 Each mode has its own page: [manual](#manual-coordinate-selection), [MNI](doc_placement_mni.md), [heuristic](doc_placement_heuristic.md), [PlanTUS](doc_placement_plantus.md), [TUS_entry](doc_placement_tus_entry.md) and [Localite](doc_placement_neuronav.md). Whatever the mode, the resolved positions are written to `sub-XXX_placement<affix>.json` in the output folder. Coordinate conventions are described in [Coordinate systems](doc_coordinate_systems.md).
 
-??? note "Details: heuristic or PlanTUS?"
+??? note "Heuristic or PlanTUS?"
     | | `heuristic` | `plantus` |
     |---|---|---|
-    | **Input** | `final_tissues.nii.gz` (label volume) | Full SimNIBS mesh (`sub-XXX.msh`) + SimNIBS Python env |
+    | **Input** | `final_tissues.nii.gz` (label volume) | Full SimNIBS mesh (`sub-XXX.msh`) + SimNIBS [Python](https://www.python.org/) env |
     | **Strategy** | Single-objective sphere-expansion on skull surface | Multi-objective optimisation (beam overlap, skin/skull angles, skull thickness, target distance) |
     | **Focal distance sweep** | No | Yes |
     | **External dependency** | None | PlanTUS + SimNIBS installation |
 
     Use `heuristic` when only a tissue-label segmentation is available or for batch jobs on an HPC cluster. Use `plantus` when the full SimNIBS mesh is available and you want multi-objective optimisation or transducer selection across focal distances.
 
-## Placement report
+## Placement Report
 
 After placement, PRESTUS writes a stand-alone HTML report, `sub-XXX_placement_<mode><affix>.html`, to `io.dir_reports` (`placement.report`, default `true`).
 
-??? note "Details: report contents"
-    It holds the target, the transducer and focus positions (T1 voxels and subject RAS mm, with transducer–focus and focus–target distances), the T1 overlay figure and the placement configuration. For `placement.mode: 'plantus'` it adds the [criteria evaluation](doc_placement_plantus.md#5a-composite-scoring-both-modes-headless-selects-the-optimum): diagnostics, each criterion at the placed spot, the criterion maps and the weight sweep. A failed report is a warning, not an error. The report is skipped when no output directory is known.
+??? note "Report contents"
+    It holds the target, the transducer and focus positions (T1 voxels and subject RAS mm, with transducer–focus and focus–target distances), the T1 overlay figure and the placement configuration. For `placement.mode: 'plantus'` it adds the [criteria evaluation](doc_placement_plantus.md#5a-combine-and-evaluate-scores): diagnostics, each criterion at the placed spot, the criterion maps and the weight sweep. A failed report is a warning, not an error. The report is skipped when no output directory is known.
 
-## Manual coordinate selection
+## Manual Coordinate Selection
 
 Identify the coordinates in your imaging software, for example from an fMRI hotspot or an anatomical marker. By default they are 1-based T1 voxel indices. Set `placement.manual.coordinate_space` to enter millimetres instead:
 
@@ -56,5 +63,4 @@ transducer:
 
 Conversion happens once per transducer in the placement stage, so `modules.run_transducer_placement` must be `1`.
 
-??? note "Details: what happens after conversion"
-    The positions become voxel indices and `coordinate_space` is set to `'voxel'`. The original inputs are kept in `placement.manual.input_trans_pos` / `input_focus_pos`. If neither `focal_distance_ep` nor `focal_distance_bowl` is set, the distance fallback from the positions is computed after conversion.
+After conversion, the positions become voxel indices and `coordinate_space` is set to `'voxel'`. The original inputs are kept in `placement.manual.input_trans_pos` / `input_focus_pos`. If neither `focal_distance_ep` nor `focal_distance_bowl` is set, the distance fallback from the positions is computed after conversion.

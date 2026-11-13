@@ -1,31 +1,35 @@
 # PRESTUS Telemetry
 
+PRESTUS can send anonymous usage statistics, one event per pipeline run, so the developers can see which features and platforms are in use. Participation is voluntary, and no data is sent without an explicit opt-in. This page shows how to give or change your decision, how batch and cluster runs handle it, and every field an event may contain.
+
+On this page:
+
+- [Opt-In and Opt-Out](#opt-in-and-opt-out): the prompt, how to record or change your decision, the `PRESTUS_TELEMETRY` override and batch or cluster runs.
+- [Collected Data](#collected-data): every field of an event, grouped by topic.
+
 !!! note "At a glance"
-    - **What:** Optional, anonymous usage statistics: one event per pipeline run, sent only after an explicit opt-in.
     - **When you need it:** To decide whether to opt in, to change your decision, or to silence the prompt on a cluster.
     - **Before you start:** Nothing; your decision lives in `~/.prestus/telemetry.json`.
 
-PRESTUS can send anonymous usage statistics so the developers can see which features and platforms are in use. Participation is voluntary. No data is sent without an explicit opt-in.
-
-## Opt-in / opt-out
+## Opt-In and Opt-Out
 
 On each pipeline run PRESTUS prints a short notice and asks whether to enable telemetry. How the prompt appears depends on the session:
 
 - **Interactive console session**: a `y`/`n` prompt that blocks until you answer.
 - **GUI session** (`prestus_gui`, deprecated): a modal **Allow / Decline / Ask me later** dialog shown once at startup, before the "Run Simulation" button can be pressed.
-- **Non-interactive session** (`matlab -batch`, deployed app, SLURM/PBS job, or a session with neither desktop nor display; see [below](#non-interactive-environments-batch-runs-hpc-jobs)): no prompt is shown and the run never waits for an answer.
+- **Non-interactive session** (`matlab -batch`, deployed app, [SLURM](https://slurm.schedmd.com/)/PBS job, or a session with neither desktop nor display; see [below](#batch-and-cluster-runs)): no prompt is shown and the run never waits for an answer.
 
 The prompt repeats every run until you give an explicit answer. Your decision is stored in `~/.prestus/telemetry.json`. To change it:
 
-- **Opt out**: set `"opt_in": false` in that file, or run `telemetry_setup_reset()` in MATLAB to be asked again on the next run.
-- **Opt in**: set `"opt_in": true` in the same file.
-- **Either, without a prompt**: `telemetry_set_consent(true)` or `telemetry_set_consent(false)`.
+- **Opt out**: run `telemetry_set_consent(false)` in [MATLAB](https://www.mathworks.com/products/matlab.html), or set `"opt_in": false` in that file.
+- **Opt in**: run `telemetry_set_consent(true)`, or set `"opt_in": true` in the same file.
+- **Undecided again**: `telemetry_setup_reset()` deletes the file, so the next run asks again.
 
-### Per-process override: `PRESTUS_TELEMETRY`
+### Per-Process Override (`PRESTUS_TELEMETRY`)
 
 The `PRESTUS_TELEMETRY` environment variable sets the decision for one MATLAB process, without a prompt and without writing `~/.prestus/telemetry.json`:
 
-??? note "Details: values and precedence"
+??? note "Values and precedence"
     | Value (case-insensitive) | Effect for this process |
     |---|---|
     | `off`, `0`, `false` | Opted out: no prompt, nothing sent. |
@@ -35,11 +39,11 @@ The `PRESTUS_TELEMETRY` environment variable sets the decision for one MATLAB pr
 
     `PRESTUS_TELEMETRY=off` takes precedence over a recorded decision: it sends nothing even after an opt-in. `PRESTUS_TELEMETRY=on` never overrides a recorded opt-out; it only applies when no decision is recorded. The variable never changes the recorded decision; use `telemetry_set_consent` for a lasting choice. Set the variable before MATLAB starts (`PRESTUS_TELEMETRY=off matlab -batch "..."`, or `export PRESTUS_TELEMETRY=off` in a job script) or with `setenv('PRESTUS_TELEMETRY', 'off')` in the session.
 
-### Non-interactive environments (batch runs, HPC jobs)
+### Batch and Cluster Runs
 
 PRESTUS never prompts, and never waits for an answer, in these sessions:
 
-??? note "Details: how these sessions are detected"
+??? note "How these sessions are detected"
     - `matlab -batch` runs (detected with `batchStartupOptionUsed`, R2019a and later), whether or not a display is attached: cron jobs, CI runners and scripts started from a terminal;
     - deployed applications and jobs under SLURM (`SLURM_JOB_ID`) or PBS/Torque (`PBS_JOBID`);
     - sessions with neither the MATLAB desktop nor a display (e.g. `matlab -nodisplay -r ...` from cron). An interactive `matlab -nodisplay` terminal session is also treated this way; record a decision there with `telemetry_set_consent`.
@@ -57,49 +61,49 @@ To opt in from an HPC environment, either:
     {"opt_in": true, "decided_on": "YYYY-MM-DD", "prestus_ver": ""}
     ```
 
-### Technical vs. deployment runs
+### Technical and Deployment Runs
 
 Test and CI runs that exercise `prestus_pipeline` are tagged `run_type: technical` automatically, so their pass/fail rate can be tracked separately from real deployment usage on the [usage statistics](doc_usage_statistics.md) page. Set `PRESTUS_RUN_TYPE=technical` yourself when running PRESTUS purely to validate an install or a pipeline change; leave it unset for real runs (default: `deployment`).
 
-## What is collected
+## Collected Data
 
 Each pipeline run emits one event: `run_end` (on clean exit) or `run_error` (if the pipeline throws an unhandled exception). The tables below list every field that may be sent. Subject IDs, file paths and directory names are not collected, because they could contain identifiable information.
 
 In short: system resources, software versions, a random installation ID, the execution environment, simulation and transducer settings, and the run outcome (an error identifier, never the message text).
 
-### System resources
+### System Resources
 
-??? note "Details: fields"
+??? note "Fields"
     | Field | Description |
     |---|---|
     | `os_version` | OS version string (macOS: `sw_vers -productVersion`; Linux: kernel release; Windows: `ver` output). Returns `'unknown'` on error. |
     | `cpu_model` | CPU model name (e.g. `Apple M2 Pro`). Returns `'unknown'` on error. |
     | `n_cpu_cores` | Number of logical CPU cores via `feature('numcores')`. |
     | `ram_gb` | Total physical RAM in GB (rounded). Returns `NaN` on error. |
-    | `gpu_model` | GPU device name from `gpuDevice()`. Returns `'no_pct'` when the Parallel Computing Toolbox is not licensed; `'none'` when no GPU is found; otherwise the device name string. |
+    | `gpu_model` | GPU device name from `gpuDevice()`. Returns `'no_pct'` when the [Parallel Computing Toolbox](https://www.mathworks.com/products/parallel-computing.html) is not licensed; `'none'` when no GPU is found; otherwise the device name string. |
     | `toolboxes` | Cell array of installed MATLAB toolbox names (MATLAB itself excluded). |
 
     All system resource fields are collected inside `try/catch` blocks and fall back to `'unknown'` or `NaN` on any error, so they never cause the telemetry payload to fail.
 
-### Identity
+### Run Identity and Versions
 
-??? note "Details: fields"
+??? note "Fields"
     | Field | Description |
     |---|---|
     | `event` | Event type: `run_end` or `run_error` |
-    | `run_type` | `technical` (test/CI run) or `deployment` (default). See [Technical vs. deployment runs](#technical-vs-deployment-runs). |
+    | `run_type` | `technical` (test/CI run) or `deployment` (default). See [Technical and Deployment Runs](#technical-and-deployment-runs). |
     | `timestamp_utc` | POSIX timestamp (seconds since epoch, UTC) |
     | `uuid` | Random UUID generated locally on first run; stored in `~/.prestus/uuid.txt`. Not linked to your identity or machine. |
     | `run_id` | Random UUID generated per pipeline run, so the events of one run can be told apart. Not linked to your identity or machine. |
     | `prestus_ver` | Version string of the running PRESTUS checkout (from `git describe` or the `VERSION` file, e.g. `v0.5.1`) |
-    | `prestus_hash` | Short git commit hash of the running PRESTUS checkout (e.g. `628edd0`) |
+    | `prestus_hash` | Short [git](https://git-scm.com/) commit hash of the running PRESTUS checkout (e.g. `628edd0`) |
     | `matlab_ver` | MATLAB release string (e.g. `R2024a`) |
-    | `kwave_ver` | k-Wave toolbox version string as reported by `getComputerInfo` |
+    | `kwave_ver` | [k-Wave](https://github.com/ucl-bug/k-wave) toolbox version string as reported by `getComputerInfo` |
     | `platform` | CPU architecture string from `computer('arch')` (e.g. `maci64`, `glnxa64`) |
 
-### Execution environment
+### Execution Environment
 
-??? note "Details: fields"
+??? note "Fields"
     | Field | Description |
     |---|---|
     | `sim_platform` | Execution platform: `matlab`, `slurm`, `qsub`, etc. |
@@ -108,9 +112,9 @@ In short: system resources, software versions, a random installation ID, the exe
     | `hpc_name` | HPC cluster name if running on a known cluster; `unknown` otherwise |
     | `use_gpu` | Boolean: whether a GPU device is configured |
 
-### Simulation configuration
+### Simulation Configuration
 
-??? note "Details: fields"
+??? note "Fields"
     | Field | Description |
     |---|---|
     | `medium` | Medium type: `water`, `layered` or `phantom` |
@@ -122,9 +126,9 @@ In short: system resources, software versions, a random installation ID, the exe
     | `modules_enabled` | Names of the `modules.*` flags set to 1 (e.g. `["run_acoustic_sims","run_heating_sims"]`) |
     | `pipeline_mode` | Pipeline mode of the run: `single`, `async` (asynchronous multi-transducer), `multi_isppa` or `sequential` |
 
-### Transducer
+### Transducer Settings
 
-??? note "Details: fields"
+??? note "Fields"
     | Field | Description |
     |---|---|
     | `transducer_type` | Transducer geometry type (e.g. `focused_bowl`) |
@@ -132,15 +136,15 @@ In short: system resources, software versions, a random installation ID, the exe
     | `freq_hz` | Nominal operating frequency in Hz |
     | `n_transducer_elements` | Number of transducer elements (`elem_n` from the transducer config) |
 
-### Outcome (`run_end` / `run_error` only)
+### Run Outcome
 
-??? note "Details: fields"
+??? note "Fields"
     | Field | Description |
     |---|---|
     | `duration_s` | Total pipeline wall-clock time in seconds |
     | `status` | `"success"` or `"error"` |
     | `error_id` | MATLAB error identifier string (e.g. `MATLAB:badsubscript`); **no message text** is transmitted |
 
-## Usage statistics
+## Usage Statistics
 
 See the [Usage Statistics](doc_usage_statistics.md) page for live charts populated from the anonymised telemetry database.

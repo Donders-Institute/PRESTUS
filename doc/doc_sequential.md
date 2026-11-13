@@ -1,11 +1,20 @@
 # Sequential Simulations
 
+A sonication that follows another can start in tissue that is still warm from the first and adds to the thermal dose already accumulated. Run independently, each simulation starts from the baseline temperature and zero CEM43, so this carryover is missing. Sequential mode chains the runs so that each heating simulation starts from the end-of-run temperature and CEM43 maps of the previous one.
+
+On this page:
+
+- [Basic usage](#basic-usage): passing follow-up configs to the pipeline.
+- [Cache reuse](#cache-reuse): which stages a follow-up run reuses and which it recomputes.
+- [Sequential simulation parameters](#sequential-simulation-parameters): the settings that carry the thermal state forward.
+- [Combining with uncertainty mode](#combining-with-uncertainty-mode): chaining each uncertainty variant.
+- [Output affix handling](#output-affix-handling): how files of each run and variant are named.
+
 !!! note "At a glance"
-    - **What:** A chain of simulations in which each heating run starts from the temperature and CEM43 maps of the previous one.
     - **When you need it:** When you stimulate from different coordinates in sequence and want the cumulative thermal state (for stimulation in parallel, see [Multi-Transducer Modelling](doc_multitransducer.md)).
     - **Before you start:** One config per sonication, loaded as structs.
 
-## Basic usage
+## Basic Usage
 
 Each config is a struct. Given `config_1`, `config_2`, and `config_3` to run in sequence:
 
@@ -28,7 +37,7 @@ prestus_pipeline_start(config_1, options);
 
 Field names in `sequential_configs` must follow the pattern `config_<N>` where `<N>` is a non-negative integer (e.g. `config_2`, `config_3`, `config_11`). The dispatcher picks the field with the lowest numeric value first; only relative order matters. Non-numeric suffixes (e.g. `config_abc`) are silently ignored.
 
-## Cache reuse
+## Cache Reuse
 
 When a follow-up simulation is dispatched, PRESTUS decides which results are reused and which are recomputed:
 
@@ -46,11 +55,11 @@ To reuse the base run's acoustic results in the follow-up (e.g. same target, dif
 options.sequential_configs.config_2.io.acoustic_cache_affix = config_1.io.output_affix;
 ```
 
-## Sequential simulation parameters
+## Sequential Simulation Parameters
 
 | Parameter | Description |
 |---|---|
-| `io.adopted_heatmap` | Path to a temperature heatmap NIfTI (`heating_end.nii.gz`) used as the thermal starting point. Set automatically from the previous run's output; override to supply a custom starting temperature. |
+| `io.adopted_heatmap` | Path to a temperature heatmap [NIfTI](https://nifti.nimh.nih.gov/) (`heating_end.nii.gz`) used as the thermal starting point. Set automatically from the previous run's output; override to supply a custom starting temperature. |
 | `io.adopted_cem43` | Path to a CEM43 NIfTI (`CEM43_end.nii.gz`) carried forward for cumulative thermal dose. Set automatically; can be overridden. |
 | `io.adopted_cem43_iso` | Path to the ISO-variant CEM43 NIfTI (`CEM43_iso_end.nii.gz`). Set automatically alongside `adopted_cem43`. |
 | `io.preproc_affix` | Affix for grid/medium cache lookup (defaults to the base run's `output_affix`). |
@@ -59,7 +68,7 @@ options.sequential_configs.config_2.io.acoustic_cache_affix = config_1.io.output
 | `options.sequential_configs` | Struct of follow-up configs to dispatch in order (see example above). |
 | `options.sequential_cleanup_intermediate` | If `true`, per-run NIfTI and image files are deleted after the final summary report is successfully generated. Default: `false`. |
 
-## Sequential simulations with uncertainty mode
+## Combining with Uncertainty Mode
 
 `options.sequential_configs` can be combined with `parameters.simulation.uncertainty = true`. Each follow-up run is executed once per uncertainty variant (default, Temp-H, Temp-L, Trans-H, Trans-L). The default and Temp variants inherit the thermal end-state from the matched variant of the prior run; the Trans variants re-run the acoustic simulation only:
 
@@ -76,7 +85,7 @@ After all sequential runs complete, a sequential report is written for all varia
 
 On HPC, job names are prefixed with `r1-` when sequential configs are present (e.g. `PRESTUS-r1-u2-sim-default_sub-001`) to keep scheduler job names unambiguous across chained submissions. See [doc_uncertainty.md](doc_uncertainty.md) for the uncertainty pipeline.
 
-## Output affix handling
+## Output Affix Handling
 
 Every PRESTUS output file embeds an **affix**, a short string appended to the subject/medium prefix, that distinguishes files produced by different simulation variants or pipeline modes. PRESTUS assigns affixes from the active modes; you rarely set one yourself.
 
@@ -100,7 +109,7 @@ sub-001_layered_desc-temphigh_seq2.csv           ← sequential run 2, Temp-H
 
 If you see a warning that a variant output was not found but the file exists on disk, confirm that `io.dir_output` was set before calling the pipeline (i.e. `path_log_setup` has run), and that no custom `options.affixes` struct was passed with different values than those used during simulation.
 
-??? note "Details: affix construction and report file lookup"
+??? note "Affix construction and report file lookup"
     **Affix sanitisation.** `load_parameters` sanitises the raw affix string before use: characters that are not alphanumeric, hyphens, underscores, or slashes are replaced with underscores, and the prefix `_desc-` is prepended if not already present. So `"pilot"` becomes `"_desc-pilot"`.
 
     **Full affix table.**

@@ -1,8 +1,15 @@
 # Reading Your Results
 
-A finished run leaves a folder of files. This page tells you which ones to open first, what to check, and how to read the safety summary. Every file and column is described in [Outputs & Reports](doc_outputs.md); terms are defined in the [Glossary](doc_glossary.md).
+A finished run leaves a folder of files. Before you use its numbers, check that the run simulated the placement and intensity you intended, and compare its exposure with the safety reference levels. This page lists the files to open first, the checks in order, and how to read the safety summary; every file and column is described in [Outputs & Reports](doc_outputs.md), and terms in the [Glossary](doc_glossary.md).
 
-## Where to look
+On this page:
+
+- [Files to Open First](#files-to-open-first): the report, placement report, metrics table and maps to open first.
+- [Checks Before Using Results](#checks-before-using-results): placement, intensity, safety reference levels and unusual results.
+- [Uncertainty of the Estimate](#uncertainty-of-the-estimate): how to see how much results depend on tissue properties.
+- [Methods Text](#methods-text): the methods paragraph the report writes for you.
+
+## Files to Open First
 
 Results are in `<path.sim>/sub-XXX/`. Open these first:
 
@@ -11,13 +18,13 @@ Results are in `<path.sim>/sub-XXX/`. Open these first:
 | `sub-XXX_<medium>_report<affix>.html` | The simulation report: safety summary, key numbers, figures and the run log. Start here. |
 | `sub-XXX_placement_<mode><affix>.html` | The placement report: where the transducer and the target ended up, drawn on the T1 (head simulations). |
 | `sub-XXX_<medium><affix>.csv` | All metrics in one table, for your own analysis. |
-| `nii/` | 3D maps (intensity, pressure, MI, temperature) in the participant's T1 space and in MNI space, to view in any NIfTI viewer. |
+| `nii/` | 3D maps (intensity, pressure, MI, temperature) in the participant's T1 space and in MNI space, to view in any [NIfTI](https://nifti.nimh.nih.gov/) viewer. |
 
 `<medium>` is `water` or `layered`, and `<affix>` is your `io.output_affix` (empty by default).
 
-## Check, in this order
+## Checks Before Using Results
 
-### 1. Did it simulate what you meant?
+### 1. Placement and Focus
 
 Open the placement report and the report's figures:
 
@@ -27,14 +34,14 @@ Open the placement report and the report's figures:
 
 For many runs, the targeting analysis (`sub-XXX_<medium><affix>_targeting.csv`) measures the distance between the simulated and the planned focus ([Targeting accuracy](doc_group.md#targeting-accuracy)).
 
-### 2. Is the intensity what you expect?
+### 2. Intensity in the Brain
 
 - `transducer.target_isppa_wcm2` is the **free-water** intensity (30 W/cm² by default). The intensity **in the brain** (`Isppa_brain`, `Ipa_target`) is lower, mostly because the skull reflects and absorbs ultrasound. How much lower depends on the person, the skull thickness and the angle of incidence.
 - If the run log shows `prestus:isppa:largeScale`, the field was scaled by more than 4× (or less than 0.25×) from the simulated drive. The result is then an extrapolation; check that it is still realistic for your device.
 
-### 3. Is it within the safety reference levels?
+### 3. Safety Reference Levels
 
-The top of the report shows a **safety verdict** and one card per metric. Each card is coloured by how close the value is to its ITRUSST non-significant-risk (NSR) reference level (Aubry et al., 2025):
+The top of the report shows a **safety verdict** and one card per metric. Each card is coloured by how close the value is to its [ITRUSST](https://itrusst.org/) non-significant-risk (NSR) reference level ([Aubry et al., 2025](https://doi.org/10.1016/j.brs.2025.10.007)):
 
 | Colour | Meaning |
 |---|---|
@@ -55,21 +62,21 @@ A red card does **not** by itself mean the protocol is unsafe, and the verdict t
 
 Thermal metrics only appear when a thermal simulation ran (`modules.run_heating_sims: 1`, with a sonication protocol in `timing.*`). The report shows the CEM43 form selected by `thermal.cem43_iso` ([Thermal](doc_simulations-thermal.md#thermal-dose-cem43-calculation)).
 
-### 4. Anything unusual?
+### 4. Unusual Results
 
 | What you see | What it may mean |
 |---|---|
 | The highest intensity is in the skin or skull rather than the brain | Expected to some degree near the transducer; a hot spot at the scalp can also mean poor contact or a transducer placed into the head. Check the placement report. |
 | The focus is much shallower or deeper than the setting | Strong skull refraction, or a target depth outside the transducer's range (`min_foc`–`max_foc` of the device). |
 | Warnings about points per wavelength (PPW) in the log | The grid is too coarse for the frequency; results near the focus may be inaccurate ([Spatial and temporal sampling](doc_simulations-acoustic.md#spatial-and-temporal-sampling)). |
-| `load_transducer_from_library:uncalibratedAmplitude` in the log | The transducer's drive at this depth was not checked in k-Wave; absolute intensities carry that uncertainty ([Transducer Library](doc_calibration.md#optional-free-water-k-wave-drive-calibration)). |
+| `load_transducer_from_library:uncalibratedAmplitude` in the log | The transducer's drive at this depth was not checked in k-Wave; absolute intensities carry that uncertainty ([Free-water k-Wave drive calibration](doc_calibration_refinement.md#free-water-k-wave-drive-calibration)). |
 
 More known messages and their fixes are in [Troubleshooting](doc_troubleshooting.md).
 
-## Uncertainty of the estimate
+## Uncertainty of the Estimate
 
 Simulated intensities and temperatures depend on assumed tissue properties, which are uncertain, especially for the skull. To see how much your results could change, run the [uncertainty mode](doc_uncertainty.md) (default tissue properties and the ITRUSST bounds that maximise and minimise heating and intensity), or use subject-specific skull properties from a [pseudo-CT](doc_pseudoCT.md).
 
-## Methods text
+## Methods Text
 
 The report contains an automatically written methods paragraph (with references) describing the software, transducer, grid, tissue properties, protocol and resulting exposure. Copy it with *Copy methods text*, and check it against your study before using it in a manuscript.

@@ -18,16 +18,16 @@ theme:
   palette:
     # Light mode toggle
     - scheme: default
-      primary: black
-      accent: cyan
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
         
     # Dark mode toggle  
     - scheme: slate
-      primary: black
-      accent: cyan
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -48,21 +48,31 @@ nav:
   - 🧠 Head Model:
     - Segmentation & Preprocessing: doc_preproc.md
     - Medium Setup: doc_medium.md
-    - (pseudo-)CT: doc_pseudoCT.md
+    - (pseudo-)CT:
+      - Overview: doc_pseudoCT.md
+      - From UTE to Pseudo-HU: doc_pseudoCT_generation.md
+      - Skull Property Mappings: doc_pseudoCT_property-mappings.md
   - 🔧 Transducer:
     - Transducer Definition: doc_transducer.md
-    - Transducer Library: doc_transducer_library.md
-    - Calibration: doc_calibration.md
-    - Adding & Maintaining Entries: doc_transducer_library_maintenance.md
+    - Transducer Library:
+      - Overview: doc_transducer_library.md
+      - Adding & Maintaining Entries: doc_transducer_library_maintenance.md
+    - Calibration:
+      - Overview: doc_calibration.md
+      - Refining With Your Hydrophone Profiles: doc_calibration_refinement.md
+      - "Matrix Arrays: Steering Correction": doc_calibration_matrix-steering.md
   - 🎯 Placement:
     - Overview & Manual: doc_placement.md
     - MNI: doc_placement_mni.md
     - Heuristic: doc_placement_heuristic.md
     - PlanTUS: doc_placement_plantus.md
     - TUS_entry: doc_placement_tus_entry.md
-    - Localite Placement: doc_placement_neuronav.md
-    - Localite Ingestion (GUI & Script): doc_placement_neuronav_workflows.md
-    - Localite Multi-Target Toolkit: doc_placement_neuronav_multitarget.md
+    - Localite:
+      - Overview: doc_placement_neuronav.md
+      - Placing from a Recorded Pose: doc_placement_neuronav_recorded-pose.md
+      - Files, Offset and Coordinates: doc_placement_neuronav_coordinates.md
+      - Ingestion (GUI & Script): doc_placement_neuronav_workflows.md
+      - Named Target Coordinates: doc_placement_neuronav_targets.md
   - 🖥️ Simulation:
     - Acoustic: doc_simulations-acoustic.md
     - Thermal: doc_simulations-thermal.md
@@ -71,12 +81,17 @@ nav:
   - ▶️ Running & Outputs:
     - Running on a Cluster: doc_hpc.md
     - Partial Runs (Modules): doc_modules.md
-    - Outputs & Reports: doc_outputs.md
+    - Outputs & Reports:
+      - Overview: doc_outputs.md
+      - Metrics Table Columns: doc_outputs_metrics-table.md
+      - Reusing Earlier Outputs and Caches: doc_outputs_reuse.md
     - Studies & Group Analysis: doc_group.md
   - 📊 Advanced Modes:
     - Overview: doc_advanced.md
     - Multi-Intensity: doc_multiintensity.md
-    - Multi-Transducer: doc_multitransducer.md
+    - Multi-Transducer:
+      - Overview: doc_multitransducer.md
+      - Async Firing: doc_multitransducer_async.md
     - Sequential: doc_sequential.md
     - Uncertainty Analysis: doc_uncertainty.md
   - ⚙️ Backends:
@@ -94,6 +109,7 @@ nav:
     - Troubleshooting: doc_troubleshooting.md
     - Changelog: CHANGELOG.md
   - 🛠️ Developers:
+    - Developer Guide: doc_developer-guide.md
     - Contributing: CONTRIBUTING.md
     - Testing: doc_testing.md
     - BabelBrain Internals: doc_babelbrain_internals.md
@@ -132,4 +148,5 @@ extra_javascript:
   - https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
   - javascripts/header_home_link.js
+  - javascripts/developer_details.js
   - javascripts/usage_statistics.js

@@ -1,11 +1,17 @@
 # k-Wave
 
+[k-Wave](https://github.com/ucl-bug/k-wave) is the default solver for the acoustic and the thermal simulation and is installed with PRESTUS. Its implementation (`simulation.code_type`) decides whether a run uses the CPU or the GPU, through [MATLAB](https://www.mathworks.com/products/matlab.html) or a C++ binary. The elastic skull model changes the physics instead: it adds shear waves in the skull, which fluid skull models omit and which lowered the intracranial pressure in ex vivo measurements; in PRESTUS it is a draft and not yet validated.
+
+On this page:
+
+- [Solver Implementations (`code_type`)](#solver-implementations-code_type): CPU or GPU, MATLAB or C++, and building the binaries.
+- [Elastic Skull Model (Shear Waves)](#elastic-skull-model-shear-waves): configuration, skull elastic properties, limitations and cost.
+
 !!! note "At a glance"
-    - **What:** The default PRESTUS backend for acoustic and thermal simulations, its CPU/GPU and MATLAB/C++ variants, and the elastic (shear-wave) skull model.
     - **When you need it:** To choose `simulation.code_type` for your hardware, or to model shear waves in the skull.
     - **Before you start:** Nothing; k-Wave is installed with PRESTUS. The C++ variants need the k-Wave binaries.
 
-## Choosing the implementation (`code_type`)
+## Solver Implementations (`code_type`)
 
 
 `simulation.code_type` selects the k-Wave implementation. This mainly affects the acoustic simulation; with either GPU variant, thermal simulations also use GPU acceleration (if k-Wave 1.4.1 is provided).
@@ -13,12 +19,12 @@
 | `code_type` | Implementation | Requirements |
 |---|---|---|
 | `matlab_cpu` | `kspaceFirstOrder3D` / `kspaceFirstOrder2D` / `kspaceFirstOrderAS` in MATLAB | none |
-| `matlab_gpu` | MATLAB with GPU acceleration via `DataCast` | Parallel Computing Toolbox |
+| `matlab_gpu` | MATLAB with GPU acceleration via `DataCast` | [Parallel Computing Toolbox](https://www.mathworks.com/products/parallel-computing.html) |
 | `cpp_cpu` | `kspaceFirstOrder3DC` wraps the C++ binary `kspaceFirstOrder-OMP` | The binary from [k-Wave downloads](http://www.k-wave.org/download.php) |
-| `cpp_gpu` | `kspaceFirstOrder3DG` wraps the C++/CUDA binary `kspaceFirstOrder-CUDA`, offloading computation to NVIDIA GPUs | A CUDA-capable Nvidia GPU and the binary from [k-Wave downloads](http://www.k-wave.org/download.php) |
+| `cpp_gpu` | `kspaceFirstOrder3DG` wraps the C++/[CUDA](https://developer.nvidia.com/cuda-toolkit) binary `kspaceFirstOrder-CUDA`, offloading computation to NVIDIA GPUs | A CUDA-capable Nvidia GPU and the binary from [k-Wave downloads](http://www.k-wave.org/download.php) |
 | `cpp_mlx` | `kspaceFirstOrder3DG` wraps the C++/[MLX](https://github.com/ml-explore/mlx) binary `kspaceFirstOrder-MLX`, offloading computation to the Apple Silicon GPU | An Apple Silicon Mac (macOS 14 or later) and the binary with `mlx.metallib`, built as described below |
 
-??? note "Details: compiling the CUDA binary for your GPU"
+??? note "Compiling the CUDA binary for your GPU"
     To use C++ with GPU support you may need to recompile the binary for your GPU version (for example the A100 GPUs on the Donders HPC).
 
     - Download the [Linux C++/CUDA source files](http://www.k-wave.org/download.php) (version 1.3; the C++ code is versioned separately from the k-Wave 1.4.1 MATLAB toolbox). This includes the Makefile to compile the binary.
@@ -27,7 +33,6 @@
     - For the Donders HPC, a precompiled binary is available [here](https://github.com/jkosciessa/PRESTUS_bin/raw/refs/heads/main/donders_kwave_bin/kspaceFirstOrder-CUDA).
     - Place the updated binary into `PRESTUS/external/k-Wave/binaries/`
 
-## Elastic skull model (shear waves)
 ??? note "Building the MLX binary (macOS)"
     `cpp_mlx` is experimental and has not been validated on a PRESTUS head simulation. It runs the acoustic simulation on the Apple GPU; thermal simulations run on the CPU. Axisymmetric grids fall back to `matlab_cpu`, and `kwave_elastic` runs with `matlab_cpu`, because the port has no solver for either.
 
@@ -43,12 +48,13 @@
 
     Copy `kspaceFirstOrder-MLX` and `mlx.metallib` from `build/mlx-darwin` into `PRESTUS/external/k-wave/k-Wave/binaries/`. The two files must stay side by side, because the binary loads `mlx.metallib` from its own folder.
 
+## Elastic Skull Model (Shear Waves)
 
-`acoustic_backend: kwave_elastic` runs k-Wave's `pstdElastic3D` / `pstdElastic2D` instead of `kspaceFirstOrder*`, so the skull supports shear as well as compressional waves. The motivation is Gao et al. (2026), who compared fluid and elastic k-Wave skull models against hydrophone scans through an ex vivo skull at normal and 40° incidence for shallow (cortical) foci. In those scans the fluid skull model overestimated the intracranial pressure by ~40 % on average and the −6 dB focal area by up to 170 %. The elastic model was also less sensitive to small transducer position errors.
+`acoustic_backend: kwave_elastic` runs k-Wave's `pstdElastic3D` / `pstdElastic2D` instead of `kspaceFirstOrder*`, so the skull supports shear as well as compressional waves. The motivation is [Gao et al. (2026)](https://doi.org/10.1109/TBME.2025.3603836), who compared fluid and elastic k-Wave skull models against hydrophone scans through an ex vivo skull at normal and 40° incidence for shallow (cortical) foci. In those scans the fluid skull model overestimated the intracranial pressure by ~40 % on average and the −6 dB focal area by up to 170 %. The elastic model was also less sensitive to small transducer position errors.
 
-**Status: draft.** Not yet validated in PRESTUS against measurements or the ITRUSST benchmarks.
+**Status: draft.** Not yet validated in PRESTUS against measurements or the [ITRUSST](https://itrusst.org/) benchmarks.
 
-### Configuration
+### Elastic Model Settings
 
 ```yaml
 acoustic_backend: kwave_elastic
@@ -67,26 +73,26 @@ elastic:                     # defaults shown; see doc_parameters.md
   long_attenuation: elastic
 ```
 
-Compressional speed and density come from the usual medium setup (layer values or pseudo-CT mapping). The shear speed and the two attenuations follow Pichardo et al. (2017), the viscoelastic model behind BabelBrain, evaluated at the transducer's fundamental frequency. Expect the elastic model to be most reliable at low frequencies: Pichardo et al. found good agreement at 270 kHz (delay error 5 % of a wavelength) but only global agreement at 836 kHz (17 %), where trabecular scattering degraded the spatial prediction of an isotropic model.
+Compressional speed and density come from the usual medium setup (layer values or pseudo-CT mapping). The shear speed and the two attenuations follow [Pichardo et al. (2017)](https://doi.org/10.1088/1361-6560/aa7ccc), the viscoelastic model behind [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain), evaluated at the transducer's fundamental frequency. Expect the elastic model to be most reliable at low frequencies: Pichardo et al. found good agreement at 270 kHz (delay error 5 % of a wavelength) but only global agreement at 836 kHz (17 %), where trabecular scattering degraded the spatial prediction of an isotropic model.
 
-??? note "Details: skull elastic properties"
+??? note "Skull elastic properties"
     Pichardo et al. (2017) fitted shear speed and attenuation to transcranial scans at 40° incidence (10 locations, 3 formalin-fixed skulls, 270 and 836 kHz). Every value is evaluated at the transducer's fundamental frequency f0:
 
     | Property | Pichardo et al. 2017 | PRESTUS default at f0 |
     |---|---|---|
     | Shear speed | cS = 0.458·ρ + 545.52 (270 kHz); cS = 0.386·ρ + 815.51 (836 kHz) | slope and intercept interpolated linearly in f. At 500 kHz: 0.429·ρ + 655.2, i.e. 1448 m/s at ρ = 1850 (cortical layer), 1384 m/s at ρ = 1700 (trabecular layer). Extrapolated, with a warning, outside 270–836 kHz |
     | Shear attenuation | 57 Np/m (270 kHz), 373 Np/m (836 kHz), one value for the whole skull | power law through both points: 43.63 dB/(cm·MHz^1.662); 0.68 Np/cm at 300 kHz, 1.59 Np/cm at 500 kHz |
-    | Longitudinal attenuation | 33 Np/m (270 kHz), 231 Np/m (836 kHz), from Pichardo et al. 2011; the shear values were fitted with these | power law through both points: 27.31 dB/(cm·MHz^1.722); 0.40 Np/cm at 300 kHz, 0.95 Np/cm at 500 kHz |
+    | Longitudinal attenuation | 33 Np/m (270 kHz), 231 Np/m (836 kHz), from [Pichardo et al. 2011](https://doi.org/10.1088/0031-9155/56/1/014); the shear values were fitted with these | power law through both points: 27.31 dB/(cm·MHz^1.722); 0.40 Np/cm at 300 kHz, 0.95 Np/cm at 500 kHz |
 
     The shear-speed fits are BabelBrain's `DensityToSSoSPichardo` before averaging: BabelBrain uses their mean over the two frequencies (0.422·ρ + 680.5).
 
     **Why the skull longitudinal attenuation is replaced.** The shear attenuation was fitted together with this longitudinal attenuation, so the pair is used as a set. The fluid/pCT skull values are fits for a fluid model, which have to absorb mode-conversion losses into the longitudinal attenuation. Set `long_attenuation: medium` to keep them anyway. The sources disagree by about 2×: Gao et al. (2026) used 0.5 Np/cm at 500 kHz with the same k-Wave solver (Pichardo pair: 0.95; PRESTUS fluid default 13.3 dB/(cm·MHz): 0.77).
 
-    **Poisson-ratio floor.** Combining a density-based shear speed with a density-based compressional speed can give unphysical bone. For example, the Gao et al. shear mapping with the k-Plan cL mapping gives ν ≈ 0 at ρ ≈ 1300 kg/m³; BabelBrain disables shear on its CT path for this reason. The Pichardo mapping is better behaved, but at ρ = 1200 kg/m³ it still gives ν from 0.17 (250 kHz) down to ≈0 (836 kHz), because cS rises with frequency while cL does not. `poisson_min` caps cS in those voxels and the run log reports how many.
+    **Poisson-ratio floor.** Combining a density-based shear speed with a density-based compressional speed can give unphysical bone. For example, the Gao et al. shear mapping with the [k-Plan](https://k-plan.io/) cL mapping gives ν ≈ 0 at ρ ≈ 1300 kg/m³; BabelBrain disables shear on its CT path for this reason. The Pichardo mapping is better behaved, but at ρ = 1200 kg/m³ it still gives ν from 0.17 (250 kHz) down to ≈0 (836 kHz), because cS rises with frequency while cL does not. `poisson_min` caps cS in those voxels and the run log reports how many.
 
     **Resolution.** The slowest shear wave sets the grid requirement. A warning is issued below `min_ppw_shear` (6; Gao et al. used 6.6 with k-Wave, Pichardo et al. 8 with 4th-order FDTD). At 0.5 mm, 300 kHz gives ≈7.4 points per wavelength for cS = 1105 m/s (ρ = 1200); 500 kHz needs ≈0.39 mm.
 
-??? note "Details: how the elastic run differs from the fluid run"
+??? note "How the elastic run differs from the fluid run"
     | Step | Fluid `kwave` | `kwave_elastic` |
     |---|---|---|
     | Medium | `sound_speed`, `density`, `alpha_coeff`/`alpha_power` | the same maps, plus `sound_speed_shear` and `alpha_coeff_shear` in the skull and (by default) `elastic.alpha_coeff_long` as skull longitudinal attenuation (`medium_elastic_properties`, called from `acoustic_wrapper` with the final density map and skull masks) |
@@ -95,9 +101,9 @@ Compressional speed and density come from the usual medium setup (layer values o
     | Solver | `kspaceFirstOrder3D/2D/AS`, MATLAB or C++ | `pstdElastic3D/2D`, MATLAB CPU or GPU (`DataCast`) |
     | Free-water baseline | fluid solver | same elastic solver (cS = 0), so ISPPA scaling uses one forward model |
 
-    The fluid `kwave_medium` returned to the pipeline is unchanged; thermal simulation, NIfTI export and the report use it as for a fluid run. With `simulation.debug: 1`, the shear speed and shear absorption grids are written to `debug/medium/matrix_*_shear*.nii.gz`.
+    The fluid `kwave_medium` returned to the pipeline is unchanged; thermal simulation, [NIfTI](https://nifti.nimh.nih.gov/) export and the report use it as for a fluid run. With `simulation.debug: 1`, the shear speed and shear absorption grids are written to `debug/medium/matrix_*_shear*.nii.gz`.
 
-### Limitations and cost
+### Elastic Model Limitations and Cost
 
 - **Compute and memory:** `pstdElastic3D` holds ≈65–75 single-precision arrays of the padded grid (split stress and velocity fields, staggered material maps, derivatives), i.e. ≈0.27–0.30 GB per million voxels, or ≈26–30 GB for a 512×512×384 padded grid. Runtime is several times that of the C++/CUDA fluid solver (MATLAB time loop, ~3× the FFT work); Gao et al. report ~15 min for 320×256×384 on an RTX 3090 at CFL 0.3. Keep `grid.source_cfl` ≤ 0.3; the PRESTUS default 0.15 is conservative.
 - **Not supported:** axisymmetric grids and C++/CUDA binaries. Nonlinearity (`BonA`) is not passed to the elastic solver.

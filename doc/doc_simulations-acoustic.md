@@ -1,13 +1,23 @@
 # Acoustic Simulations
 
+The acoustic simulation computes the pressure field the transducer produces in the head. Every reported intensity, focus position and mechanical index comes from this field, so its settings decide how far the results can be trusted: how finely the grid samples the wave, how long the simulation runs, and which intensity the field is scaled to.
+
+On this page:
+
+- [Main Settings](#main-settings): the few settings most studies change.
+- [Spatial and Temporal Sampling](#spatial-and-temporal-sampling): grid resolution, time step and simulation duration.
+- [Amplitude Ramping](#amplitude-ramping): how the source is switched on.
+- [ISPPA Targeting](#isppa-targeting): scaling the field to a free-water intensity.
+- [Memory Use](#memory-use): fitting large runs into memory.
+- [Axisymmetric Simulations](#axisymmetric-simulations): fast 2D runs for symmetric setups.
+
 !!! note "At a glance"
-    - **What:** How the acoustic simulation is set up: grid sampling, intensity targeting, memory use and 2D axisymmetric runs.
     - **When you need it:** Read [ISPPA targeting](#isppa-targeting) for every study. The rest matters when you change grid settings or run out of memory.
     - **Before you start:** Nothing; the defaults are a sound starting point.
 
-## What to set
+## Main Settings
 
-The defaults run a 3D simulation with k-Wave's `kspaceFirstOrder3D` (see the available [simulation backends](doc_backend.md)). The settings most studies touch:
+The defaults run a 3D simulation with [k-Wave](https://github.com/ucl-bug/k-wave)'s `kspaceFirstOrder3D` (see the available [simulation backends](doc_backend.md)). The settings most studies touch:
 
 ```yaml
 grid:
@@ -22,9 +32,9 @@ modules:
 The simulation models compressional waves (P-waves) in isotropic media and computes pressure and velocity fields. Shear waves are not modelled explicitly; their scattering contributes to the bulk attenuation coefficient. This makes the run faster and less memory-intensive than an elastic simulation. An elastic skull model is available as a separate backend ([`kwave_elastic`](doc_kwave.md#elastic-skull-model-shear-waves), draft).
 
 !!! note "Turning off acoustic simulations"
-    With `modules.run_acoustic_sims: 0`, PRESTUS loads the existing acoustic results from the cache (subject to `io.overwrite_files`; see [Overwrite behaviour](doc_outputs.md#overwrite-behaviour)). This lets a follow-up thermal simulation reuse an earlier acoustic run. Other modules behave differently: turning them off may skip the step without loading existing data.
+    With `modules.run_acoustic_sims: 0`, PRESTUS loads the existing acoustic results from the cache (subject to `io.overwrite_files`; see [Overwrite behaviour](doc_outputs_reuse.md#overwrite-behaviour)). This lets a follow-up thermal simulation reuse an earlier acoustic run. Other modules behave differently: turning them off may skip the step without loading existing data.
 
-## Spatial and temporal sampling
+## Spatial and Temporal Sampling
 
 Accuracy depends on resolving the shortest wavelength in the domain. Two parameters govern this.
 
@@ -47,7 +57,7 @@ PPP = PPW / CFL
 
 Rule of thumb: the coarsest grid that satisfies a minimum PPW at frequency `f` in the slowest medium is `dx_max = c_min / (f × PPW_min)`. At 500 kHz in water (1500 m/s) with PPW = 6: `resolution_mm = 0.50 mm`.
 
-??? note "Details: PPW across tissues, the stability recheck and the CFL default"
+??? note "PPW across tissues, the stability recheck and the CFL default"
     **PPW varies across tissues.** The check against `grid.min_ppw` uses the slowest medium. At 500 kHz with 0.5 mm resolution, water/brain (1500 m/s) gives PPW ≈ 10 and skull (2800 m/s) PPW ≈ 37. The binding spatial constraint is always in the slow tissues.
 
     **The stability recheck can reduce `dt` below the CFL target.** After source setup, `prestus_pipeline` calls `checkStability`. If the CFL-derived `dt` exceeds the estimated stability limit for the heterogeneous medium, source setup is rerun with a smaller time step scaled by `grid.source_limit_fraction` (default 0.9). The final `dt` can therefore be smaller than `CFL × dx / c_max`. The PPW check runs only on the first source setup call; the adjusted call receives `dt` explicitly and bypasses it.
@@ -56,7 +66,7 @@ Rule of thumb: the coarsest grid that satisfies a minimum PPW at frequency `f` i
 
     **The default CFL of 0.15 is conservative.** k-Wave's own default is 0.3. PRESTUS uses 0.15 for extra stability margin in heterogeneous skull simulations, where the theoretical stability limit is an approximation ([`checkStability`](http://www.k-wave.org/documentation/checkStability.php)). This roughly doubles the number of time steps and the acoustic runtime. If simulations are stable, `source_cfl` can be raised towards 0.3; validate this against the `checkStability` output for your medium.
 
-### Simulation duration (`t_end`)
+### Simulation Duration
 
 With the default `grid.steady_state_transits: 1`, the simulation lasts long enough for the wave to cross the domain diagonal once, so the steady-state field is established everywhere:
 
@@ -67,7 +77,7 @@ N_steps = round(t_end / dt)
 
 where `grid_diagonal = sqrt(x_size² + y_size² + z_size²)` and `c_min` is the minimum sound speed across all media (water or brain, ~1500 m/s). Request more transits for compact, reflective domains, or set a fixed duration with `grid.sim_time_us`. The sensor records `p_max_all` and `p_final` over the last `grid.steady_state_num_periods` (default 3) wave periods.
 
-## Amplitude ramping
+## Amplitude Ramping
 
 A ramped pulse delivers less pulse-average intensity (ISPPA) than the temporal-peak intensity (ISPTP), because intensity scales with amplitude². When `timing.pulse_ramp_dur > 0`, `acoustic_analysis` scales the `acoustic_Ipa` map and every derived ISPPA value (per tissue, at target) by
 
@@ -90,7 +100,7 @@ Example: 20 ms pulse, 2 ms ramp per edge (10 % of `pd` per edge, 20 % total):
 | linear | 1/3 | ≈ 0.867 |
 | tukey | 3/8 | ≈ 0.875 |
 
-??? note "Details: ramp factor formula"
+??? note "Ramp factor formula"
     ```
     t_flat = pd - 2 × ramp_dur
     f      = (k × ramp_dur + t_flat + k × ramp_dur) / pd
@@ -98,7 +108,7 @@ Example: 20 ms pulse, 2 ms ramp per edge (10 % of `pd` per edge, 20 % total):
 
     Ramping reduces spectral splatter by smoothing the transducer drive at pulse onset and offset instead of switching abruptly.
 
-## ISPPA targeting
+## ISPPA Targeting
 
 The acoustic simulation runs at the drive `elem_p_amp` (from the study config or the transducer library). `transducer.target_isppa_wcm2` (default `30` W/cm²) sets the **free-water** ISPPA the results are reported at. Pressure is linear in drive, so PRESTUS scales the simulated field by
 
@@ -106,11 +116,11 @@ The acoustic simulation runs at the drive `elem_p_amp` (from the study config or
 scale_p = sqrt(target_isppa / baseline_isppa)
 ```
 
-where `baseline_isppa` is the free-water peak ISPPA of the same drive. All pressure fields used downstream (`p_max_all`, `p_min_all`, `p_final`) are scaled, so intensities, MI and heating are consistent. A scalar target scales one run; a vector runs [one thermal job per value](doc_multiintensity.md); an empty target (`[]`) reports the field at `elem_p_amp`.
+where `baseline_isppa` is the free-water peak ISPPA of the same drive. All pressure fields used downstream (`p_max_all`, `p_min_all`, `p_final`) are scaled, so intensities, MI and heating are consistent. A scalar target scales one run; a vector runs [one thermal job per value](doc_multiintensity.md); an empty target (`[]`) reports the field at an inline `elem_p_amp`. A transducer resolved from the library (`transducer.serial`) needs a target, because its drive is resolved at that ISPPA.
 
 The baseline comes from one of two sources (`isppa_baseline`):
 
-1. a **free-water simulation** with the same grid, source and backend (`acoustic_water_baseline`; BabelBrain runs its own), recorded as `acoustic_provenance.freefield_isppa_wcm2` with its origin in `freefield_source`; or
+1. a **free-water simulation** with the same grid, source and backend (`acoustic_water_baseline`; [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) runs its own), recorded as `acoustic_provenance.freefield_isppa_wcm2` with its origin in `freefield_source`; or
 2. the transducer's **calibration ISPPA** (`tx_calibration.isppa_wcm2`, from the library or a calibration file), used only when it matches the target to within 1 %. No scaling is then needed.
 
 `modules.run_water_baseline` decides when the free-water simulation runs (`needs_water_baseline`):
@@ -127,10 +137,10 @@ A target is never reported unscaled. When a rescale is needed but no simulated b
 
 **Several transducers.** `target_isppa_wcm2` is set per transducer and refers to that transducer alone. Coherent runs set each transducer's drive to its own target before the simulation; async runs scale each field before combining ([Multi-transducer: ISPPA targets](doc_multitransducer.md#isppa-targets)). The older `calibration.target_isppa_wcm2` is read and moved to `transducer(1).target_isppa_wcm2` with a deprecation warning.
 
-??? note "Details: axial profile plot"
-    The baseline run also stores the free-water intensity along each transducer's beam axis (bowl apex to grid edge) as `acoustic_provenance.freefield_axial`. The axial profile plot (`sub-XXX_<medium>_axial_profile<affix>.png` / `.csv`, 3D grids) compares the simulated intensity with the free-water intensity of the simulated transducer settings: the k-Wave baseline profile when the baseline ran, and the analytical O'Neil profile for a single annular transducer (always), both at the drive level of the plotted field after scaling. The plot is omitted for combined async / FOV fields (scaled per source) and for the BabelBrain backend.
+??? note "Axial profile plot"
+    The baseline run also stores the free-water intensity along each transducer's beam axis (bowl apex to grid edge) as `acoustic_provenance.freefield_axial`. The axial profile plot (`sub-XXX_<medium>_axial_profile<affix>.png` / `.csv`, 3D grids) compares the simulated intensity with the free-water intensity of the simulated transducer settings: the k-Wave baseline profile when the baseline ran, and the analytical [O'Neil](https://doi.org/10.1121/1.1906542) profile for a single annular transducer (always), both at the drive level of the plotted field after scaling. The plot is omitted for combined async / FOV fields (scaled per source) and for the BabelBrain backend.
 
-## Memory and source signal optimisation
+## Memory Use
 
 Two components dominate acoustic memory:
 
@@ -139,7 +149,7 @@ Two components dominate acoustic memory:
 
 PRESTUS compresses the source matrix automatically per backend (details below). A coarser grid or a [limited acoustic FOV](doc_limited_fov.md) reduces the grid fields; the `cpp_*` backends stream the source matrix from disk.
 
-??? note "Details: how PRESTUS reduces source memory by backend"
+??? note "How PRESTUS reduces source memory by backend"
     The source signal matrix has size `num_source_voxels × Nt`. For a kHz-range aperture at 0.5 mm resolution with the standard CFL of 0.15, `Nt` is on the order of several thousand, so the dense matrix reaches several gigabytes for large transducers.
 
     **`matlab_cpu` / `matlab_gpu`: lazy rank-2 factorisation for CW sources.** For continuous-wave (CW) stimulation every source voxel's time signal has the form
@@ -150,7 +160,7 @@ PRESTUS compresses the source matrix automatically per backend (details below). 
 
     which two real numbers per voxel describe (amplitude and phase, or the real and imaginary part of a complex amplitude). PRESTUS stores only those two numbers per voxel (`CWSourceMatrix.m`) and evaluates each time column on demand during the simulation. Memory scales with `num_source_voxels` only, a reduction by a factor of ~2 000–5 000 for typical parameters. This path is used when `code_type` is `matlab_cpu` or `matlab_gpu` and all transducer elements share a single frequency; otherwise the dense matrix is used. k-Wave's own source scaling (`kspaceFirstOrder_scaleSourceTerms`), including the per-voxel loop for heterogeneous media, is applied to the stored amplitudes, so no dense matrix is built at any point.
 
-    **`cpp_cpu` / `cpp_gpu`: HDF5 streaming from disk.** The source matrix is written to an HDF5 file before the simulation and the C++ binary reads it in blocks during execution. Peak memory is bounded by the block size rather than the full matrix, at the cost of I/O throughput.
+    **`cpp_cpu` / `cpp_gpu`: [HDF5](https://www.hdfgroup.org/solutions/hdf5/) streaming from disk.** The source matrix is written to an HDF5 file before the simulation and the C++ binary reads it in blocks during execution. Peak memory is bounded by the block size rather than the full matrix, at the cost of I/O throughput.
 
     | Backend | Simulation device | Source signal representation | Peak additional RAM / VRAM |
     |---|---|---|---|
@@ -160,7 +170,7 @@ PRESTUS compresses the source matrix automatically per backend (details below). 
 
     For a 10 000-voxel source at Nt = 9 000 time steps: dense = **360 MB**; CW lazy = **0.08 MB**.
 
-## Axisymmetric simulations
+## Axisymmetric Simulations
 
 For symmetric media (a 2D `phantom` or `water` medium), a 3D axisymmetric problem can be modelled on a 2D grid with [`kspaceFirstOrderAS`](http://www.k-wave.org/documentation/kspaceFirstOrderAS.php) (`grid.axisymmetric: 1`; see k-Wave's [focused bowl example](https://github.com/ucl-bug/k-wave/blob/main/k-Wave/examples/example_at_focused_bowl_AS.m)). This reduces the computational cost markedly compared with a full 3D simulation. [`kspaceFirstOrder2D`](http://www.k-wave.org/documentation/kspaceFirstOrder2D.php) is not a substitute: it models an infinite cylinder, not a focusing shell.
 
@@ -169,22 +179,22 @@ What applies in axisymmetric mode:
 - Specify the grid as `[radial x 2, axial]`. The (2x) radial axis is assumed to be shorter than the axial axis.
 - Only a **single transducer** is supported; several transducers with `axisymmetric == 1` raise an error.
 - Only **annular transducers** explicitly support axisymmetric `kWaveArray` mode. Other transducer types are untested in this configuration.
-- A 3D `phantom` is cut along its second dimension at the transducer's `trans_pos` when that is given in 3D, else at the centre slice. Output NIfTIs of `phantom` runs are written in the phantom file's voxel order and world space.
+- A 3D `phantom` is cut along its second dimension at the transducer's `trans_pos` when that is given in 3D, else at the centre slice. Output [NIfTIs](https://nifti.nimh.nih.gov/) of `phantom` runs are written in the phantom file's voxel order and world space.
 - The source keeps every grid point with a non-zero band-limited-interpolation weight, as the 3D path and k-Wave do.
 
 !!! note "Axisymmetric 2D vs. 3D output"
     Axisymmetric simulations are 3D simulations performed on 2D input grids. `grid.axisymmetric_output` sets the form of the results: `'auto'` (default) expands them to 3D for `phantom` media and when heating follows, and keeps the 2D plane otherwise; `'2d'` keeps the mirrored plane (no heating); `'3d'` always expands.
 
-### Backend compatibility
+### Backend Compatibility
 
 | Backend (`simulation.code_type`) | Axisymmetry support | Notes |
 |---|---|---|
 | `matlab_cpu` | ✓ | Uses `kspaceFirstOrderAS` |
 | `matlab_gpu` | ✓ | Uses `kspaceFirstOrderAS` with `RadialSymmetry` option |
 | `cpp_cpu` | ✓ | Uses the C++ OMP binary `kspaceFirstOrderASC` |
-| `cpp_gpu` (CUDA) | ✗ | No CUDA binary supports axisymmetric geometry. PRESTUS falls back to the `matlab_gpu` path (`kspaceFirstOrderAS` with `gpuArray` data cast) with a warning. GPU acceleration is preserved; only the CUDA binary is bypassed. |
+| `cpp_gpu` ([CUDA](https://developer.nvidia.com/cuda-toolkit)) | ✗ | No CUDA binary supports axisymmetric geometry. PRESTUS falls back to the `matlab_gpu` path (`kspaceFirstOrderAS` with `gpuArray` data cast) with a warning. GPU acceleration is preserved; only the CUDA binary is bypassed. |
 
-??? note "Details: axis mapping and PML in axisymmetric mode"
+??? note "Axis mapping and PML in axisymmetric mode"
     `kspaceFirstOrder2D` uses a 2D Cartesian grid with X and Y axes, mapped onto the second and first dimensions of input matrices and coordinates ([y, x]). This mirrors 3D image voxel coordinates [i, j, k], which map onto [Y, X, Z]. `kspaceFirstOrderAS` uses axial and radial axes, mapped onto the first and second dimensions. Internally, `[radial x 2, axial]` is remapped onto `[axial, radial]` and only the columns from the beam axis (the transducer's lateral position) onward are retained. With the axis off centre, the expanded output repeats the outermost simulated value beyond the simulated radius. Medium, source and sensor are set up in [axial, radial] dimensions. After the simulation, values are either mirrored into a Cartesian 2D grid (`[radial x 2, axial]` again, as for `kspaceFirstOrder2D`) or radially expanded into a Cartesian 3D grid.
 
     **PML.** With `PMLInside=false` (the PRESTUS default) the PML is applied asymmetrically: the axial dimension receives `pml_size` voxels on both sides, the radial outer edge `pml_size` voxels on one side only. The inner radial boundary at `r = 0` is a symmetry axis and needs no PML. k-Wave handles this; no configuration change is needed.

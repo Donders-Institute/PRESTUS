@@ -1,19 +1,27 @@
 # Installation
 
+PRESTUS runs in [MATLAB](https://www.mathworks.com/products/matlab.html) and simulates with [k-Wave](https://github.com/ucl-bug/k-wave) by default; head simulations also need [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html) to segment the MRI. MATLAB, PRESTUS and k-Wave are enough for a free-water simulation, and the Python environments further down serve optional features only. This page lists what each kind of simulation needs and how to install it, so you can install only what your study uses.
+
+On this page:
+
+- [Required Components](#required-components): which component each kind of simulation requires.
+- [Install PRESTUS](#install-prestus): the clone with its submodules and the MATLAB path.
+- [Install SimNIBS](#install-simnibs): the SimNIBS environment for head segmentation, and how PRESTUS finds it.
+- [Install Optional Components](#install-optional-components): environments for other backends, placement tools, the Nexus, C++ binaries and defacing.
+
 !!! note "At a glance"
-    - **What:** MATLAB, PRESTUS and k-Wave are enough for a free-water simulation. SimNIBS adds head simulations. The Python environments further down are for optional features only.
     - **When you need it:** Before your [first simulation](doc_getting-started.md).
     - **Before you start:** MATLAB R2023b (other versions may work; R2023b is the tested default). Installing SimNIBS takes the most time, so start with the free-water simulation if you only want to try PRESTUS.
 
-## What you need
+## Required Components
 
 | Component | Needed for | Where it comes from |
 |---|---|---|
 | MATLAB R2023b | Everything | MathWorks. More recent versions can cause issues on HPCs with GPUs. |
 | PRESTUS with its submodules (k-Wave 1.4.1, export_fig, FEX-minimize, xml2struct) | Everything | The recursive clone below |
-| SimNIBS 4 | Head simulations (segmentation with `charm`) | [SimNIBS installation](#simnibs-installation) |
-| Python environments | BabelBrain or jwave backends, PlanTUS and TUS_entry placement, the Nexus | [Optional components](#optional-components) |
+| SimNIBS 4 | Head simulations (segmentation with `charm`) | [Install SimNIBS](#install-simnibs) |
 | k-Wave C++ binaries | `cpp_cpu`, `cpp_gpu` and `cpp_mlx` code types | [k-Wave C++ binaries](#k-wave-c-binaries) |
+| Python environments | [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) or [jwave](https://github.com/ucl-bug/jwave) backends, [PlanTUS](https://github.com/mlueckel/PlanTUS) and [TUS_entry](https://github.com/CyrilAtkinson/TUS_entry) placement, the Nexus | [Install Optional Components](#install-optional-components) |
 
 ## Install PRESTUS
 
@@ -33,7 +41,7 @@ addpath(genpath('functions')); addpath(genpath('config')); addpath(genpath('exte
 
 That is all a free-water simulation needs. Continue with [Your first simulation](doc_getting-started.md) and come back here for SimNIBS when you want a head simulation.
 
-??? note "Details: submodules and manual downloads"
+??? note "Submodules and manual downloads"
     k-Wave 1.4 is supported, but version 1.4.1 (currently [GitHub only](https://github.com/ucl-bug/k-wave/releases/tag/v1.4.1)) adds GPU support for thermal simulations with `kWaveDiffusion`, so the submodule points there. If you updated an existing clone, fetch the submodules with:
 
     ```bash
@@ -44,7 +52,7 @@ That is all a free-water simulation needs. Continue with [Your first simulation]
 
     Without git, download [k-Wave](https://github.com/ucl-bug/k-wave.git), [export_fig](https://github.com/altmany/export_fig), [FEX-minimize](https://github.com/rodyo/FEX-minimize.git) and [xml2struct](https://github.com/joe-of-all-trades/xml2struct) yourself and place them in the matching `external/` subfolders.
 
-??? note "Details: Donders Institute HPC cluster"
+??? note "Donders Institute HPC cluster"
     On the Donders HPC, PRESTUS and its dependencies (SimNIBS, k-Wave) are installed centrally, but these versions lag behind `main` and `development`. Load a SimNIBS module (`module avail simnibs` lists them; put the `module load` line in your `.bashrc`) and add an installed PRESTUS to your MATLAB path, e.g. `addpath('/opt/prestus/dev')` (`ls /opt/prestus` lists the versions). For current features, clone PRESTUS yourself as above. The example dataset can be copied to your home directory:
 
     ```bash
@@ -53,11 +61,11 @@ That is all a free-water simulation needs. Continue with [Your first simulation]
 
     The HPC scripts hardcode the MATLAB R2023b module. See [Running on a cluster](doc_hpc.md).
 
-## SimNIBS installation
+## Install SimNIBS
 
-Head simulations need [SimNIBS 4](https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4) for the `charm` segmentation. Install it in its own conda environment; this also works on clusters that restrict user permissions and lets several SimNIBS versions coexist.
+Head simulations need [SimNIBS 4](https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4) for the `charm` segmentation. Install it in its own [conda](https://docs.conda.io/) environment; this also works on clusters that restrict user permissions and lets several SimNIBS versions coexist.
 
-The quickest route is the setup script in `examples/`, which creates a `PRESTUS_env_4.6.0` environment with SimNIBS and the optional PlanTUS and Connectome Workbench dependencies in one step:
+The quickest route is the setup script in `examples/`, which creates a `PRESTUS_env_4.6.0` environment with SimNIBS and the optional PlanTUS and [Connectome Workbench](https://www.humanconnectome.org/software/connectome-workbench) dependencies in one step:
 
 ```bash
 bash examples/setup_PRESTUS_env.sh
@@ -70,7 +78,7 @@ Optional flags:
 
 When it finishes, the script prints the `simnibs_bin_path` and `env_path` values to put in your config. Alternatively, follow the [official conda guide](https://simnibs.github.io/simnibs/build/html/installation/conda.html).
 
-### Specifying SimNIBS paths in PRESTUS
+### Point PRESTUS to SimNIBS
 
 Tell PRESTUS where the environment is, in the config or in MATLAB:
 
@@ -79,13 +87,13 @@ parameters.startup.simnibs_bin_path = fullfile('/home', 'neuromod', 'USER', '.co
 parameters.hpc.ld_library_path = "/opt/gcc/7.2.0/lib64";   % only if charm reports 'undefined symbol' errors
 ```
 
-??? note "Details: manual SimNIBS installation on a Linux cluster"
+??? note "Manual SimNIBS installation on a Linux cluster"
     Some steps and paths differ between clusters.
 
     1. Log in and start an interactive session (adjust walltime and memory):
 
         QSUB: `qsub -I -X -N 'simnibs' -l walltime=01:00:00,mem=8g`
-        SLURM (Donders default): `srun --pty --x11 -J simnibs -t 1:00:00 --mem=8G bash`
+        [SLURM](https://slurm.schedmd.com/) (Donders default): `srun --pty --x11 -J simnibs -t 1:00:00 --mem=8G bash`
 
     2. Download the environment file for the SimNIBS version you want to your home directory:
 
@@ -116,13 +124,13 @@ parameters.hpc.ld_library_path = "/opt/gcc/7.2.0/lib64";   % only if charm repor
 
     To check the installation later: start an interactive session, `module load anaconda3/2020.07`, `source activate simnibs_v4.6.0`, `simnibs_gui`. The SimNIBS window should open. `conda deactivate` leaves the environment.
 
-## Optional components
+## Install Optional Components
 
-PRESTUS itself is MATLAB, but several optional parts run in their own Python (or R) environment. Keep them separate: their dependencies conflict, and most are only needed on the machine that runs that part.
+PRESTUS itself is MATLAB, but several optional parts run in their own Python (or [R](https://www.r-project.org/)) environment. Keep them separate: their dependencies conflict, and most are only needed on the machine that runs that part.
 
 | Environment | Needed for | Create with | Where PRESTUS finds it |
 |---|---|---|---|
-| SimNIBS (e.g. `simnibs_v4.6.0`, or `PRESTUS_env_4.6.0` incl. PlanTUS and Workbench) | Head segmentation (`charm`), PlanTUS placement | `examples/setup_PRESTUS_env.sh` or the SimNIBS `environment_linux.yml` (see [above](#simnibs-installation)) | `simnibs_bin_path` |
+| SimNIBS (e.g. `simnibs_v4.6.0`, or `PRESTUS_env_4.6.0` incl. PlanTUS and Workbench) | Head segmentation (`charm`), PlanTUS placement | `examples/setup_PRESTUS_env.sh` or the SimNIBS `environment_linux.yml` (see [above](#install-simnibs)) | `simnibs_bin_path` |
 | BabelBrain | `acoustic_backend` / `thermal_backend: babelbrain` | `external/BabelBrain/environment_<platform>.yml` ([BabelBrain](doc_babelbrain.md)) | `babelbrain.python_env` |
 | jwave | `acoustic_backend: jwave` | `conda create` + `pip install` ([jwave](doc_jwave.md)) | `jwave.python_env`, `jwave.python_env_gpu` |
 | `tus_entry` | TUS_entry placement (R) | `examples/environment_tus_entry.yml` ([Placement](doc_placement.md)) | `placement.tus_entry.env_path` |
@@ -130,13 +138,13 @@ PRESTUS itself is MATLAB, but several optional parts run in their own Python (or
 
 The Nexus runs where you edit configs and needs a display; the others run where the pipeline runs (typically the cluster). After setting up or updating a BabelBrain or jwave environment, run `smoke_test_backends` (in `tests/`).
 
-### Optional: C++ binaries
+### k-Wave C++ Binaries
 
 Only the `cpp_cpu` and `cpp_gpu` code types need these optional binaries: download the C++ binaries from the [k-Wave website](http://www.k-wave.org/download.php) and place them in `k-Wave/binaries/` ([k-Wave instructions](http://www.k-wave.org/documentation/kspaceFirstOrder3DC.php)). The [kspacefirstorder-unified](https://github.com/waltsims/kspacefirstorder-unified) repository is an alternative source for the same C++ code (OpenMP and CUDA variants, with macOS support). It also hosts the MLX port for Apple Silicon GPUs, which the `cpp_mlx` code type needs and which is not on the k-Wave website. Compiling and selecting binaries is described in [k-Wave](doc_kwave.md).
 
-### Optional: PlanTUS dependencies
+### PlanTUS Dependencies
 
-The `plantus` placement mode needs extra Python packages in the SimNIBS environment (the setup script installs them unless `--no-plantus` was given):
+The optional `plantus` placement mode needs extra Python packages in the SimNIBS environment (the setup script installs them unless `--no-plantus` was given):
 
 ```bash
 source activate simnibs_v4.6.0
@@ -158,9 +166,9 @@ placement:
     connectome_wb_path: "/path/to/workbench/bin_linux64"
 ```
 
-### Optional: defacing
+### MRI Defacing
 
-MRI defacing (`segmentation.deface: 1`) needs `pydeface` in the SimNIBS environment:
+Optional MRI defacing (`segmentation.deface: 1`) needs [pydeface](https://github.com/poldracklab/pydeface) in the SimNIBS environment:
 
 ```bash
 source activate simnibs_v4.6.0

@@ -1,19 +1,46 @@
 # PRESTUS Parameters
 
-Parameters are organised in nested structs that map directly to YAML keys. `config_default.yaml` defines all parameters and their default values and should not be edited; a study config is merged on top and only needs the values that differ (see [Configuring a study](doc_configuration.md) for the full layering, project defaults and overrides). Parameters can also be set in MATLAB before calling `prestus_pipeline_start(parameters)`. Mandatory parameters have no meaningful default and must always be provided.
+This page lists every configuration parameter with its default, grouped by the YAML struct it belongs to.
+
+On this page:
+
+- [Subject and Platform (`subject_id`, `platform`)](#subject-and-platform-subject_id-platform): subject identifier and execution platform.
+- [Simulation Type (`simulation`)](#simulation-type-simulation): medium, [k-Wave](https://github.com/ucl-bug/k-wave) code type, precision, interactive and debug modes, transducer coupling.
+- [Simulation Backends (`acoustic_backend`, `thermal_backend`)](#simulation-backends-acoustic_backend-thermal_backend): which solver runs the acoustic and thermal steps, and its settings.
+- [Data Paths (`path`)](#data-paths-path): input, segmentation, simulation and [Localite](https://www.localite.de/) folders.
+- [Environment & Toolbox Paths (`startup`)](#environment-toolbox-paths-startup): [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html), [MATLAB](https://www.mathworks.com/products/matlab.html) and other external tool paths.
+- [I/O Management (`io`)](#io-management-io): output affix, overwriting, cache checks and which matrices are saved.
+- [Pipeline Modules (`modules`)](#pipeline-modules-modules): which pipeline stages run.
+- [Transducer Specification (`transducer`)](#transducer-specification-transducer): ISPPA target, transducer type, frequency, library entry and positions.
+- [Transducer Placement (`placement`)](#transducer-placement-placement): placement mode, skin gap, reuse and the per-mode keys.
+- [Simulation Grid (`grid`)](#simulation-grid-grid): resolution, dimensions, axisymmetric mode and PML.
+- [Segmentation (`segmentation`)](#segmentation-segmentation): options passed to SimNIBS [charm](https://simnibs.github.io/simnibs/build/html/documentation/command_line/charm.html), and defacing.
+- [Head Model & Segmentation Preprocessing (`headmodel`)](#head-model-segmentation-preprocessing-headmodel): padding and mask preprocessing of the head model.
+- [Pseudo-CT Skull Property Mapping (`pct`)](#pseudo-ct-skull-property-mapping-pct): pseudo-CT generation and its mapping to skull properties.
+- [Tissue Layers (`layers`)](#tissue-layers-layers): which segmentation labels form each tissue layer.
+- [Tissue Acoustic & Thermal Properties (`medium_properties`)](#tissue-acoustic-thermal-properties-medium_properties): per-tissue acoustic and thermal properties.
+- [Sonication Timing (`timing`)](#sonication-timing-timing): pulse and pulse-train durations and repetition intervals.
+- [Thermal Settings (`thermal`)](#thermal-settings-thermal): CEM43 variant, baseline temperatures and thermal sensor and logging.
+- [Time Reversal (`time_reversal`)](#time-reversal-time_reversal): the extra point-source run per target.
+- [Output Analysis (`analysis`)](#output-analysis-analysis): focus-area radius and MNI target or ROI for analysis.
+- [Study Setup (`study`)](#study-setup-study): study manifest and output folder name.
+- [High-Performance Computing (`hpc`)](#high-performance-computing-hpc): GPU, partition, time and memory limits for cluster jobs.
+- [Transducer Calibration (`calibration`)](#transducer-calibration-calibration): keys of `config_calibration.yaml`.
+
+Parameters are organised in nested structs that map directly to [YAML](https://yaml.org/) keys. `config_default.yaml` defines all parameters and their default values and should not be edited; a study config is merged on top and only needs the values that differ (see [Configuring a study](doc_configuration.md) for the full layering, project defaults and overrides). Parameters can also be set in MATLAB before calling `prestus_pipeline_start(parameters)`. Mandatory parameters have no meaningful default and must always be provided.
 
 ---
 
-### General
+### Subject and Platform (`subject_id`, `platform`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `subject_id` | Subject identifier used for file naming and folder management. | — | Mandatory. Set before calling `prestus_pipeline_start(parameters)`. |
-| `platform` | Execution platform. | `'auto'` | `auto` / `slurm` / `qsub` / `matlab`. `auto` detects SLURM or qsub and errors when neither is installed; use `matlab` to run in the current session. See [HPC](doc_hpc.md#where-a-run-executes). |
+| `subject_id` | Subject identifier used for file naming and folder management. | none | Mandatory. Set before calling `prestus_pipeline_start(parameters)`. |
+| `platform` | Execution platform. | `'auto'` | `auto` / `slurm` / `qsub` / `matlab`. `auto` detects [SLURM](https://slurm.schedmd.com/) or qsub and errors when neither is installed; use `matlab` to run in the current session. See [HPC](doc_hpc.md#where-a-run-executes). |
 
 ---
 
-### Simulation type (`simulation`)
+### Simulation Type (`simulation`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -23,31 +50,31 @@ Parameters are organised in nested structs that map directly to YAML keys. `conf
 | `interactive` | Interactive mode with prompts and evolving plots. | `0` | `1 = yes`, `0 = no`. If `0`, see `overwrite_files`. |
 | `debug` | Verbose debug mode with additional intermediate outputs. | `0` | `1 = yes`, `0 = no` |
 | `transducer_coupling` | How several transducers interact acoustically. | `'coherent'` | `coherent`: pressure fields superpose in one k-Wave run (interference). `async`: each transducer is simulated separately and intensities are summed incoherently before the thermal simulation. See [doc_multitransducer.md](doc_multitransducer.md). |
-| `uncertainty_temp_high` | Medium properties of the Temp-H variant (bounds that maximise brain heating) when `simulation.uncertainty` is on. | `''` | A YAML file with a `medium_properties` block, merged onto the run's config: an absolute path, or a file name in `config/uncertainty/`. `''` = `config/uncertainty/config_medium_temp_high.yaml`. The `options.temp_high_config` argument of `uncertainty_pipeline` takes precedence. See [doc_uncertainty.md](doc_uncertainty.md#customising-options). |
+| `uncertainty_temp_high` | Medium properties of the Temp-H variant (bounds that maximise brain heating) when `simulation.uncertainty` is on. | `''` | A YAML file with a `medium_properties` block, merged onto the run's config: an absolute path, or a file name in `config/uncertainty/`. `''` = `config/uncertainty/config_medium_temp_high.yaml`. The `options.temp_high_config` argument of `uncertainty_pipeline` takes precedence. See [doc_uncertainty.md](doc_uncertainty.md#customising-pipeline-options). |
 | `uncertainty_temp_low` | Medium properties of the Temp-L variant (bounds that minimise brain heating). | `''` | As `uncertainty_temp_high`; `''` = `config/uncertainty/config_medium_temp_low.yaml`; `options.temp_low_config` takes precedence. |
 | `uncertainty_trans_high` | Medium properties of the Trans-H variant (bounds that maximise brain intensity; acoustic only). | `''` | As `uncertainty_temp_high`; `''` = `config/uncertainty/config_medium_trans_high.yaml`; `options.trans_high_config` takes precedence. |
 | `uncertainty_trans_low` | Medium properties of the Trans-L variant (bounds that minimise brain intensity; acoustic only). | `''` | As `uncertainty_temp_high`; `''` = `config/uncertainty/config_medium_trans_low.yaml`; `options.trans_low_config` takes precedence. |
 
 ---
 
-### Simulation backends (`acoustic_backend`, `thermal_backend`)
+### Simulation Backends (`acoustic_backend`, `thermal_backend`)
 
-Top-level keys (not nested under `simulation`). Pre-processing (segmentation, medium, grid, placement) and post-processing (analysis, NIfTI export, report) are shared by all backends. See [Simulation backends](doc_backend.md) for how the backends compare and when results are directly comparable.
+Top-level keys (not nested under `simulation`). Pre-processing (segmentation, medium, grid, placement) and post-processing (analysis, [NIfTI](https://nifti.nimh.nih.gov/) export, report) are shared by all backends. See [Simulation backends](doc_backend.md) for how the backends compare and when results are directly comparable.
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `acoustic_backend` | Acoustic solver. | `'kwave'` | `kwave` / `kwave_elastic` / `babelbrain` / `jwave`. Validated in `load_parameters`. `babelbrain` takes one transducer, with the beam along the grid z axis (not `grid.mode: ras_plus`); see [BabelBrain geometry limits](doc_babelbrain.md#geometry-limits). `kwave_elastic` models shear waves in the skull (see [Elastic skull](doc_kwave.md#elastic-skull-model-shear-waves)). |
-| `thermal_backend` | Bio-heat solver. | `'kwave'` | `kwave` / `babelbrain`. `babelbrain` requires `acoustic_backend: babelbrain`, one transducer and no `path.acoustic_input`; invalid combinations error at config load. jwave has no thermal solver — pair it with `kwave`. |
+| `thermal_backend` | Bio-heat solver. | `'kwave'` | `kwave` / `babelbrain`. `babelbrain` requires `acoustic_backend: babelbrain`, one transducer and no `path.acoustic_input`; invalid combinations error at config load. [jwave](https://github.com/ucl-bug/jwave) has no thermal solver; pair it with `kwave`. |
 
-#### BabelBrain settings (`babelbrain`)
+#### BabelBrain Settings (`babelbrain`)
 
 Used when `acoustic_backend` or `thermal_backend` is `babelbrain`, or when `io.export_babelbrain: true`. Full explanation in [BabelBrain](doc_babelbrain.md).
 
-??? note "Details: BabelBrain settings"
+??? note "BabelBrain settings"
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
-    | `python_env` | BabelBrain conda env (directory containing `bin/python`) or Python executable. | `''` | Must be set; system `python3` lacks `BabelViscoFDTD`. |
+    | `python_env` | BabelBrain [conda](https://docs.conda.io/) env (directory containing `bin/python`) or [Python](https://www.python.org/) executable. | `''` | Must be set; system `python3` lacks `BabelViscoFDTD`. |
     | `root` | BabelBrain source tree. | `''` | Empty = `external/BabelBrain` submodule. |
     | `computing_backend` | GPU/CPU backend. | `'auto'` | `auto` / `cuda` / `opencl` / `metal` / `cpu` (or `1`–`4`). `auto`: Metal on macOS, else CUDA if `nvidia-smi` finds a GPU, else CPU. The thermal engine has no CPU backend. |
     | `device_name` | Device name. | `'auto'` | Set explicitly when several GPUs are present. |
@@ -70,14 +97,14 @@ Used when `acoustic_backend` or `thermal_backend` is `babelbrain`, or when `io.e
     | `tx_mech_adjust_z_m` | Additional transducer standoff [m]. | `0` | Added to the automatic placement correction. |
     | `z_steering_m` | Pin BabelBrain `ZSteering` [m]. | `~` | Empty = auto-derived. |
     | `isppa_w_per_cm2` | Override the Isppa given to BabelBrain thermal [W/cm²]. | `~` | Interpreted as the **in-situ peak ISPPA in brain**. Empty = derived from the scaled acoustic field (recommended; matches k-Wave thermal). |
-    | `cleanup_cache` | Delete the per-subject BabelBrain cache after reading. | `true` | Result HDF5s are moved out first. |
+    | `cleanup_cache` | Delete the per-subject BabelBrain cache after reading. | `true` | Result [HDF5](https://www.hdfgroup.org/solutions/hdf5/)s are moved out first. |
     | `dry_run` | Prepare the BabelBrain inputs without simulating. | `false` | The pipeline stops after the acoustic stage; nothing is cached. |
 
-#### jwave settings (`jwave`)
+#### jwave Settings (`jwave`)
 
 Used when `acoustic_backend: jwave`.
 
-??? note "Details: jwave settings"
+??? note "jwave settings"
 
     PML thickness is set by `grid.pml_size`. Full reference: [jwave configuration](doc_jwave.md#configuration-reference).
 
@@ -98,11 +125,11 @@ Used when `acoustic_backend: jwave`.
     | `dry_run` | Write the HDF5 solver inputs only. | `false` | The pipeline stops after the acoustic stage and caches nothing. |
     | `cleanup_cache` | Delete the HDF5 solver input after a successful run. | `true` | The input is rewritten on every run and never reused. Kept on dry runs and failed runs; set `false` to keep it for debugging. |
 
-#### Elastic skull settings (`elastic`)
+#### Elastic Skull Settings (`elastic`)
 
 Used when `acoustic_backend: kwave_elastic`.
 
-??? note "Details: elastic skull settings"
+??? note "Elastic skull settings"
 
     Applied to the skull layers (`skull`, `skull_cortical`, `skull_trabecular`). Attenuations are power laws a·f^y [dB/(cm·MHz^y)], converted to the solver's y = 2 law so the value at the source frequency is exact. Sources and rationale: [k-Wave elastic backend](doc_kwave.md#elastic-skull-model-shear-waves).
 
@@ -120,53 +147,53 @@ Used when `acoustic_backend: kwave_elastic`.
 
 ---
 
-### Data paths (`path`)
+### Data Paths (`path`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `anat` | Absolute path to structural input data. | — | Mandatory |
-| `sim` | Absolute path to simulation outputs. | — | Mandatory |
-| `seg` | Absolute path to SimNIBS segmentations (m2m folders). | — | Mandatory |
-| `placement` | Placement outputs: one folder per run, `<placement>/sub-XXX/<mode>/<target_name>/` (heuristic, PlanTUS, TUS_entry). | `''` | Empty = `<sim>/placement`. Share one folder across setups to reuse placements. See [Where outputs live](doc_outputs.md#where-outputs-live). |
-| `localite_raw` | Raw Localite exports, `<localite_raw>/sub-XXX/ses-XX/[<loc_folder>/]…`. | `''` | See [Localite I/O](doc_placement_neuronav.md#localite-io). |
+| `anat` | Absolute path to structural input data. | none | Mandatory |
+| `sim` | Absolute path to simulation outputs. | none | Mandatory |
+| `seg` | Absolute path to SimNIBS segmentations (m2m folders). | none | Mandatory |
+| `placement` | Placement outputs: one folder per run, `<placement>/sub-XXX/<mode>/<target_name>/` (heuristic, [PlanTUS](https://github.com/mlueckel/PlanTUS), [TUS_entry](https://github.com/CyrilAtkinson/TUS_entry)). | `''` | Empty = `<sim>/placement`. Share one folder across setups to reuse placements. See [Where outputs live](doc_outputs.md#where-outputs-live). |
+| `localite_raw` | Raw Localite exports, `<localite_raw>/sub-XXX/ses-XX/[<loc_folder>/]…`. | `''` | See [Localite I/O](doc_placement_neuronav_coordinates.md#localite-file-layout). |
 | `localite_post` | Ingested Localite markers, `<localite_post>/sub-XXX/ses-XX/InstrumentMarker_sub-XXX_ses-XX.xml/.json`. | `''` | Written by `neuronav_ingest_markers` / `neuronav_gui`; read by `placement.mode: 'localite'` (automatic mode). |
 | `localite_t1` | Folder with the planning T1s loaded into Localite (`[sub-XXX/]<localite_t1_pattern>`). | `''` | Empty = `localite_raw`. |
 | `localite_t1_pattern` | File-name template of the planning T1; `%s` = `sub-XXX`. | `'%s_*T1*.nii*'` | Replaces `neuronav_t1_pattern` (still read). |
 | `localite_export` | Output folder for files to import into Localite (heuristic placement), per subject `sub-XXX/`. | `''` | Resolved into `io.dir_localite_export`. |
 | `pct` | Pseudo-CT outputs, per subject `<pct>/sub-NNN/`. | `''` | Empty = `<parent of path.seg>/pct/sub-NNN/`, next to the SimNIBS folder (never inside it). Resolved into `io.dir_pct`. |
-| `acoustic_input` | Start from a prior pressure map instead of simulating: a peak-pressure NIfTI [Pa] in this subject's T1w space, e.g. an earlier run's `nii/T1w/*_pressure.nii.gz`. | `''` | Its JSON sidecar is checked against the current settings and used to rescale the map to `transducer.target_isppa_wcm2`; acoustic analysis and thermal simulation then run as usual. Replaces `io.external_acoustic_nifti` (still read). See [Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs). |
+| `acoustic_input` | Start from a prior pressure map instead of simulating: a peak-pressure NIfTI [Pa] in this subject's T1w space, e.g. an earlier run's `nii/*_T1w*_pressure.nii.gz`. | `''` | Its JSON sidecar is checked against the current settings and used to rescale the map to `transducer.target_isppa_wcm2`; acoustic analysis and thermal simulation then run as usual. Replaces `io.external_acoustic_nifti` (still read). See [Starting from earlier stage outputs](doc_outputs_reuse.md#starting-from-earlier-stage-outputs). |
 | `localite` | **Deprecated.** | `''` | Read as `localite_raw` and as `localite_export` when those are empty. |
 | `t1_pattern` | T1 image path template relative to `path.anat`. | `'sub-%1$03d_T1w.nii*'` | Supports `%03d`-style subject ID substitution |
 | `t2_pattern` | T2 image path template relative to `path.anat`. | `''` | Optional; empty skips the T2 (e.g. `'sub-%1$03d_T2w.nii*'`). |
 
 ---
 
-### Environment & toolbox paths (`startup`)
+### Environment & Toolbox Paths (`startup`)
 
 Segmentation and MNI conversion need `startup.simnibs_bin_path`. The other paths are needed for pseudo-CT generation or to add folders to the MATLAB path.
 
-??? note "Details: environment and toolbox paths"
+??? note "Environment and toolbox paths"
 
     | **Parameter** | **Description** | **Comments** |
     |---|---|---|
     | `simnibs_bin_path` | Absolute path to SimNIBS binaries. | Mandatory for segmentation and MNI conversion |
     | `matlab_bin_path` | Absolute path to MATLAB binary. | Required for pseudoCT generation on HPC (e.g. `/opt/matlab/R2024a/bin/matlab`). Local execution falls back to `matlabroot`. |
-    | `fsl_bin_path` | Absolute path to FSL bin directory. | Required for pseudoCT generation (e.g. `/opt/fsl/bin`). Prepended to PATH at runtime. |
-    | `ants_bin_path` | Absolute path to ANTs bin directory. | Required for pseudoCT generation (e.g. `/opt/ants/bin`). Prepended to PATH at runtime. |
-    | `ants_simg_path` | ANTs Singularity image (`.simg`/`.sif`). | When set, ANTs tools run via `singularity exec`. |
+    | `fsl_bin_path` | Absolute path to [FSL](https://fsl.fmrib.ox.ac.uk/fsl/) bin directory. | Required for pseudoCT generation (e.g. `/opt/fsl/bin`). Prepended to PATH at runtime. |
+    | `ants_bin_path` | Absolute path to [ANTs](https://github.com/ANTsX/ANTs) bin directory. | Required for pseudoCT generation (e.g. `/opt/ants/bin`). Prepended to PATH at runtime. |
+    | `ants_simg_path` | ANTs [Singularity](https://apptainer.org/) image (`.simg`/`.sif`). | When set, ANTs tools run via `singularity exec`. |
     | `modules_to_load` | HPC environment modules loaded before pseudoCT generation. | e.g. `['matlab/R2023b', 'fsl/6.0.7', 'ants/2.5.3']` |
     | `paths_to_add` | Paths to add with `addpath()`. | [cell] e.g. `{"path/to/x"}` |
     | `subpaths_to_add` | Paths to add recursively with `addpath(genpath())`. | [cell]; relative to the MATLAB working directory |
 
 ---
 
-### I/O management (`io`)
+### I/O Management (`io`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
 | `output_affix` | Optional affix for output file names. | `''` | Differentiates outputs for the same subject/transducer (e.g. different intensities or targets) |
-| `overwrite_files` | File overwrite behaviour. | `'always'` | `never` / `always` / `force` / `ask`. Does NOT apply to SimNIBS segmentations. In chained pipelines (async, multi-ISPPA, uncertainty), `always` re-runs only the output stages (CSV, NIfTI, HTML report) and reuses cached intermediates; `force` re-runs every stage. See [Overwrite behaviour](doc_outputs.md#overwrite-behaviour). |
-| `cache_signature_check` | Response when a reused grid, medium or acoustic cache, or a stage output a run starts from (placement run, pseudo-CT, pressure map), was built from different settings. | `'error'` | `error` / `warn` (reuse anyway) / `off`. Caches: applies when one is reused because of `overwrite_files: never` (or a declined overwrite). See [Cache reuse checks](doc_outputs.md#cache-reuse-checks) and [Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs). |
+| `overwrite_files` | File overwrite behaviour. | `'always'` | `never` / `always` / `force` / `ask`. Does NOT apply to SimNIBS segmentations. In chained pipelines (async, multi-ISPPA, uncertainty), `always` re-runs only the output stages (CSV, NIfTI, HTML report) and reuses cached intermediates; `force` re-runs every stage. See [Overwrite behaviour](doc_outputs_reuse.md#overwrite-behaviour). |
+| `cache_signature_check` | Response when a reused grid, medium or acoustic cache, or a stage output a run starts from (placement run, pseudo-CT, pressure map), was built from different settings. | `'error'` | `error` / `warn` (reuse anyway) / `off`. Caches: applies when one is reused because of `overwrite_files: never` (or a declined overwrite). See [Cache reuse checks](doc_outputs_reuse.md#cache-reuse-checks) and [Starting from earlier stage outputs](doc_outputs_reuse.md#starting-from-earlier-stage-outputs). |
 | `overwrite_simnibs` | Overwrite SimNIBS segmentation results? | `0` | `1 = yes`, `0 = no` |
 | `save_matrices` | Save all intermediate matrices (`.mat` / cache files)? | `[]` | `1` = save all, `0` = save none, `[]` = use the per-step defaults. Applies to every per-step matrix flag left empty; a per-step flag set to `0`/`1` always wins. `0` also triggers cleanup of uncertainty intermediates. |
 | `save_source_matrices` | Save `kwave_source.mat` (transducer source array)? | `[]` → `1` | `[]` inherits `save_matrices`, else default. Needed by multi-stage pipelines (e.g. uncertainty). |
@@ -180,11 +207,11 @@ Segmentation and MNI conversion need `startup.simnibs_bin_path`. The other paths
 | `save_Ita` | Save the temporal-average intensity (Ita) NIfTI map? | `1` | Suppressed automatically when `timing.pd`/`timing.pri` are absent. |
 | `save_p_complex` | Save the complex pressure field (`p_complex`) in the acoustic cache? | `0` | Large. |
 | `deface_plots` | Remove facial anatomy from all QC figures? | `1` | `1 = yes`, `0 = no`. Uses the SimNIBS eye label to anchor the cut plane ~30 mm posterior to the eye socket (ear-canal level). Requires the SimNIBS segmentation (`path.seg`). Has no effect on saved NIfTIs; see `segmentation.deface` for that. |
-| `adopted_heatmap` | Path to an existing **temperature** heatmap NIfTI (`heating_end.nii.gz`) to use as the thermal starting point for a follow-up simulation. Set automatically by the sequential dispatcher; can be overridden manually. | — | Optional. Used for sequential multi-target runs. |
-| `adopted_cem43` | Path to an existing CEM43 heatmap NIfTI to accumulate heating across runs. Set automatically by the sequential dispatcher. | — | Optional. Used for sequential multi-target runs. |
-| `adopted_cem43_iso` | Path to an existing ISO-variant CEM43 heatmap NIfTI (`CEM43_iso_end.nii.gz`) to accumulate across runs. Set automatically alongside `adopted_cem43` by the sequential dispatcher. | — | Optional. Used for sequential multi-target runs. |
+| `adopted_heatmap` | Path to an existing **temperature** heatmap NIfTI (`heating_end.nii.gz`) to use as the thermal starting point for a follow-up simulation. Set automatically by the sequential dispatcher; can be overridden manually. | none | Optional. Used for sequential multi-target runs. |
+| `adopted_cem43` | Path to an existing CEM43 heatmap NIfTI to accumulate heating across runs. Set automatically by the sequential dispatcher. | none | Optional. Used for sequential multi-target runs. |
+| `adopted_cem43_iso` | Path to an existing ISO-variant CEM43 heatmap NIfTI (`CEM43_iso_end.nii.gz`) to accumulate across runs. Set automatically alongside `adopted_cem43` by the sequential dispatcher. | none | Optional. Used for sequential multi-target runs. |
 
-??? note "Details: runtime-derived io fields"
+??? note "Runtime-derived io fields"
 
     **Runtime-derived (set by `path_log_setup`):**
 
@@ -210,7 +237,7 @@ Segmentation and MNI conversion need `startup.simnibs_bin_path`. The other paths
 
 ---
 
-### Pipeline modules (`modules`)
+### Pipeline Modules (`modules`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -236,7 +263,7 @@ All flags: `1 = yes`, `0 = no`.
 
 ---
 
-### Transducer specification (`transducer`)
+### Transducer Specification (`transducer`)
 
 See [doc_transducer.md](doc_transducer.md).
 
@@ -244,13 +271,13 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `target_isppa_wcm2` | Target free-water ISPPA [W/cm²] of this transducer alone. | Default `30`. Scalar: the field is scaled to it (needs a free-water baseline; see `modules.run_water_baseline`). Vector: one thermal job per value ([multi-intensity](doc_multiintensity.md)). Empty `[]`: no scaling, the field is reported at `elem_p_amp`. Several transducers: each transducer's own target; coherent runs set each drive before the simulation, async runs scale each field before combining (see [Multi-transducer — ISPPA targets](doc_multitransducer.md#isppa-targets)). |
+| `target_isppa_wcm2` | Target free-water ISPPA [W/cm²] of this transducer alone. | Default `30`. Scalar: the field is scaled to it (needs a free-water baseline; see `modules.run_water_baseline`). Vector: one thermal job per value ([multi-intensity](doc_multiintensity.md)). Empty `[]`: no scaling, the field is reported at `elem_p_amp`. Several transducers: each transducer's own target; coherent runs set each drive before the simulation, async runs scale each field before combining (see [Multi-transducer: ISPPA targets](doc_multitransducer.md#isppa-targets)). |
 | `type` | Type of transducer array. | `annular` / `matrix`. Mandatory. |
 | `freq_hz` | Fundamental frequency [Hz]. | Shared across all elements. |
 | `serial` | Equipment serial; geometry, phases and drive come from the equipment config and transducer library. | See [doc_transducer_library.md](doc_transducer_library.md). Values set in the study config take precedence. |
 | `combo.ds_serial` | Driving-system serial. | Selects `<serial>_<ds_serial>.yaml`; without it only `<serial>.yaml` is looked up. |
 | `library_path` | Folder with your own library entries. | Used when it holds an entry for this combo, otherwise the shipped `config/calibration/` (with a warning). |
-| `condition` | **Experimental, not validated.** Dephased library condition (`conditions.<label>` in the library entry). | Replaces the focal-depth lookup; `focal_distance_ep` defaults to the condition's nominal setpoint. See [Dephased conditions](doc_transducer_library.md#dephased-conditions-experimental). |
+| `condition` | **Experimental, not validated.** Dephased library condition (`conditions.<label>` in the library entry). | Replaces the focal-depth lookup; `focal_distance_ep` defaults to the condition's nominal setpoint. See [Dephased conditions](doc_transducer_library.md#dephased-conditions). |
 | `trans_pos` | Transducer position (XYZ, bowl apex). | T1 voxels by default; RAS+ or MNI mm via `placement.manual.coordinate_space`. |
 | `focus_pos` | Focus (target) position (XYZ). | T1 voxels by default; RAS+ or MNI mm via `placement.manual.coordinate_space`. |
 | `focal_distance_ep` | Focal depth setting: the depth the device is set to focus at, from the exit plane [mm]. | For annular arrays it selects the library phases and drive, so the simulated focus lands here whatever the `trans_pos`→`focus_pos` distance (the planned target depth). Empty = that distance minus `focal_distance_offset` (`focal_distance_calculation`). |
@@ -282,7 +309,7 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 | `elem_width_mm` | Element width [mm], along x. | `rect` elements: size along x; `disc`/`bowl`: sets the equal-area diameter. |
 | `elem_diameter_mm` | Aperture diameter of `disc`/`bowl` elements [mm]. | Optional. Empty = equal-area diameter from `elem_width_mm` × `elem_height_mm` (flat disc area for `disc`, spherical-cap area for `bowl`). Also sets the element size in the transducer mask. |
 | `elem_phase_override_deg` | Calibrated per-element phases [deg]. | Optional, one value per element (after Clover replication). Replaces the geometric steering phases toward `focus_pos`; element orientation is unchanged. Empty = geometric steering. |
-| `use_steering_correction` | Scale the element drive by the steering correction k(target). | Default `true`. Used when the transducer library (or `steering_correction`) holds one; see [Steering correction of matrix arrays](doc_calibration.md#steering-correction-of-matrix-arrays). |
+| `use_steering_correction` | Scale the element drive by the steering correction k(target). | Default `true`. Used when the transducer library (or `steering_correction`) holds one; see [Steering correction of matrix arrays](doc_calibration_matrix-steering.md#steering-correction-of-matrix-arrays). |
 | `steering_correction` | Steering correction given inline. | Optional struct as written by `build_steering_correction`. Empty = from the transducer library. |
 | `outer_diameter_mm` | Outer diameter of the transducer [mm]. | Defines active aperture boundary. |
 | `is_curved` | Whether the array has a curved surface. | `false` = flat array: every element faces +z, `curv_radius_mm` is not used, `elem_shape` must be `rect` or `disc`. |
@@ -293,7 +320,7 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 
 ##### Matrix: Clover (`clover`)
 
-??? note "Details: Clover keys"
+??? note "Clover keys"
 
     | **Parameter** | **Description** | **Comments** |
     |---|---|---|
@@ -302,9 +329,9 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
     | `az_sep_deg` | Azimuthal separation between adjacent leaves [deg]. | Optional. Empty = `360 / n_leaves`. `n_leaves × az_sep_deg` must not exceed 360. |
     | `elevation_deg` | Tilt of each leaf from the parent axis [deg]. | Optional. Empty = smallest tilt at which adjacent leaf centres are one `outer_diameter_mm` apart on the parent bowl. |
 
-##### Matrix: Grid distribution (`define_here`)
+##### Matrix: Grid Distribution (`define_here`)
 
-??? note "Details: grid distribution keys"
+??? note "Grid distribution keys"
 
     Warning: The `define_here` options are experimental and may contain bugs due to limited testing time.
 
@@ -335,9 +362,9 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
     |---|---|---|
     | `elem_n` | Total number of elements. | Uses spiral distribution. |
 
-##### Matrix: File extraction (`extract_from_file`)
+##### Matrix: File Extraction (`extract_from_file`)
 
-??? note "Details: file extraction keys"
+??? note "File extraction keys"
 
     | **Parameter** | **Description** | **Comments** |
     |---|---|---|
@@ -352,7 +379,7 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
     | `project_on_new_ROC` | Project elements onto new curvature. | May introduce unrealistic layouts. |
     | `ROC_projection.new_ROC_mm` | New radius of curvature [mm]. | Used when projection enabled. |
 
-### Transducer placement (`placement`)
+### Transducer Placement (`placement`)
 
 See [doc_placement.md](doc_placement.md).
 
@@ -360,24 +387,24 @@ See [doc_placement.md](doc_placement.md).
 |---|---|---|---|
 | `mode` | Placement mode. | `'manual'` | `'manual'`, `'localite'`, `'heuristic'`, `'mni'`, `'plantus'` or `'tus_entry'`. |
 | `report` | Write the stand-alone placement report `sub-XXX_placement_<mode>.html` to `io.dir_reports`. | `true` | See [placement report](doc_placement.md#placement-report). |
-| `reuse` | When to reuse a recorded heuristic, PlanTUS or TUS_entry run (`placement_run.json` in its run folder). | `'auto'` | `'auto'`: reuse it when its settings match, else run again; `'always'`: require it (mismatch per `io.cache_signature_check`); `'never'`: always run. Independent of `io.overwrite_files`. See [Starting from earlier stage outputs](doc_outputs.md#starting-from-earlier-stage-outputs). |
 | `skin_gap_mm` | Gap between scalp and transducer exit plane along the beam axis [mm]. | `5` | e.g. a gel pad. Used by heuristic, MNI, PlanTUS and TUS_entry placement and by their [time-reversal pose search](doc_time_reversal.md); manual and Localite poses keep their own gap. The exit plane lies `curv_radius_mm − dist_geom_ep_mm` in front of the bowl apex. |
+| `reuse` | When to reuse a recorded heuristic, PlanTUS or TUS_entry run (`placement_run.json` in its run folder). | `'auto'` | `'auto'`: reuse it when its settings match, else run again; `'always'`: require it (mismatch per `io.cache_signature_check`); `'never'`: always run. Independent of `io.overwrite_files`. See [Starting from earlier stage outputs](doc_outputs_reuse.md#starting-from-earlier-stage-outputs). |
 
-#### `placement.manual`
+#### Manual Placement (`placement.manual`)
 
 See [doc_placement.md](doc_placement.md#manual-coordinate-selection).
 
-??? note "Details: manual placement keys"
+??? note "Manual placement keys"
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
     | `coordinate_space` | Space of `transducer.trans_pos` / `focus_pos` in `mode='manual'`. | `'voxel'` | `'voxel'` (1-based T1 voxels), `'ras'` (subject RAS+ mm), `'mni'` (MNI mm; transducer via 12dof, focus via nonlinear warp, no scalp snapping). Converted per transducer in the placement stage, which must be enabled. |
 
-#### `placement.localite`
+#### Localite Placement (`placement.localite`)
 
 See [doc_placement_neuronav.md](doc_placement_neuronav.md).
 
-??? note "Details: Localite placement keys"
+??? note "Localite placement keys"
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
@@ -394,26 +421,26 @@ See [doc_placement_neuronav.md](doc_placement_neuronav.md).
     | `reference_distance_mm` | Fallback offset from the Localite matrix origin to the bowl rear centre, along the beam axis [mm]. | `15` | Used only when `tracker_to_bowl_mm` is empty and the transducer has no scalar `curv_radius_mm` and `dist_geom_ep_mm`. Same sign convention as `tracker_to_bowl_mm`. |
     | `tracker_to_bowl_mm` | Measured offset from the Localite matrix origin to the bowl rear centre [mm]. | `[]` | Overrides geometry and `reference_distance_mm`. |
 
-#### `neuronav`
+#### Neuronavigation Ingestion (`neuronav`)
 
-See [doc_placement_neuronav_multitarget.md](doc_placement_neuronav_multitarget.md).
+See [Localite ingestion](doc_placement_neuronav_workflows.md#shared-settings-file); `coil_map` also feeds [target resolution](doc_placement_neuronav_targets.md#target-coordinates-from-several-sources).
 
-??? note "Details: neuronav ingestion keys"
+??? note "Neuronav ingestion keys"
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
     | `coil_map` | Multi-coil ingestion: one entry per coil with `.coil` (index of `TriggerMarkers_Coil<N>`) and `.target` or `.sequences(:).target`. | `[]` | `[]` = single-coil ingestion (Coil0, GUMMarkers fallback). |
-    | `suggest_names` | Name series after the planned target nearest their beam axis. | `true` | See [naming](doc_placement_neuronav_workflows.md#how-series-are-named). |
+    | `suggest_names` | Name series after the planned target nearest their beam axis. | `true` | See [naming](doc_placement_neuronav_workflows.md#series-naming). |
     | `axis_tolerance_mm` | Max. distance of that target from the beam axis [mm]. | `10` | |
     | `target_depth_mm` | Accepted target depth along the beam axis [mm]. | `[0, 150]` | Narrow around the focal distance to reject far matches. |
     | `target_labels` | Label map: entries `.target` + `.labels` (patterns with `*`/`?`, case-insensitive). | `[]` | `[]` = labels used as recorded; list them with `neuronav_scan_sessions`. |
     | `batch_write` | Series written by `neuronav_ingest_batch`: `'all'` tracked series or only `'named'` ones. | `'all'` | |
 
-#### `placement.heuristic`
+#### Heuristic Placement (`placement.heuristic`)
 
 See [doc_placement_heuristic.md](doc_placement_heuristic.md).
 
-??? note "Details: heuristic placement keys"
+??? note "Heuristic placement keys"
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
@@ -429,22 +456,22 @@ See [doc_placement_heuristic.md](doc_placement_heuristic.md).
     | `criterion_skull_var` | Variance of EP voxel distance from skull [quantile]. | `[]` | |
     | `expand_step` | Expansion step for skin intersection criterion. | `0.01` | 1% |
 
-#### `placement.mni`
+#### MNI Placement (`placement.mni`)
 
 See [doc_placement_mni.md](doc_placement_mni.md).
 
-??? note "Details: MNI placement keys"
+??? note "MNI placement keys"
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
     | `trans_pos_mm` | Desired transducer (scalp entry) position [MNI mm]. | `[]` | Required for `mode='mni'`. Converted with the linear (12dof) transform, then snapped to scalp. |
     | `focus_pos_mm` | Focus / target position [MNI mm]. | `[]` | Required for `mode='mni'`. Converted with the nonlinear (nonl) transform, like the heuristic target. |
 
-#### `placement.plantus`
+#### PlanTUS Placement (`placement.plantus`)
 
 See [doc_placement_plantus.md](doc_placement_plantus.md).
 
-??? note "Details: PlanTUS placement keys"
+??? note "PlanTUS placement keys"
 
     Headless or interactive selection is set by `interactive`, which defaults to `simulation.interactive`.
 
@@ -461,28 +488,28 @@ See [doc_placement_plantus.md](doc_placement_plantus.md).
     | `min_distance_mm` | Smallest eligible skin–target distance [mm]. | `[]` | `[]` = `min(focal_distance_list) − max(flhm_list)`. For a steerable array, set it and `max_distance_mm` to the steering range; the default margin otherwise admits spots the focus cannot reach. |
     | `max_distance_mm` | Largest eligible skin–target distance [mm]. | `[]` | `[]` = `max(focal_distance_list) + max(flhm_list)`. |
     | `optimal_distance_mm` | Optimum of the distance criterion [mm]. | `[]` | `[]` = `mean(focal_distance_list)`. |
-    | `weight_skin_target_distances` | Weight: deviation of skin–target distance from the optimal distance. | `0.2` | The five weights should sum to 1. See [composite scoring](doc_placement_plantus.md#5a-composite-scoring-both-modes-headless-selects-the-optimum). |
+    | `weight_skin_target_distances` | Weight: deviation of skin–target distance from the optimal distance. | `0.2` | The five weights should sum to 1. See [composite scoring](doc_placement_plantus.md#5a-combine-and-evaluate-scores). |
     | `weight_skin_target_angles` | Weight: angle between skin normal and direction to target. | `0.2` | |
     | `weight_skin_target_intersections` | Weight: beam path length inside the target (higher is better). | `0.2` | |
     | `weight_skin_skull_angles` | Weight: angle between skin and skull normals. | `0.2` | |
-    | `weight_skull_thickness` | Weight: bone path length along the skin normal. | `0.2` | From `m2m_sub-XXX/final_tissues.nii.gz`; ignored if that file is missing. See [skull thickness](doc_placement_plantus.md#4e-skull-thickness-t_i). |
+    | `weight_skull_thickness` | Weight: bone path length along the skin normal. | `0.2` | From `m2m_sub-XXX/final_tissues.nii.gz`; ignored if that file is missing. See [skull thickness](doc_placement_plantus.md#4e-skull-thickness). |
     | `save_metrics` | Write per-vertex criteria, score and selected vertex to `plantus_metrics.mat`. | `true` | Both modes. Used by the criteria evaluation and offline re-scoring. |
-    | `evaluate` | Evaluate the placement from `plantus_metrics.mat` (weight sweep, diagnostics, figures). | `true` | Both modes; needs `save_metrics`. Shown in the placement report. See [criteria evaluation](doc_placement_plantus.md#5a-composite-scoring-both-modes-headless-selects-the-optimum). |
-    | `interactive` | Choose the vertex in Connectome Workbench. | `[]` | `1` = interactive, `0` = headless, `[]` = follow `simulation.interactive`. `1` needs a display but not the MATLAB desktop; without a display PlanTUS runs headless. |
+    | `evaluate` | Evaluate the placement from `plantus_metrics.mat` (weight sweep, diagnostics, figures). | `true` | Both modes; needs `save_metrics`. Shown in the placement report. See [criteria evaluation](doc_placement_plantus.md#5a-combine-and-evaluate-scores). |
+    | `interactive` | Choose the vertex in [Connectome Workbench](https://www.humanconnectome.org/software/connectome-workbench). | `[]` | `1` = interactive, `0` = headless, `[]` = follow `simulation.interactive`. `1` needs a display but not the MATLAB desktop; without a display PlanTUS runs headless. |
     | `connectome_wb_path` | Connectome Workbench `bin/` directory. | `''` | Needed unless `wb_command` is on PATH or in the env's `bin/`; interactive mode also needs `wb_view`. |
 
-#### `placement.tus_entry`
+#### TUS_entry Placement (`placement.tus_entry`)
 
 See [TUS_entry placement](doc_placement_tus_entry.md).
 
-??? note "Details: TUS_entry placement keys"
+??? note "TUS_entry placement keys"
 
     Not in `config_default.yaml`; the keys are listed in `nexus/prestus_nexus/overlay.yaml`.
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
-    | `script_path` | Full path to `TUS_entry.R`. | — | Required. |
-    | `env_path` | Conda environment containing `Rscript`. | — | Required. |
+    | `script_path` | Full path to `TUS_entry.R`. | none | Required. |
+    | `env_path` | Conda environment containing `Rscript`. | none | Required. |
     | `scalp_mask` | Head or scalp mask in the T1 grid (nonzero = head). | SimNIBS `final_tissues.nii.gz` | Filled into a solid head mask in the work directory. |
     | `target_mask` | Binary NIfTI target mask. | *(auto)* | Empty: a sphere around `focus_pos` or `mni_target_mm`. |
     | `target_mask_radius_mm` | Radius of the auto-generated target sphere [mm]. | `5` | |
@@ -499,7 +526,7 @@ See [TUS_entry placement](doc_placement_tus_entry.md).
 
 ---
 
-### Simulation grid (`grid`)
+### Simulation Grid (`grid`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -518,15 +545,16 @@ See [TUS_entry placement](doc_placement_tus_entry.md).
 | `source_cfl` | Courant-Friedrichs-Lewy (CFL) fraction. | `0.15` | Controls temporal resolution independently of spatial resolution. Given a fixed spatial step `dx`, the time step is `dt = CFL × dx / c_max`, where `c_max` is the fastest medium sound speed (typically skull at ~2800 m/s). Smaller CFL = finer temporal sampling and must remain below the stability limit. Set to 0.15 (half k-Wave's default of 0.3) for additional stability margin in heterogeneous skull simulations. Can be relaxed toward 0.3 to reduce runtime, but should be validated against `checkStability` output. |
 | `source_limit_fraction` | Fraction of the stability limit to use for time step. | `0.9` | After source setup, `checkStability` is called; if the CFL-derived `dt` exceeds the estimated limit, source setup reruns with `dt = source_limit_fraction × dt_stability_limit`. The final effective `dt` may therefore be smaller than `CFL × dx / c_max`. Set to `0` to disable. |
 | `steady_state_transits` | Number of domain-diagonal one-way transits (at min. sound speed) before recording starts. | `1` | Total simulation duration is `transits × diagonal / c_min`. Compact, highly reflective domains (e.g. a partial-FOV crop with a high skull/water impedance mismatch, ~50% reflection coefficient for typical skull properties) may need more than one transit for multiply-reflected energy to decay to true periodic steady state. jwave's own cross-validation test uses `roundtrips=20`. |
-| `steady_state_num_periods` | Number of trailing wave periods recorded as the steady-state window. | `3` | `sensor.record_start_index` is set so the last `num_periods` periods of the simulation are recorded for `p_max_all`/`p_min_all`/`p_final`. Increase together with `steady_state_transits` if reported Isppa/focal depth are still drifting as either is increased — a converged setup should stop changing further. |
+| `steady_state_num_periods` | Number of trailing wave periods recorded as the steady-state window. | `3` | `sensor.record_start_index` is set so the last `num_periods` periods of the simulation are recorded for `p_max_all`/`p_min_all`/`p_final`. Increase together with `steady_state_transits` if reported Isppa/focal depth are still drifting as either is increased; a converged setup should stop changing further. |
 | `bli_tolerance` | kWaveArray band-limited interpolation (BLI) tolerance. | `[]` | Empty: 0.1 (3D), 0.01 (axisymmetric). Smaller values keep more of the sinc tails (more source grid points). |
 | `bli_upsampling_rate` | kWaveArray integration points per grid point. | `[]` | Empty: 10 (3D), 100 (axisymmetric). |
-| `source_ppp` | Time steps per wave period (PPP) override. | `[]` | When set, `dt = period / source_ppp`; `source_ppw` and `source_cfl` are not used. For matching a reference simulation's time step (e.g. the ITRUSST k-Wave references). The stability recheck (`source_limit_fraction`) still applies. |
+| `source_ppp` | Time steps per wave period (PPP) override. | `[]` | When set, `dt = period / source_ppp`; `source_ppw` and `source_cfl` are not used. For matching a reference simulation's time step (e.g. the [ITRUSST](https://itrusst.org/) k-Wave references). The stability recheck (`source_limit_fraction`) still applies. |
 | `sim_time_us` | Fixed simulation duration [µs]. | `[]` | When set, replaces `steady_state_transits` (and jwave's PML margin); the last `steady_state_num_periods` periods of this duration are recorded. |
 | `max_expand` | Maximum grid expansion for prime-number FFT optimisation [voxels]. | `40` | |
 | `use_kWaveArray` | Use the kWaveArray class for transducer modelling? | `1` | `1 = yes`, `0 = no` |
-| `acoustic_fov_diameter_mm` | Lateral extent of the acoustic simulation FOV [mm], centred on the focus. When set together with `acoustic_fov_length_mm`, the k-Wave acoustic simulation runs on a cropped sub-grid rather than the full head grid. Thermal simulation is always performed on the full head grid. | `[]` | Optional. See [doc_limited_fov.md](doc_limited_fov.md). |
-| `acoustic_fov_length_mm` | Axial extent of the acoustic simulation FOV [mm], starting from the transducer centre and extending distally. Must be large enough to enclose the focus and any near-field region of interest. | `[]` | Optional. Requires `acoustic_fov_diameter_mm`. See [doc_limited_fov.md](doc_limited_fov.md). |
+| `acoustic_fov_diameter_mm` | Lateral extent of the acoustic simulation FOV [mm], centred on the beam axis. When set together with `acoustic_fov_length_mm`, the acoustic simulation runs on a cropped sub-grid rather than the full head grid. Thermal simulation runs on the full head grid unless `thermal_use_acoustic_fov: 1`. | `[]` | Optional. `'auto'`: the outer element diameter of `transducer(1)`. See [doc_limited_fov.md](doc_limited_fov.md). |
+| `acoustic_fov_length_mm` | Axial extent of the acoustic simulation FOV [mm], starting from the bowl apex (`trans_pos`) and extending distally. Must be large enough to enclose the focus and any near-field region of interest. | `[]` | Optional. Requires `acoustic_fov_diameter_mm`. `'auto'`: the `trans_pos`-to-`focus_pos` distance + `z_beyond_focus_mm`. See [doc_limited_fov.md](doc_limited_fov.md). |
+| `thermal_use_acoustic_fov` | Run the thermal simulation within the acoustic FOV instead of the full grid. | `0` | `1` is faster, with a less accurate cooling boundary. See [doc_limited_fov.md](doc_limited_fov.md). |
 | `thermal_resolution_mm` | Grid resolution for the thermal simulation [mm]. When set to a value larger than `resolution_mm`, the acoustic pressure field is resampled to a coarser grid before thermal simulation, reducing memory and runtime. | `[]` | Optional. Defaults to `resolution_mm` (same grid). |
 | `thermal_fov_mm` | Spatial extent of the thermal simulation domain [mm], as a `[1×3]` vector `[x y z]`. When set, the thermal grid is cropped to a box of this size centred on the focus. Unlike the acoustic FOV crop, the thermal FOV has no physical justification for excluding regions: heat diffuses well beyond the focal zone, and cropping can underestimate temperature rise in neighbouring tissue. Use only for rapid prototyping, not for safety-critical results. | `[]` | Optional. See [doc_limited_fov.md](doc_limited_fov.md). |
 
@@ -538,19 +566,19 @@ See [TUS_entry placement](doc_placement_tus_entry.md).
 |---|---|---|---|
 | `use_qform` | Force qform reorientation before charm segmentation? | `0` | Set to `1` if charm reports a qform/sform mismatch error. |
 | `debug` | Pass `--debug` to charm for verbose segmentation output? | `0` | `1 = yes`, `0 = no` |
-| `deface` | Create a defaced copy of the SimNIBS m2m folder (`m2m_sub-NNN_defaced/`) for safe sharing? | `0` | `1 = yes`, `0 = no`. Runs `pydeface` (must be installed in `startup.simnibs_bin_path`) on T1, UTE, bias-corrected, and MNI-space anatomical images. The original m2m folder is never modified. Only affects saved files; see `io.deface_plots` for figure defacing. |
+| `deface` | Create a defaced copy of the SimNIBS m2m folder (`m2m_sub-NNN_defaced/`) for safe sharing? | `0` | `1 = yes`, `0 = no`. Runs [`pydeface`](https://github.com/poldracklab/pydeface) (must be installed in `startup.simnibs_bin_path`) on T1, UTE, bias-corrected, and MNI-space anatomical images. The original m2m folder is never modified. Only affects saved files; see `io.deface_plots` for figure defacing. |
 
 ---
 
-### Head model & segmentation preprocessing (`headmodel`)
+### Head Model & Segmentation Preprocessing (`headmodel`)
 
 See [doc_preproc.md](doc_preproc.md).
 
-??? note "Details: head model keys"
+??? note "Head model keys"
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
-    | `head_pad_mm` | Symmetric padding applied to the cropped head grid prior to transducer + PML setup [mm]. | `0` | |
+    | `head_pad_mm` | Symmetric padding of the rotated head volume before CSF expansion and cropping [mm]; bowls outside the volume are auto-padded. | `0` | |
     | `csf_expansion` | Dilation of the CSF brain mask into surrounding head regions [mm]. | `40` | Converted to voxels at the grid resolution (`preproc_crop_eCSF`). |
     | `smooth_method` | Mask smoothing filter type. | `'gaussian'` | `gaussian` / `box` / `off` |
     | `smooth_threshold_skull` | Binarisation threshold for skull mask; higher = thinner mask. | `0.5` | |
@@ -564,11 +592,11 @@ See [doc_preproc.md](doc_preproc.md).
 
 ---
 
-### Pseudo-CT skull property mapping (`pct`)
+### Pseudo-CT Skull Property Mapping (`pct`)
 
 See [doc_pseudoCT.md](doc_pseudoCT.md).
 
-??? note "Details: pseudo-CT mapping keys"
+??? note "Pseudo-CT mapping keys"
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
@@ -577,14 +605,14 @@ See [doc_pseudoCT.md](doc_pseudoCT.md).
     | `custom_slope` | Slope of the `custom` UTE→HU map (HU per normalised UTE unit). | `[]` | Scalar; required when `skull_mapping` is `custom`. |
     | `custom_intercept` | Intercept of the `custom` UTE→HU map [HU]. | `[]` | Scalar; required when `skull_mapping` is `custom`. |
     | `debug` | Keep intermediate NIfTI files in the `pseudoCT/` subfolder. | `1` | `1 = keep`, `0 = delete after generation`. |
-    | `mapping_density` | HU-to-density mapping algorithm. | `'k-plan'` | `k-plan` / `k-wave` / `marsac` / `aubry` / `air-tissue` / `none`. See [doc](doc_pseudoCT.md#mapping-skull-density). |
-    | `density_calibration` | HU-to-density table for `mapping_density: k-plan`; use the table of the CT the UTE→HU line was fitted to. | `''` | `''` (k-Plan default) / `ucl_lowdose_80kvp` (for `treeby`) / `cph2025` / path to a CSV (HU, density [kg/m³]). See [doc](doc_pseudoCT.md#mapping-skull-density). |
-    | `mapping_soundspeed` | HU-to-sound-speed mapping algorithm. | `'k-plan'` | `k-plan` / `marsac` / `aubry` / `webb` / `pichardo` / `mcdannold` / `none`. See [doc](doc_pseudoCT.md#mapping-skull-sound-speed). |
-    | `mapping_attenuation` | HU-to-attenuation mapping algorithm. | `'k-plan'` | `k-plan` / `mueller` / `aubry` / `webb` / `pichardo` / `mcdannold` / `none`. See [doc](doc_pseudoCT.md#mapping-skull-attenuation). |
+    | `mapping_density` | HU-to-density mapping algorithm. | `'k-plan'` | `k-plan` / `k-wave` / `marsac` / `aubry` / `air-tissue` / `none`. See [doc](doc_pseudoCT_property-mappings.md#mapping-skull-density). |
+    | `density_calibration` | HU-to-density table for `mapping_density: k-plan`; use the table of the CT the UTE→HU line was fitted to. | `''` | `''` ([k-Plan](https://k-plan.io/) default) / `ucl_lowdose_80kvp` (for `treeby`) / `cph2025` / path to a CSV (HU, density [kg/m³]). See [doc](doc_pseudoCT_property-mappings.md#mapping-skull-density). |
+    | `mapping_soundspeed` | HU-to-sound-speed mapping algorithm. | `'k-plan'` | `k-plan` / `marsac` / `aubry` / `webb` / `pichardo` / `mcdannold` / `none`. See [doc](doc_pseudoCT_property-mappings.md#mapping-skull-sound-speed). |
+    | `mapping_attenuation` | HU-to-attenuation mapping algorithm. | `'k-plan'` | `k-plan` / `mueller` / `aubry` / `webb` / `pichardo` / `mcdannold` / `none`. See [doc](doc_pseudoCT_property-mappings.md#mapping-skull-attenuation). |
 
 ---
 
-### Tissue layers (`layers`)
+### Tissue Layers (`layers`)
 
 See [doc_preproc.md](doc_preproc.md).
 
@@ -601,7 +629,7 @@ Maps tissue compartment names to their SimNIBS charm label indices. Compartments
 
 ---
 
-### Tissue acoustic & thermal properties (`medium_properties`)
+### Tissue Acoustic & Thermal Properties (`medium_properties`)
 
 See [doc_medium.md](doc_medium.md).
 
@@ -609,19 +637,19 @@ Each tissue compartment (`water`, `brain`, `skin`, `skull`, `skull_trabecular`, 
 
 | **Field** | **Description** | **Units / Reference** |
 |---|---|---|
-| `sound_speed` | Speed of sound. | m/s — ITRUSST benchmarks |
-| `density` | Density. | kg/m³ — ITRUSST benchmarks |
+| `sound_speed` | Speed of sound. | m/s; source: ITRUSST benchmarks |
+| `density` | Density. | kg/m³; source: ITRUSST benchmarks |
 | `alpha_coeff` | Attenuation coefficient. | dB/cm/MHz |
-| `alpha_power` | Attenuation power law exponent. | — |
-| `thermal_conductivity` | Thermal conductivity. | W/m/°C — Tissue Properties DB |
-| `specific_heat_capacity` | Specific heat capacity. | J/kg/°C — Tissue Properties DB |
-| `perfusion` | Perfusion / heat transfer rate. | mL/min/kg — Tissue Properties DB |
-| `absorption_fraction` | Fraction of attenuation converted to heat. Set this or `absorption_coeff`; a config layer that sets one empties the other ([Heat deposition](doc_simulations-thermal.md#heat-deposition)). Default for every tissue. | [0–1] — Pinton et al., 2012 |
-| `absorption_coeff` | Absorption coefficient, with the power law `alpha_power`; empty by default. Set this or `absorption_fraction`. | dB/cm/MHz — Pinton et al., 2012 |
+| `alpha_power` | Attenuation power law exponent. | dimensionless |
+| `thermal_conductivity` | Thermal conductivity. | W/m/°C; source: [Tissue Properties DB](https://itis.swiss/virtual-population/tissue-properties/database) |
+| `specific_heat_capacity` | Specific heat capacity. | J/kg/°C; source: Tissue Properties DB |
+| `perfusion` | Perfusion / heat transfer rate. | mL/min/kg; source: Tissue Properties DB |
+| `absorption_fraction` | Fraction of attenuation converted to heat. Set this or `absorption_coeff`; a config layer that sets one empties the other ([Heat deposition](doc_simulations-thermal.md#heat-deposition)). Default for every tissue. | [0–1]; source: [Pinton et al., 2012](https://doi.org/10.1118/1.3668316) |
+| `absorption_coeff` | Absorption coefficient, with the power law `alpha_power`; empty by default. Set this or `absorption_fraction`. | dB/cm/MHz; source: Pinton et al., 2012 |
 
 ---
 
-### Sonication timing (`timing`)
+### Sonication Timing (`timing`)
 
 See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 
@@ -632,20 +660,20 @@ Protocol duration fields must be set for thermal simulations.
 | `pd` | Pulse Duration (PD) [s]. | `0` | Duty cycle = `pd`/`pri`. |
 | `pri` | Pulse Repetition Interval (PRI) [s]. | `0` | PRF = 1/`pri`. |
 | `ptd` | Pulse Train Duration (PTD) [s]. | `0` | |
-| `pt_timestep` | Modelling time step within a pulse train [s]. | `0.02` | |
+| `pt_timestep` | Modelling time step within a pulse train [s]; used with `equal_step_duration: 1`. | `0.02` | |
 | `ptri` | Pulse Train Repetition Interval (PTRI) [s]. | `0` | OFF duration = `ptri` − `ptd`. |
 | `ptrd` | Pulse Train Repetition Duration (PTRD) [s]. | `0` | |
-| `post_ptri_dur` | Post-PTRI steady-state duration [s]. | `0` | |
-| `post_pt_timestep` | Modelling time step following PT & PTRI [s]. | `1` | |
+| `post_ptri_dur` | Cooling period after the PTRD [s]. | `0` | |
+| `post_pt_timestep` | Modelling time step between pulse trains and after the PTRD [s]. | `1` | |
 | `equal_step_duration` | Equal step durations for on and off cycles? | `0` | `1 = yes`, `0 = no` |
 | `pulse_ramp_dur` | Rise (= fall) duration of the amplitude ramp at each end of a pulse [s]. | *(not set)* = `0` | Not in `config_default.yaml`. Scales the pulse-average intensity: Ipa = factor × Itp (`compute_ramp_factor`). |
 | `pulse_ramp_shape` | Ramp shape: `'linear'` or `'tukey'` (raised cosine). | *(not set)* = `'linear'` | Used with `pulse_ramp_dur`. |
 
-The Nexus draws this protocol (pulse, pulse train, repetitions) and exchanges it with the [TUS calculator](https://www.socsci.ru.nl/fusinitiative/tuscalculator/); see [Nexus](doc_nexus.md#timing-diagram-and-tus-calculator).
+The Nexus draws this protocol (pulse, pulse train, repetitions) and exchanges it with the [TUS calculator](https://www.socsci.ru.nl/fusinitiative/tuscalculator/); see [Nexus](doc_nexus_tabs.md#timing-diagram-and-tus-calculator).
 
 ---
 
-### Thermal settings (`thermal`)
+### Thermal Settings (`thermal`)
 
 See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 
@@ -659,11 +687,11 @@ See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 
 ---
 
-### Time reversal (`time_reversal`)
+### Time Reversal (`time_reversal`)
 
 See [Time reversal](doc_time_reversal.md).
 
-??? note "Details: time reversal keys"
+??? note "Time reversal keys"
 
     One extra k-Wave run per target (point source at the target), between the free-water baseline and the acoustic simulation.
 
@@ -692,7 +720,7 @@ See [Time reversal](doc_time_reversal.md).
 
 ---
 
-### Output analysis (`analysis`)
+### Output Analysis (`analysis`)
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
@@ -702,7 +730,7 @@ See [Time reversal](doc_time_reversal.md).
 
 ---
 
-### Study setup (`study`)
+### Study Setup (`study`)
 
 Multi-subject studies with per-run settings; see [Group analysis](doc_group.md#study-setup).
 
@@ -713,7 +741,7 @@ Multi-subject studies with per-run settings; see [Group analysis](doc_group.md#s
 
 ---
 
-### High-performance computing (`hpc`)
+### High-Performance Computing (`hpc`)
 
 See [k-Wave](doc_kwave.md) and [HPC](doc_hpc.md).
 
@@ -733,11 +761,11 @@ See [k-Wave](doc_kwave.md) and [HPC](doc_hpc.md).
 | `depend_type` | Scheduler dependency type for `depend_job_id(s)`. | `'afterok'` | `'afterok'` or `'afterany'`. Internal (not in `config_default.yaml`); `prestus_study_start` uses `'afterany'` for the study-report job. |
 
 
-#### Snellius GPU partitions (`snellius`)
+#### Snellius GPU Partitions (`snellius`)
 
 Used when `hpc.name: 'snellius'`: `hpc.partition` selects one of these blocks, which sets the job's resources.
 
-??? note "Details: Snellius partition keys"
+??? note "Snellius partition keys"
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
@@ -752,11 +780,11 @@ Used when `hpc.name: 'snellius'`: `hpc.partition` selects one of these blocks, w
 
 ---
 
-### Transducer calibration (`calibration`)
+### Transducer Calibration (`calibration`)
 
 See [doc_calibration.md](doc_calibration.md).
 
-??? note "Details: calibration keys"
+??? note "Calibration keys"
 
     A separate `config_calibration.yaml` applies for calibration workflows and is loaded as `parameters.calibration`.
 
@@ -773,7 +801,7 @@ See [doc_calibration.md](doc_calibration.md).
     | `add_FDO` | Append Focal Distance Offset (bowl-to-exit-plane distance)? | Set to `1` if zero point in profiles reflects exit plane rather than bowl. |
     | `axisymmetric2D` | Use axisymmetric 2D instead of default 3D free-water simulations? | `1 = yes`, `0 = no` |
     | `force_kwavearray` | Force use of kWaveArray for free-water simulations? | If `0`, uses the setting in the default/study config. |
-    | `opt_method` | Optimisation method. | `FEXminimize` (open source) / `GlobalSearch` (MATLAB Global Optimization Toolbox) |
+    | `opt_method` | Optimisation method. | [`FEXminimize`](https://github.com/rodyo/FEX-minimize) (open source) / `GlobalSearch` (MATLAB [Global Optimization Toolbox](https://www.mathworks.com/products/global-optimization.html)) |
     | `opt_limits` | Distance limits for optimisation [mm]. | |
     | `opt_weights` | Weighting of original profile during fitting. | `1` = equal; `>1` = Gaussian (narrower with larger values) |
     | `opt_seed` | Random seed for optimisation. | |
@@ -784,4 +812,4 @@ See [doc_calibration.md](doc_calibration.md).
     | `skip_front_peak_mm` | Distance from profile start to ignore [mm]. | Avoids near-field artefacts in peak/FWHM calculations. |
     | `profile_align` | Focus alignment when interpolating measured profiles to an unmeasured focal depth. | `'label'` (default) = column focal-depth headers; `'peak'` = intensity peak beyond `skip_front_peak_mm`. See `interpolate_axial_profiles`. |
     | `max_extrapolation_mm` | How far outside the measured depth range a desired depth may lie [mm]. | `0` (default) = no extrapolation (error). Otherwise the nearest measured profile, shifted to the desired depth. |
-    | `focal_reference` | Convention for what a quoted focal depth means. | `flhm_3db` (default, ITRUSST, intensity ≥ peak/2) / `flhm_6db` (Imasonic/IGT, intensity ≥ peak/4) / `peak` (raw intensity peak). Recorded into the sidecar YAML's `meta.calibration.focal_reference`. See [doc_calibration.md](doc_calibration.md). |
+    | `focal_reference` | Convention for what a quoted focal depth means. | `flhm_3db` (default, ITRUSST, intensity ≥ peak/2) / `flhm_6db` ([Imasonic](https://www.imasonic.com/)/IGT, intensity ≥ peak/4) / `peak` (raw intensity peak). Recorded into the sidecar YAML's `meta.calibration.focal_reference`. See [doc_calibration.md](doc_calibration.md). |

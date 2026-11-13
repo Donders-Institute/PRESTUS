@@ -1,19 +1,26 @@
 # PlanTUS Placement
 
+The entry point decides which part of the skull the beam crosses and whether the focus can reach the target. Given a T1-weighted image, a [SimNIBS](https://simnibs.github.io/simnibs/) head mesh, a target-ROI mask and a transducer configuration, [PlanTUS](https://github.com/mlueckel/PlanTUS) (`placement.mode: 'plantus'`) scores every skin vertex as a candidate transducer position on skin–target distance, skin and skull angles, skull thickness and beam–target overlap. PRESTUS places the transducer at the vertex with the best weighted score, or at a vertex you pick in [Connectome Workbench](https://www.humanconnectome.org/software/connectome-workbench).
+
+On this page:
+
+- [Running PlanTUS](#running-plantus): the steps of a placement run.
+- [Headless and Interactive Mode](#headless-and-interactive-mode): automatic or manual vertex selection.
+- [Step-by-Step Pipeline](#step-by-step-pipeline): inputs, criteria, composite score, evaluation and placement geometry.
+- [Coordinate Conventions](#coordinate-conventions): the frames PlanTUS and PRESTUS exchange.
+- [External Dependencies](#external-dependencies): the tools each mode needs.
+
 !!! note "At a glance"
-    - **What:** Placement with the external PlanTUS tool, which scores scalp positions on several criteria (distance, angles, skull thickness, beam–target overlap).
     - **When you need it:** When you want an optimised, documented choice of entry point, or to compare focal depths.
-    - **Before you start:** The full SimNIBS mesh, a PlanTUS installation and Connectome Workbench ([Installation](doc_installation.md#optional-plantus-dependencies)).
+    - **Before you start:** The full SimNIBS mesh, a PlanTUS installation and Connectome Workbench ([Installation](doc_installation.md#plantus-dependencies)).
 
 !!! warning "Experimental"
     PlanTUS placement is under active development. Verify results manually before use in a study.
 
-Set `placement.mode: 'plantus'`. Given a T1-weighted image, a SimNIBS head mesh, a target-ROI mask and a transducer configuration, PlanTUS ranks every skin vertex as a candidate transducer position.
-
 !!! warning "Limitations"
-    - Interactive mode needs a display (desktop or VNC), Connectome Workbench `wb_view` and `pynput`. On macOS, the terminal or MATLAB needs Accessibility permission for `pynput`. Without a display (Linux), PlanTUS runs headless.
-    - The review dialog needs PyQt5 in the SimNIBS Python. It ships with SimNIBS; without it, the last clicked vertex is placed without review.
-    - The avoidance mask needs FSL, FreeSurfer and Workbench tools. Without them, all skin vertices are eligible (step 3).
+    - Interactive mode needs a display (desktop or VNC), Connectome Workbench `wb_view` and `pynput`. On macOS, the terminal or [MATLAB](https://www.mathworks.com/products/matlab.html) needs Accessibility permission for `pynput`. Without a display (Linux), PlanTUS runs headless.
+    - The review dialog needs [PyQt5](https://www.riverbankcomputing.com/software/pyqt/) in the SimNIBS [Python](https://www.python.org/). It ships with SimNIBS; without it, the last clicked vertex is placed without review.
+    - The avoidance mask needs [FSL](https://fsl.fmrib.ox.ac.uk/fsl/), [FreeSurfer](https://surfer.nmr.mgh.harvard.edu/) and Workbench tools. Without them, all skin vertices are eligible (step 3).
     - To see errors from the launcher directly, run `prestus_plantus_gui_launcher.py` from a terminal (step 5b).
 
 ## Running PlanTUS
@@ -22,9 +29,9 @@ Set `placement.mode: 'plantus'`. Given a T1-weighted image, a SimNIBS head mesh,
 2. Choose how the vertex is selected. In the Nexus, the Placement card offers *Choose in Workbench…* and *Automatic*; both run only the placement. In MATLAB, set `placement.plantus.interactive` (`1` interactive, `0` automatic; `[]` follows `simulation.interactive`) and run the pipeline.
 3. Interactive: PlanTUS computes the criterion maps (a few minutes) and opens Connectome Workbench with one map per tab. Click a skin position. Each click prints the vertex's criteria, composite score and rank in the log. Click again to change it.
 4. Close Workbench. PlanTUS places the transducer at the last selected vertex and shows it, with the focus, in a second Workbench window. A dialog lists the vertex's criteria: *Use this position*, *Choose another vertex* (the maps reopen, nothing is recomputed) or *Cancel*.
-5. Check the [placement report](doc_placement.md#placement-report) and, in the Nexus, the Viewer. Section [5a](#5a-composite-scoring-both-modes-headless-selects-the-optimum) explains the evaluation it contains.
+5. Check the [placement report](doc_placement.md#placement-report) and, in the Nexus, the Viewer. Section [5a](#5a-combine-and-evaluate-scores) explains the evaluation it contains.
 
-## Headless and interactive mode
+## Headless and Interactive Mode
 
 `placement.plantus.interactive` selects the mode (`[]`, the default, follows `simulation.interactive`):
 
@@ -35,16 +42,15 @@ Set `placement.mode: 'plantus'`. Given a T1-weighted image, a SimNIBS head mesh,
 
 Both modes compute the same maps and composite score (steps 2 to 5a) and write the same files. Headless mode writes the Workbench scenes but never opens `wb_view`. Only interactive mode needs `pynput`, `wb_view` and PyQt5.
 
-??? note "Details: scripts"
-    Both modes share all code except vertex selection (`plantus_common.py`). The scripts replicate `PlanTUS_wrapper.py` (Mainz group, at `placement.plantus.script_path`) but take CLI arguments instead of hard-coded paths.
+Both modes share all code except vertex selection (`plantus_common.py`). The scripts replicate `PlanTUS_wrapper.py` (Mainz group, at `placement.plantus.script_path`) but take CLI arguments instead of hard-coded paths.
 
-## Step-by-step pipeline
+## Step-by-Step Pipeline
 
-### 1  Parse inputs
+### 1  Parse Inputs
 
 PRESTUS writes a flat transducer YAML for PlanTUS.
 
-??? note "Details: the skin–target distance window"
+??? note "The skin–target distance window"
     `position_transducer_plantus.m` derives the skin–target distance window from the transducer calibration, unless `placement.plantus.min_distance_mm`, `max_distance_mm` and `optimal_distance_mm` are set:
 
     | Field | Value written by PRESTUS (when not set) |
@@ -55,23 +61,23 @@ PRESTUS writes a flat transducer YAML for PlanTUS.
 
     If `max(flhm_list)` is NaN or ≤ 0, a 10 mm margin is used instead. For a steerable array, list the steering depths in `focal_distance_list` and set the window to the steering range. The default margin (the largest FLHM, often > 50 mm) otherwise admits skin spots the focus cannot reach.
 
-??? note "Details: launcher inputs and the FLHM fit"
+??? note "Launcher inputs and the FLHM fit"
     | Input | Description |
     |-------|-------------|
     | `t1_filepath` | Subject T1.nii.gz (SimNIBS output) |
-    | `simnibs_mesh_filepath` | Head mesh `sub-XXX.msh` (CHARM output) |
-    | `target_mask_filepath` | Binary NIfTI sphere centred on the target |
+    | `simnibs_mesh_filepath` | Head mesh `sub-XXX.msh` ([CHARM](https://simnibs.github.io/simnibs/build/html/documentation/command_line/charm.html) output) |
+    | `target_mask_filepath` | Binary [NIfTI](https://nifti.nimh.nih.gov/) sphere centred on the target |
     | `tx_config_yaml` | Transducer + placement parameters (written by PRESTUS) |
 
     The YAML is flat. Key fields: `max_distance`, `min_distance`, `optimal_distance`, `transducer_diameter`, `plane_offset`, `additional_offset`, `focal_distance_list`, `flhm_list`, five `weight_*` scalars. Without `optimal_distance` in the YAML, the launcher uses `(min_distance + max_distance) / 2`.
 
     PlanTUS fits FLHM against focal distance with a cubic, which needs at least 4 points. With fewer (e.g. the single O'Neil estimate when no axial profile CSV is given), the launchers (`plantus_compat.py`) interpolate linearly and hold FLHM constant outside the calibrated range. Non-finite pairs are dropped.
 
-### 2  Convert SimNIBS mesh to surfaces
+### 2  Convert SimNIBS Mesh to Surfaces
 
 `PlanTUS.convert_simnibs_mesh_to_surface` extracts `.surf.gii` surfaces from the `.msh` mesh.
 
-??? note "Details: surfaces extracted"
+??? note "Surfaces extracted"
     | Surface | SimNIBS tags | File |
     |---------|-------------|------|
     | Skin | 1005 | `skin.surf.gii` |
@@ -79,24 +85,24 @@ PRESTUS writes a flat transducer YAML for PlanTUS.
 
     SimNIBS also produces `skull.stl`, used for the skull-entry angle (4d).
 
-### 3  Avoidance mask
+### 3  Build the Avoidance Mask
 
 Skin vertices over air cavities and near the eyes and ears are excluded from the composite score.
 
-??? note "Details: excluded vertices and required tools"
+??? note "Excluded vertices and required tools"
     Skin vertices over air cavities and sinuses, within 30 mm of each eye centre and within 15 mm of the tragus are excluded from the composite score (`avoidance == 0`), and the mask is eroded by `transducer_radius` mm as a safety margin. The step needs `fslmaths`, `wb_command`, `mri_tessellate`, `mris_convert` and `final_tissues.nii.gz`. If any is missing, the step is skipped with a warning and all vertices remain eligible.
 
-??? note "Details: how the mask is built (`create_avoidance_mask`)"
+??? note "How the mask is built (`create_avoidance_mask`)"
     1. **Air cavities / sinuses**: vertices whose outward normal ray hits air in `final_tissues.nii.gz` (holes filled with `wb_command -volume-fill-holes`, tessellated with `mri_tessellate`).
     2. **Eyes**: vertices within 30 mm of each eye centre (tag 1006, centres by k-means on x).
     3. **Ears (tragus)**: vertices within 15 mm of LPA/RPA from `eeg_positions/Fiducials.csv`, shifted 1.5 cm posterior.
     4. **Erosion**: the mask is eroded by `transducer_radius` mm.
 
-### 4  Per-vertex scoring metrics
+### 4  Score Each Vertex
 
 PlanTUS scores every skin vertex on five metrics: 4a to 4d here, 4e below.
 
-??? note "Details: metrics 4a to 4d"
+??? note "Metrics 4a to 4d"
     | Metric | Definition | Better |
     |---|---|---|
     | 4a Skin–target distance `d_i` | Euclidean distance from vertex *i* to the target mask's centre of mass (`PlanTUS.roi_center_of_gravity`). The score uses the absolute deviation from `optimal_distance`; vertices outside `[min_distance, max_distance]` are excluded (see 5a). | Lower deviation |
@@ -104,23 +110,22 @@ PlanTUS scores every skin vertex on five metrics: 4a to 4d here, 4e below.
     | 4c Skin–target intersection `x_i` | Path length of the 200 mm outward-normal ray inside the target mask STL (`PlanTUS.stl_from_nii`); chords are summed for several entry–exit pairs. | Higher |
     | 4d Skin–skull angle `β_i` | Angle between the skin normal and the skull normal where the 40 mm ray meets the skull. NaN (worst) where it meets no skull. | Lower |
 
-#### 4e  Skull thickness  `t_i`
+#### 4e  Skull Thickness
 
 Bone path length (mm) along the 4d ray.
 
-??? note "Details: sampling and missing values"
+??? note "Sampling and missing values"
     `final_tissues.nii.gz` (next to the SimNIBS mesh) is sampled every 0.25 mm (nearest voxel) up to 50 mm from the skin. Bone samples (labels 4, 7, 8: bone, compact, spongy) are counted until the first intracranial sample (labels 1–3: WM, GM, CSF). Lower is better.
 
     `t_i` is NaN (worst) where the ray meets no bone or reaches no intracranial tissue within 50 mm (face, neck, skull base). Without `final_tissues.nii.gz`, `t_i` is NaN everywhere, a warning is logged and `weight_skull_thickness` is ignored.
 
-??? note "Details: known artefacts"
-    A few vertices get implausibly thin values (≤ 1 mm): neck rays reaching the spinal canal, and skin next to the ear where CHARM places bone or CSF directly under the skin. These vertices also have large skin–target angles and are rarely chosen unless thickness dominates the weights.
+A few vertices get implausibly thin values (≤ 1 mm): neck rays reaching the spinal canal, and skin next to the ear where CHARM places bone or CSF directly under the skin. These vertices also have large skin–target angles and are rarely chosen unless thickness dominates the weights.
 
-### 5a  Composite scoring (both modes; headless selects the optimum)
+### 5a  Combine and Evaluate Scores
 
 PlanTUS combines the normalised metrics into a weighted composite score; headless mode places the vertex with the minimum score.
 
-??? note "Details: the composite score"
+??? note "The composite score"
     Each metric is min–max normalised to **[0, 1]** over its finite values. NaN or infinite values are set to 1 (worst), also for the inverted intersection metric.
 
     ```
@@ -136,7 +141,7 @@ PlanTUS combines the normalised metrics into a weighted composite score; headles
 
 **Criteria evaluation** (`placement.plantus.evaluate`) re-scores the placement under 12 weight sets and flags settings under which a criterion cannot discriminate.
 
-??? note "Details: criteria evaluation"
+??? note "Criteria evaluation"
     **Criteria evaluation** (`placement.plantus.evaluate`, default `true`; needs `save_metrics`) re-scores the placement under 12 weight sets (configured, equal, one criterion at 0.55 with the rest sharing 0.45, and each criterion alone) and writes, next to the metrics file:
 
     | File | Contents |
@@ -160,16 +165,16 @@ PlanTUS combines the normalised metrics into a weighted composite score; headles
 
     Warnings also go to the placement log. Evaluation failures never abort a placement.
 
-??? note "Details: `plantus_metrics.mat` and offline re-scoring"
+??? note "`plantus_metrics.mat` and offline re-scoring"
     `plantus_metrics.mat` (`placement.plantus.save_metrics`, default `true`) is written to `<output_dir>/plantus_metrics.mat`. It holds skin coordinates, normals and faces, the target centre, `d_i`, `α_i`, `x_i`, `β_i`, `t_i` (`skull_thickness`), the avoidance mask, the composite score, `best_vertex` (composite optimum), `selected_vertex` (vertex placed), `selection_mode` (`auto` headless, `gui` interactive, `manual` after `--do_only_trajectory`), `min_distance`, `max_distance`, `optimal_distance` and the weights. Vertex indices and faces are 0-based. Each run deletes an existing `plantus_metrics.mat` first, even with `save_metrics: false`.
 
     Use `compute_composite_score` in `plantus_common.py` to re-score under other weights without new ray casts. The evaluation runs `plantus_evaluation.py` on the metrics; to evaluate an existing metrics file, run `python functions/neuronav/plantus_evaluation.py <plantus_metrics.mat>`.
 
-### 5b  Interactive mode: GUI vertex selection
+### 5b  Select a Vertex Interactively
 
 With `placement.plantus.interactive = 1`, `wb_view` opens a scene with the maps 4a–4d, one per tab. The skull-thickness map (`skull_thickness_skin.func.gii`) is loaded too and can be chosen as an overlay in any tab. Each click replaces the selection and prints the vertex's criteria, composite score and rank (and the composite optimum) to the log.
 
-??? note "Details: review dialog and requirements"
+??? note "Review dialog and requirements"
     Closing `wb_view` places the last selected vertex (step 6) and opens its placement scene (transducer and focus on skin and T1) in a second `wb_view`. A review dialog then offers *Use this position*, *Choose another vertex* (the planning scene reopens; metrics are not recomputed) or *Cancel* (the launcher exits non-zero and PRESTUS stops). Closing the planning scene without a click reviews the previous vertex, or aborts if there is none.
 
     Interactive mode requires:
@@ -179,21 +184,21 @@ With `placement.plantus.interactive = 1`, `wb_view` opens a scene with the maps 
     - Connectome Workbench `wb_view`, on `PATH` or via `placement.plantus.connectome_wb_path`
     - PyQt5 for the review dialog (part of SimNIBS)
 
-??? note "Details: the `--selection` launcher option"
+??? note "The `--selection` launcher option"
     `--selection` sets how a vertex is confirmed: `review` (the dialog above; PRESTUS uses it), `prompt` (`Generate transducer placement for vertex N? (yes/no)` after each click, for a terminal), `last_click` (no review) and `auto` (default: `prompt` when stdin is a terminal, else `review` if PyQt5 is available, else `last_click`). If no vertex is confirmed, the launcher exits non-zero. If `wb_view` exits at once without a click, the planning scene is reopened without the skull-thickness map.
 
-### 6  Placement geometry
+### 6  Compute the Placement Geometry
 
-For the selected vertex, PlanTUS computes the beam direction and the transducer centre (`prepare_acoustic_simulation`) and writes a 4 × 4 Localite position matrix (RAS mm).
+For the selected vertex, PlanTUS computes the beam direction and the transducer centre (`prepare_acoustic_simulation`) and writes a 4 × 4 [Localite](https://www.localite.de/en/) position matrix (RAS mm).
 
-??? note "Details: output files"
+??? note "Output files"
     Outputs go to `<output_dir>/vtx<N>/`, where `<output_dir>` is the per-target [placement run folder](doc_outputs.md#where-outputs-live) `<path.placement>/sub-XXX/plantus/<target_name>/`:
 
     | File | Contents |
     |------|----------|
     | `*_Localite.mat` | `position_matrix` (4×4, RAS mm), **used by PRESTUS** |
     | `*_Localite.txt` | Plain-text copy |
-    | `*_kPlan.mat` | Same matrix in k-Plan convention (m, axes permuted) |
+    | `*_kPlan.mat` | Same matrix in [k-Plan](https://brainbox-neuro.com/products/k-plan) convention (m, axes permuted) |
     | `*_Localite_XML.txt` | Fake Localite XML snippet (rewritten on each run) |
     | `focus_position_matrix_*.txt` | Focus point transform |
     | `transducer_*.surf.gii` | Transducer surface model at position |
@@ -201,18 +206,18 @@ For the selected vertex, PlanTUS computes the beam direction and the transducer 
 
     `<output_dir>` itself holds the skin/skull surfaces, the metric maps (`distances_skin`, `distances_skin_thresholded`, `angles_skin`, `target_intersection_skin`, `skin_skull_angles_skin`, `skull_thickness_skin`, `avoidance_skin`; `.func.gii`), the planning `scene.scene` and `plantus_metrics.mat`.
 
-??? note "Details: beam direction and transducer centre"
+??? note "Beam direction and transducer centre"
     For the selected vertex *v*:
 
     1. **Beam direction**: the negated skin normal if it intersects the target (`x_v > 0`), otherwise the negated skin-to-target vector. Both are unit vectors pointing into the head.
     2. **Transducer centre**: `transducer_centre = skin_coordinate_v − (plane_offset + additional_offset) × beam_direction`. `plane_offset` is the distance from the bowl apex to the exit plane (`curv_radius_mm − dist_geom_ep_mm`); `additional_offset` is `placement.skin_gap_mm`, the gap between skin and exit plane.
     3. **Localite position matrix** (`PlanTUS.create_Localite_position_matrix`): column 3 = `transducer_centre`, column 0 = `beam_direction`, columns 1–2 by Gram–Schmidt.
 
-### 7  PRESTUS reads the output
+### 7  Read the Output into PRESTUS
 
 `position_transducer_plantus.m` loads the most recent `*Localite.mat` under `<path.placement>/sub-XXX/plantus/<target_name>/` written during the current run. If there is none, it errors (`PRESTUS:plantus:noOutput`). `localite_matrix_to_positions` converts `position_matrix` into `trans_pos` and `focus_pos` in voxel coordinates. A T1 overlay plot (`plot_placement_t1_overlay`) of the transducer and target is written to the subject output folder.
 
-## Coordinate conventions
+## Coordinate Conventions
 
 | Frame | Units | Description |
 |-------|-------|-------------|
@@ -221,13 +226,13 @@ For the selected vertex, PlanTUS computes the beam direction and the transducer 
 | MNI | mm | Template space; target specified here, mapped to RAS via SimNIBS |
 | k-Plan | m, permuted axes | Not used by PRESTUS |
 
-## External dependencies
+## External Dependencies
 
 | Tool | Headless | Interactive | Used in step |
 |------|:--------:|:-----------:|-------------|
-| SimNIBS Python (nibabel, scipy, nilearn), see [installation guide](doc_installation.md#simnibs-installation) | ✓ | ✓ | All steps |
+| SimNIBS Python ([nibabel](https://nipy.org/nibabel/), [scipy](https://scipy.org/), [nilearn](https://nilearn.github.io/stable/index.html)), see [installation guide](doc_installation.md#install-simnibs) | ✓ | ✓ | All steps |
 | PlanTUS Python library (`PlanTUS.py`) | ✓ | ✓ | All steps |
-| PyYAML (or built-in fallback) | ✓ | ✓ | YAML config loading |
+| [PyYAML](https://pyyaml.org/) (or built-in fallback) | ✓ | ✓ | YAML config loading |
 | FSL `fslmaths` | ✓ | ✓ | Avoidance mask: tissue binarisation |
 | Connectome Workbench `wb_command` | ✓ | ✓ | Avoidance mask: hole filling |
 | FreeSurfer `mri_tessellate` / `mris_convert` | ✓ | ✓ | Avoidance mask: air mesh |
@@ -235,7 +240,7 @@ For the selected vertex, PlanTUS computes the beam direction and the transducer 
 | `pynput` Python package | – | ✓ | Mouse click listener for wb_view |
 | PyQt5 (part of SimNIBS) | – | ✓ | Review dialog |
 
-Install `pynput` for interactive mode in the SimNIBS conda environment:
+Install `pynput` for interactive mode in the SimNIBS [conda](https://docs.conda.io/) environment:
 
 ```bash
 conda activate simnibs_v4.6.0

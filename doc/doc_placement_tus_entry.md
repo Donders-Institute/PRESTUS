@@ -1,14 +1,22 @@
 # TUS_entry Transducer Placement
 
+A simulated transducer position is useful only if the real transducer can be placed there with good contact on the scalp. `placement.mode: 'tus_entry'` runs the [TUS_entry](https://github.com/CyrilAtkinson/TUS_entry) [R](https://www.r-project.org/) toolbox, which selects the scalp entry point with the smallest coupling geometry error (the standard deviation of the transducer-disk-edge to scalp distances), subject to an optional depth constraint. TUS_entry optimises **mechanical fit** (how perpendicular the transducer disk sits on the scalp); [PlanTUS](https://github.com/mlueckel/PlanTUS) optimises **acoustic objectives** (beam–target overlap, skull thickness).
+
+On this page:
+
+- [Installation](#installation): R, its packages and TUS_entry in a [conda](https://docs.conda.io/) environment.
+- [Required Configuration](#required-configuration): the two paths PRESTUS needs and the head mask it builds.
+- [Optional Configuration](#optional-configuration): masks, depth window and other settings.
+- [Candidate List](#candidate-list): the full ranked candidate list.
+- [Coordinate Conventions](#coordinate-conventions): voxel and world frames, and how the exit plane and focus are set.
+- [Output Files](#output-files): the files written per run.
+
 !!! note "At a glance"
-    - **What:** Placement with the external TUS_entry tool, which picks the entry point where the transducer sits most evenly on the scalp.
     - **When you need it:** When good mechanical contact of the transducer is the main concern.
-    - **Before you start:** R with TUS_entry in a conda environment, and a SimNIBS segmentation (or another head mask).
+    - **Before you start:** R with TUS_entry in a conda environment, and a [SimNIBS](https://simnibs.github.io/simnibs/) segmentation (or another head mask).
 
 !!! warning "Experimental feature"
     TUS_entry placement is under active development and is not yet covered by the PRESTUS test suite. Check the [placement report](doc_placement.md#placement-report) before simulating.
-
-`placement.mode: 'tus_entry'` runs the [TUS_entry](https://github.com/CyrilAtkinson/TUS_entry) R toolbox as an optional placement backend. It selects the scalp entry point with the smallest coupling geometry error: the standard deviation of the transducer-disk-edge to scalp distances along the trajectory, subject to an optional depth constraint. TUS_entry optimises **mechanical fit** (how perpendicular the transducer disk sits on the scalp); PlanTUS optimises **acoustic objectives** (beam–target overlap, skull thickness).
 
 ```yaml
 placement:
@@ -23,7 +31,7 @@ placement:
     target_name: DLPFC
 ```
 
-??? note "Details: how TUS_entry selects the entry point"
+??? note "How TUS_entry selects the entry point"
     1. **Distance filter**: candidate entry points on a sphere of radius `maximal_distance` around the target centroid. Only trajectories that cross the scalp surface and avoid the exclusion zone are kept.
     2. **Spatial decimation**: candidates are thinned by `resolution`.
     3. **Angle scoring**: for each candidate, a circular transducer footprint (diameter `transducer_size`) perpendicular to the trajectory is scored by the SD of disk-edge-to-scalp distances. A lower SD is a better-coupled placement.
@@ -31,7 +39,7 @@ placement:
 
 ## Installation
 
-TUS_entry requires R and four CRAN packages. Use a dedicated conda environment:
+TUS_entry requires R and four [CRAN](https://cran.r-project.org/) packages. Use a dedicated conda environment:
 
 ```bash
 conda env create -f examples/environment_tus_entry.yml
@@ -46,7 +54,7 @@ git clone https://github.com/CyrilAtkinson/TUS_entry /path/to/TUS_entry
 
 Point `placement.tus_entry.script_path` to `TUS_entry.R` and `placement.tus_entry.env_path` to the conda env prefix (e.g. `~/.conda/envs/tus_entry`).
 
-## Required configuration
+## Required Configuration
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -55,11 +63,11 @@ Point `placement.tus_entry.script_path` to `TUS_entry.R` and `placement.tus_entr
 
 TUS_entry needs a **solid** head mask. It walks each candidate ray from outside the head towards the target and takes the last voxel outside the mask as the scalp entry. With a hollow skin shell the head interior counts as outside, every candidate collapses onto the target, and TUS_entry fails (`replacement has 1 row, data has 0`). PRESTUS therefore builds the head mask itself: it reads `placement.tus_entry.scalp_mask` (default: the SimNIBS `m2m_sub-<ID>/final_tissues.nii.gz`), treats every nonzero voxel as head, fills it (3D and slice-wise, which also closes a skin shell open at the neck) and writes the result to the work directory. The source file is only read.
 
-## Optional configuration
+## Optional Configuration
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `placement.tus_entry.scalp_mask` | *(SimNIBS `final_tissues.nii.gz`)* | NIfTI head or scalp mask in the T1 grid (nonzero = head); filled into a solid head mask in the work directory |
+| `placement.tus_entry.scalp_mask` | *(SimNIBS `final_tissues.nii.gz`)* | [NIfTI](https://nifti.nimh.nih.gov/) head or scalp mask in the T1 grid (nonzero = head); filled into a solid head mask in the work directory |
 | `placement.tus_entry.target_mask` | *(auto)* | Path to binary NIfTI target mask. When empty, a sphere is generated from `focus_pos` or `mni_target_mm`. |
 | `placement.tus_entry.target_mask_radius_mm` | `5` | Radius [mm] for the auto-generated spherical target mask |
 | `placement.tus_entry.mni_target_mm` | *(from focus_pos)* | [1×3] MNI target coordinate [mm]; converted to subject RAS via SimNIBS |
@@ -76,9 +84,9 @@ TUS_entry needs a **solid** head mask. It walks each candidate ray from outside 
 !!! note "Units"
     TUS_entry uses centimetres internally. PRESTUS converts distance outputs to millimetres, as for all other PRESTUS coordinates.
 
-All keys are also listed in [Parameters](doc_parameters.md#placementtus_entry).
+All keys are also listed in [Parameters](doc_parameters.md#tus_entry-placement-placementtus_entry).
 
-## Candidate list
+## Candidate List
 
 By default, TUS_entry returns a single selected entry point. With `return_candidates = true`, the runner script saves the full angle-ranked candidate list to `tus_entry_candidates.rds` in the working directory. Inspect it in R:
 
@@ -87,9 +95,9 @@ cands <- readRDS("tus_entry_candidates.rds")
 head(cands)
 ```
 
-MATLAB cannot read RDS files directly. To filter ranked candidates in PRESTUS (e.g. the entry with the lowest skull thickness among the top-10 coupling candidates), load the RDS in R, export to CSV and load that in MATLAB. The `candidates` output argument of `position_transducer_tus_entry` is reserved for a future native implementation and returns an empty struct array.
+[MATLAB](https://www.mathworks.com/products/matlab.html) cannot read RDS files directly. To filter ranked candidates in PRESTUS (e.g. the entry with the lowest skull thickness among the top-10 coupling candidates), load the RDS in R, export to CSV and load that in MATLAB. The `candidates` output argument of `position_transducer_tus_entry` is reserved for a future native implementation and returns an empty struct array.
 
-## Coordinate conventions
+## Coordinate Conventions
 
 | Space | What TUS_entry provides | PRESTUS convention |
 |-------|------------------------|-------------------|
@@ -100,7 +108,7 @@ TUS_entry operates in the native voxel space of the input masks. **Use the same 
 
 The exit plane lies `placement.skin_gap_mm` (default 5 mm) outward from the `Scalp_coordinates` returned by TUS_entry, along the trajectory. `trans_pos` lies a further `curv_radius_mm − dist_geom_ep_mm` outward, the offset used by all placement modes. `focus_pos` is derived by stepping inward from the exit plane by `transducer.focal_distance_ep` (or `focal_distance_bowl` minus the apex-to-exit-plane offset, as `focal_distance_calculation` converts it; if neither is set, the geometric focus `dist_geom_ep_mm`).
 
-## Output files
+## Output Files
 
 All outputs are written to the [placement run folder](doc_outputs.md#where-outputs-live), `<path.placement>/sub-<ID>/tus_entry/<target_name>/` (override with `placement.tus_entry.work_dir`):
 
@@ -111,7 +119,7 @@ All outputs are written to the [placement run folder](doc_outputs.md#where-outpu
 | `tus_entry_candidates.rds` | Full ranked candidate list (only if `return_candidates = true`) |
 | `sub-<ID>_tus_entry_head_mask.nii.gz` | Solid head mask passed to TUS_entry as `scalp` |
 | `placement_run.json` | Run record: resolved positions and the settings they depend on (reused per `placement.reuse`) |
-| `sub-<ID>_<target_name>_trajectory.txt` | Brainsight trajectory export |
+| `sub-<ID>_<target_name>_trajectory.txt` | [Brainsight](https://www.rogue-research.com/tms/brainsight-tms/) trajectory export |
 | `sub-<ID>_<target_name>_target_mask.nii.gz` | Auto-generated spherical target mask (if no target mask was provided) |
 
 ??? note "References"

@@ -1,22 +1,35 @@
-# Multi-Target Extraction Toolkit
+# Named Target Coordinates
+
+When a session has several named targets, each simulated focus needs a coordinate and a record of how far that coordinate can be trusted. `neuronav_resolve_target` takes each target's coordinate from the best source available, from a pre-hoc lookup table down to a projection along the tracked transducer axis, and reports which source it used.
+
+On this page:
+
+- [Target Coordinates from Several Sources](#target-coordinates-from-several-sources): what the functions resolve and when to use them.
+- [Inputs You Provide](#inputs-you-provide): the recordings, the `target_map` and the optional sources.
+- [Resolution Order](#resolution-order): the four tiers and their confidence.
+- [Worked Example](#worked-example): a loop over subjects and sessions.
+- [Exported Session CSV](#exported-session-csv): the per-session output and the function reference.
 
 !!! note "At a glance"
-    - **What:** Tools to extract several planned targets from Localite exports in one go.
-    - **When you need it:** Advanced: for studies with several targets per session. Most users need only [Localite ingestion](doc_placement_neuronav_workflows.md).
-    - **Before you start:** Localite exports with planned targets.
+    - **When you need it:** A study has more than one named target per subject and session, or needs a documented answer to where each target coordinate came from.
+    - **Before you start:** The raw Localite exports and the planning T1 per subject; ingestion as in [Localite Ingestion](doc_placement_neuronav_workflows.md).
 
-This is a toolkit, not a pipeline mode: a set of functions your own extraction script calls to resolve **named, per-session brain-target coordinates** (e.g. this subject's `L_PUL` on `ses-03`) from whichever raw Localite export the operator recorded, with a logged account of how confident each resolved coordinate is. It sits on top of [Neuronavigation read-in](doc_placement_neuronav.md) (read that first for the Localite file formats and coordinate spaces) and adds to the single-target placement pipeline rather than replacing it. Use it when a study needs **more than one named target per subject**, or a documented answer to where each reported coordinate came from.
+---
 
-## What you need to provide
+## Target Coordinates from Several Sources
+
+When a session has several named targets, your own extraction script resolves **named, per-session brain-target coordinates** (e.g. this subject's `L_V1` on `ses-03`) from whichever raw Localite export the operator recorded, with a logged account of how confident each resolved coordinate is. The resolved coordinate is what a simulation uses as `focus_pos`. This is not a pipeline mode: the functions read the ingested files and add to the single-target placement pipeline rather than replacing it. Use them when a study needs **more than one named target per subject**, or a documented answer to where each reported coordinate came from. Localite file formats are in [Neuronavigation read-in](doc_placement_neuronav.md#realised-angle-vs-planned-trajectory) and coordinate spaces in [Localite Files, Offset and Coordinates](doc_placement_neuronav_coordinates.md#coordinate-transforms).
+
+## Inputs You Provide
 
 1. **Raw entry-point recordings** per subject and session, in any supported format (`TriggerMarkers`, `GUMMarkers` or `InstrumentMarker`). This supplies the transducer/coil position, always read from the current session's own recording.
-2. **A `target_map`** naming your targets, built by `neuronav_build_target_map` from a `coil_map` you construct per subject and session:
+2. **A `target_map`** naming your targets, built by `neuronav_build_target_map` from the `neuronav.coil_map` you construct per subject and session:
 
     ```matlab
     coil_map(1).coil   = 0;              % hardware coil index (0-based)
-    coil_map(1).target = 'L_PUL';        % target_name -- your convention
+    coil_map(1).target = 'L_V1';        % target_name -- your convention
     coil_map(2).coil   = 1;
-    coil_map(2).target = 'R_PUL';
+    coil_map(2).target = 'R_V1';
     target_map = neuronav_build_target_map(coil_map);
     parameters.neuronav.coil_map = coil_map;   % ingest reads one file per coil
     ```
@@ -28,15 +41,15 @@ The following inputs are optional. Each one you provide moves more targets up th
 - **`EntryTarget` exports**, for at least some sessions, if your operator uses Localite's target-confirmation feature. `target_map(i).localite_key` is matched (case-insensitive substring) against each `EntryTarget` description. Set it whenever your description convention differs from `target_name`, and pass a **cell array of candidates** if more than one convention is in use across sessions:
 
     ```matlab
-    coil_map(1).localite_key = {'LEFT PUL', 'L_PUL', 'LEFT P', 'L_P'};
+    coil_map(1).localite_key = {'LEFT V1', 'L_V1', 'LEFT V', 'L_V'};
     ```
 
 - **A pre-hoc target lookup table**, if your study establishes targets before the session (e.g. a placement or optimisation step run ahead of time). This is the highest-confidence source when present and is cross-checked against `EntryTarget` wherever both exist. `neuronav_read_target_lookup.m` documents the CSV schema (`subject_id, target_name, space, x, y, z`). Build this file with your own per-study script from whatever your planning step produces.
 
-??? note "Details: why several sources"
-    Across one study, the same target was confirmed in different ways for different subjects and sessions: an operator-confirmed `EntryTarget` export for the exact session; an `EntryTarget` export only from an earlier session; no `EntryTarget` export at all (workflows that only used `GUMMarkers`, which has no separate target confirmation); two label conventions in the `EntryTarget` description across sessions (`"LEFT P"` and `"L_P"`); and a pre-hoc planned coordinate from individual anatomical segmentation, independent of Localite. The toolkit resolves each target from the best source available for that target and reports which one it used.
+??? note "Why several sources"
+    Across one study, the same target was confirmed in different ways for different subjects and sessions: an operator-confirmed `EntryTarget` export for the exact session; an `EntryTarget` export only from an earlier session; no `EntryTarget` export at all (workflows that only used `GUMMarkers`, which has no separate target confirmation); two label conventions in the `EntryTarget` description across sessions (`"LEFT V"` and `"L_V"`); and a pre-hoc planned coordinate from individual anatomical segmentation, independent of Localite. `neuronav_resolve_target` resolves each target from the best source available for that target and reports which one it used.
 
-## Resolution order
+## Resolution Order
 
 `neuronav_resolve_target` tries these in order per target and returns which one supplied each row (`target_source`). **Check this before treating a coordinate as ground truth.**
 
@@ -49,7 +62,7 @@ The following inputs are optional. Each one you provide moves more targets up th
 
 Because of tier 4, the resolved coordinate is **never NaN**: every target gets a value, but tier-4 rows are not confirmed. In one cross-check, tier-4 estimates differed from the tier-1 target by 3-5 voxels for a subject without any `EntryTarget` export, while tier-1 and tier-2 values matched to within 0-1 voxel. If a study needs sub-voxel target accuracy and some subjects stay on tier 4, provide a lookup table (tier 1) for those subjects.
 
-## Minimal worked example
+## Worked Example
 
 ```matlab
 for i_sub = 1:numel(all_subjects)
@@ -67,7 +80,7 @@ for i_sub = 1:numel(all_subjects)
         [trans_ras, trans_pos, target_ras, target_pos_projected] = ...
             neuronav_convert_trigger_to_voxels(sub_id, active_sides, results, parameters);
 
-        t1_header = niftiinfo(my_planning_t1_path(sub_id));   % see doc_placement_neuronav.md
+        t1_header = niftiinfo(my_planning_t1_path(sub_id));   % see doc_placement_neuronav_coordinates.md
 
         [target_vox, target_mm, target_source] = neuronav_resolve_target( ...
             parameters, sub_id, session, sessions, target_map, t1_header, ...
@@ -83,7 +96,7 @@ for i_sub = 1:numel(all_subjects)
 end
 ```
 
-## Output: the exported CSV
+## Exported Session CSV
 
 `neuronav_export_session_csv` writes one row per target with, among other columns:
 
@@ -93,13 +106,11 @@ end
 - `target_projected_mm_x/y/z`: the tier-4 geometric estimate, always computed whichever tier was used, kept for comparison.
 - `target_source`: see the resolution-order table above.
 
-??? note "Details: function reference"
+??? developer "Function reference"
+    The ingestion functions (`neuronav_ingest_markers`, `neuronav_ingest_batch`, `neuronav_scan_sessions`) are listed under [GUI workflow](doc_placement_neuronav_workflows.md#gui-workflow); the naming functions under [Series naming](doc_placement_neuronav_workflows.md#series-naming).
+
     | Function | Role |
     |---|---|
-    | `neuronav_ingest_markers` | Stage 1: reads raw markers (any format), writes normalised `InstrumentMarker` XML + a QC JSON sidecar (pulse count, position deviation in mm, rotation deviation in rad, source file) per subject/session |
-    | `neuronav_gui` | Stand-alone GUI for the ingest step: preview detected series and QC, name targets, write the XML/JSON (see [doc_gui.md](doc_gui.md#localite-ingest-gui)) |
-    | `neuronav_ingest_batch` / `neuronav_scan_sessions` | Batch ingestion and inventory of many subjects/sessions, with a summary CSV of coordinates; see [GUI and script workflows](doc_placement_neuronav_workflows.md) |
-    | `neuronav_read_label_candidates` / `neuronav_suggest_target_names` | Heuristic naming: collects named planned targets (EntryTarget, GUMMarkers pairs) and names each ingested series after the one nearest its beam axis, with distance/depth for QC |
     | `neuronav_build_target_map` | Expands your `coil_map` into the flat `target_map` every other function here consumes |
     | `neuronav_convert_trigger_to_voxels` | Converts ingested marker positions to native voxel/mm space; also computes the tier-4 axis-projected target |
     | `neuronav_read_entry_target` | Reads the latest `EntryTarget*.xml` snapshot for one subject/session |
@@ -108,4 +119,4 @@ end
     | **`neuronav_resolve_target`** | **The orchestrator**: runs all four tiers in order for one subject/session and returns the resolved coordinate + provenance per target. Call this one function rather than the matching/lookup functions individually. |
     | `neuronav_export_session_csv` | Writes the per-session summary CSV, including a `target_source` column |
     | `neuronav_plot_placement` | QC plot of every target_map entry's entry/target pair on the segmented head |
-    | `neuronav_get_group_mean_mni` / `neuronav_apply_inverse_deformation` | Group-mean-MNI fallback for subjects missing trigger data entirely (a more severe gap than a missing target confirmation; see the coordinate-transform section of [Neuronavigation read-in](doc_placement_neuronav.md)) |
+    | `neuronav_get_group_mean_mni` / `neuronav_apply_inverse_deformation` | Group-mean-MNI fallback for subjects missing trigger data entirely (a more severe gap than a missing target confirmation; see [Coordinate transforms](doc_placement_neuronav_coordinates.md#coordinate-transforms)) |

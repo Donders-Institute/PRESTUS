@@ -1,4 +1,4 @@
-# Study config for the head-simulation tutorial (doc/doc_tutorial_head.md).
+# Study config for a head simulation of SimNIBS' Ernie (doc/doc_getting-started.md, "3. A head simulation").
 # Only the values that differ from config/config_default.yaml are listed.
 # Replace the four paths before running.
 

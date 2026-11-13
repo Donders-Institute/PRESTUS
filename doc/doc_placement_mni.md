@@ -1,12 +1,15 @@
 # MNI Transducer Placement
 
 A transducer site and target given in MNI coordinates let one plan apply to every subject, but each subject's simulation needs both points in its own anatomy. `placement.mode: 'mni'` converts both points to the subject's T1 grid, snaps the transducer to the scalp and sets its exit plane `placement.skin_gap_mm` (default 5 mm) off the scalp; no search is performed, so the result is deterministic. The [heuristic](doc_placement_heuristic.md) mode, by contrast, takes only an MNI target and searches the scalp for a transducer position.
-!!! note "At a glance"
-    - **What:** Placement from a transducer position and a target given in MNI coordinates.
-    - **When you need it:** When you know both points in template space, e.g. a group target and a standard scalp position.
-    - **Before you start:** A SimNIBS segmentation of the subject (for the MNI-to-subject transforms).
 
-`placement.mode: 'mni'` places the transducer at a position **you** give in MNI (MNI152, mm) coordinates, together with the focus. No search is performed; the result is deterministic. The [heuristic](doc_placement_heuristic.md) mode takes only an MNI target and searches the scalp for a transducer position. The `mni` mode applies the same scalp standoff geometry, so the housing clears the skin.
+On this page:
+
+- [How a Position Is Resolved](#how-a-position-is-resolved): coordinate conversion, scalp snap and standoff.
+- [Limitations](#limitations): the transducer types the mode assumes and what to check.
+
+!!! note "At a glance"
+    - **When you need it:** When you know both points in template space, e.g. a group target and a standard scalp position.
+    - **Before you start:** A [SimNIBS](https://simnibs.github.io/simnibs/) segmentation of the subject (for the MNI-to-subject transforms).
 
 ```yaml
 placement:
@@ -19,7 +22,7 @@ placement:
 
 A SimNIBS `m2m_sub-XXX` folder (under `path.seg`) is required: the conversion relies on `final_tissues.nii.gz` and the SimNIBS coordinate transforms.
 
-## How a position is resolved
+## How a Position Is Resolved
 
 1. **Coordinate conversion.** Both points are mapped MNI → subject RAS+ → grid voxel, each with the SimNIBS transform suited to where it sits:
 
@@ -34,7 +37,7 @@ A SimNIBS `m2m_sub-XXX` folder (under `path.seg`) is required: the conversion re
 
 The resolved `trans_pos` / `focus_pos` (T1 grid voxels) are written into every configured transducer, and a QC overlay is saved. Downstream simulation is unchanged.
 
-??? note "Details: functions involved"
+??? note "Functions involved"
     - Conversion: `transform_coordinates` and `mni2subject_coords_LDfix`, shared with the heuristic.
     - Scalp snap: `tp_scalp_boundary` (nearest scalp / outer-boundary voxel).
     - Standoff: `transducer_scalp_geometry`, shared with `tp_candidate_mesh`; the geometry the heuristic applies to every candidate.

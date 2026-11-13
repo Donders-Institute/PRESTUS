@@ -70,7 +70,7 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
     % instrument-registration-dependent and NOT validated in PRESTUS. It may
     % represent the IR tracker cluster centroid, the exit plane, or a housing
     % reference. Set tracker_to_bowl_mm to a directly measured value if spatial
-    % accuracy is critical. See doc_placement_neuronav.md §"Localite matrix origin".
+    % accuracy is critical. See doc_placement_neuronav_coordinates.md §"Transducer offset (tracker_to_bowl_mm)".
 
     lc = struct();
     if isfield(parameters, 'placement') && isfield(parameters.placement, 'localite')

@@ -1,6 +1,10 @@
 # PRESTUS Functions
 
-The following documents the functions provided in PRESTUS.
+This page lists every MATLAB function under `functions/` with a one-line description, so that you can find the function behind a stage, a setting or a message.
+
+On this page:
+
+- One table per folder of `functions/`, in folder order from [ACOUSTIC](#acoustic) to [UNCERTAINTY](#uncertainty): each function's name and what it does. Files at the top of `functions/` are listed under [CORE](#core).
 
 #### ACOUSTIC
 
@@ -45,7 +49,7 @@ The following documents the functions provided in PRESTUS.
 | **Function Name**                       | **Description**                                                                                 |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------|
 | `babelbrain_check_geometry`             | Error for geometries the BabelBrain backend cannot simulate (several transducers, beam off the grid z axis) |
-| `babelbrain_insitu_isppa`               | In-brain peak ISPPA of the scaled acoustic field — the `Isppa` BabelBrain's thermal solver normalises to. |
+| `babelbrain_insitu_isppa`               | In-brain peak ISPPA of the scaled acoustic field: the `Isppa` BabelBrain's thermal solver normalises to. |
 | `babelbrain_placement_correction`       | Mechanical Tx offset that puts BabelBrain's apex at trans_pos |
 | `babelbrain_thermal_timing`             | Convert PRESTUS timing to BabelBrain thermal parameters |
 | `babelbrain_thermal_wrapper`            | Run BabelBrain thermal simulation and read results |

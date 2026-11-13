@@ -1,20 +1,19 @@
 # Group Analysis
 
+A study simulates many subjects or conditions, and comparing them needs the same settings applied to every run and the results collected in one place. PRESTUS runs every row of a study table with its own settings, measures per run how well the focus hits the target, and summarises the runs in group MNI maps and a group report. The report and the maps never run simulations; they read the per-run outputs that already exist on disk.
+
+On this page:
+
+- [Study setup](#study-setup): a study manifest with one row per run, run with `prestus_study_start` locally or on HPC.
+- [Targeting accuracy](#targeting-accuracy): how far each simulated focus lies from the planned focus, an MNI target and an MNI ROI.
+- [Group MNI maps](#group-mni-maps): focal-volume overlap, mean and SD intensity and mean heating per condition.
+- [Group HTML report](#group-html-report): one interactive report across runs, with a one-row-per-run CSV.
+
 !!! note "At a glance"
-    - **What:** Running many subjects or conditions from one table, and summarising them in group maps and a group report.
     - **When you need it:** For studies with more than a handful of runs.
     - **Before you start:** A study config that works for one subject.
 
-PRESTUS supports multi-subject studies end to end:
-
-- **[Study setup](#study-setup)**: a *study manifest* lists every run (a subject, optionally under a named condition) with its own settings. `prestus_study_start` runs all rows locally or on HPC.
-- **[Targeting accuracy](#targeting-accuracy)**: each run measures how well the simulated focus hits the planned focus, an MNI target and an MNI ROI (`modules.run_targeting_analysis`).
-- **[Group MNI maps](#group-mni-maps)**: focal-volume overlap, mean/SD intensity and mean heating per condition in MNI space.
-- **[Group HTML report](#group-html-report)**: one self-contained, interactive report across runs, with a one-row-per-run CSV (`prestus_group_report_start`).
-
-The report and the maps never run simulations; they read the per-run outputs that already exist on disk.
-
-## Study setup
+## Study Setup
 
 A study is a normal PRESTUS config (the *study config*) whose `study.manifest` names a table with one row per run. The study config holds everything the runs share. The manifest holds what differs between runs.
 
@@ -45,7 +44,7 @@ subject_id  condition  placement.localite.session  placement.localite.target  tr
 2           L_M1       ses-02                      L_M1                       20                            [-38, -20, 58]
 ```
 
-### Running a study
+### Running a Study
 
 ```matlab
 prestus_study_start('config/config_pilot.yaml', 'DryRun', true)   % load + check every row, print the plan
@@ -55,50 +54,50 @@ prestus_study_start(cfg, 'Rows', 1, 'Platform', 'matlab', ...
     'Overrides', {'grid.resolution_mm', 2})                         % quick debug run of one row
 ```
 
-??? note "Details: dry run, platform and the study report"
+??? note "Dry run, platform and the study report"
     - **Config errors surface first.** All selected rows are loaded before anything runs. The dry run prints each row's placement mode, target, transducer, planned depth, target intensity and platform, and writes `<path.sim>/group/<name>/log/plan_<time>.tsv`. A real launch writes `launch_<time>.tsv` with the job ID and status per row.
     - **Platform.** Each run is started with `prestus_pipeline_start` and its own `platform`. On `matlab` the rows run one after another; a failing row is logged and the others continue (unless `'StopOnError', true`). On `slurm`/`qsub` there is one job per row, or a job graph for uncertainty, multi-ISPPA and async rows.
-    - **One report at the end.** Study runs switch off the per-subject group report (`modules.generate_group_report = 0`, unless the manifest sets it). The study report is built once at the end: directly on `matlab`, and on HPC as a dependent CPU job (`afterany`, so it also runs when some subject jobs fail). Rows that submit a job graph return no single final job ID; for those, run `prestus_group_report_start(cfg)` once their jobs have finished.
+    - **One report at the end.** Study runs switch off the per-subject group report (`modules.generate_group_report = 0`). `prestus_study_start` applies this after the manifest columns, so a manifest column cannot switch it back on; its `'Overrides'` option can. The per-subject simulation report (`modules.generate_report`) is not affected. The study report is built once at the end: directly on `matlab`, and on HPC as a dependent CPU job (`afterany`, so it also runs when some subject jobs fail). Rows that submit a job graph return no single final job ID; for those, run `prestus_group_report_start(cfg)` once their jobs have finished.
 
-### Manifest columns
+### Manifest Columns
 
 `subject_id` is the only required column; any dotted config key sets a per-run value.
 
-??? note "Details: column reference and cell syntax"
+??? note "Column reference and cell syntax"
     | Column | Meaning |
     |---|---|
     | `subject_id` | Required. Integer, `003` or `sub-003`. |
     | `condition` | Optional run label (target, protocol, session, …). Becomes the run's output affix and the grouping variable in the group report. |
     | `include` | Optional `1`/`0`, `true`/`false`, `yes`/`no`; default `1`. |
-    | `config` | Optional per-row YAML merged over the study config. The path is relative to the manifest. |
+    | `config` | Optional per-row [YAML](https://yaml.org/) merged over the study config. The path is relative to the manifest. |
     | `notes` | Ignored free text (also `note`, `comment`). |
     | any dotted config key | A per-run value, e.g. `placement.localite.target`, `transducer.focal_distance_ep`, `grid.resolution_mm`. Struct arrays take an index: `transducer(2).trans_pos` for the second transducer of a multi-transducer setup. A plain `transducer.x` is only allowed while the config defines one transducer. |
 
     Cells are parsed like YAML values: `30`, `[-38, 20, 52]`, `L_M1`, `true`. An **empty cell keeps the study value**, and `[]` sets an empty value. Lines starting with `#` are comments. In `.csv` files, quote cells that contain commas: `"[-38, 20, 52]"`. Unknown keys are set anyway, with a warning (a typo guard).
 
-### Output names
+### Output Names
 
 Each run writes the usual per-subject outputs to `<path.sim>/sub-XXX/`, distinguished by its output affix.
 
-??? note "Details: affix rules and clashes"
+??? note "Affix rules and clashes"
     - An explicit `io.output_affix` column (or row-config value) is used as is.
     - Otherwise the condition is appended to the study affix with `-`. For example, study affix `pilot` with condition `M1` gives `_desc-pilot-M1`; without a study affix, condition `M1` gives `_desc-M1`.
     - The result is sanitised like any `io.output_affix`.
 
     Two included rows that would write to the same files (same subject, affix, medium and `path.sim`) are rejected before anything runs. Give them distinct conditions.
 
-??? note "Details: merge order"
+??? note "Merge order"
     For each row, later sources win:
 
     `config_default.yaml` < study config < row `config` YAML < manifest columns < `Overrides` of `prestus_study_start` < the run's `subject_id` and output affix
 
     All of this goes through one `load_parameters` call. Derived values (transducer geometry, thermal timing, …) are therefore computed from the row's own settings. `load_parameters` accepts the same kind of overrides directly: `load_parameters('config.yaml', dir, {'subject_id', 3; 'placement.localite.target', 'L_M1'})`.
 
-### From Localite ingestion
+### Importing Runs from Localite
 
-Ingest the recordings on the Nexus's *Placement ▸ Localite* page or with `neuronav_gui` (single sessions via *Write outputs*, many via *Ingest all sessions…* / the batch window), then use **Import from Localite…** on the Nexus's Study tab (or the shortcut on the Placement tab).
+Ingest the [Localite](https://www.localite.de/) recordings on the Nexus's *Placement ▸ Localite* page or with `neuronav_gui` (single sessions via *Write outputs*, many via *Ingest all sessions…* / the batch window), then use **Import from Localite…** on the Nexus's Study tab (or the shortcut on the Placement tab).
 
-??? note "Details: importer files and row layouts"
+??? note "Importer files and row layouts"
     The importer reads what ingestion writes under `path.localite_post`: `neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json` files. It builds rows with `placement.mode = localite`, `placement.localite.session` and `placement.localite.target`, in one of two ways:
 
     - **One run per target** (one transducer): the condition is the target, with the session appended when a subject has the same target in several sessions.
@@ -106,11 +105,11 @@ Ingest the recordings on the Nexus's *Placement ▸ Localite* page or with `neur
 
 PRESTUS reads the ingested markers itself at run time, so no positions are copied into the manifest.
 
-## Targeting accuracy
+## Targeting Accuracy
 
-With `modules.run_targeting_analysis: 1` (default, layered or phantom media, `run_nifti_creation` on), each run writes `sub-XXX_<medium><affix>_targeting.csv` next to its per-subject CSV. The analysis reads the focal-mask NIfTIs and never fails the pipeline; unavailable measures are `NaN`. Targets and ROIs can differ per run: set `analysis.target_mni_mm` or `analysis.target_roi_mni` as manifest columns. With several transducers, the planned focus and beam axis of `transducer(1)` are used.
+With `modules.run_targeting_analysis: 1` (default, layered or phantom media, `run_nifti_creation` on), each run writes `sub-XXX_<medium><affix>_targeting.csv` next to its per-subject CSV. The analysis reads the focal-mask [NIfTIs](https://nifti.nimh.nih.gov/) and never fails the pipeline; unavailable measures are `NaN`. Targets and ROIs can differ per run: set `analysis.target_mni_mm` or `analysis.target_roi_mni` as manifest columns. With several transducers, the planned focus and beam axis of `transducer(1)` are used.
 
-??? note "Details: targeting CSV columns"
+??? note "Targeting CSV columns"
     | Columns | Meaning |
     |---|---|
     | `condition`, `placement_mode`, `target_label`, `transducer_name`, `n_transducers`, `focal_distance_ep_planned_mm`, `target_isppa_wcm2` | The run's settings, shown in the report's study design table. |
@@ -126,9 +125,9 @@ With `modules.run_targeting_analysis: 1` (default, layered or phantom media, `ru
 
 The same analysis runs post hoc with `targeting_analysis(parameters, 'PlannedFocus', f, 'PlannedTrans', t)` (T1 voxel positions).
 
-## Group MNI maps
+## Group MNI Maps
 
-`prestus_group_report_start` builds these by default (`'Maps', false` to skip). They use each run's MNI NIfTIs and are computed per condition, or across all runs when there are no conditions. `<out>` is `<path.sim>/group/<study.name>/` for a study and `<path.sim>/group/<medium><affix>/` otherwise.
+`prestus_group_report_start` builds these by default (`'Maps', false` to skip), for layered media only (`simulation.medium` containing `layered` in the study or subject config); other media get the report without maps. They use each run's MNI NIfTIs and are computed per condition, or across all runs when there are no conditions. `<out>` is `<path.sim>/group/<study.name>/` for a study and `<path.sim>/group/<medium><affix>/` otherwise.
 
 | File in `<out>/maps/` | Content |
 |---|---|
@@ -138,7 +137,7 @@ The same analysis runs post hoc with `targeting_analysis(parameters, 'PlannedFoc
 
 `<out>/plots/group_<cond>_focal_overlap.png` shows three orthogonal MNI slices through the overlap peak, with the ROI outline, the per-run focal centroids and the targets. The background is the mean MNI-space T1 of the subjects (`<path.seg>/m2m_sub-XXX/toMNI/T1_to_MNI_post-hoc.nii.gz`, when present). Runs whose MNI grid differs from the first run's are skipped with a warning.
 
-## Group HTML report
+## Group HTML Report
 
 ```matlab
 prestus_group_report_start('config/config_pilot.yaml');           % study: runs from the manifest
@@ -154,9 +153,9 @@ prestus_group_report_start(cfg, [], 'Maps', false);                 % report onl
 
 With `modules.generate_group_report: 1`, `prestus_pipeline` rebuilds the subject-mode report after each subject (best-effort, without group maps). Runs started by `prestus_study_start` skip this and build one study report at the end.
 
-The report reads each run's `sub-XXX_<medium><affix>.csv` (last row) and, when present, the targeting sidecar and the per-subject PNGs. Runs without a CSV are listed as missing. It opens with a safety banner for runs above any ITRUSST non-significant-risk reference level, a group safety dashboard, and a per-run filter; condition comparison and targeting sections appear when the study has conditions or targeting sidecars.
+The report reads each run's `sub-XXX_<medium><affix>.csv` (last row) and, when present, the targeting sidecar and the per-subject PNGs. Runs without a CSV are listed as missing. It opens with a safety banner for runs above any [ITRUSST](https://itrusst.org/) non-significant-risk reference level, a group safety dashboard, and a per-run filter; condition comparison and targeting sections appear when the study has conditions or targeting sidecars.
 
-??? note "Details: report sections"
+??? note "Report sections"
     - **Header**: study, manifest, runs, subjects, conditions, missing runs, medium, and a link to the one-row-per-run CSV.
     - **Safety banner**: runs above any ITRUSST non-significant-risk reference level, with links to their rows.
     - **Filter**: checkboxes per run and per-condition buttons. The dashboard, roster and cards update live; box plots and figures show the full set.
@@ -172,5 +171,5 @@ The report reads each run's `sub-XXX_<medium><affix>.csv` (last row) and, when p
     - **Per-run cards**: the run's settings and figures.
     - **Configuration summary**: of the loaded (study) config. Per-run settings are in the study design table.
 
-??? note "Details: deprecated entry points (`prestus_group_start`, `create_group_MNI_plots`)"
+??? note "Deprecated entry points (`prestus_group_start`, `create_group_MNI_plots`)"
     `prestus_group_start` warns and runs `prestus_group_report_start` (group MNI maps + report) instead. Its plot options are ignored; for an ROI, set `analysis.target_roi_mni`. `create_group_MNI_plots` expects an output layout (`parameters.temp_output_dir`, `*_final_intensity_MNI*.nii.gz`, `*_output_table*.csv`) that the pipeline does not write. Its ROI statistics (intensity in the ROI, overlap, centroid distance) are part of the [targeting analysis](#targeting-accuracy), in mm rather than voxels.

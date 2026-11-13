@@ -63,7 +63,7 @@ path:
   pct: ''               # Base output directory for pseudoCT files: <pct>/sub-NNN/. Empty = <parent of seg>/pct/sub-NNN/
                         # (next to the SimNIBS folder; the m2m folders are only read).
   acoustic_input: ''    # Start from a prior pressure map instead of simulating: a peak-pressure NIfTI [Pa] in this
-                        # subject's T1w space, e.g. an earlier run's nii/T1w/*_pressure.nii.gz. Its .json sidecar is
+                        # subject's T1w space, e.g. an earlier run's nii/*_T1w*_pressure.nii.gz. Its .json sidecar is
                         # used to check the settings and rescale to transducer.target_isppa_wcm2; acoustic analysis
                         # and thermal simulation then run as usual. Empty = simulate.
 
@@ -83,7 +83,7 @@ startup:
 
 io:
   output_affix: ''          # Optional affix for output file names; differentiates outputs for the same subject/transducer
-  overwrite_files: always   # 'never' reuse existing files; 'always' overwrite (chained pipelines: re-run output stages, reuse intermediate caches); 'force' also re-run chained intermediate stages; any other value asks for confirmation. See doc_outputs.md#overwrite-behaviour
+  overwrite_files: always   # 'never' reuse existing files; 'always' overwrite (chained pipelines: re-run output stages, reuse intermediate caches); 'force' also re-run chained intermediate stages; any other value asks for confirmation. See doc_outputs_reuse.md#overwrite-behaviour
   cache_signature_check: error # Reused grid/medium/acoustic caches (overwrite_files: never) must match this run's settings: 'error' | 'warn' (reuse anyway) | 'off'
   overwrite_simnibs: 0      # By default, SimNIBS segmentation results are not overwritten, unless enabled here
   # Intermediate matrix saving
@@ -521,10 +521,10 @@ segmentation:
 #------------ Head model processing
 
 headmodel:
-  head_pad_mm: 0      # Symmetric padding applied to the cropped head grid prior to transducer + PML setup [mm]
+  head_pad_mm: 0      # Symmetric padding of the rotated head volume before CSF expansion and cropping [mm]; bowls outside the volume are auto-padded
   csf_expansion: 40   # Dilation of the CSF brain mask into surrounding head regions [mm]; converted to voxels at grid.resolution_mm
   # Thresholds for smoothing masks (and acoustic properties)
-  smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'box']
+  smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'box'|'off' (no smoothing or binarisation)]
   smooth_threshold_skull: 0.5 # (higher threshold -> thinner mask)
   smooth_threshold_other: 0.5 # (higher threshold -> thinner mask)
   smooth_fwhm_mm: 1   # Smoothing FWHM [mm]
@@ -569,11 +569,11 @@ timing:
   pd: 0            # Pulse Duration (PD) [s]
   pri: 0           # Pulse Repetition Interval (PRI) [s]; PRF = 1/pri
   ptd: 0           # Pulse Train Duration (PTD) [s]
-  pt_timestep: 0.02   # Modelling time step within a pulse train [s]
+  pt_timestep: 0.02   # Modelling time step within a pulse train [s]; used with equal_step_duration: 1
   ptri: 0          # Pulse Train Repetition Interval (PTRI) [s]
   ptrd: 0          # Pulse Train Repetition Duration (PTRD) [s]
-  post_ptri_dur: 0 # Post-PTRI steady-state duration [s]
-  post_pt_timestep: 1 # Modelling time step following PT & PTRI [s]
+  post_ptri_dur: 0 # Cooling period after the PTRD [s]
+  post_pt_timestep: 1 # Modelling time step between pulse trains and after the PTRD [s]
   equal_step_duration: 0 # Equal step durations for on and off cycles? 1=yes, 0=no
 
 #------------ Thermal parameters

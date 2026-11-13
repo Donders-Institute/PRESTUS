@@ -1,11 +1,20 @@
 # jwave Acoustic Backend
 
-!!! note "At a glance"
-    - **What:** jwave as an alternative acoustic solver, with a frequency-domain Helmholtz solve for continuous-wave runs.
-    - **When you need it:** To cross-check k-Wave with an independent implementation, or for a fast CW steady-state solve.
-    - **Before you start:** A Python 3.11 environment with `jax`, `jwave`, `h5py` and `numpy` ([Python environment setup](#python-environment-setup)).
+[jwave](https://github.com/ucl-bug/jwave) implements the [k-Wave](https://github.com/ucl-bug/k-wave) acoustic equations independently, in [JAX](https://github.com/jax-ml/jax), so a jwave run of the same setup and tissue properties cross-checks a k-Wave field. Its default Helmholtz solver computes the continuous-wave steady state directly, in one linear solve instead of thousands of time steps. jwave covers the acoustic stage only; the thermal simulation runs in k-Wave.
 
-PRESTUS can run [jwave](https://github.com/ucl-bug/jwave) in place of k-Wave for the acoustic stage. Pre-processing (segmentation, grid, medium masks, placement) and post-processing (focal metrics, NIfTI export, HTML report) run unchanged. jwave (University College London) implements the k-Wave pseudo-spectral equations in [JAX](https://github.com/google/jax), which gives JIT compilation, automatic differentiation and NVIDIA GPU acceleration without compiled MATLAB/C++ binaries. It offers a time-domain solver equivalent to `kspaceFirstOrder*` and a frequency-domain Helmholtz solver that computes the CW steady state directly.
+On this page:
+
+- [Quick Start](#quick-start): selecting the backend, the Python environment and the solver.
+- [Python Environment Setup](#python-environment-setup): installing jwave and JAX for CPU or GPU.
+- [Limitations](#limitations): what jwave does not support.
+- [Solver Options](#solver-options): the Helmholtz, pseudo-spectral and finite-difference solvers, convergence and the density term.
+- [Configuration Reference](#configuration-reference): every `jwave` setting with its default.
+
+!!! note "At a glance"
+    - **When you need it:** To cross-check k-Wave with an independent implementation, or for a fast CW steady-state solve.
+    - **Before you start:** A [Python](https://www.python.org/) 3.11 environment with `jax`, `jwave`, `h5py` and `numpy` ([Python environment setup](#python-environment-setup)).
+
+PRESTUS can run [jwave](https://github.com/ucl-bug/jwave) in place of k-Wave for the acoustic stage. Pre-processing (segmentation, grid, medium masks, placement) and post-processing (focal metrics, [NIfTI](https://nifti.nimh.nih.gov/) export, HTML report) run unchanged. jwave (University College London) implements the k-Wave pseudo-spectral equations in [JAX](https://github.com/google/jax), which gives JIT compilation, automatic differentiation and NVIDIA GPU acceleration without compiled [MATLAB](https://www.mathworks.com/products/matlab.html)/C++ binaries. It offers a time-domain solver equivalent to `kspaceFirstOrder*` and a frequency-domain Helmholtz solver that computes the CW steady state directly.
 
 | | PRESTUS (k-Wave) | jwave |
 |---|---|---|
@@ -13,12 +22,12 @@ PRESTUS can run [jwave](https://github.com/ucl-bug/jwave) in place of k-Wave for
 | **Physics** | Scalar linear acoustic | Scalar linear acoustic |
 | **Skull model** | Scalar ρ, c, α | Scalar ρ, c, α |
 | **Differentiable** | No | Yes (JAX automatic differentiation) |
-| **GPU backends** | CUDA (via MATLAB `gpuArray` or C++ binary) | NVIDIA CUDA only |
+| **GPU backends** | [CUDA](https://developer.nvidia.com/cuda-toolkit) (via MATLAB `gpuArray` or C++ binary) | NVIDIA CUDA only |
 | **Thermal simulation** | Yes (`kWaveDiffusion`) | Not supported |
 
 jwave uses the same scalar acoustic model as k-Wave: no shear waves in bone and no Rayleigh pre-step. The `medium_properties` PRESTUS assigns apply to both equally, so results are directly comparable. See [k-Wave](doc_kwave.md) for the k-Wave backend options.
 
-## Quick start
+## Quick Start
 
 Set three things: the backend, the Python environment and the solver.
 
@@ -56,7 +65,7 @@ parameters.jwave.dry_run         = false;
 
 `python_env` is the path of the CPU environment (its root, its `bin` directory or the Python executable). `python_env_gpu` points to the GPU (CUDA) environment. Leaving both empty falls back to the system `python3`, which is unlikely to have jwave installed. You get a `sensor_data` struct with the same fields as from k-Wave, so all downstream PRESTUS modules work unchanged.
 
-??? note "Details: which environment runs"
+??? note "Which environment runs"
     | `use_gpu` | GPU detected (`nvidia-smi`) | `python_env_gpu` set | Environment used |
     |---|---|---|---|
     | `[]` (auto) | yes | yes | GPU |
@@ -66,9 +75,9 @@ parameters.jwave.dry_run         = false;
     | `true` | – | no | **error** |
     | `false` | – | – | CPU |
 
-## Python environment setup
+## Python Environment Setup
 
-jwave needs a dedicated Python environment. A separate environment avoids version conflicts with other PRESTUS Python tools (BabelBrain, SimNIBS).
+jwave needs a dedicated Python environment. A separate environment avoids version conflicts with other PRESTUS Python tools ([BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain), [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html)).
 
 **1. Create the environment**
 
@@ -111,7 +120,7 @@ which python   # inside the activated environment
 #      /home/user/.venvs/jwave_env/bin/python
 ```
 
-??? note "Details: parallel CPU and GPU environments"
+??? note "Parallel CPU and GPU environments"
     If you work on both CPU and GPU machines (a laptop and an HPC cluster with shared home directories), maintain two environments and point `jwave.python_env` and `jwave.python_env_gpu` to them:
 
     ```bash
@@ -134,50 +143,50 @@ which python   # inside the activated environment
 
 ## Limitations
 
-- **Acoustic only.** jwave has no bio-heat solver. Thermal simulation (`run_heating_sims`) uses k-Wave or BabelBrain.
+- **Acoustic only.** jwave has no bio-heat solver. Thermal simulation (`run_heating_sims`) after a jwave acoustic run uses k-Wave (`thermal_backend: kwave`); BabelBrain thermal requires `acoustic_backend: babelbrain`.
 - **No axisymmetric grids.** jwave requires a full 3-D domain.
-- **GPU: NVIDIA CUDA only.** JAX does not officially support AMD ROCm or Apple Metal. CPU execution works on any platform.
+- **GPU: NVIDIA CUDA only.** JAX does not officially support AMD [ROCm](https://rocm.docs.amd.com/) or Apple [Metal](https://developer.apple.com/metal/). CPU execution works on any platform.
 
-## Solver options
+## Solver Options
 
-### `helmholtz` (default)
+### Helmholtz Solver (Default)
 
 Frequency-domain GMRES solver. It computes the complex pressure field `P(r)` at the drive frequency in a single linear solve instead of thousands of time steps, so it is much faster than `pseudo_spectral` for CW simulations, with equivalent accuracy for monochromatic excitation in lossy tissue. It returns `p_max_all` = |P| [Pa], `p_min_all` = −|P| and `p_final` = Re(P) [Pa]. GMRES convergence is controlled by `jwave.gmres_restart` and `jwave.gmres_maxiter`.
 
 !!! note "Convergence is checked and enforced"
     After every Helmholtz solve, PRESTUS compares the relative GMRES residual (`/diagnostics/residual_norm`) against `jwave.convergence_threshold` (default `0.05`). If the residual exceeds the threshold, the pipeline errors, because an unconverged GMRES iterate is dominated by solver noise rather than physics. The error message gives ranked fixes: revert `gmres_restart`/`gmres_maxiter` to jwave's own defaults rather than enlarging them (a larger restart in single precision can destabilise GMRES); try `precision: double`; check the PML fraction of the domain via `--debug`; only then loosen `gmres_tol`. If you have reviewed the field and diagnostics and accept the residual anyway, set `jwave.ignore_convergence_threshold: true` to downgrade the error to a warning and keep the result.
 
-??? note "Details: how the Helmholtz residual, water attenuation and source are handled"
+??? note "How the Helmholtz residual, water attenuation and source are handled"
     - **Residual.** The residual is computed exactly, by re-evaluating the operator and source scaling of the solve on the solved field (`conservative_residual`, or `compute_helmholtz_residual` for `helmholtz_operator: jwave`, in `run_jwave_sim.py`), so it reflects the true solver error rather than an approximation.
     - **Lossless water.** `alpha_coeff = 0` makes the Helmholtz operator near-singular (purely real wavenumber in the bulk), which stalls GMRES and underestimates peak pressure by ~18%. `run_jwave_sim.py` floors `alpha_coeff` to 0.002 dB/(cm·MHz²), the physical value for distilled water, before building the medium. The effect on the field is negligible (< 0.006 % attenuation over 100 mm at 500 kHz).
     - **Source-amplitude window.** The Helmholtz solver extracts the complex per-voxel drive amplitude via a single-frequency DFT of the CW source signal, restricted to `sensor.record_start_index:end`, the same steady-state window (last N periods, after the wavefront has crossed the domain) that k-Wave and jwave's time-domain solvers use for `p_max_all`/`p_min_all`. `createCWSignals()` applies a startup cosine up-ramp (default 4 periods) to the drive signal; a DFT over the full signal would average that lower-amplitude ramp in with the steady CW cycles and underestimate the drive amplitude. The steady-state window is built from an integer number of samples per period, which also removes most DFT scalloping loss.
-    - **Sources.** Both source paths work: `grid.use_kWaveArray: 1` (band-limited off-grid source, as for k-Wave; recommended, and needed for flat elements) and `0` (`makeBowl`/`makeArc` voxels). The stair-stepped `makeBowl` bowl is ~9 % low in focal pressure in free water at 0.5 mm (ITRUSST BM1). The kWaveArray source reaches jwave as a `CWSourceMatrix` and is written to the HDF5 input in factored form (per-voxel complex amplitude × [cos; −sin] basis), since its BLI weights make every voxel's signal distinct.
+    - **Sources.** Both source paths work: `grid.use_kWaveArray: 1` (band-limited off-grid source, as for k-Wave; recommended, and needed for flat elements) and `0` (`makeBowl`/`makeArc` voxels). The stair-stepped `makeBowl` bowl is ~9 % low in focal pressure in free water at 0.5 mm ([ITRUSST](https://itrusst.org/) BM1). The kWaveArray source reaches jwave as a `CWSourceMatrix` and is written to the HDF5 input in factored form (per-voxel complex amplitude × [cos; −sin] basis), since its BLI weights make every voxel's signal distinct.
 
-#### Density term (`helmholtz_operator`)
+#### Density Term (`helmholtz_operator`)
 
 The default `helmholtz_operator: conservative` solves ρ∇·((1/ρ)∇p) + k²p, with 1/ρ averaged onto the staggered points where ∇p is evaluated (as k-Wave staggers its density), and scales the source by the sound speed at each source voxel (as k-Wave does). `helmholtz_operator: jwave` uses jwave's built-in operator, which writes the density term as ∇²p − ∇ρ·∇p/ρ with a spectral gradient of ρ and scales the source by the minimum sound speed of the medium (`scale_source_helmholtz`). In homogeneous media the two agree.
 
-??? note "Details: why the conservative form is the default"
+??? note "Why the conservative form is the default"
     Across a sharp density jump (water/skull) jwave's built-in form does not enforce continuity of (1/ρ)∂p/∂n and loses energy at every interface. In 1D plane-wave tests against the analytic transmission it gives −19 % through a density-only plate and −26 % through the ITRUSST BM3 cortical plate (6.5 mm) at 0.5 mm, still −17 % at 0.125 mm. Attenuation and sound-speed contrasts alone are reproduced (≤ 3 %). In 3D this showed as PRESTUS jwave fields 23–29 % below the k-Wave reference on ITRUSST BM3–7. The conservative form gives −0.2 % (BM3 plate) and −3 % (BM4 skin + three-layer skull) at 0.5 mm in the same tests.
 
-### `pseudo_spectral`
+### Pseudo-Spectral Solver
 
 Pseudo-spectral symplectic time-domain integrator with the same equations as `kspaceFirstOrder*`. It runs `Nt` time steps with a PML absorbing boundary and records pressure over the last `Nt - record_start_index` steps (the steady-state window). It returns `p_max_all` (peak positive pressure), `p_min_all` (peak negative pressure) and `p_final` (pressure at the final recorded time step), all in Pa. Use it for direct equivalence with k-Wave output or when you need the transient field.
 
-### `finite_differences`
+### Finite-Difference Solver
 
 Finite-difference time-domain solver. `jwave.fd_accuracy` sets the spatial stencil order (default 8).
 
-## Configuration reference
+## Configuration Reference
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `solver` | string | `'helmholtz'` | Solver to use: `'helmholtz'` (default), `'pseudo_spectral'`, or `'finite_differences'` |
 | `precision` | string | `'single'` | Floating-point precision: `'single'` (float32) or `'double'` (float64). Single is faster and sufficient for TUS. |
-| `python_env` | string | `''` | Full path to the **bin directory** of the CPU jwave environment. Empty = system `python3`. |
-| `python_env_gpu` | string | `''` | Full path to the **bin directory** of the GPU (CUDA) jwave environment. Empty = always use CPU env. |
+| `python_env` | string | `''` | Path to the CPU jwave environment: its root, its `bin` directory or the Python executable. Empty = system `python3`. |
+| `python_env_gpu` | string | `''` | Path to the GPU (CUDA) jwave environment: its root, its `bin` directory or the Python executable. Empty = always use CPU env. |
 | `use_gpu` | bool/empty | `[]` | GPU selection override. `[]` = auto-detect via `nvidia-smi`; `true` = force GPU env (errors if `python_env_gpu` unset); `false` = force CPU env. |
-| `dry_run` | bool | `false` | If true, write HDF5 inputs but skip the simulation. The pipeline then stops after the acoustic stage (no analysis, thermal or report) and nothing is cached. Useful for inspecting the grid before running. |
+| `dry_run` | bool | `false` | If true, write [HDF5](https://www.hdfgroup.org/solutions/hdf5/) inputs but skip the simulation. The pipeline then stops after the acoustic stage (no analysis, thermal or report) and nothing is cached. Useful for inspecting the grid before running. |
 | `cleanup_cache` | bool | `true` | Delete the HDF5 input (`*_jwave_input*.h5`, several GB for a head grid) from `io.dir_cache` after a successful run. It is rewritten on every run, so it is never reused. Dry runs and runs that error (e.g. Helmholtz residual above threshold) keep it. |
 | `gmres_restart` | int | `10` | GMRES Krylov subspace size. Matches jwave's own `helmholtz_solver` default. Helmholtz solver only. |
 | `gmres_maxiter` | int | `1000` | Maximum GMRES outer iterations. Matches jwave's own `helmholtz_solver` default. Helmholtz solver only. |
@@ -188,10 +197,10 @@ Finite-difference time-domain solver. `jwave.fd_accuracy` sets the spatial stenc
 | `ignore_convergence_threshold` | bool | `false` | If true, exceeding `convergence_threshold` only warns (and returns the unconverged result) instead of erroring. Helmholtz solver only. |
 | `grid.pml_size` | int/`'auto'` | `'auto'` | PML thickness in grid points (set under `grid:`, not `jwave:`, so both backends read the same field). `'auto'` resolves differently per backend: jwave uses a wavelength-based target of ~2.5λ, not k-Wave's FFT-prime-factorization heuristic (`resolve_jwave_pml_size.m`). |
 
-??? note "Details: how `grid.pml_size: auto` is sized for jwave"
+??? note "How `grid.pml_size: auto` is sized for jwave"
     With `grid.pml_size: auto`, jwave's PML is sized to about 2.5 wavelengths (clipped to [10, 40] grid points), in line with jwave's own example notebooks. The wavelength is taken at the **fastest** sound speed in the medium (`max(medium.sound_speed)`), not the slowest. jwave's Helmholtz PML (`complex_pml_on_grid`) is a fixed function of voxel position: it does not scale with frequency or with the local sound speed, so a given thickness absorbs fewer wavelengths where it borders a fast medium such as skull. On a head-model partial-FOV crop, a 20-voxel (15 mm) PML sized from water (1500 m/s) covered 3.0 wavelengths in water but only 1.8 in skull, and skull bordered most of the transverse boundary. Smoothing the skull/water interface did not reduce the Helmholtz-vs-k-Wave gap, which points to PML coverage rather than interface discontinuities. Sizing from the fastest medium gives every bordering tissue the full target thickness.
 
-??? note "Details: output fields"
+??? note "Output fields"
     `jwave_wrapper` returns a `sensor_data` struct with the same fields as `acoustic_simulation.m`:
 
     | Field | Size | Description |
@@ -202,13 +211,10 @@ Finite-difference time-domain solver. `jwave.fd_accuracy` sets the spatial stenc
     | `jwave_input_h5` | string | Path to the HDF5 file written to `io.dir_cache`; empty once deleted by `cleanup_cache` |
     | `jwave_output_h5` | string | Path to the HDF5 file read from `io.dir_cache` |
 
-??? note "Details: benchmark scripts"
-    Two benchmark scripts are provided in `v05/code/`:
+??? note "Checking the jwave environment"
+    `smoke_test_backends('jwave')` (in `tests/`) checks in under 30 s that jwave and its dependencies import and that the PRESTUS bridge scripts are present, without running a simulation. Run it after changing the Python environment.
 
-    - `benchmark_jwave.m`: staged debug script. Runs five progressive stages: Python environment check → HDF5 write → Python bridge → `jwave_wrapper` → full pipeline. Run stage by stage to isolate where a problem occurs.
-    - `benchmark_jwave_pipeline.m`: single-run pipeline script, mirroring `benchmark_babelbrain_pipeline.m`. Sets `acoustic_backend = 'jwave'` and calls `prestus_pipeline_start` on the testdata subject.
-
-??? note "Details: automatic differentiation"
+??? note "Automatic differentiation"
     Because jwave runs in JAX, the simulation is fully differentiable. This is not exposed through the PRESTUS wrapper but is available by calling `run_jwave_sim.py` directly or extending it. All of the examples below use `jwave` and `jax` directly in Python; no MATLAB changes are needed.
 
     **Sensitivity map**: gradient of focal pressure with respect to every voxel's speed of sound. Cost: one reverse-mode pass, equivalent to a single forward simulation, regardless of grid size.

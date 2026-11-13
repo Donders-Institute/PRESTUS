@@ -1,11 +1,18 @@
 # Heuristic Transducer Placement
 
-!!! note "At a glance"
-    - **What:** An automatic search for a transducer position on the scalp from an MNI target.
-    - **When you need it:** When you have a target but no planned transducer position, e.g. for many subjects at once.
-    - **Before you start:** A SimNIBS segmentation and an MNI target.
+When only a target is known, the transducer position still has to be chosen, and it decides how much skull lies in front of the transducer. `placement.mode: 'heuristic'` searches the skull surface for a transducer position whose geometric focus reaches an MNI target, keeps candidates whose exit plane intersects little skull and selects the one closest to the target. Besides the target and the focal depth (`transducer.focal_distance_ep` or `focal_distance_bowl`), which sets the search radius, no manual input is needed, which suits automatic end-to-end workflows.
 
-`placement.mode: 'heuristic'` searches the skull surface for a transducer position whose geometric focus reaches an MNI target. Besides the target, no manual input is needed, which suits automatic end-to-end workflows.
+On this page:
+
+- [Candidate Table](#candidate-table): the metrics computed for every candidate position.
+- [Ear Exclusion Zones](#ear-exclusion-zones): optionally excluding candidates over the ears.
+- [Position Selection](#position-selection): the selection criteria and the coordinate output.
+- [Placement Figures](#placement-figures): the overview and T1 overlay figures.
+- [Localite Planning Image](#localite-planning-image): a header-adjusted T1 for [Localite](https://www.localite.de/en/).
+
+!!! note "At a glance"
+    - **When you need it:** When you have a target but no planned transducer position, e.g. for many subjects at once.
+    - **Before you start:** A [SimNIBS](https://simnibs.github.io/simnibs/) segmentation, an MNI target and the focal depth (`transducer.focal_distance_ep`).
 
 ```yaml
 placement:
@@ -15,12 +22,11 @@ placement:
     target_name: 'target'         # used in output file names
 ```
 
-The search converts the target to subject space with SimNIBS tools, finds candidate positions on the skull by expanding a sphere, scores each candidate (target distance, intersection with skin, mean and variance of the distances to skin and skull), optionally removes positions over the ears, and selects one position by the criteria below. Candidates and the selected position are written to the [placement run folder](doc_outputs.md#where-outputs-live), `<path.placement>/sub-XXX/heuristic/<target_name>/`; a copy of the selected position also goes to `path.localite_export` when set. All parameters: [overview](doc_parameters.md#placementheuristic).
+The search converts the target to subject space with SimNIBS tools, finds candidate positions on the skull by expanding a sphere, scores each candidate (target distance, intersection with skin, mean and variance of the distances to skin and skull), optionally removes positions over the ears, and selects one position by the criteria below. Candidates and the selected position are written to the [placement run folder](doc_outputs.md#where-outputs-live), `<path.placement>/sub-XXX/heuristic/<target_name>/`; a copy of the selected position also goes to `path.localite_export` when set. All parameters: [overview](doc_parameters.md#heuristic-placement-placementheuristic).
 
-??? note "Details: functions"
 `transducer_positioning` runs the search; `transducer_positioning_start` calls it. Candidate positions come from an expanding sphere on the skull. For each candidate it computes the intersection proportion between the transducer and skin, mean and variance of the distances to skin and skull, and the geometric focus and exit plane positions. Each candidate's exit plane lies `placement.skin_gap_mm` (default 5 mm) off the scalp.
 
-## Candidate table
+## Candidate Table
 
 `tpars_sub-XXX_target.csv` lists every candidate with the columns below. Use it to pick a candidate yourself, e.g. one with `prop_intersect < 0.05` and minimal distance to the target, supported by visual inspection.
 
@@ -40,11 +46,11 @@ The search converts the target to subject space with SimNIBS tools, finds candid
 |`mean_dist_skull`| Mean distance from **all** voxels in the plane to the nearest skull boundary. | Average clearance between the plane and skull. |
 |`var_dist_skull` | Variance of distances to the skull boundary. | Irregularity of skull spacing within the beam footprint. |
 
-## Removing ear locations (optional)
+## Ear Exclusion Zones
 
-Transducer locations over the ears are not wanted. Candidates within `placement.heuristic.ear_radius` (radius of the no-go zone in voxels, default 35) around `left_ear_center` and `right_ear_center` (approximate ear coordinates, voxels) are removed when the centres are set.
+Optional. Transducer locations over the ears are not wanted. Candidates within `placement.heuristic.ear_radius` (radius of the no-go zone in voxels, default 35) around `left_ear_center` and `right_ear_center` (approximate ear coordinates, voxels) are removed when the centres are set.
 
-## Selecting the position
+## Position Selection
 
 The accepted intersection with the skull is set by `placement.heuristic.criterion_intersection`. If no candidate meets it, the criterion is expanded by `expand_step` (default: 1%) until one does. The keys below sit under `placement.heuristic`; an empty value (`[]`, the default) switches a criterion off.
 
@@ -61,7 +67,7 @@ Among the candidates that meet the criteria, the one closest to the target is se
 !!! warning
     Localite mm coordinates assume that the Localite planning image has `canonical_affine_transform` applied (see [Localite planning image](#localite-planning-image)). They are the 0-based voxel indices ([MATLAB](https://www.mathworks.com/products/matlab.html) index − 1) rescaled by the voxel sizes in the header, with no affine transformation. Always verify coordinates visually.
 
-??? note "Details: example coordinate output table"
+??? note "Example coordinate output table"
     ```
     trans_x	161
     trans_y	138
@@ -93,7 +99,7 @@ Among the candidates that meet the criteria, the one closest to the target is se
     ras_targ_z_mm	5.19
     ```
 
-## Plot heuristic transducer position
+## Placement Figures
 
 PRESTUS generates an overview of the selected transducer placement:
 
@@ -103,6 +109,6 @@ If `path.localite_export` is set, a copy of the plot and the position table is a
 
 A T1 overlay plot (`plot_placement_t1_overlay`) is generated after the position is selected. It shows the transducer position and target on orthogonal T1 slices and is written to the subject output folder next to the standard placement figure.
 
-## Save Localite planning image
+## Localite Planning Image
 
 Optional. Localite can struggle with images that contain affine matrices in the image header. With `placement.heuristic.save_localite_t1: true`, PRESTUS writes a header-adjusted T1 planning image for Localite, based on the `T1.nii.gz` in the SimNIBS m2m directory. `path.localite_export` must be set; the image is written as `<path.localite_export>/sub-XXX/sub-XXX_T1_forneuronav.nii`.

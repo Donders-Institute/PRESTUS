@@ -1,12 +1,19 @@
 # Your First Simulation
 
-This page takes you from a fresh installation to a finished simulation and its outputs. It starts in free water (no MRI, no SimNIBS, a few minutes on a CPU) and then points to what changes for a head simulation.
+This page takes you from a fresh installation to a finished simulation and its outputs. It starts in free water (no MRI, no [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html), a few minutes on a CPU) and then points to what changes for a head simulation.
 
-Before you start, install PRESTUS and its MATLAB dependencies ([Installation](doc_installation.md)). SimNIBS is only needed from step 3 on. If terms such as *exit plane*, *ISPPA* or *free-water baseline* are new to you, keep the [glossary](doc_glossary.md) open alongside.
+On this page:
+
+- [1. Run a Free-Water Simulation](#1-run-a-free-water-simulation): a complete run in MATLAB and the files it writes.
+- [2. Use a Transducer From the Library](#2-use-a-transducer-from-the-library): naming a device instead of typing its geometry and drive.
+- [3. Set Up a Head Simulation](#3-set-up-a-head-simulation): the inputs and settings a head simulation adds.
+- [4. Next Steps](#4-next-steps): where to go for study configs, the Nexus and larger studies.
+
+Before you start, install PRESTUS and its [MATLAB](https://www.mathworks.com/products/matlab.html) dependencies ([Installation](doc_installation.md)). SimNIBS is only needed from step 3 on. If terms such as *exit plane*, *ISPPA* or *free-water baseline* are new to you, keep the [glossary](doc_glossary.md) open alongside.
 
 If you prefer forms to code, the [PRESTUS Nexus](doc_nexus.md) builds the same config from a T1 and the defaults, and runs it. The steps below show what the Nexus writes for you.
 
-## 1. A free-water simulation
+## 1. Run a Free-Water Simulation
 
 Free water needs no images: the transducer sits in a homogeneous water grid. The settings below are the ones the pipeline test `tests/test_integration_water.m` runs (a single-element 250 kHz bowl on a small 1 mm grid).
 
@@ -57,9 +64,9 @@ The run takes a few minutes on a CPU. When it finishes, `out/sub-001/` holds the
 
 [Reading your results](doc_results.md) explains what to check first; [Outputs](doc_outputs.md) lists every file and column.
 
-## 2. Use a transducer from the library
+## 2. Use a Transducer From the Library
 
-Real studies rarely type in element geometry and drive. PRESTUS ships an equipment and calibration library: name the transducer and its driving system, set the focal depth and the free-water intensity you want, and PRESTUS fills in geometry, phases and drive. The library is resolved when the config is loaded, so put these keys in a YAML file rather than setting them in MATLAB afterwards:
+Real studies rarely type in element geometry and drive. PRESTUS ships an equipment and calibration library: name the transducer and its driving system, set the focal depth and the free-water intensity you want, and PRESTUS fills in geometry, phases and drive. The library is resolved when the config is loaded, so put these keys in a [YAML](https://yaml.org/) file rather than setting them in MATLAB afterwards:
 
 ```yaml
 # config_first.yaml
@@ -79,21 +86,21 @@ parameters = load_parameters('config_first.yaml', pwd);
 
 With a target ISPPA set, PRESTUS also runs a short free-water baseline and scales the field to that intensity ([ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting)). The available devices, how the library works and how to calibrate your own are described in [Transducer Library](doc_transducer_library.md).
 
-## 3. A head simulation
+## 3. Set Up a Head Simulation
 
 A head (`layered`) simulation adds an MRI, a SimNIBS segmentation and a target. Compared to step 2 you need:
 
 | What | Where it is set | See |
 |---|---|---|
 | T1 (optionally T2/UTE) per subject | `path.anat`, `path.t1_pattern`, `path.t2_pattern` | [Configuring a study](doc_configuration.md) |
-| SimNIBS installation and segmentation folder | `startup.simnibs_bin_path`, `path.seg` | [Installation](doc_installation.md#simnibs-installation) |
+| SimNIBS installation and segmentation folder | `startup.simnibs_bin_path`, `path.seg` | [Installation](doc_installation.md#install-simnibs) |
 | Medium | `simulation.medium: layered` | [Medium Setup](doc_medium.md) |
 | Transducer position and target | `transducer.trans_pos`/`focus_pos`, or a `placement.mode` | [Placement](doc_placement.md) |
 | Sonication protocol (for heating) | `timing.*`, `modules.run_heating_sims: 1` | [Thermal](doc_simulations-thermal.md) |
 
 On the first run PRESTUS runs SimNIBS `charm` (this takes an hour or more); later runs reuse the segmentation unless `io.overwrite_simnibs` is set. To segment first and simulate later, set `modules.segmentation_only: 1`. Head simulations are much larger than step 1: use a GPU (`simulation.code_type: matlab_gpu` or `cpp_gpu`, see [k-Wave](doc_kwave.md)) or a cluster ([HPC](doc_hpc.md)). Thermal simulations are off by default (`modules.run_heating_sims: 0`); switch them on once the acoustic result looks right.
 
-## 4. Next steps
+## 4. Next Steps
 
 - Keep your settings in a project folder and a study config: [Configuring a study](doc_configuration.md).
 - Prefer forms to YAML: [PRESTUS Nexus](doc_nexus.md).
@@ -102,7 +109,7 @@ On the first run PRESTUS runs SimNIBS `charm` (this takes an hour or more); late
 - Many subjects or conditions: [Group analysis](doc_group.md#study-setup).
 - Sweeps over intensities, several transducers, sequences or tissue-property uncertainty: [Advanced modes](doc_advanced.md).
 
-## Demos
+## Demos and Examples
 
 - A simplified 2D benchmarking example: [PRESTUS_2D_demo](https://github.com/jkosciessa/PRESTUS_2D_demo) (runs on a local CPU).
 - A 3D demo on SimNIBS' Ernie head as a [DataLad dataset](https://gin.g-node.org/PRESTUS/sim_ernie/). It was made with an earlier PRESTUS version, but shows one way to organise data.

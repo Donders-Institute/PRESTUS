@@ -1,13 +1,21 @@
 # Configuring a Study
 
+All PRESTUS settings live in [YAML](https://yaml.org/) config files, and the config decides what a run simulates: the head, the transducer and its placement, and the protocol. You never write a complete config: PRESTUS starts from its defaults, and your files contain only what differs. Every parameter is listed in [Parameters](doc_parameters.md).
+
+On this page:
+
+- [How a Config Is Assembled](#how-a-config-is-assembled): the four layers `load_parameters` merges, and how to override settings per run.
+- [Project Config Folder](#project-config-folder): setting up a project folder that pins its defaults.
+- [Example Study Config](#example-study-config): an example config for head simulations.
+- [Configs From Earlier PRESTUS Versions](#configs-from-earlier-prestus-versions): how renamed and retired keys are handled.
+- [Editing Configs With a GUI](#editing-configs-with-a-gui): the Nexus, which writes the same files.
+- [Prompts for Missing Tool Paths](#prompts-for-missing-tool-paths): when PRESTUS asks for missing tool paths.
+
 !!! note "At a glance"
-    - **What:** How PRESTUS combines its defaults, your project defaults, your study files and per-run overrides into one config.
     - **When you need it:** To set up a study, or to change settings for one subject or run.
     - **Before you start:** PRESTUS installed ([Installation](doc_installation.md)).
 
-All PRESTUS settings live in YAML config files. You never write a complete config: PRESTUS starts from its defaults, and your files contain only what differs. This page explains how the files are combined, how to set up a project folder, and how to override settings per run. Every parameter is listed in [Parameters](doc_parameters.md).
-
-## How a config is assembled
+## How a Config Is Assembled
 
 `load_parameters` builds one `parameters` struct from up to four layers, each merged onto the previous one:
 
@@ -28,14 +36,14 @@ parameters = load_parameters('config_projectX.yaml', cfg_dir, ...
 
 The merge is deep: a study file that sets only `grid.resolution_mm` keeps every other `grid` setting at its default.
 
-??? note "Details: merge rules and validation"
+??? note "Merge rules and validation"
     Lists of transducers (`transducer(2)`, …) keep their own fields. One exception: `medium_properties.<tissue>.absorption_fraction` and `absorption_coeff` exclude each other, so a layer that sets one empties the other (see [Heat deposition](doc_simulations-thermal.md#heat-deposition)).
 
     Before merging, keys from earlier PRESTUS versions are converted to their current names ([see below](#configs-from-earlier-prestus-versions)). After merging, `load_parameters` validates the result: it resolves `transducer.serial` against the [transducer library](doc_transducer_library.md), checks the timing protocol and the backend combination, and turns `io.output_affix` into a `_desc-<label>` file-name entity. Keys PRESTUS does not know produce the warning `prestus:unknownConfigKey`, with a suggestion when it looks like a typo.
 
-You can also change the struct in MATLAB after loading (`parameters.subject_id = 2;`), as in [Your first simulation](doc_getting-started.md). The exception is the transducer library keys (`transducer.serial`, `combo`, `library_path`, and the `focal_distance_ep` they resolve phases for): `load_parameters` looks up geometry, phases and drive from them, so set them in a file or as an override rather than in the struct afterwards.
+You can also change the struct in [MATLAB](https://www.mathworks.com/products/matlab.html) after loading (`parameters.subject_id = 2;`), as in [Your first simulation](doc_getting-started.md). The exception is the transducer library keys (`transducer.serial`, `combo`, `library_path`, and the `focal_distance_ep` they resolve phases for): `load_parameters` looks up geometry, phases and drive from them, so set them in a file or as an override rather than in the struct afterwards.
 
-## A project config folder
+## Project Config Folder
 
 Keep your configs in a project folder outside the PRESTUS toolbox, and start it with `prestus_config_init`:
 
@@ -52,10 +60,10 @@ This writes two files:
 
 Load them with `load_parameters('config_projectX.yaml', '/path/to/project/config')`. PRESTUS looks for the project `config_default.yaml` next to the study config, else in the folder you pass, else in the current folder (with the warning `prestus:cwdDefault`).
 
-??? note "Details: updating a project copy of the defaults"
+??? note "Updating a project copy of the defaults"
     When PRESTUS later adds new settings, a project copy made earlier does not contain them. They then take their toolbox default, and `load_parameters` warns (`prestus:staleProjectDefault`). `prestus_config_upgrade(folder)` replaces the copy with the current toolbox default, keeps a dated backup, and can first write the values your copy pinned differently into the study config, so the simulation settings stay the same. The Nexus offers the same under **Tools ▸ Update project defaults…**.
 
-## What a study config usually contains
+## Example Study Config
 
 A study config for head simulations typically sets the paths, the transducer, the placement and the protocol:
 
@@ -95,9 +103,9 @@ modules:
   run_heating_sims: 1
 ```
 
-On a workstation without a job scheduler, also set `platform: matlab`: the default `auto` only detects SLURM or qsub and stops with an error when neither is found. The subject is usually not in the file but set per run (`parameters.subject_id = 3`, an override, or a [study manifest](doc_group.md#study-setup)).
+On a workstation without a job scheduler, also set `platform: matlab`: the default `auto` only detects [SLURM](https://slurm.schedmd.com/) or qsub and stops with an error when neither is found. The subject is usually not in the file but set per run (`parameters.subject_id = 3`, an override, or a [study manifest](doc_group.md#study-setup)).
 
-??? note "Details: where to look next"
+??? note "Where to look next"
     | Topic | Keys | Page |
     |---|---|---|
     | Paths and input images | `path.*`, `startup.*` | [Parameters](doc_parameters.md#data-paths-path) |
@@ -109,11 +117,11 @@ On a workstation without a job scheduler, also set `platform: matlab`: the defau
     | Where and how it runs | `platform`, `hpc.*`, `simulation.code_type`, `acoustic_backend` | [HPC](doc_hpc.md), [Backends](doc_backend.md), [k-Wave](doc_kwave.md) |
     | Output files | `io.*` | [Outputs](doc_outputs.md) |
 
-## Configs from earlier PRESTUS versions
+## Configs From Earlier PRESTUS Versions
 
-Configs written for PRESTUS v0.5.0 or later load as they are. `load_parameters` converts each renamed key to its current name, in every config layer and in the overrides, and lists the conversions in one warning (`prestus:renamedConfigKey`). Update the config with the names from that list; the [Nexus](doc_nexus.md) marks the same keys when you open the file.
+`load_parameters` reads configs written for PRESTUS v0.5.0 or later. It converts each renamed key to its current name, in every config layer and in the overrides, and lists the conversions in one warning (`prestus:renamedConfigKey`); keys without a replacement are dropped. Old keys without an exact counterpart stop the run (see below), as does a layer that sets an old key and its current name to different values (`prestus:configKeyConflict`). Update the config with the names from that list; the [Nexus](doc_nexus.md) marks the same keys when you open the file.
 
-??? note "Details: old keys without a current name"
+??? note "Old keys without a current name"
     A few old keys have no exact counterpart. These stop the run (`prestus:legacyConfigKey`) with a message naming the key to set instead:
 
     | Old key | Set instead |
@@ -126,15 +134,13 @@ Configs written for PRESTUS v0.5.0 or later load as they are. `load_parameters` 
 
     A config that sets an old key and its current name to different values also stops the run. Conversion covers names only: defaults that changed since your config was written (for example `transducer.target_isppa_wcm2`) apply unless the config sets them, as listed in the [changelog](CHANGELOG.md). `calibration.skip_front_peak_mm` kept its name but is now measured from the exit plane rather than the bowl apex.
 
-## Editing configs with a GUI
-
 Two front ends write the same YAML files:
-
 - the [PRESTUS Nexus](doc_nexus.md) (experimental), a desktop app that also checks the config as you type and shows a placement viewer, and
 - the [MATLAB GUI](doc_gui.md) (`prestus_gui`, deprecated).
+## Editing Configs With a GUI
 
 Both write only the values that differ from the defaults, so their files load with `load_parameters` like hand-written ones.
 
-## Missing tools and prompts
+## Prompts for Missing Tool Paths
 
 Missing tool paths (`startup.simnibs_bin_path`, `hpc.ld_library_path`) only prompt for input in an interactive MATLAB desktop session with `simulation.interactive: 1`. Otherwise PRESTUS warns and continues, so batch and cluster runs never wait on a dialog.

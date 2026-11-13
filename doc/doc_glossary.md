@@ -1,8 +1,16 @@
 # Glossary
 
-The terms the PRESTUS documentation uses, grouped by topic. For the overall workflow see [Concepts](doc_concepts.md).
+This page defines the terms the PRESTUS documentation uses, grouped by topic; for the overall workflow see [Concepts](doc_concepts.md).
 
-## Transducer and equipment
+On this page:
+
+- [Transducer and Equipment](#transducer-and-equipment): the device and its driving system, reference points on the bowl, focal depth and calibration.
+- [Intensity and Safety Metrics](#intensity-and-safety-metrics): free-water and in-situ intensity, MI, temperature rise, CEM43 and the [ITRUSST](https://itrusst.org/) levels.
+- [Head Model](#head-model): segmentation, media and their properties, pseudo-CT, placement modes and coordinate spaces.
+- [Simulation](#simulation): solvers, grid and sampling, the sonication protocol and where a run executes.
+- [Files and Runs](#files-and-runs): study config, output affix, cache and study manifest.
+
+## Transducer and Equipment
 
 Transducer
 :   The device that emits the ultrasound. PRESTUS models focused, bowl-shaped transducers.
@@ -14,7 +22,7 @@ Matrix array
 :   A transducer made of many small elements that can steer the focus in 3D.
 
 Driving system
-:   The electronics that drive the transducer (e.g. Sonic Concepts TPO, IGT). The same transducer behaves slightly differently with different driving systems, so calibrations are per transducer and driving-system pair.
+:   The electronics that drive the transducer (e.g. [Sonic Concepts](https://sonicconcepts.com/) TPO, IGT). The same transducer behaves slightly differently with different driving systems, so calibrations are per transducer and driving-system pair.
 
 Serial, combo
 :   The identifiers of a transducer (`transducer.serial`) and its driving system (`transducer.combo.ds_serial`) in the shipped [transducer library](doc_transducer_library.md). Setting them fills in geometry, phases and drive.
@@ -40,7 +48,7 @@ FLHM
 Calibration
 :   Fitting the phases and drive of the simulated transducer so that its field in water matches measurements (hydrophone profiles) of the real device. See [Calibration](doc_calibration.md).
 
-## Intensity and safety metrics
+## Intensity and Safety Metrics
 
 Free water
 :   A simulation in water only, without a head. Measurements and manufacturer specifications refer to free water.
@@ -58,7 +66,7 @@ In situ
 :   In the tissue, after the skull. The in-situ intensity at the target is usually much lower than the free-water value, mainly because of the skull.
 
 Ipa, Ita
-:   Pulse-average and time-average intensity at a location. Ita includes the off-time of the protocol (the duty cycle). See [Outputs](doc_outputs.md#intensity-nomenclature).
+:   Pulse-average and time-average intensity at a location. Ita includes the off-time of the protocol (the duty cycle). See [Outputs](doc_outputs_metrics-table.md#intensity-nomenclature).
 
 MI
 :   Mechanical index, a measure of the risk of cavitation (peak negative pressure in MPa divided by the square root of the frequency in MHz). `MI_tc` is the transcranial MI inside the skull.
@@ -72,10 +80,10 @@ CEM43
 ITRUSST
 :   The International Transcranial Ultrasonic Stimulation Safety and Standards consortium. Its consensus documents define the non-significant-risk (NSR) levels the PRESTUS report compares against (e.g. MI ≤ 1.9, temperature rise ≤ 2 °C). See [Reading your results](doc_results.md).
 
-## Head model
+## Head Model
 
 Segmentation
-:   Dividing the MRI into tissue types. PRESTUS uses SimNIBS `charm`.
+:   Dividing the MRI into tissue types. PRESTUS uses [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html) [`charm`](https://simnibs.github.io/simnibs/build/html/documentation/command_line/charm.html).
 
 m2m folder
 :   The SimNIBS output folder of a subject (`m2m_sub-XXX`, under `path.seg`). PRESTUS reads it but never writes into it.
@@ -97,8 +105,8 @@ Voxel, RAS, MNI
 
 ## Simulation
 
-k-Wave
-:   The open-source acoustic simulation toolbox that PRESTUS uses by default. BabelBrain and jwave are alternatives ([Backends](doc_backend.md)).
+[k-Wave](https://github.com/ucl-bug/k-wave)
+:   The open-source acoustic simulation toolbox that PRESTUS uses by default. [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) and [jwave](https://github.com/ucl-bug/jwave) are alternatives ([Backends](doc_backend.md)).
 
 Grid
 :   The 3D box of points on which the simulation is computed. `grid.resolution_mm` is the spacing between points: finer grids are more accurate but slower and need more memory.
@@ -119,15 +127,15 @@ Sonication protocol (`timing.*`)
 :   How the ultrasound is switched on and off: pulse duration (PD), pulse repetition interval (PRI), pulse train duration (PTD) and its repetitions (PTRI, PTRD). Needed for thermal simulations.
 
 `code_type`
-:   Which k-Wave implementation runs the simulation: MATLAB or C++, on CPU or GPU. A GPU makes head simulations much faster.
+:   Which k-Wave implementation runs the simulation: [MATLAB](https://www.mathworks.com/products/matlab.html) or C++, on CPU or GPU. A GPU makes head simulations much faster.
 
 Platform (`platform`)
 :   Where the run happens: in your MATLAB session (`matlab`) or as a job on a cluster (`slurm`, `qsub`). See [Running on a cluster](doc_hpc.md).
 
-## Files and runs
+## Files and Runs
 
 Study config
-:   Your YAML file with the settings that differ from the defaults ([Configuring a study](doc_configuration.md)).
+:   Your [YAML](https://yaml.org/) file with the settings that differ from the defaults ([Configuring a study](doc_configuration.md)).
 
 Output affix (`io.output_affix`)
 :   A label added to output file names, to keep several runs of the same subject apart (it appears as `_desc-<label>`).

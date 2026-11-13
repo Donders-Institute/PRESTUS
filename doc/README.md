@@ -8,42 +8,35 @@ PRESTUS is an open-source MATLAB toolbox for imaging-informed simulations of tra
 
 PRESTUS is intended for basic research. It is not approved for clinical use.
 
-## Where to start
+## Where to Start
 
 New to PRESTUS? Follow these in order:
 
-1. [Concepts](doc_concepts.md): what PRESTUS does, in one picture. Unfamiliar terms are in the [Glossary](doc_glossary.md).
-2. [Installation](doc_installation.md): MATLAB, PRESTUS and k-Wave are enough to begin.
-3. [Your first simulation](doc_getting-started.md): a free-water run in a few minutes, then what a head simulation needs.
-4. [Reading your results](doc_results.md): what to check in the report, and how to read the safety summary.
-5. [Configuring a study](doc_configuration.md): your own config files for your own data.
+<div class="p-list" markdown>
 
-Looking for something specific?
+1. **[Concepts](doc_concepts.md)**: what PRESTUS does, in one picture; terms are in the [Glossary](doc_glossary.md).
+2. **[Installation](doc_installation.md)**: MATLAB, PRESTUS and k-Wave are enough to begin.
+3. **[Your First Simulation](doc_getting-started.md)**: a free-water run in a few minutes, then what a head simulation needs.
+4. **[Reading Your Results](doc_results.md)**: what to check in the report, and how to read the safety summary.
+5. **[Configuring a Study](doc_configuration.md)**: config files for your own data, or a form in the [PRESTUS Nexus (GUI)](doc_nexus.md).
 
-| I want to… | Go to |
-|---|---|
-| simulate a transducer I own | [Transducer Library](doc_transducer_library.md) |
-| decide where the transducer goes | [Placement](doc_placement.md) |
-| simulate heating for my protocol | [Thermal](doc_simulations-thermal.md) |
-| simulate a pose recorded with Localite | [Localite placement](doc_placement_neuronav.md) |
-| use subject-specific skull properties | [pseudo-CT](doc_pseudoCT.md) |
-| run many subjects | [Studies & group analysis](doc_group.md) |
-| run on a cluster | [Running on a cluster](doc_hpc.md) |
-| build a config with a form instead of YAML | [PRESTUS Nexus](doc_nexus.md) |
-| look up a setting | [Parameters](doc_parameters.md) |
-| fix an error | [Troubleshooting](doc_troubleshooting.md) |
+</div>
 
-## What PRESTUS does
+## What PRESTUS Does
 
-- [Segmentation](doc_preproc.md) of the T1 (and T2 or UTE) image with SimNIBS `charm`, and preprocessing into a simulation grid.
-- [Medium mapping](doc_medium.md) of water, skin, skull (cortical and trabecular) and brain, optionally with a [(pseudo-)CT](doc_pseudoCT.md) for continuous skull properties.
-- A [transducer library](doc_transducer_library.md) with calibrated phases and drive for the devices in use at the Donders Institute, and [calibration](doc_calibration.md) of your own against hydrophone profiles.
-- [Placement](doc_placement.md) by typed coordinates, MNI coordinates, automatic search, or a pose recorded with neuronavigation.
-- [Acoustic](doc_simulations-acoustic.md) and [thermal](doc_simulations-thermal.md) simulation of a sonication protocol, with k-Wave, [BabelBrain or jwave](doc_backend.md) as the engine.
-- [Outputs](doc_outputs.md): a metrics table, NIfTI maps in subject and MNI space, and an HTML report with ITRUSST safety reference levels and a methods paragraph.
-- [Cluster](doc_hpc.md) execution with SLURM or qsub, and [group](doc_group.md) reports across subjects.
+<div class="p-list" markdown>
 
-A recent overview poster can be found [here](https://jkosciessa.github.io/downloads/2025-FUN25-PRESTUS.pdf).
+- **[Segmentation and Preprocessing](doc_preproc.md)**: the T1 (and T2 or UTE) image segmented with SimNIBS `charm`, then preprocessed into a simulation grid.
+- **[Medium](doc_medium.md)**: water, skin, skull (cortical and trabecular) and brain, optionally with a [(pseudo-)CT](doc_pseudoCT.md) for continuous skull properties.
+- **[Transducers](doc_transducer_library.md)**: a library with calibrated phases and drive for the devices in use at the Donders Institute, and [calibration](doc_calibration.md) of your own against hydrophone profiles.
+- **[Placement](doc_placement.md)**: typed coordinates, MNI coordinates, automatic search, or a pose recorded with neuronavigation.
+- **[Acoustic](doc_simulations-acoustic.md) and [Thermal](doc_simulations-thermal.md) Simulation**: a sonication protocol, with k-Wave, [BabelBrain or jwave](doc_backend.md) as the engine.
+- **[Outputs](doc_outputs.md)**: a metrics table, NIfTI maps in subject and MNI space, and an HTML report with ITRUSST safety reference levels and a methods paragraph.
+- **[Clusters](doc_hpc.md) and [Groups](doc_group.md)**: execution with SLURM or qsub, and group reports across subjects.
+
+</div>
+
+To look up a setting, see [Parameters](doc_parameters.md); for an error message, see [Troubleshooting](doc_troubleshooting.md). A recent overview poster can be found [here](https://jkosciessa.github.io/downloads/2025-FUN25-PRESTUS.pdf).
 
 ## Versions
 
@@ -55,7 +48,7 @@ If you use PRESTUS for a publication, please cite:
 
 > Kosciessa, J. Q., Chetverikov, A., Cornelissen, M., van der Zee, K., Carpino, E., Wimmers, M., Adelhöfer, N., Meijer, S., & Verhagen, L. (2026). PRESTUS (0.6.0). Zenodo. https://doi.org/10.5281/zenodo.15095860
 
-## License and disclaimer
+## License and Disclaimer
 
 Released under the GNU General Public License v3.0 (see LICENSE). To help develop PRESTUS, see [Contributing](CONTRIBUTING.md).
 
