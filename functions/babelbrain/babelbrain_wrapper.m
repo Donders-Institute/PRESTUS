@@ -157,6 +157,7 @@ bb = apply_default(bb, 'device_name',        'auto');
 bb = apply_default(bb, 'ppw',                12);
 bb = apply_default(bb, 'do_refocusing',      false);
 bb = apply_default(bb, 'tight_narrow_beam',  []);   % [] = auto (off unless no FOV crop AND explicitly requested); see below
+bb = apply_default(bb, 'z_beyond_focus_mm',  40);
 % Focal calibration: choose the geometric steer so the achieved FWHM-centre
 % (or peak) lands at focal_distance_ep, rather than steering geometrically to
 % focal_distance_ep directly (which places the peak proximal via the diffraction
@@ -197,7 +198,7 @@ else
     tight_narrow_beam = false;   % default: full (non-narrow) domain, so the pre-focal field is emitted
 end
 
-z_beyond_focus_mm = 40;
+z_beyond_focus_mm = bb.z_beyond_focus_mm;
 if tight_narrow_beam
     fprintf(['[babelbrain_wrapper] BabelBrain narrow-beam domain ENABLED (babelbrain.tight_narrow_beam=true): ' ...
         'z_beyond_focus=%.1f mm. NOTE: the pre-focal field is not emitted -- the returned axial profile will be ' ...

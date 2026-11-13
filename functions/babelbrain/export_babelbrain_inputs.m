@@ -80,6 +80,7 @@ if isfield(parameters, 'babelbrain')
     bb = parameters.babelbrain;
 end
 bb = apply_default(bb, 'tx_system',          '');
+bb = apply_default(bb, 'z_beyond_focus_mm',  40);
 bb = apply_default(bb, 'computing_backend',   3);
 bb = apply_default(bb, 'device_name',         'Apple');
 bb = apply_default(bb, 'ppw',                 6);
@@ -95,14 +96,13 @@ end
 tight_narrow_beam = ~isempty(fov_len_mm);
 if tight_narrow_beam
     focal_depth_mm = 0;
-    if isfield(parameters, 'transducer') && isfield(parameters.transducer(1), 'focal_distance_mm')
-        focal_depth_mm = parameters.transducer(1).focal_distance_mm;
-    elseif isfield(parameters, 'transducer') && isfield(parameters.transducer(1), 'focal_distance_ep')
+    if isfield(parameters, 'transducer') && isfield(parameters.transducer(1), 'focal_distance_ep') && ...
+            ~isempty(parameters.transducer(1).focal_distance_ep)
         focal_depth_mm = parameters.transducer(1).focal_distance_ep;
     end
-    z_beyond_focus_mm = max(40, fov_len_mm - focal_depth_mm);
+    z_beyond_focus_mm = max(bb.z_beyond_focus_mm, fov_len_mm - focal_depth_mm);
 else
-    z_beyond_focus_mm = 40;
+    z_beyond_focus_mm = bb.z_beyond_focus_mm;
 end
 bb = apply_default(bb, 'tx_mech_adjust_z_m',  0.0);
 

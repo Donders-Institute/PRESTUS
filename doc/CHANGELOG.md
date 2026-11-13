@@ -178,6 +178,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - **k-Wave elastic** (`acoustic_backend: kwave_elastic`, *draft*, not validated): shear waves in the skull with properties from the new `elastic:` section; MATLAB CPU/GPU, no axisymmetric grids
 - Backend settings are validated at config load; the HTML report has backend sections and backend-specific methods text
 
+- Fixed: `babelbrain.z_beyond_focus_mm` was ignored (40 mm was always used)
 #### Advanced modes (uncertainty, multi-ISPPA, sequential)
 - Uncertainty composes with multi-ISPPA sweeps and async multi-transducer runs, with one report per sweep point; uncertainty is the outer mode on every platform
 - Uncertainty mode runs five variants: default, Temp-H / Temp-L (the ITRUSST tissue-property bounds that maximise / minimise brain heating) and Trans-H / Trans-L (the acoustic bounds that maximise / minimise brain intensity; acoustic only). See [doc_uncertainty.md](doc_uncertainty.md)

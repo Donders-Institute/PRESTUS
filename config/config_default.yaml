@@ -448,14 +448,14 @@ grid:
                                 #   Same free-water ISPPA and focus as [144, 144, 400] (k-Wave drive benchmark, 2026-10).
                                 #   A matrix transducer placed by trans_pos/focus_pos (grid indices) keeps [144, 144, 400].
   # water_margin_mm: 5      # Lateral margin on each side of the aperture when default_dims='auto' [mm].
-  # z_beyond_focus_mm: 40   # Extra axial length beyond the focal depth when acoustic_fov_length_mm='auto' or default_dims='auto' [mm].
+  # z_beyond_focus_mm: 40   # Extra axial length beyond the focus when acoustic_fov_length_mm='auto' or default_dims='auto' [mm].
   #                          # Default 40 mm, matching BabelBrain conventions.  Override to extend or
   #                          # shorten the acoustic-only sub-grid along the beam axis.
   # acoustic_fov_diameter_mm: []  # Lateral diameter of the beam-axis-aligned acoustic sub-grid [mm].
   #                               # 'auto' → outermost element diameter of transducer(1).
   #                               # Set to a number to restrict the acoustic sim to a smaller lateral FOV.
   # acoustic_fov_length_mm: []    # Axial length of the acoustic sub-grid [mm].
-  #                               # 'auto' → focal_depth + z_beyond_focus_mm.
+  #                               # 'auto' → bowl apex (trans_pos) to focus distance + z_beyond_focus_mm.
   # thermal_use_acoustic_fov: 0   # 1 = thermal simulation also runs within the acoustic FOV (faster,
   #                               # less accurate cooling boundary). 0 = thermal uses the full grid (default).
   # thermal_resolution_mm: []     # Override grid resolution for thermal simulation only [mm].
