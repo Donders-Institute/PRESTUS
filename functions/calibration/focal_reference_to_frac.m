@@ -5,7 +5,7 @@ function frac = focal_reference_to_frac(focal_reference)
 % settings using different axial-profile conventions. This maps the
 % human-readable convention name (as set in calibration.focal_reference)
 % to the intensity fraction of the profile peak used to find the FLHM
-% (full-length-at-half-maximum) span in COMPUTE_FLHM_CENTER / COMPUTE_FOCAL_METRICS.
+% (focal length at half maximum) span in COMPUTE_FLHM_CENTER / COMPUTE_FOCAL_METRICS.
 %
 % Use as:
 %   frac = focal_reference_to_frac(focal_reference)

@@ -260,7 +260,7 @@ The following documents the functions provided in PRESTUS.
 | `find_sidecar`                          | JSON sidecar of a data file: same name with .json (BIDS convention) |
 | `get_crop_dims`                         | Computes cropping dimensions for a 3D image with a margin. |
 | `get_field`                             | Value of a (nested) struct field, or a default when it is missing |
-| `get_flhm_center_position`              | Calculates the center position of the full-length half-maximum (FLHM). |
+| `get_flhm_center_position`              | Calculates the center position of the focal length at half maximum (FLHM). |
 | `get_nonempty_field`                    | Value of a (nested) struct field, or a default when it is missing or empty |
 | `get_output_dir`                        | Derive the simulation output directory from parameters |
 | `get_pct_dir`                           | Per-subject pseudo-CT folder |

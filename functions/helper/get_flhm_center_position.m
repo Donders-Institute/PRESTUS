@@ -1,5 +1,5 @@
 function [flhm_center, flhm_center_index] = get_flhm_center_position(x, y)
-% GET_FLHM_CENTER_POSITION  Compute the centre of the full-length half-maximum (FLHM)
+% GET_FLHM_CENTER_POSITION  Compute the centre of the focal length at half maximum (FLHM)
 %
 %   Locates the FLHM region (where y >= half-max) and returns the midpoint
 %   between the left and right FLHM crossing positions, along with its index.

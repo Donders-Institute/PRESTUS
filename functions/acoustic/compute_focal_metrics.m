@@ -58,7 +58,7 @@ function fm = compute_focal_metrics(acoustic_Ipa, peak_Isppa, region_mask, trans
 %     centroid_3dB_dist_mm  distance from reference point to −3 dB centroid [mm]
 %     flhm_center_vox       [1×3] voxel coords of the FLHM centre (on-axis)
 %     flhm_center_dist_mm   distance from reference point to the FLHM centre [mm]
-%     flhm_span_mm          axial full-length-at-half-maximum, at the
+%     flhm_span_mm          axial focal length at half maximum, at the
 %                           configured focal_reference threshold [mm]
 %     flhm_truncated        true if the FLHM span hit the grid boundary
 %                           (FLHM centre then unreliable — enlarge the FOV)

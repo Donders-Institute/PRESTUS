@@ -1,7 +1,7 @@
 function [D_star_ep_mm, diag] = calibrate_focal_steering(tr, target_ep_mm, parameters, opts)
-% CALIBRATE_FOCAL_STEERING  Analytical steer that lands the FWHM/peak at a target
+% CALIBRATE_FOCAL_STEERING  Analytical steer that lands the FLHM centre/peak at a target
 %
-% PRESTUS specifies a focal depth (focal_distance_ep) as the FWHM/FLHM-centre of
+% PRESTUS specifies a focal depth (focal_distance_ep) as the FLHM centre of
 % the achieved field.  Steering, however, is geometric: focusing geometrically
 % at depth D produces an intensity peak proximal to D (diffraction focal shift)
 % and an FLHM-centre near D.  To place the achieved FLHM-centre (or peak) exactly
@@ -22,7 +22,7 @@ function [D_star_ep_mm, diag] = calibrate_focal_steering(tr, target_ep_mm, param
 %   tr            - single transducer struct (parameters.transducer(1) style):
 %                   uses tr.freq_hz and tr.annular.{elem_n, elem_id_mm,
 %                   elem_od_mm, curv_radius_mm, dist_geom_ep_mm, elem_p_amp}
-%   target_ep_mm  - desired FWHM-centre (or peak) depth from the exit plane [mm]
+%   target_ep_mm  - desired FLHM-centre (or peak) depth from the exit plane [mm]
 %   parameters    - PRESTUS config; uses medium_properties.water.{sound_speed,density}
 %   opts.target   - 'flhm_center' (default) | 'peak'
 %   opts.phases_rad - optional [1xN] fixed drive phases.  When supplied, the

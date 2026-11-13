@@ -82,10 +82,10 @@ function [err, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, param
         % UNIFORM: equal weight everywhere (optimize entire profile)
         weights = ones(size(axial_position));
     elseif weights >= 1
-        % FWHM GAUSSIAN: weights controls narrowness
+        % GAUSSIAN around the FLHM centre: weights controls narrowness
         [~, flhm_center_index] = get_flhm_center_position(axial_position, desired_intensity_curve);
         center_pos = axial_position(flhm_center_index);
-        sigma = center_pos / weights;  % 1=wide FWHM, 10=narrow peak
+        sigma = center_pos / weights;  % 1=wide Gaussian, 10=narrow peak
         weights = normpdf(axial_position, center_pos, sigma);
     end
     % Normalize over the optimization range only (zero weight outside it),

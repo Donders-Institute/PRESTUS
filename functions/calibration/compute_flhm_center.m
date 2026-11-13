@@ -1,5 +1,5 @@
 function [flhm_center, z_first, z_last] = compute_flhm_center(I, z, focal_reference)
-% COMPUTE_FLHM_CENTER  Full-length-half-maximum centre of an axial profile.
+% COMPUTE_FLHM_CENTER  Focal length at half maximum (FLHM) centre of an axial profile.
 %
 %   [flhm_center, z_first, z_last] = compute_flhm_center(I, z)
 %   [flhm_center, z_first, z_last] = compute_flhm_center(I, z, focal_reference)

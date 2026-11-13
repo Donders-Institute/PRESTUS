@@ -12,7 +12,7 @@ function runs = prestus_study_start(study_config, options)
 % session; 'slurm'/'qsub' submit one job per row (or a job graph for
 % uncertainty / multi-ISPPA / async rows). The per-subject automatic group
 % report is switched off for study runs (modules.generate_group_report = 0,
-% unless the manifest sets it); instead the study report
+% applied after the manifest columns; only 'Overrides' can re-enable it); instead the study report
 % (PRESTUS_GROUP_REPORT_START on the study config) is built once at the end:
 % directly on 'matlab', or as a dependent HPC job ('afterany', so it also
 % runs when some subjects fail).
