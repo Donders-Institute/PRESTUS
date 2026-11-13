@@ -17,7 +17,7 @@ prestus_pipeline_start(config_2)
 prestus_pipeline_start(config_3)
 ```
 
-With heat carryover, pass the follow-up configs via `options`:
+With heat carryover, pass the follow-up configs via `options`. The thermal end state is handed over as T1w-space NIfTIs (`*_heating_end`, `*_CEM43_end`, `*_CEM43_iso_end`). Each follow-up resamples them into its own grid with its own transform, so the start state is correct for a follow-up with a different beam axis. The NIfTI stage is enabled for every run in a chain, and dispatch stops with `sequential_pipeline:missingThermalEnd` if a map is missing. It never starts from the water baseline silently.
 
 ```matlab
 sequential_configs.config_2 = config_2;

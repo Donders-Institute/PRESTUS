@@ -6,7 +6,10 @@ Notable changes to this project are documented here.
 
 ## v0.7-pre (development)
 
+**Fixes**
+- Sequential chains: the follow-up's start state is the base run's T1w end map (heating, CEM43, CEM43 ISO), resampled into its own grid. The NIfTI stage is enabled for chained runs, and dispatch errors (`sequential_pipeline:missingThermalEnd`) when a map is missing, instead of starting from the water baseline.
 - `convert_final_to_MNI_simnibs`: `subject2mni` runs one volume at a time in the foreground. A failed conversion now raises `PRESTUS:MNIConversionFailed` and fails the job. The previous background path discarded output and reported success when volumes were missing.
+
 Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibration library with per-depth refinement, partial-FOV acoustic simulations, study manifests with group analysis, and the PRESTUS Nexus as the new configuration and run interface. Placement gains MNI and TUS_entry modes, a placement report and reusable placement runs; pseudo-CT gains new skull mappings and CT calibrations. Several result-changing fixes affect MI, simulation duration, axisymmetric sources, coherent multi-transducer runs, RAS coordinate conversion and Localite placement; check the ⚠️ lines below.
 
 > ⚠️ **Migration note:** Several defaults have changed, and some outputs have moved.

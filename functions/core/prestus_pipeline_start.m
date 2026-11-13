@@ -46,6 +46,12 @@ function [job_id, jobs] = prestus_pipeline_start(parameters, options)
         error('parameters.subject_id must be set before calling prestus_pipeline_start.');
     end
 
+    % A sequential chain hands the thermal end state to the next run as T1w-space
+    % NIfTI maps, which only the NIfTI stage writes. Enable that stage for the base run.
+    if isfield(options, 'sequential_configs')
+        parameters.modules.run_nifti_creation = 1;
+    end
+
     % Ensure helper functions are accessible
     helpers_path = fileparts(mfilename('fullpath'));
     if ~contains(path, helpers_path)

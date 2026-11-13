@@ -69,6 +69,24 @@ end
         sprintf('sub-%03d_%s_T1w%s_CEM43_iso_end.nii.gz', ...
         parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
 
+    % ---- enforce the spatial thermal end maps ----
+    % The follow-up starts from the base run's end state, stored in T1w space.
+    % thermal_simulation.m resamples it into the follow-up grid with the
+    % follow-up's own transform. Without these files the follow-up would start
+    % from the water baseline with no warning, so the dispatch stops instead.
+    end_maps = {sequential_parameters.io.adopted_heatmap, ...
+                sequential_parameters.io.adopted_cem43, ...
+                sequential_parameters.io.adopted_cem43_iso};
+    missing_maps = end_maps(~cellfun(@isfile, end_maps));
+    if ~isempty(missing_maps)
+        error('sequential_pipeline:missingThermalEnd', ...
+            ['Sequential follow-up needs the T1w end-state maps of the completed run, ' ...
+             'but these are missing:\n  %s\nThey are written by the NIfTI stage ' ...
+             '(modules.run_nifti_creation = 1).'], strjoin(missing_maps, sprintf('\n  ')));
+    end
+    % The follow-up must also write its own end maps for any later step in the chain.
+    sequential_parameters.modules.run_nifti_creation = 1;
+
     % ---- affix defaults ----
     seq_suffix = ['_seq', num2str(min(numbers))];
 
