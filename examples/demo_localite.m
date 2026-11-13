@@ -21,13 +21,13 @@ demo_session = 'ses-01';                         % Session identifier (inputs fo
 demo_setup = 'CTX500-026-010_79.6mm';            % Transducer/setup configuration name (suffix of 'config_XXX')
 demo_positions = {'lVS', 'rVS'};                 % Target names of the recorded series 1 and 2
 
-rootpath = '/project/2425122.01/kplan_example/';  % Root directory of data and tools, adjust to your environment
+rootpath = '/path/to/localite_example/';  % Root directory of data and tools, adjust to your environment
 
 % Indicate whether to compute and include MNI-space coordinates (optional)
 mni_coords_requested = 0;
 
 % Define key path structure for data and external
-pn.tuSIM = fullfile('/project/2425122.01/v05/', 'tools', 'PRESTUS');           % PRESTUS toolbox path
+pn.tuSIM = fullfile('/path/to', 'tools', 'PRESTUS');           % PRESTUS toolbox path
 addpath(pn.tuSIM);
 pn.tuSIM_fun = fullfile(pn.tuSIM, 'functions');              % PRESTUS functions path
 addpath(genpath(pn.tuSIM_fun));

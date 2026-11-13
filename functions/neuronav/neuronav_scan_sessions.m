@@ -101,7 +101,7 @@ end
 
 
 function s = label_stem(label)
-% Drop a trailing separator + number ('L_MD_2' -> 'L_MD', 'target 3' -> 'target').
+% Drop a trailing separator + number ('L_M1_2' -> 'L_M1', 'target 3' -> 'target').
     s = regexprep(label, '[_\-\s]+\d+$', '');
     if isempty(s), s = label; end
 end

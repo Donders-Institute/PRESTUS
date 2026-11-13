@@ -334,7 +334,7 @@ placement:
     # --- Automatic mode: ingested markers under path.localite_post (ingested from path.localite_raw on first use) ---
     session: 1        # Session: integer n (-> ses-0n) or 'ses-XX'
     target: ''        # Pick the series by target name (ingested name, or the XML description in file mode); '' = use position.
-                      #   Multi-transducer: one name per transducer, e.g. [L_MD, R_MD] (transducer i uses entry i)
+                      #   Multi-transducer: one name per transducer, e.g. [L_M1, R_M1] (transducer i uses entry i)
     position: 1       # Otherwise: index of the detected series (1-based, after the expected_segment_length filter); one per transducer allowed
     markertype: 'TriggerMarkers'  # DEPRECATED, ignored: the marker type is detected from the files
     # --- Ingestion (neuronav_ingest_markers / neuronav_gui) ---
@@ -426,16 +426,16 @@ placement:
 neuronav:
   coil_map: []      # Multi-coil ingestion: one entry per coil, e.g.
                     #   - coil: 0                 # hardware coil index (TriggerMarkers_Coil<N>)
-                    #     target: 'L_MD'          # one recorded block, or:
-                    #     sequences: [{target: 'R_MD'}, {target: 'R_MD'}]   # several blocks
+                    #     target: 'L_M1'          # one recorded block, or:
+                    #     sequences: [{target: 'R_M1'}, {target: 'R_M1'}]   # several blocks
                     # [] = single-coil ingestion (Coil0, GUMMarkers fallback)
   # --- Target naming (neuronav_name_series; same rule in neuronav_gui and neuronav_ingest_batch) ---
   suggest_names: true       # Name series after the planned target (EntryTarget / GUMMarkers) nearest their beam axis
   axis_tolerance_mm: 10     # Max. distance of that target from the beam axis [mm]
   target_depth_mm: [0, 150] # Accepted target depth along the beam axis [mm]
   target_labels: []         # Label map: planned-target labels as recorded -> study target names, e.g.
-                            #   - target: 'L_PUL'
-                            #     labels: ['LEFT PUL', 'L_P*']   # wildcards * ?, case-insensitive
+                            #   - target: 'L_V1'
+                            #     labels: ['LEFT V1', 'L_V*']   # wildcards * ?, case-insensitive
                             # [] = use the labels as found (list them with neuronav_scan_sessions)
   batch_write: 'all'        # neuronav_ingest_batch: 'all' tracked series, or only 'named' ones
 

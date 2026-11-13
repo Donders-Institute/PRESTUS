@@ -383,7 +383,7 @@ See [doc_placement_neuronav.md](doc_placement_neuronav.md).
     | `enabled` | Load transducer position from Localite neuronavigation files in head preprocessing? | `0` | `1 = yes`, `0 = no`. Older switch; `placement.mode: 'localite'` is the placement-stage equivalent. Both use `neuronav_localite_pose`. |
     | `file` | Single Localite XML (TriggerMarkers, GUMMarkers or InstrumentMarker; type detected). | `''` | File mode. Empty = automatic mode (ingested markers under `path.localite_post`). |
     | `session` | Session of the automatic mode. | `1` | Integer `n` → `ses-0n`, or `'ses-XX'`. |
-    | `target` | Select the series by name. | `''` | Ingested target name (automatic mode) or entry description (file mode). Several transducers: one name per transducer, e.g. `[L_MD, R_MD]` (transducer *i* uses entry *i*); a single name applies to all. |
+    | `target` | Select the series by name. | `''` | Ingested target name (automatic mode) or entry description (file mode). Several transducers: one name per transducer, e.g. `[L_M1, R_M1]` (transducer *i* uses entry *i*); a single name applies to all. |
     | `position` | Otherwise: index of the detected series (1-based, after the `expected_segment_length` filter). | `1` | Automatic mode matches it against `series_index` in the JSON sidecar. Several transducers: one index per transducer, e.g. `[1, 2]`. |
     | `markertype` | **Deprecated, ignored.** | `'TriggerMarkers'` | The marker type is detected from the files. |
     | `loc_folder` | Folder between `ses-XX/` and the Localite export. | `'loc'` | `''` = the export sits directly under `ses-XX/`. |

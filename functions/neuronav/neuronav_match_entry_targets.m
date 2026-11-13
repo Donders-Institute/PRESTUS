@@ -37,7 +37,7 @@ function [localite_mm, localite_vox] = neuronav_match_entry_targets( ...
 %                                      precedence over target_name matching.
 %                                      Required when description conventions
 %                                      differ from target_name (e.g. target
-%                                      'L_MD' described as 'LEFT M Target').
+%                                      'L_M1' described as 'LEFT M1 Target').
 %                                      May be a single char/string, or a cell
 %                                      array of candidate keys when more than
 %                                      one description convention is in use
@@ -69,7 +69,7 @@ for ti = 1:N
     if isfield(tm, 'localite_key') && ~isempty(tm.localite_key)
         raw_keys = tm.localite_key;
     else
-        % Strip trailing numeric disambiguation suffix (e.g. 'L_MD_2' → 'L_MD')
+        % Strip trailing numeric disambiguation suffix (e.g. 'L_M1_2' → 'L_M1')
         raw_keys = regexprep(strtrim(tm.target_name), '_\d+$', '');
     end
     if ischar(raw_keys) || isstring(raw_keys)

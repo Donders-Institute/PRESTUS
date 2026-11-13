@@ -38,10 +38,10 @@ neuronav:
   axis_tolerance_mm: 10
   target_depth_mm: [0, 150]
   target_labels:                   # planned-target labels as recorded -> study target names
-    - target: 'L_PUL'
-      labels: ['LEFT PUL', 'L_PUL*']
-    - target: 'R_PUL'
-      labels: ['RIGHT PUL', 'R_PUL*']
+    - target: 'L_V1'
+      labels: ['LEFT V1', 'L_V1*']
+    - target: 'R_V1'
+      labels: ['RIGHT V1', 'R_V1*']
   batch_write: 'all'               # or 'named'
 ```
 
@@ -59,7 +59,7 @@ Repeated names get `_rep2`, `_rep3`, …; a planned pair that shares its label w
 
 ### The label map (`neuronav.target_labels`)
 
-Operators label planned targets inconsistently across sessions (`LEFT PUL` in one session, `L_PUL_1` in the next). `target_labels` maps recorded labels to the names your study uses. Each entry lists label patterns (`*` and `?` wildcards, case-insensitive); the first matching entry wins; a label that matches no entry is kept as recorded. `neuronav_map_label('L_PUL_1', map)` shows the result for a single label. **When `target_labels` is empty, labels are used as found.**
+Operators label planned targets inconsistently across sessions (`LEFT V1` in one session, `L_V1_1` in the next). `target_labels` maps recorded labels to the names your study uses. Each entry lists label patterns (`*` and `?` wildcards, case-insensitive); the first matching entry wins; a label that matches no entry is kept as recorded. `neuronav_map_label('L_V1_1', map)` shows the result for a single label. **When `target_labels` is empty, labels are used as found.**
 
 To see which labels the data contain, scan all sessions:
 
@@ -158,7 +158,7 @@ A pose aimed at a target missing from the export takes the nearest remaining one
     - A GUMMarkers `EntryTargetPair` series uses its own label; when a pose in the same file matched that label, the pair becomes `<label>_target` and the pose keeps the bare name. Repeated blocks on one target get `_rep2`, `_rep3`, ….
 
 ??? note "Details: single-coil and multi-coil"
-    With the coil table empty, ingest uses the newest non-duplicate `TriggerMarkers_Coil0` file (falling back to `GUMMarkers`) and every detected series becomes a row. With one row per coil, ingest uses `neuronav.coil_map`: it reads one file per coil and keeps one series per target listed for that coil, skipping untracked blocks. For a coil that recorded several blocks, enter comma-separated target names (e.g. `L_MD, L_MD` → `L_MD_1`, `L_MD_2`).
+    With the coil table empty, ingest uses the newest non-duplicate `TriggerMarkers_Coil0` file (falling back to `GUMMarkers`) and every detected series becomes a row. With one row per coil, ingest uses `neuronav.coil_map`: it reads one file per coil and keeps one series per target listed for that coil, skipping untracked blocks. For a coil that recorded several blocks, enter comma-separated target names (e.g. `L_M1, L_M1` → `L_M1_1`, `L_M1_2`).
 
 ### Many sessions
 

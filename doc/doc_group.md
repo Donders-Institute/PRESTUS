@@ -19,7 +19,7 @@ The report and the maps never run simulations; they read the per-run outputs tha
 A study is a normal PRESTUS config (the *study config*) whose `study.manifest` names a table with one row per run. The study config holds everything the runs share. The manifest holds what differs between runs.
 
 ```yaml
-# config_amythal.yaml (study config)
+# config_pilot.yaml (study config)
 path:
   sim: /project/sims
   seg: /project/simnibs
@@ -34,23 +34,23 @@ placement:
   mode: localite
 study:
   manifest: study.tsv      # relative to this config's folder
-  name: amythal            # outputs in <path.sim>/group/amythal/
+  name: pilot            # outputs in <path.sim>/group/pilot/
 ```
 
 ```text
 # study.tsv: one row per run; tab-separated (.tsv) or comma-separated (.csv)
 subject_id  condition  placement.localite.session  placement.localite.target  transducer.target_isppa_wcm2  analysis.target_mni_mm
-1           L_MD       ses-02                      L_MD                                                     [-8, -16, 6]
-1           R_MD       ses-02                      R_MD                                                     [8, -16, 6]
-2           L_MD       ses-02                      L_MD                       20                            [-8, -16, 6]
+1           L_M1       ses-02                      L_M1                                                     [-38, -20, 58]
+1           R_M1       ses-02                      R_M1                                                     [38, -20, 58]
+2           L_M1       ses-02                      L_M1                       20                            [-38, -20, 58]
 ```
 
 ### Running a study
 
 ```matlab
-prestus_study_start('config/config_amythal.yaml', 'DryRun', true)   % load + check every row, print the plan
-prestus_study_start('config/config_amythal.yaml')                   % run / submit all included rows
-prestus_study_start(cfg, 'Subjects', [1 3], 'Conditions', "L_MD")   % a subset
+prestus_study_start('config/config_pilot.yaml', 'DryRun', true)   % load + check every row, print the plan
+prestus_study_start('config/config_pilot.yaml')                   % run / submit all included rows
+prestus_study_start(cfg, 'Subjects', [1 3], 'Conditions', "L_M1")   % a subset
 prestus_study_start(cfg, 'Rows', 1, 'Platform', 'matlab', ...
     'Overrides', {'grid.resolution_mm', 2})                         % quick debug run of one row
 ```
@@ -74,7 +74,7 @@ prestus_study_start(cfg, 'Rows', 1, 'Platform', 'matlab', ...
     | `notes` | Ignored free text (also `note`, `comment`). |
     | any dotted config key | A per-run value, e.g. `placement.localite.target`, `transducer.focal_distance_ep`, `grid.resolution_mm`. Struct arrays take an index: `transducer(2).trans_pos` for the second transducer of a multi-transducer setup. A plain `transducer.x` is only allowed while the config defines one transducer. |
 
-    Cells are parsed like YAML values: `30`, `[-38, 20, 52]`, `L_MD`, `true`. An **empty cell keeps the study value**, and `[]` sets an empty value. Lines starting with `#` are comments. In `.csv` files, quote cells that contain commas: `"[-38, 20, 52]"`. Unknown keys are set anyway, with a warning (a typo guard).
+    Cells are parsed like YAML values: `30`, `[-38, 20, 52]`, `L_M1`, `true`. An **empty cell keeps the study value**, and `[]` sets an empty value. Lines starting with `#` are comments. In `.csv` files, quote cells that contain commas: `"[-38, 20, 52]"`. Unknown keys are set anyway, with a warning (a typo guard).
 
 ### Output names
 
@@ -92,7 +92,7 @@ Each run writes the usual per-subject outputs to `<path.sim>/sub-XXX/`, distingu
 
     `config_default.yaml` < study config < row `config` YAML < manifest columns < `Overrides` of `prestus_study_start` < the run's `subject_id` and output affix
 
-    All of this goes through one `load_parameters` call. Derived values (transducer geometry, thermal timing, …) are therefore computed from the row's own settings. `load_parameters` accepts the same kind of overrides directly: `load_parameters('config.yaml', dir, {'subject_id', 3; 'placement.localite.target', 'L_MD'})`.
+    All of this goes through one `load_parameters` call. Derived values (transducer geometry, thermal timing, …) are therefore computed from the row's own settings. `load_parameters` accepts the same kind of overrides directly: `load_parameters('config.yaml', dir, {'subject_id', 3; 'placement.localite.target', 'L_M1'})`.
 
 ### From Localite ingestion
 
@@ -102,7 +102,7 @@ Ingest the recordings on the Nexus's *Placement ▸ Localite* page or with `neur
     The importer reads what ingestion writes under `path.localite_post`: `neuronav_ingest_summary.csv` and the per-session `InstrumentMarker_*.json` files. It builds rows with `placement.mode = localite`, `placement.localite.session` and `placement.localite.target`, in one of two ways:
 
     - **One run per target** (one transducer): the condition is the target, with the session appended when a subject has the same target in several sessions.
-    - **One run per session** (several transducers): the session's targets are assigned to transducers 1, 2, … as `placement.localite.target: [L_MD, R_MD]`. Order them left first (`L…` before `R…`), alphabetically, or in a given order. Sessions whose target count does not match the configured transducers are skipped and listed. The condition is the session.
+    - **One run per session** (several transducers): the session's targets are assigned to transducers 1, 2, … as `placement.localite.target: [L_M1, R_M1]`. Order them left first (`L…` before `R…`), alphabetically, or in a given order. Sessions whose target count does not match the configured transducers are skipped and listed. The condition is the session.
 
 PRESTUS reads the ingested markers itself at run time, so no positions are copied into the manifest.
 
@@ -141,7 +141,7 @@ The same analysis runs post hoc with `targeting_analysis(parameters, 'PlannedFoc
 ## Group HTML report
 
 ```matlab
-prestus_group_report_start('config/config_amythal.yaml');           % study: runs from the manifest
+prestus_group_report_start('config/config_pilot.yaml');           % study: runs from the manifest
 prestus_group_report_start('config/config_single.yaml');            % no manifest: auto-discover subjects
 prestus_group_report_start('config/config_single.yaml', [1 2 3 5]); % explicit subject list
 prestus_group_report_start(cfg, [], 'Maps', false);                 % report only

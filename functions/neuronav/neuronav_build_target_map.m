@@ -9,7 +9,7 @@ function target_map = neuronav_build_target_map(coil_map)
 %   .coil     - hardware coil index (0-based, matches Localite trigger files)
 %
 % and either:
-%   .target   - target label string for a single sequence (e.g. 'L_MD')
+%   .target   - target label string for a single sequence (e.g. 'L_M1')
 %
 % or:
 %   .sequences - struct array, one element per sequence on this coil, each with:
@@ -17,9 +17,9 @@ function target_map = neuronav_build_target_map(coil_map)
 %
 % Use sequences when a coil records multiple position blocks in a session:
 %   - Same target repeated (e.g. two stim blocks) → names get a _N suffix:
-%       'L_MD', 'L_MD' → 'L_MD_1', 'L_MD_2'
+%       'L_M1', 'L_M1' → 'L_M1_1', 'L_M1_2'
 %   - Different targets (coil repositioned) → names stay distinct:
-%       'R_MD', 'R_PUL' → 'R_MD', 'R_PUL'
+%       'R_M1', 'R_V1' → 'R_M1', 'R_V1'
 %   - Mixed: a target that appears once keeps its bare name; one that
 %     appears multiple times gets _N on all of its occurrences.
 %
@@ -28,14 +28,14 @@ function target_map = neuronav_build_target_map(coil_map)
 %   coil_map(i).sequences(j).localite_key - overrides coil-level key for seq j
 %   Each localite_key may be a single char/string, or a cell array of
 %   candidate keys when more than one EntryTarget description convention is
-%   in use (e.g. {'LEFT P', 'L_P'}) -- neuronav_match_entry_targets tries
+%   in use (e.g. {'LEFT V', 'L_V'}) -- neuronav_match_entry_targets tries
 %   each candidate in order and uses the first that matches.
 %
 % Output:
 %   target_map - struct array with one entry per sequence, fields:
 %                  .series_index  - 1-based position in the flat list
 %                  .transducer_id - hardware coil index (.coil value)
-%                  .target_name   - full label, e.g. 'L_MD' or 'L_MD_2'
+%                  .target_name   - full label, e.g. 'L_M1' or 'L_M1_2'
 %                  .color         - default plot colour (#rrggbb)
 %                  .localite_key  - set from coil_map if present, else ''
 %

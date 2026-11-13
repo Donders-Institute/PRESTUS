@@ -5,8 +5,10 @@ function [target_vox, target_mm, target_source] = neuronav_resolve_target( ...
 % coordinate from the best available source, in order of confidence.
 %
 % Multi-target Localite studies (see doc_placement_neuronav_multitarget.md)
+% Multi-target Localite studies (see doc_placement_neuronav_targets.md#target-coordinates-from-several-sources)
 % need one confirmed brain-target coordinate per named target
 % (e.g. 'L_AMY', 'R_MD') per session. No single source is reliably present
+% (e.g. 'L_DLPFC', 'R_M1') per session. No single source is reliably present
 % for every subject/session, so this tries four, in order, and records
 % which one actually supplied each row:
 %

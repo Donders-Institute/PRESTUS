@@ -152,8 +152,8 @@ end
 
 % -------------------------------------------------------------------------
 function label = display_target_name(name)
-% Convert an internal target_name (e.g. 'L_PUL', 'R_MD_2') into a more
-% readable legend label ('LEFT PUL', 'RIGHT MD (2)'). Cosmetic only -- this
+% Convert an internal target_name (e.g. 'L_V1', 'R_M1_2') into a more
+% readable legend label ('LEFT V1', 'RIGHT M1 (2)'). Cosmetic only -- this
 % is never fed back into EntryTarget matching or any file-naming/lookup
 % logic, which continue to use the original 'L_'/'R_'-prefixed target_name.
     name = char(name);

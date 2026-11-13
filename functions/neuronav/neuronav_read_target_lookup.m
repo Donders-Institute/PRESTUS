@@ -16,7 +16,7 @@ function target_lookup_vox = neuronav_read_target_lookup(lookup_csv, sub_id, tar
 % Lookup CSV format (header row required):
 %   subject_id, target_name, space, x, y, z  [, source_file]
 %     subject_id  - e.g. 'sub-003' (case-insensitive match)
-%     target_name - matches target_map(i).target_name, e.g. 'L_AMY'
+%     target_name - matches target_map(i).target_name, e.g. 'L_DLPFC'
 %                   (case-insensitive match; trailing '_<N>' sequence
 %                   suffixes are NOT stripped -- provide one row per exact
 %                   target_name if a coil has multiple sequences)
@@ -27,8 +27,8 @@ function target_lookup_vox = neuronav_read_target_lookup(lookup_csv, sub_id, tar
 %     x, y, z     - the coordinate, in the space above
 %     source_file - optional, for provenance/audit only; not used here
 %
-% A study builds this CSV with its own helper script (e.g. the amythal
-% study's code/build_target_lookup.m, which parses per-subject/per-target
+% A study builds this CSV with its own helper script (e.g. a
+% build_target_lookup.m in the study's own code, which parses per-subject/per-target
 % planning files into this generic format) -- this function only reads the
 % already-unified table, so it stays study-agnostic.
 %

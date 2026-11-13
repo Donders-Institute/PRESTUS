@@ -17,7 +17,7 @@ function [manifest, info] = study_read_manifest(manifest_path)
 % Every other column is a config key in dotted form (e.g.
 % 'placement.localite.target', 'transducer.target_isppa_wcm2',
 % 'transducer(2).serial'). Cells are parsed as YAML scalars or flow
-% sequences ('30', '[-38, 20, 52]', 'L_MD', 'true'); an empty cell keeps the
+% sequences ('30', '[-38, 20, 52]', 'L_M1', 'true'); an empty cell keeps the
 % study value, '[]' sets an empty value. yes/no/on/off and zero-padded
 % numbers ('001') stay text. Lines starting with '#' are comments.
 %
