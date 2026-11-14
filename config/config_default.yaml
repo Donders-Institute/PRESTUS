@@ -512,6 +512,10 @@ grid:
                            #   'ras_plus' — keep volume in RAS+ orientation; no rotation applied,
                            #     only isotropic rescaling, so every beam is oblique to the grid.
                            #     Not compatible with grid.axisymmetric.
+  focal_axis_min_norm: 0.5 # grid.mode 'focal_axis': if the mean beam axis (beams averaged as axes) is
+                           #   shorter than this, the beams are too spread to average and z follows
+                           #   transducer(1)'s axis. Only reachable with 3+ transducers (two beams
+                           #   always give >= 0.71).
 
 #------------ Segmentation
 

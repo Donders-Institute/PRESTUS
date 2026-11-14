@@ -79,6 +79,14 @@ function [ok, diffs] = check_cache_signature(filename, stored, current, paramete
             ~(isfield(stored, 'grid') && isstruct(stored.grid) && isfield(stored.grid, 'axisym_transposed'))
         current.grid = rmfield(current.grid, 'axisym_transposed');
     end
+    % grid.focal_axis_min_norm joined config_default.yaml later; caches that
+    % predate it were built with the code's built-in 0.5
+    if isfield(current, 'grid') && isstruct(current.grid) && isfield(current.grid, 'focal_axis_min_norm') && ...
+            ~(isfield(stored, 'grid') && isstruct(stored.grid) && isfield(stored.grid, 'focal_axis_min_norm')) && ...
+            isequal(current.grid.focal_axis_min_norm, 0.5)
+        current.grid = rmfield(current.grid, 'focal_axis_min_norm');
+    end
+
 
     diffs = struct_diff_keys(stored, current, '');
     if isempty(diffs)

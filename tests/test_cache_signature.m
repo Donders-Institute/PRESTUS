@@ -32,6 +32,18 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_cache_
             tc.verifyTrue(ok);
         end
 
+        function test_focal_axis_min_norm_legacy_cache(tc)
+            % caches from before grid.focal_axis_min_norm was a default match
+            % its built-in 0.5, but not another value
+            p = tc.params();
+            legacy = cache_signature(p, 'grid');
+            p.grid.focal_axis_min_norm = 0.5;
+            tc.verifyTrue(check_cache_signature('x.mat', legacy, cache_signature(p, 'grid'), p));
+            p.grid.focal_axis_min_norm = 0.3;
+            tc.verifyError(@() check_cache_signature('x.mat', legacy, cache_signature(p, 'grid'), p), ...
+                'prestus:cache:signatureMismatch');
+        end
+
         function test_changed_transducer_position_is_detected(tc)
             p = tc.params(); q = p;
             q.transducer.trans_pos = [10 20 31];

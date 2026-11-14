@@ -229,6 +229,7 @@ fields:
   grid.axisymmetric: {kind: flag}
   grid.axisymmetric_output: {choices: [auto, 2d, 3d]}
   grid.mode: {choices: [focal_axis, transducer_axis, ras_plus]}
+  grid.focal_axis_min_norm: {visible_if: [{key: __n_transducers, not_in: [0, 1, 2]}, {key: grid.mode, in: [focal_axis]}]}
 
   segmentation.use_qform: {kind: flag}
   segmentation.debug: {kind: flag}
@@ -888,6 +889,7 @@ display:
   grid.axisymmetric: {label: Axisymmetric (2-D) simulation}
   grid.axisymmetric_output: {label: Axisymmetric output form}
   grid.mode: {label: Grid orientation}
+  grid.focal_axis_min_norm: {label: Mean-axis spread limit}
   grid.z_beyond_focus_mm: {label: Axial extent beyond the focus}
   grid.acoustic_fov_diameter_mm: {label: Acoustic FOV diameter}
   grid.acoustic_fov_length_mm: {label: Acoustic FOV length}
