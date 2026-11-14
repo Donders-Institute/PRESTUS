@@ -3,34 +3,46 @@ transducer and focus, bowl outline and distance checks (manual placement)."""
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 
 import numpy as np
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QDoubleSpinBox, QFileDialog, QFrame,
                              QHBoxLayout, QLabel, QMenu, QMessageBox, QPushButton, QSlider,
                              QToolButton, QVBoxLayout, QWidget, QWidgetAction)
 
-from .. import checks, neuronav_import as ni, paths, placement as pl
+from .. import checks, multitransducer as mt, neuronav_import as ni, paths, placement as pl
 from ..heuristic_import import candidates as heuristic_candidates, selected as heuristic_selected
 from ..model import TX, ConfigModel, Issue, is_empty
 from ..outputs import dir_placement_run, placement_record
-from . import style
+from . import icons, style
+from .readout import muted, readout, status
 from .empty_state import EmptyStack
+from .ortho_view import load_volume_async
+
+
+class _LoadRelay(QObject):
+    """Hands a finished T1 / segmentation load from the worker thread to the GUI thread."""
+    done = pyqtSignal(object)           # the load's key
 
 try:        # matplotlib is optional: the page explains what is missing
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+    from .mpl_theme import ThemedCanvas as FigureCanvasQTAgg   # drawn in the Nexus theme
     from matplotlib.colors import ListedColormap
     from matplotlib.figure import Figure
+    from matplotlib.lines import Line2D
     HAVE_MPL = True
 except ImportError:          # pragma: no cover
     HAVE_MPL = False
 
 
-def _ok_colour(ok: bool) -> str:
-    """Palette green / red for a check in the info panel (follows dark mode)."""
-    return style.active()["green" if ok else "red"]
+def _mm_status(v: float, warn_below: float | None = None) -> str:
+    """Signed distance [mm], red when negative (amber below warn_below), 'n/a' when unknown."""
+    if not np.isfinite(v):
+        return muted("n/a")
+    level = "bad" if v < 0 else ("warn" if warn_below is not None and v < warn_below else "ok")
+    return status(f"{v:+.1f} mm", level)
 
 
 QC_PATH = "placement viewer"     # Issue.path of the viewer's checks (MainWindow opens the viewer)
@@ -45,6 +57,7 @@ TISSUE = {1: ("white matter", "#f2f2f2"), 2: ("grey matter", "#9e9e9e"), 3: ("CS
 VIEWS = [("Axial", 2, (0, 1)), ("Coronal", 1, (0, 2)), ("Sagittal", 0, (1, 2))]
 AXIS_LABELS = {0: ("L", "R"), 1: ("P", "A"), 2: ("I", "S")}
 _OVERHEAD_FRAC = 0.12          # approx. fraction of row height spent on title/axis-label chrome
+_LEGEND_FRAC = 0.1             # fraction of the figure the marker legend under the slices takes
 
 
 class PlacementPage(QWidget):
@@ -64,7 +77,6 @@ class PlacementPage(QWidget):
         self._slice_ratio: float | None = None       # ideal slice-row height per pixel of width
 
         self._t1_error = ""                          # why the T1 could not be read, if so
-
         v = QVBoxLayout(self)
         title = QLabel("Placement viewer")
         title.setObjectName("CardTitle")
@@ -98,6 +110,8 @@ class PlacementPage(QWidget):
         bar.setSpacing(6)
         self.tx_combo = QComboBox()
         self.tx_combo.setToolTip("The transducer that clicks and the Place actions edit")
+        self.tx_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.tx_combo.setMinimumContentsLength(len("Transducer 10"))     # never clipped
         self.tx_combo.currentIndexChanged.connect(self._select_transducer)
         bar.addWidget(self.tx_combo)
         self.tx_add = QPushButton("+")
@@ -137,6 +151,25 @@ class PlacementPage(QWidget):
             seg.addWidget(b)
         self.rb_focus.setChecked(True)
         bar.addWidget(self.click_mode)
+        bar.addSpacing(10)
+
+        # undo / redo of placement edits (positions, focal depth, mode, FOV, transducers)
+        self._undo: list[dict] = []
+        self._redo: list[dict] = []
+        self._recording = False
+        self.undo_btn = QPushButton(icons.icon("undo"), "")
+        self.undo_btn.setToolTip("Undo the last placement change (Ctrl+Z)")
+        self.undo_btn.clicked.connect(self.undo)
+        self.redo_btn = QPushButton(icons.icon("redo"), "")
+        self.redo_btn.setToolTip("Redo (Ctrl+Shift+Z)")
+        self.redo_btn.clicked.connect(self.redo)
+        for btn, keys in ((self.undo_btn, QKeySequence.StandardKey.Undo),
+                          (self.redo_btn, QKeySequence.StandardKey.Redo)):
+            btn.setProperty("compact", True)
+            btn.setEnabled(False)
+            sc = QShortcut(QKeySequence(keys), self, btn.click)
+            sc.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+            bar.addWidget(btn)
         bar.addSpacing(10)
 
         b_snap = QPushButton("&Snap to scalp")
@@ -180,7 +213,7 @@ class PlacementPage(QWidget):
         self.alpha = QSlider(Qt.Orientation.Horizontal, minimum=0, maximum=100, value=35)
         self.alpha.setMinimumWidth(140)
         self.alpha.setToolTip("Opacity of the tissue segmentation drawn over the T1")
-        self.alpha.valueChanged.connect(self._draw)
+        self.alpha.valueChanged.connect(lambda _v: self._request_draw())
         view.addAction(self._menu_row("Tissue overlay", self.alpha, view))
         self.fov_diam = QDoubleSpinBox(minimum=0, maximum=300, value=0, singleStep=1, suffix=" mm")
         self.fov_diam.setSpecialValueText("auto")
@@ -196,6 +229,14 @@ class PlacementPage(QWidget):
                                 "depth + grid.z_beyond_focus_mm.")
         self.fov_len.editingFinished.connect(self._fov_edited)
         view.addAction(self._menu_row("Acoustic FOV length", self.fov_len, view))
+        view.addSeparator()
+        self.grid_z_action = view.addAction("Grid z axis (grid.mode)")
+        self.grid_z_action.setCheckable(True)
+        self.grid_z_action.setToolTip(
+            "The direction PRESTUS rotates onto the simulation grid's z axis under grid.mode, "
+            "drawn through the mean focus. On by default with more than one transducer. The "
+            "cropped grid box needs the head masks and is only known after preprocessing.")
+        self.grid_z_action.toggled.connect(self._grid_z_toggled)
         view.setToolTipsVisible(True)
         self.view_btn.clicked.connect(lambda: self._popup(view, self.view_btn))
         self._view_menu = view
@@ -249,10 +290,14 @@ class PlacementPage(QWidget):
 
         body = QHBoxLayout()
         if HAVE_MPL:
-            self.fig = Figure(figsize=(9, 3.4), tight_layout=True)
-            self.canvas = FigureCanvasQTAgg(self.fig)
+            self.fig = Figure(figsize=(9, 3.6), tight_layout=True)
+            from .export import subject_stem
+            self.canvas = FigureCanvasQTAgg(self.fig, export_name="placement",
+                                            filename_hint=subject_stem(lambda: self.model, "placement"))
             self.axes = [self.fig.add_subplot(1, 3, i + 1) for i in range(3)]
             self.canvas.mpl_connect("button_press_event", self._clicked)
+            from .tooltip import MarkerTips
+            self.marker_tips = MarkerTips(self.canvas)     # hover a marker: its transducer's name
             self.canvas.mpl_connect("scroll_event", self._scrolled)
             body.addWidget(self.canvas, 3)
         self.info = QLabel()
@@ -260,11 +305,17 @@ class PlacementPage(QWidget):
         self.info.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.info.setMinimumWidth(280)
         self.info.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.info.setToolTip(
+            "Exit plane → scalp: along the beam axis, from the SimNIBS labels.\n"
+            "Rim → scalp: from 36 points on the exit-plane rim along the beam; a negative minimum "
+            "means the transducer cuts into the head, a large SD uneven contact.\n"
+            "Bone on the beam: 37 rays from the aperture (centre + 3 rings) to the target.")
         body.addWidget(self.info, 1)
         cv.addLayout(body, 1)
         self._body = body
-        hint = QLabel("Click a slice to set the chosen point (or just browse); scroll to step "
-                      "through slices. Positions are saved to the study config at once.")
+        hint = QLabel("Click a slice to set the chosen point; scroll to step through slices. "
+                      "Positions are saved to the study config at once. The Beam axis tab shows "
+                      "the medium and the free-water profile along the beam.")
         hint.setObjectName("CardSub")
         hint.setWordWrap(True)
         cv.addWidget(hint)
@@ -311,7 +362,7 @@ class PlacementPage(QWidget):
         rgba = lambda a: f"rgba({col.red()}, {col.green()}, {col.blue()}, {a})"   # noqa: E731
         self.banner_box.setStyleSheet(
             f"QFrame#ViewerBanner {{ background: {rgba(0.10)}; border: 1px solid {rgba(0.45)}; "
-            f"border-left: 4px solid {col.name()}; border-radius: 6px; }}"
+            f"border-radius: 6px; }}"
             f"QFrame#ViewerBanner QLabel {{ color: {c['ink']}; background: transparent; }}")
         self.banner.setText("<br>".join(lines))
         self.banner_box.show()
@@ -353,38 +404,149 @@ class PlacementPage(QWidget):
     def _editable(self) -> bool:
         return self.model.get("placement.mode") in ("manual", None, "") and self._space() in ("voxel", "ras")
 
-    def _load_images(self) -> None:
+    # The T1 and segmentation are read on ortho_view's loader thread (shared cache, one read
+    # per file however many pages ask). refresh() does not wait: it shows 'Loading' and draws
+    # when the read is done. Callers that need the images at once (ensure_images, the Beam
+    # axis and 3D pages, the checks) wait for the same read.
+    _pending_load: tuple | None = None      # (key, {'t1': (path, Future), 'seg': ...})
+    _load_hooked: object = None
+    _t1: pl.Volume | None = None
+    _seg: pl.Volume | None = None
+
+    # Reading t1 / seg waits for a read refresh() started, so every user of the images
+    # (Beam axis, 3D, PlanTUS pages, the checks) sees them as before.
+    @property
+    def t1(self) -> pl.Volume | None:
+        self._finish_load()
+        return self._t1
+
+    @t1.setter
+    def t1(self, vol: pl.Volume | None) -> None:
+        self._t1 = vol
+
+    @property
+    def seg(self) -> pl.Volume | None:
+        self._finish_load()
+        return self._seg
+
+    @seg.setter
+    def seg(self, vol: pl.Volume | None) -> None:
+        self._seg = vol
+
+    def _load_images(self, wait: bool = True) -> None:
         m = self.model
         sid = m.get("subject_id")
         anat, pattern = m.get("path.anat"), m.get("path.t1_pattern")
         seg_root = m.get("path.seg") or anat
         key = (sid, anat, pattern, seg_root)
-        if key == self._loaded_for:
+        if key != self._loaded_for:
+            self._loaded_for = key
+            self.t1 = self.seg = None
+            self._overlay_cache = {}            # per-image caches (keyed by object id) start over
+            self._axes_for = None
+            self._t1_error = ""
+            self._pending_load = None
+            if not isinstance(sid, (int, float)) or is_empty(anat):
+                return
+            futures = {}
+            t1 = pl.find_t1(anat, pattern or "", int(sid))
+            seg = pl.find_segmentation(seg_root, int(sid)) if not is_empty(seg_root) else None
+            for role, path in (("t1", t1), ("seg", seg)):
+                if path is None:
+                    continue
+                try:
+                    futures[role] = (path, load_volume_async(path))
+                except OSError as exc:
+                    if role == "t1":
+                        self._t1_error = f"{path}: {exc}"
+            self._pending_load = (key, futures) if futures else None
+        if self._pending_load is None:
             return
-        self._loaded_for = key
-        self.t1 = self.seg = None
-        self._t1_error = ""
-        if not isinstance(sid, (int, float)) or is_empty(anat):
-            return
-        t1 = pl.find_t1(anat, pattern or "", int(sid))
-        if t1 is not None:
+        key, futures = self._pending_load
+        if wait or all(f.done() for _p, f in futures.values()):
+            self._apply_load()
+        elif self._load_hooked is not key:
+            self._load_hooked = key
+            relay = self.__dict__.get("_relay")
+            if relay is None:
+                relay = self._relay = _LoadRelay(self)
+                relay.done.connect(self._load_done, Qt.ConnectionType.QueuedConnection)
+            for _p, f in futures.values():
+                def done(_f, k=key, r=relay):
+                    try:
+                        r.done.emit(k)
+                    except RuntimeError:          # page closed meanwhile
+                        pass
+                f.add_done_callback(done)
+
+    def _apply_load(self) -> None:
+        """Take the finished (or waited-for) reads of the pending load."""
+        _key, futures = self._pending_load
+        self._pending_load = None
+        for role, (path, fut) in futures.items():
             try:
-                self.t1 = pl.Volume(t1)
-                self.cursor = self.t1.to_ras(np.array(self.t1.shape) / 2)[0]
+                vol = fut.result()
             except Exception as exc:
-                self._t1_error = f"{t1}: {exc}"
-        seg = pl.find_segmentation(seg_root, int(sid)) if not is_empty(seg_root) else None
-        if seg is not None:
-            try:
-                self.seg = pl.Volume(seg)
-            except Exception:
-                self.seg = None
+                if role == "t1":
+                    self._t1_error = f"{path}: {exc}"
+                vol = None
+            if role == "t1":
+                self.t1 = vol
+                if vol is not None:
+                    self.cursor = vol.to_ras(np.array(vol.shape) / 2)[0]
+            else:
+                self.seg = vol
+
+    def _load_done(self, key) -> None:
+        if self._pending_load is None or self._pending_load[0] != key:
+            return                                # applied already, or superseded
+        if all(f.done() for _p, f in self._pending_load[1].values()):
+            self._apply_load()
+            self.refresh()
+
+    def _finish_load(self) -> None:
+        """Wait for a T1 / segmentation read refresh() started (positions need the T1)."""
+        if self._pending_load is not None:
+            self._load_images()
+
+    def images_loading(self) -> bool:
+        """A T1 / segmentation read is still running (refresh shows 'Loading')."""
+        return self._pending_load is not None
 
     def positions(self) -> tuple[np.ndarray | None, np.ndarray | None]:
         """(transducer, focus) in RAS mm for the current transducer, if known."""
         return self._positions_for(self.ti)
 
+    # One draw asks for every transducer's positions and geometry several times, and in the
+    # Localite / heuristic modes each answer reads files on the project volume; so answers
+    # are kept while the model's values, the T1 and the files' refresh() stay the same.
+    _memo_key: tuple | None = None
+
+    def _memo(self, name: str, ti: int | None, compute):
+        key = (repr((self.model.overrides, self.model.tx)), id(self.t1), id(self.seg))
+        if self._memo_key != key:
+            self._memo_key, self._memo_store = key, {}
+        if (name, ti) not in self._memo_store:
+            self._memo_store[(name, ti)] = compute()
+        return self._memo_store[(name, ti)]
+
+    def _forget(self) -> None:
+        """Read positions and geometry again on next use (files may have changed)."""
+        self._memo_key = None
+
     def _positions_for(self, ti: int) -> tuple[np.ndarray | None, np.ndarray | None]:
+        def compute():
+            before = self.position_source
+            trans, focus = self._read_positions(ti)
+            source = self.position_source if self.position_source != before else None
+            self.position_source = before
+            return trans, focus, source
+        trans, focus, source = self._memo("positions", ti, compute)
+        if source is not None:
+            self.position_source = source
+        return (None if trans is None else trans.copy()), (None if focus is None else focus.copy())
+
+    def _read_positions(self, ti: int) -> tuple[np.ndarray | None, np.ndarray | None]:
         """(transducer, focus) in RAS mm for transducer ti, if known.
 
         Manual placement reads transducer.trans_pos/focus_pos directly. Localite and
@@ -392,6 +554,7 @@ class PlacementPage(QWidget):
         ingested markers / the heuristic search) -- for those two modes, fall back to
         what neuronav_gui / transducer_positioning already wrote to disk, so the viewer
         isn't blank for every non-manual mode."""
+        self._finish_load()
         out = []
         for key in ("trans_pos", "focus_pos"):
             v = self.model.get(f"{TX}.{key}", ti)
@@ -482,6 +645,8 @@ class PlacementPage(QWidget):
         return sel.trans_ras, sel.focus_ras
 
     def _write(self, key: str, ras: np.ndarray) -> None:
+        self._finish_load()
+        self._record()
         if self._space() == "ras":
             value = [round(float(c), 2) for c in ras]
         else:
@@ -489,11 +654,88 @@ class PlacementPage(QWidget):
         self.model.set(f"{TX}.{key}", value, self.ti)
         self.changed.emit()
 
+    # ── undo / redo ─────────────────────────────────────────────────────
+    UNDO_TX_KEYS = ("trans_pos", "focus_pos", "focal_distance_ep", "focal_distance_bowl")
+    UNDO_KEYS = ("placement.mode", "grid.acoustic_fov_diameter_mm", "grid.acoustic_fov_length_mm")
+    UNDO_DEPTH = 100
+
+    def _snapshot(self) -> dict:
+        """The placement values: per transducer the positions and focal depth setting, plus
+        the placement mode, the acoustic FOV and the transducer list's length. Only these are
+        restored, so edits on other tabs in between are kept."""
+        m = self.model
+        keys = {}
+        for ti in range(m.n_transducers):
+            for k in self.UNDO_TX_KEYS:
+                path = f"{TX}.{k}"
+                keys[(path, ti)] = (m.is_overridden(path, ti), copy.deepcopy(m.get(path, ti)))
+        for path in self.UNDO_KEYS:
+            keys[(path, 0)] = (m.is_overridden(path), copy.deepcopy(m.get(path)))
+        return {"keys": keys, "tx": copy.deepcopy(m.tx), "tx_as_list": m.tx_as_list, "ti": self.ti}
+
+    @staticmethod
+    def _same(a: dict, b: dict) -> bool:
+        return repr(a["keys"]) == repr(b["keys"]) and len(a["tx"]) == len(b["tx"])
+
+    def _record(self) -> None:
+        """Remember the state before a user action (once per action, however many values it
+        writes); a new action clears the redo history."""
+        if self._recording:
+            return
+        self._recording = True
+        QTimer.singleShot(0, lambda: setattr(self, "_recording", False))
+        self._undo.append(self._snapshot())
+        del self._undo[:-self.UNDO_DEPTH]
+        self._redo.clear()
+        self._update_undo_buttons()
+
+    def _restore(self, snap: dict) -> None:
+        m = self.model
+        if len(snap["tx"]) != m.n_transducers:          # a transducer was added or removed
+            m.tx = copy.deepcopy(snap["tx"])
+            m.tx_as_list = snap["tx_as_list"]
+        for (path, ti), (overridden, value) in snap["keys"].items():
+            if ti >= m.n_transducers:
+                continue
+            if overridden:
+                m.set(path, copy.deepcopy(value), ti)
+            elif m.is_overridden(path, ti):
+                m.reset(path, ti)
+        self.ti = min(snap["ti"], m.n_transducers - 1)
+        self._cursor_set_by_user = False
+        self.changed.emit()
+        self.refresh()
+
+    def _step(self, source: list, target: list) -> None:
+        now = self._snapshot()
+        while source and self._same(source[-1], now):    # actions that changed nothing
+            source.pop()
+        if not source:
+            self._update_undo_buttons()
+            return
+        target.append(now)
+        self._restore(source.pop())
+        self._update_undo_buttons()
+
+    def undo(self) -> None:
+        self._step(self._undo, self._redo)
+
+    def redo(self) -> None:
+        self._step(self._redo, self._undo)
+
+    def _update_undo_buttons(self) -> None:
+        self.undo_btn.setEnabled(bool(self._undo))
+        self.redo_btn.setEnabled(bool(self._redo))
+
     def _bowl(self) -> pl.Bowl | None:
         return self._bowl_for(self.ti)
 
+    def _transducers(self) -> list[dict]:
+        """model.effective_transducers(), merged once per model state."""
+        return self._memo("transducers", None, self.model.effective_transducers)
+
     def _bowl_for(self, ti: int) -> pl.Bowl | None:
-        txs = self.model.effective_transducers()
+        txs = self._transducers()
         return pl.Bowl.from_transducer(txs[ti]) if ti < len(txs) else None
 
     def _heuristic_candidate_points(self) -> tuple[np.ndarray, np.ndarray]:
@@ -532,7 +774,7 @@ class PlacementPage(QWidget):
 
     def _expected_bowl_distance(self, ti: int | None = None) -> float | None:
         ti = self.ti if ti is None else ti
-        tx = self.model.effective_transducers()[ti]
+        tx = self._transducers()[ti]
         bowl = self._bowl_for(ti)
         ep, fb = tx.get("focal_distance_ep"), tx.get("focal_distance_bowl")
         if isinstance(fb, (int, float)) and not isinstance(fb, bool):
@@ -543,16 +785,30 @@ class PlacementPage(QWidget):
 
     # ── refresh ─────────────────────────────────────────────────────────
     def refresh(self) -> None:
+        self._forget()
         self.tx_combo.blockSignals(True)
         self.tx_combo.clear()
-        self.tx_combo.addItems([f"Transducer {i + 1}" for i in range(self.model.n_transducers)])
+        for i in range(self.model.n_transducers):
+            self.tx_combo.addItem(f"Transducer {i + 1}")
+            self.tx_combo.setItemData(i, self.model.transducer_tooltip(i), Qt.ItemDataRole.ToolTipRole)
         self.ti = min(self.ti, self.model.n_transducers - 1)
         self.tx_combo.setCurrentIndex(self.ti)
+        self.tx_combo.setToolTip(f"{self.model.transducer_tooltip(self.ti)}\n"
+                                 "The transducer that clicks and the Place actions edit")
         self.tx_combo.blockSignals(False)
         self.tx_remove.setEnabled(self.model.n_transducers > 1)
-        self._load_images()
+        self._load_images(wait=False)
+        if self._grid_z_user is None:
+            self.grid_z_action.blockSignals(True)
+            self.grid_z_action.setChecked(self.model.n_transducers > 1)
+            self.grid_z_action.blockSignals(False)
 
         self._restyle()
+        if self.images_loading():
+            path = next(iter(self._pending_load[1].values()))[0]
+            self.stack.show_empty("Loading the T1 image…", str(path))
+            self._slice_ratio = None
+            return
         if self.t1 is None:
             self._show_empty()
             self._slice_ratio = None
@@ -567,7 +823,7 @@ class PlacementPage(QWidget):
             if r_trans is not None or r_focus is not None:
                 source = self.position_source or "PRESTUS"
                 msgs.append(f"placement.mode is <b>{mode}</b>: showing the position written by {source} "
-                            "(read-only here — PRESTUS resolves it again at run time).")
+                            "(read-only here; PRESTUS resolves it again at run time).")
             else:
                 level = "warning"
                 where = {"localite": "path.localite_post, placement.localite.session/.target",
@@ -594,13 +850,25 @@ class PlacementPage(QWidget):
         trans, focus = self.positions()
         if focus is not None and not self._cursor_set_by_user:
             self.cursor = focus.copy()
+        if self.window().isVisible() and not self.isVisible():
+            self._stale = True              # another sub-tab is showing: draw when shown
+            return
         self._draw()
+
+    _stale = False
+
+    def showEvent(self, event) -> None:        # noqa: N802
+        super().showEvent(event)
+        if self._stale:
+            self._stale = False
+            self._draw()
 
     @staticmethod
     def _mm_or(v, default: float = 0.0) -> float:
         return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else default
 
     def _fov_edited(self) -> None:
+        self._record()
         self.model.set("grid.acoustic_fov_diameter_mm", self.fov_diam.value() or [])
         self.model.set("grid.acoustic_fov_length_mm", self.fov_len.value() or [])
         self.changed.emit()
@@ -609,14 +877,29 @@ class PlacementPage(QWidget):
     _cursor_set_by_user = False
 
     # ── drawing ─────────────────────────────────────────────────────────
-    def _draw(self) -> None:
+    def _request_draw(self) -> None:
+        """Redraw the slices once control returns to the event loop: a burst of scroll
+        steps or slider moves costs one draw. The readout does not depend on the crosshair,
+        so it is left as it is."""
+        if not hasattr(self, "_draw_timer"):
+            self._draw_timer = QTimer(self, singleShot=True, interval=0)
+            self._draw_timer.timeout.connect(lambda: self._draw(info=False))
+        self._draw_timer.start()
+
+    def _window(self) -> tuple[float, float]:
+        """Display range of the T1 (1st to 99.5th percentile), once per image."""
+        if getattr(self, "_window_for", None) is not self.t1:
+            self._window_for = self.t1
+            self._window_lohi = tuple(np.percentile(self.t1.canon[::4, ::4, ::4], [1, 99.5]))
+        return self._window_lohi
+
+    def _draw(self, info: bool = True) -> None:
         if not HAVE_MPL:
             return
-        for ax in self.axes:
-            ax.clear()
-            ax.set_xticks([])
-            ax.set_yticks([])
+        if hasattr(self, "_draw_timer"):
+            self._draw_timer.stop()                 # this draw covers a pending request
         if self.t1 is None:
+            self._setup_axes()
             self._slice_ratio = None
             self._apply_row_cap()
             self.canvas.draw_idle()
@@ -626,7 +909,7 @@ class PlacementPage(QWidget):
         c = t1.ras_to_canon(self.cursor)[0]
         data = t1.canon
         vs = np.sqrt((t1.canon_affine[:3, :3] ** 2).sum(axis=0))
-        lo, hi = np.percentile(data[::4, ::4, ::4], [1, 99.5])
+        lo, hi = self._window()
         trans, focus = self.positions()
         # One entry per transducer that has a drawable bowl: (is_selected, shapes, trans, focus).
         # Non-selected transducers are drawn dimmed, so a multi-transducer arrangement is visible
@@ -638,7 +921,7 @@ class PlacementPage(QWidget):
             if ti_trans is not None and ti_focus is not None and ti_bowl is not None and \
                     np.linalg.norm(ti_focus - ti_trans) > 0:
                 tx_shapes.append((i == self.ti, ti_bowl.outline(ti_trans, ti_focus - ti_trans),
-                                  ti_trans, ti_focus))
+                                  ti_trans, ti_focus, self.model.transducer_tooltip(i)))
         # Acoustic FOV box of every transducer, each resolved from its own geometry as
         # resolve_acoustic_fov_params.m does; coherent coupling crops to their union,
         # async coupling uses one per transducer (doc_limited_fov.md).
@@ -649,28 +932,34 @@ class PlacementPage(QWidget):
             if ti_trans is not None and ti_focus is not None and ti_diam and ti_len \
                     and np.linalg.norm(ti_focus - ti_trans) > 0:
                 fovs.append((i == self.ti, pl.fov_box(ti_trans, ti_focus, ti_diam, ti_len)))
-        heur_pts, heur_prop = self._heuristic_candidate_points()
+        heur_pts, heur_prop = self._memo("heuristic", None, self._heuristic_candidate_points)
+        grid_z = self._grid_z_line() if self.grid_z_action.isChecked() else None
         row_ratio = 0.0     # tallest per-column (height/width) need across the three views
-        for ax, (title, plane, (h, w)) in zip(self.axes, VIEWS):
+        # The slice images, titles and legend are made once per T1/segmentation and then only
+        # given new data; the markers below are redrawn each time (clearing and rebuilding the
+        # axes cost about as much as rendering them).
+        images = self._setup_axes(lo, hi, vs)
+        alpha = self.alpha.value()
+        for ax, (title, plane, (h, w)), (im, over) in zip(self.axes, VIEWS, images):
             k = int(np.clip(round(c[plane]), 0, data.shape[plane] - 1))
-            sl = np.take(data, k, axis=plane)            # remaining axes in order (h, w)
+            sl = data[(slice(None),) * plane + (k,)]     # a view; remaining axes in order (h, w)
             row_ratio = max(row_ratio, (vs[w] / vs[h]) * (sl.shape[1] / sl.shape[0]))
-            ax.imshow(sl.T, cmap="gray", origin="lower", vmin=lo, vmax=hi,
-                      aspect=vs[w] / vs[h], interpolation="nearest")
-            if self.seg is not None and self.alpha.value() > 0:
-                ax.imshow(self._overlay(plane, k, sl.shape).T, origin="lower",
-                          cmap=_TISSUE_CMAP, vmin=0, vmax=10, alpha=self.alpha.value() / 100,
-                          aspect=vs[w] / vs[h], interpolation="nearest")
-            ax.set_title(f"{title}", fontsize=9)
-            ax.set_xlabel(f"{AXIS_LABELS[h][0]}  ←→  {AXIS_LABELS[h][1]}", fontsize=8)
-            ax.set_ylabel(f"{AXIS_LABELS[w][0]}  ←→  {AXIS_LABELS[w][1]}", fontsize=8)
+            im.set_data(sl.T)
+            if over is not None:
+                over.set_visible(alpha > 0)
+                if alpha > 0:
+                    over.set_data(self._overlay(plane, k, sl.shape).T)
+                    over.set_alpha(alpha / 100)
+            for artist in list(ax.lines) + list(ax.collections):
+                artist.remove()
             ax.axhline(c[w], color="#ffd54f", lw=0.5, alpha=0.6)
             ax.axvline(c[h], color="#ffd54f", lw=0.5, alpha=0.6)
 
             def proj(pts):
                 p = t1.ras_to_canon(pts)
                 return p[:, h], p[:, w]
-            for selected, shapes, s_trans, s_focus in tx_shapes:
+            self.marker_tips.clear(ax)
+            for selected, shapes, s_trans, s_focus, tip in tx_shapes:
                 a = 1.0 if selected else 0.35
                 rim_c, ax_c = ("#e53935", "#e53935") if selected else ("#9e9e9e", "#9e9e9e")
                 x, y = proj(shapes["rim"])
@@ -684,13 +973,17 @@ class PlacementPage(QWidget):
                 for point, colour, marker in ((s_trans, rim_c, "o"), (s_focus, "#1e88e5" if selected else "#9e9e9e", "+")):
                     x, y = proj(point[None])
                     ax.plot(x, y, marker, color=colour, ms=9, mew=2, mfc="none" if marker == "o" else colour, alpha=a)
+                    self.marker_tips.add(ax, x[0], y[0], tip if marker == "o" else f"{tip} · focus")
             for selected, fov in fovs:
                 for edge in fov["edges"]:
                     x, y = proj(edge)
                     ax.plot(x, y, color="#43a047", lw=0.8, ls=(0, (3, 2)), alpha=1.0 if selected else 0.35)
+            if grid_z is not None:
+                x, y = proj(grid_z)
+                ax.plot(x, y, color=style.active()["brand"], lw=1.0, ls=(0, (6, 2, 1, 2)))
             if len(heur_pts):
                 x, y = proj(heur_pts)
-                ax.scatter(x, y, c=heur_prop, cmap="RdYlGn_r", vmin=0, vmax=0.3, s=8,
+                ax.scatter(x, y, c=heur_prop, cmap="cividis", vmin=0, vmax=0.3, s=8,
                           alpha=0.6, linewidths=0)
             ax.set_xlim(-0.5, sl.shape[0] - 0.5)
             ax.set_ylim(-0.5, sl.shape[1] - 0.5)
@@ -700,10 +993,43 @@ class PlacementPage(QWidget):
         # the surrounding layout and never revisited, and the aspect-locked axes just centre
         # themselves in the extra width as blank margin. _OVERHEAD_FRAC approximates the title
         # and axis-label chrome tight_layout reserves, as a fraction of the row height.
-        self._slice_ratio = row_ratio / len(self.axes) / (1 - _OVERHEAD_FRAC)
+        self._slice_ratio = row_ratio / len(self.axes) / (1 - _OVERHEAD_FRAC - _LEGEND_FRAC)
         self.canvas.draw_idle()
         self._apply_row_cap()
-        self._update_info()
+        if info:
+            self._update_info()
+
+    def _setup_axes(self, lo: float = 0.0, hi: float = 1.0, vs=None) -> list:
+        """(T1 image, tissue overlay image or None) per view, made when the T1 or the
+        segmentation changed (or cleared when there is no T1)."""
+        key = (id(self.t1), id(self.seg))
+        if getattr(self, "_axes_for", None) == key:
+            return self._images
+        self._axes_for = key
+        self._images = []
+        for ax in self.axes:
+            ax.clear()
+            ax.set_xticks([])
+            ax.set_yticks([])
+        if self.t1 is None:
+            return self._images
+        shape = self.t1.canon.shape
+        for ax, (title, plane, (h, w)) in zip(self.axes, VIEWS):
+            blank = np.zeros((shape[w], shape[h]))
+            im = ax.imshow(blank, cmap="gray", origin="lower", vmin=lo, vmax=hi,
+                           aspect=vs[w] / vs[h], interpolation="nearest")
+            over = None
+            if self.seg is not None:
+                over = ax.imshow(np.full((shape[w], shape[h]), np.nan), origin="lower",
+                                 cmap=_TISSUE_CMAP, vmin=0, vmax=10, aspect=vs[w] / vs[h],
+                                 interpolation="nearest")
+            ax.set_title(f"{title}", fontsize=style.PLOT_PT["title"])
+            ax.set_xlabel(f"{AXIS_LABELS[h][0]}  ←→  {AXIS_LABELS[h][1]}", fontsize=style.PLOT_PT["normal"])
+            ax.set_ylabel(f"{AXIS_LABELS[w][0]}  ←→  {AXIS_LABELS[w][1]}", fontsize=style.PLOT_PT["normal"])
+            ax.set_autoscale_on(False)
+            self._images.append((im, over))
+        self._draw_legend()
+        return self._images
 
     def _apply_row_cap(self) -> None:
         if not HAVE_MPL:
@@ -718,6 +1044,22 @@ class PlacementPage(QWidget):
         self.canvas.setMaximumHeight(max(50, round(min(ideal, avail))))
 
     def _overlay(self, plane: int, k: int, shape2d: tuple) -> np.ndarray:
+        """Tissue labels on T1 slice k of the given plane (NaN outside the head), cached
+        per slice so scrolling back and redrawing the same slices does not resample."""
+        key = (id(self.t1), id(self.seg), plane, k)
+        cache = self.__dict__.setdefault("_overlay_cache", {})
+        if key not in cache:
+            if len(cache) > 96:
+                cache.clear()
+            cache[key] = self._overlay_slice(plane, k, shape2d)
+        return cache[key]
+
+    def _overlay_slice(self, plane: int, k: int, shape2d: tuple) -> np.ndarray:
+        if self.seg.shape == self.t1.shape and np.allclose(self.seg.affine, self.t1.affine, atol=1e-4):
+            # same grid as the T1 (SimNIBS writes final_tissues on it): the slice itself
+            labels = self.seg.canon[(slice(None),) * plane + (k,)].astype(float)
+            labels[labels == 0] = np.nan
+            return labels
         ii, jj = np.meshgrid(np.arange(shape2d[0]), np.arange(shape2d[1]), indexing="ij")
         vox = np.zeros((ii.size, 3))
         others = [a for a in range(3) if a != plane]
@@ -728,66 +1070,86 @@ class PlacementPage(QWidget):
         labels[labels == 0] = np.nan
         return labels.reshape(shape2d)
 
+    def _draw_legend(self) -> None:
+        """One line under the slices naming the markers (the Beam axis tab has its own key)."""
+        for leg in list(self.fig.legends):
+            leg.remove()
+        marks = [
+            Line2D([], [], ls="none", marker="+", color="#1e88e5", ms=8, mew=2, label="target"),
+            Line2D([], [], ls="none", marker="o", mfc="none", color="#e53935", ms=7, mew=2,
+                   label="bowl apex"),
+            Line2D([], [], color="#e53935", lw=1, label="bowl rim"),
+            Line2D([], [], ls="none", marker="s", color="#e53935", ms=3, label="exit plane"),
+            Line2D([], [], color="#e53935", lw=0.8, ls="--", label="beam axis"),
+            Line2D([], [], ls="none", marker="x", color="#9e9e9e", ms=5, label="geometric focus"),
+            Line2D([], [], color="#43a047", lw=0.8, ls=(0, (3, 2)), label="acoustic FOV")]
+        if self.grid_z_action.isChecked():
+            marks.append(Line2D([], [], color=style.active()["brand"], lw=1.0, ls=(0, (6, 2, 1, 2)),
+                                label="grid z"))
+        self.fig.legend(handles=marks, loc="lower center", ncol=len(marks), fontsize=style.PLOT_PT["small"],
+                        frameon=False, handlelength=1.6, columnspacing=1.2)
+        self.fig.get_layout_engine().set(rect=(0, _LEGEND_FRAC * 0.6, 1, 1 - _LEGEND_FRAC * 0.6))
+
     # ── info panel ──────────────────────────────────────────────────────
     def _update_info(self) -> None:
+        """The readout: target and depth, contact, skull on the beam, beam plane,
+        positions, grid; the coordinate space and T1 as a footer."""
         trans, focus = self.positions()
-        lines = [f"<b>Coordinate space:</b> {self._space()}"]
-        if self.t1 is not None:
-            lines.append(f"<b>T1:</b> {self.t1.path.name} "
-                         f"({'×'.join(f'{s:.2g}' for s in self.t1.voxel_size)} mm)")
-        for label, p in (("Focus", focus), ("Transducer (bowl apex)", trans)):
-            if p is None:
-                lines.append(f"<b>{label}:</b> not set")
-                continue
-            vox = pl.ras_to_prestus_voxel(self.t1, p) if self.t1 is not None else None
-            tissue = self._tissue_at(p)
-            lines.append(f"<b>{label}:</b> RAS [{p[0]:.2f}, {p[1]:.2f}, {p[2]:.2f}] mm · "
-                         f"voxel {vox}{' · ' + tissue if tissue else ''}")
         bowl = self._bowl()
+        target, contact, skull = [], [], []
         if trans is not None and focus is not None and bowl is not None:
             axis = focus - trans
             dist = float(np.linalg.norm(axis))
-            exp = self._expected_bowl_distance()
             ep = dist - bowl.offset
-            line = f"<b>Target depth:</b> {ep:.2f} mm from the exit plane (bowl apex → target {dist:.2f} mm)"
+            target.append(("Target depth", f"{ep:.1f} mm" + muted(" from the exit plane")))
+            exp = self._expected_bowl_distance()
             if exp is not None:
                 diff = dist - exp
-                colour = _ok_colour(abs(diff) <= DEPTH_TOL_MM)
-                where = (f"target {abs(diff):.2f} mm {'beyond' if diff > 0 else 'short of'} the focus"
-                         if abs(diff) >= 0.005 else "on target")
-                line += (f"<br>Focal depth setting: {exp - bowl.offset:.2f} mm from the exit plane — "
-                         f"<span style='color:{colour}'>{where}</span>")
+                where = ("on target" if abs(diff) < 0.05 else
+                         f"target {abs(diff):.1f} mm {'beyond' if diff > 0 else 'short of'} the focus")
+                target.append(("Focal depth setting", f"{exp - bowl.offset:.1f} mm · "
+                               + status(where, "ok" if abs(diff) <= DEPTH_TOL_MM else "bad")))
             dev = self.model.device(self.ti)
             if dev is not None and dev.min_foc is not None and dev.max_foc is not None:
                 ok = dev.min_foc <= ep <= dev.max_foc
-                line += (f"<br>Device focal range {dev.min_foc:g}–{dev.max_foc:g} mm: "
-                         + (f"<span style='color:{_ok_colour(True)}'>OK</span>" if ok
-                            else f"<span style='color:{_ok_colour(False)}'>outside</span>"))
-            lines.append(line)
+                target.append(("Steering range", f"{dev.min_foc:g}–{dev.max_foc:g} mm · "
+                               + status("inside" if ok else "outside", "ok" if ok else "bad")))
             if self.seg is not None and dist > 0:
-                exit_pt = trans + axis / dist * bowl.offset
                 scalp = pl.scalp_exit(self.seg, focus, trans - focus)
                 if scalp is not None:
-                    gap = float(np.dot(exit_pt - scalp, (trans - focus) / dist))
-                    colour = _ok_colour(gap >= 0)
-                    lines.append(f"<b>Exit plane vs scalp:</b> <span style='color:{colour}'>"
-                                 f"{gap:+.1f} mm</span> ({'outside' if gap >= 0 else 'inside the head'})")
-                lines.append(self._beam_qc_text(trans, focus, bowl))
+                    gap = float(np.dot(trans + axis / dist * bowl.offset - scalp, (trans - focus) / dist))
+                    contact.append(("Exit plane → scalp", _mm_status(gap)
+                                    + muted(" on the axis (outside)" if gap >= 0 else " (inside the head)")))
+                rows = self._beam_qc_rows(trans, focus, bowl)
+                contact += rows["contact"]
+                skull = rows["skull"]
+        positions = []
+        for label, p in (("Target", focus), ("Bowl apex", trans)):
+            if p is None:
+                positions.append((label, muted("not set")))
+                continue
+            vox = pl.ras_to_prestus_voxel(self.t1, p) if self.t1 is not None else None
+            tissue = self._tissue_at(p)
+            positions.append((label, f"RAS ({p[0]:.1f}, {p[1]:.1f}, {p[2]:.1f}) mm<br>"
+                              + muted(f"voxel {vox}" + (f" · {tissue}" if tissue else ""))))
+        grid = []
         fov_diam, fov_len, fov_diam_auto, fov_len_auto = self._resolved_fov(trans, focus, bowl)
         if fov_diam and fov_len:
-            lines.append(f"<b>Acoustic FOV (transducer {self.ti + 1}):</b> "
-                         f"⌀ {fov_diam:.0f}{' (auto)' if fov_diam_auto else ''} mm × "
-                         f"{fov_len:.0f}{' (auto)' if fov_len_auto else ''} mm")
+            auto = " (auto)" if fov_diam_auto and fov_len_auto else ""
+            grid.append(("Acoustic FOV", f"⌀ {fov_diam:.0f} × {fov_len:.0f} mm" + muted(auto)))
         if self.model.n_transducers > 1:
-            mode = self.model.get("grid.mode") or "focal_axis"
-            freqs = {t.get("freq_hz") for t in self.model.effective_transducers()
-                     if isinstance(t.get("freq_hz"), (int, float)) and not isinstance(t.get("freq_hz"), bool)}
             freq_issue = any(i.where() == "transducer.freq_hz" for i in checks.rule_issues(self.model))
-            line = f"<b>{self.model.n_transducers} transducers</b> · grid.mode: {mode}"
-            if freq_issue:
-                line += f" · <span style='color:{_ok_colour(False)}'>frequencies differ</span>"
-            lines.append(line)
-        self.info.setText("<br><br>".join(lines))
+            grid.append(("Transducers", f"{self.model.n_transducers} · grid.mode "
+                         f"{self.model.get('grid.mode') or 'focal_axis'}"
+                         + (" · " + status("frequencies differ", "bad") if freq_issue else "")))
+        title = "Target" + (f" · transducer {self.ti + 1}" if self.model.n_transducers > 1 else "")
+        footer = f"Coordinates: {self._space()}"
+        if self.t1 is not None:
+            footer += (f" · T1 {self.t1.path.name} "
+                       f"({'×'.join(f'{s:.2g}' for s in self.t1.voxel_size)} mm)")
+        self.info.setText(readout([(title, target), ("Contact", contact),
+                                   ("Skull along the beam", skull),
+                                   ("Positions", positions), ("Simulation grid", grid)], footer))
 
     def _beam_qc(self, trans, focus, bowl: pl.Bowl) -> dict[str, float]:
         """placement.beam_qc, cached per placement (and shared with qc_issues)."""
@@ -856,6 +1218,34 @@ class PlacementPage(QWidget):
             self.position_source = source
         return issues
 
+    _grid_z_user: bool | None = None       # the View menu choice; None: on with 2+ transducers
+
+    def _grid_z_toggled(self, on: bool) -> None:
+        self._grid_z_user = on
+        if self.t1 is not None and HAVE_MPL:
+            self._draw_legend()
+            self._request_draw()
+
+    def _grid_z_line(self) -> np.ndarray | None:
+        """Two RAS points 80 mm either side of the mean focus along the grid z axis that
+        grid.mode gives (multitransducer.grid_z_axis, in the T1's RAS+ voxel grid as
+        preproc_head.m), or None when it cannot be determined."""
+        t1 = self.t1
+        if t1 is None:
+            return None
+        def compute():
+            to_canon = lambda r: t1.ras_to_canon(np.atleast_2d(r))[0]      # noqa: E731
+            txs = mt.model_transducers(self.model, self._positions_for, to_canon)
+            o = mt.orientation(self.model, txs)
+            foci = [np.asarray(t["focus_pos"], float) for t in txs if t.get("focus_pos") is not None]
+            if o["z"] is None or not foci:
+                return None
+            centre = np.mean(foci, axis=0)
+            vs = np.sqrt((t1.canon_affine[:3, :3] ** 2).sum(axis=0))
+            step = o["z"] * (80.0 / float(np.linalg.norm(o["z"] * vs)))   # 80 mm in voxels
+            return t1.canon_to_ras(np.vstack([centre - step, centre + step]))
+        return self._memo("grid_z", None, compute)
+
     def ensure_images(self) -> None:
         """Load the T1 and segmentation (if not yet), so qc_issues can check the placement."""
         self._load_images()
@@ -864,31 +1254,24 @@ class PlacementPage(QWidget):
         if 0 <= ti < self.model.n_transducers:
             self.tx_combo.setCurrentIndex(ti)
 
-    def _beam_qc_text(self, trans, focus, bowl: pl.Bowl) -> str:
-        """Skull and coupling along the beam (placement.beam_qc), cached per placement."""
+    def _beam_qc_rows(self, trans, focus, bowl: pl.Bowl) -> dict[str, list]:
+        """Contact and skull rows of placement.beam_qc (37 rays from the aperture to the
+        focus; rim gap: exit-plane rim to scalp along the beam), cached per placement."""
         q = self._beam_qc(trans, focus, bowl)
-
-        def c(text, bad=False, warn=False):
-            colour = style.active()["red" if bad else ("amber" if warn else "green")]
-            return f"<span style='color:{colour}'>{text}</span>"
-
-        inc = q["beam_skull_incidence_mean_deg"]
         rim_min = q["rim_gap_min_mm"]
-        parts = [
-            f"skull {q['beam_skull_path_mean_mm']:.1f} ± {q['beam_skull_path_sd_mm']:.1f} mm "
-            f"(central ray {q['skull_path_mm']:.1f} mm)",
-            "incidence " + (c(f"{inc:.0f}°", warn=inc > 20) if np.isfinite(inc) else "n/a")
-            + " (beam mean)",
-            "rim to scalp " + (c(f"{q['rim_gap_mean_mm']:.1f} ± {q['rim_gap_sd_mm']:.1f} mm, "
-                                 f"min {rim_min:+.1f} mm", bad=rim_min < 0)
-                               if np.isfinite(rim_min) else "n/a"),
-        ]
+        contact = []
+        if np.isfinite(rim_min):
+            even = q["rim_gap_sd_mm"]
+            contact.append(("Rim → scalp", f"{q['rim_gap_mean_mm']:.1f} ± {even:.1f} mm · min "
+                            + _mm_status(rim_min)))
+        inc = q["beam_skull_incidence_mean_deg"]
+        skull = [("Bone on the beam", f"{q['beam_skull_path_mean_mm']:.1f} ± "
+                  f"{q['beam_skull_path_sd_mm']:.1f} mm" + muted(f" · central ray {q['skull_path_mm']:.1f} mm")),
+                 ("Incidence", (status(f"{inc:.0f}°", "warn" if inc > 20 else "ok") if np.isfinite(inc)
+                                else muted("n/a")) + muted(" beam mean"))]
         if q["eye_in_beam"] > 0:
-            parts.append(c(f"{100 * q['eye_in_beam']:.0f}% of beam rays pass an eye", bad=True))
-        tip = ("Rays from the aperture (centre + 3 rings) to the focus; rim gap: exit-plane rim "
-               "to scalp along the beam (min < 0: the transducer cuts into the head; "
-               "large SD: uneven contact)")
-        return f"<b title='{tip}'>Beam:</b> " + " · ".join(parts)
+            skull.append(("Eye", status(f"{100 * q['eye_in_beam']:.0f}% of beam rays", "bad")))
+        return {"contact": contact, "skull": skull}
 
     def _tissue_at(self, ras) -> str:
         if self.seg is None:
@@ -904,12 +1287,14 @@ class PlacementPage(QWidget):
             self.refresh()
 
     def _add_transducer(self) -> None:
+        self._record()
         self.ti = self.model.add_transducer()
         self._cursor_set_by_user = False
         self.changed.emit()
         self.refresh()
 
     def _remove_transducer(self) -> None:
+        self._record()
         self.model.remove_transducer(self.ti)
         self.ti = max(0, self.ti - 1)
         self._cursor_set_by_user = False
@@ -934,7 +1319,7 @@ class PlacementPage(QWidget):
             self._write("focus_pos" if self.rb_focus.isChecked() else "trans_pos", ras)
             self.refresh()
         else:
-            self._draw()
+            self._request_draw()
 
     def _scrolled(self, event) -> None:
         if self.t1 is None or event.inaxes not in self.axes:
@@ -944,13 +1329,13 @@ class PlacementPage(QWidget):
         c[plane] += 1 if event.button == "up" else -1
         self.cursor = self.t1.canon_to_ras(c[None])[0]
         self._cursor_set_by_user = True
-        self._draw()
+        self._request_draw()
 
     def _centre(self) -> None:
         _, focus = self.positions()
         if focus is not None:
             self.cursor = focus.copy()
-            self._draw()
+            self._request_draw()
 
     def _entry_ras(self, transformation_type: str = "nonl") -> np.ndarray | None:
         """RAS mm for the typed X/Y/Z in the chosen entry space, or None (after a message) if
@@ -1016,7 +1401,7 @@ class PlacementPage(QWidget):
             return
         self.cursor = ras
         self._cursor_set_by_user = True
-        self._draw()
+        self._request_draw()
 
     def _set_coords(self, key: str) -> None:
         if not self._editable():
@@ -1046,6 +1431,7 @@ class PlacementPage(QWidget):
         return None
 
     def _need(self, what: str) -> bool:
+        self._finish_load()
         if not self._editable():
             QMessageBox.information(self, "Placement", "Switch to manual placement with coordinate "
                                     "space 'voxel' or 'ras' to place the transducer here.")
@@ -1088,6 +1474,7 @@ class PlacementPage(QWidget):
             QMessageBox.information(self, "Placement", "Needs transducer, focus and transducer geometry.")
             return
         ep = round(float(np.linalg.norm(focus - trans)) - bowl.offset, 2)
+        self._record()
         self.model.set(f"{TX}.focal_distance_ep", ep, self.ti)
         self.model.reset(f"{TX}.focal_distance_bowl", self.ti)      # derived from ep by PRESTUS
         self.changed.emit()
@@ -1119,6 +1506,7 @@ class PlacementPage(QWidget):
                                    ". Set the focal depth setting (focal_distance_ep) to place the transducer on its axis") + ".")
 
     def _use_manual(self) -> None:
+        self._record()
         self.model.set("placement.mode", "manual")
         self.changed.emit()
         self.refresh()

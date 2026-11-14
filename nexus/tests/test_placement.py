@@ -209,6 +209,48 @@ def test_beam_qc_layered_sphere(tmp_path):
     # transducer pushed into the head: the rim cuts into the scalp
     q = pl.beam_qc(seg, np.asarray(apex) - [0, 0, 20], [0, 0, 0], bowl)
     assert q["rim_gap_min_mm"] < 0
+
+
+def test_beam_plane_basis():
+    axis, lat = pl.beam_plane_basis([0, 0, 50], [0, 30, 0])       # oblique beam
+    assert axis @ lat == pytest.approx(0, abs=1e-12)
+    assert lat[2] > 0                                              # 0°: towards superior
+    _, lat90 = pl.beam_plane_basis([0, 0, 50], [0, 30, 0], 90)
+    assert lat @ lat90 == pytest.approx(0, abs=1e-12)
+    _, lat_v = pl.beam_plane_basis([0, 0, 50], [0, 0, 0])         # vertical beam: anterior
+    np.testing.assert_allclose(lat_v, [0, 1, 0], atol=1e-12)
+
+
+def test_segmentation_to_medium():
+    names = ["water", "brain", "skin", "skull", "skull_trabecular", "skull_cortical"]
+    layers = {"water": [0, 3, 6, 9, 10], "brain": [1, 2], "skin": [5], "skull": [4],
+              "skull_cortical": [7], "skull_trabecular": [8]}
+    labels = np.array([0, 1, 2, 3, 4, 5, 7, 8, 11])
+    med = pl.segmentation_to_medium(labels, layers, names)
+    # multi-layer skull: bone (4) and compact bone (7) are cortical, spongy (8) trabecular;
+    # an unmapped label (11) is water
+    assert [names[i - 1] for i in med] == ["water", "brain", "brain", "water", "skull_cortical",
+                                           "skin", "skull_cortical", "skull_trabecular", "water"]
+    single = {"water": [0], "brain": [1, 2], "skin": [5], "skull": [4, 7, 8]}
+    assert names[pl.segmentation_to_medium(np.array([7]), single, names)[0] - 1] == "skull"
+
+
+def test_medium_clearance():
+    bowl = pl.Bowl(63.2, 64, 52.38)                 # exit plane 10.82 mm from the apex
+    depth = np.arange(-10, 100, 0.5)
+    offsets = np.arange(-40, 40.25, 0.5)
+    med = np.ones((len(offsets), len(depth)), int)  # all water (index 1)
+    med[:, depth >= 20] = 3                          # flat skin 20 mm from the apex
+    on_axis, worst = pl.medium_clearance(med, depth, offsets, bowl, water_index=1)
+    assert on_axis == pytest.approx(20 - bowl.offset)
+    assert worst == pytest.approx(on_axis)
+    med[np.abs(offsets) > 25, :] = 3                 # tissue beside the axis, behind the exit plane
+    _, worst = pl.medium_clearance(med, depth, offsets, bowl, water_index=1)
+    assert worst < 0
+    med[:] = 0                                       # outside the simulation grid: no tissue
+    assert all(math.isnan(v) for v in pl.medium_clearance(med, depth, offsets, bowl, 1))
+
+
 def test_voxels_are_cached_locally_until_the_image_changes(tmp_path, monkeypatch):
     path = tmp_path / "t1.nii.gz"
     data = np.arange(24, dtype=np.float32).reshape(2, 3, 4)

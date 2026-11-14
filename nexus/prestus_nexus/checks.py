@@ -771,6 +771,39 @@ def _on(v: Any) -> bool:
     return v is True or (_is_num(v) and v != 0)
 
 
+def multitransducer_issues(model: ConfigModel) -> list[Issue]:
+    """Multi-transducer and grid-orientation combinations PRESTUS refuses or reduces."""
+    issues: list[Issue] = []
+    g = model.get
+    n = len(model.effective_transducers())
+    axisym = _on(g("grid.axisymmetric"))
+    is_async = n > 1 and g("simulation.transducer_coupling") == "async"     # is_async_mode.m
+    medium = g("simulation.medium") or "layered"
+
+    # grid_transducer_location.m:50-57: non-layered media keep transducer(1) only
+    if n > 1 and not is_async and "layered" not in str(medium):
+        issues.append(Issue("warning", "simulation.medium",
+                            f"'{medium}' simulations model only transducer 1; the other "
+                            f"{n - 1} transducer(s) are dropped. Use a layered medium for several "
+                            "transducers"))
+    # source_create.m:241-244: axisymmetric kWaveArray sources take one transducer
+    if n > 1 and axisym and not is_async and g("grid.use_kWaveArray") not in (0, False):
+        issues.append(Issue("error", "grid.axisymmetric",
+                            "Axisymmetric simulations support one transducer; switch "
+                            "grid.axisymmetric off for several transducers"))
+    # combine_async_intensity.m:134-139: async fields must be 3-D
+    if is_async and axisym:
+        issues.append(Issue("error", "grid.axisymmetric",
+                            "Async coupling combines 3-D fields; axisymmetric (2-D) results "
+                            "cannot be combined. Switch grid.axisymmetric off"))
+    # grid_axisymmetry.m:84-90: axisymmetry needs the beam on the grid z axis
+    if g("grid.mode") == "ras_plus" and axisym:
+        issues.append(Issue("error", "grid.mode",
+                            "grid.mode 'ras_plus' is incompatible with grid.axisymmetric: the "
+                            "beam must lie on the grid z axis ('focal_axis')"))
+    return issues
+
+
 def heating_issues(model: ConfigModel) -> list[Issue]:
     """Timing and thermal grid checks load_parameters.m runs when run_heating_sims is on
     (it calls thermal_parameters.m), and the thermal FOV against the acoustic FOV."""

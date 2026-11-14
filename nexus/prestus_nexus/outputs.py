@@ -91,11 +91,6 @@ def pseudoct_file(model: ConfigModel) -> tuple[Path | None, bool]:
     return None, False
 
 
-def placement_record(model: ConfigModel) -> dict | None:
-    """Positions the placement stage resolved, from <dir_output>/sub-XXX_placement<affix>.json
-    (write_placement_positions.m): {'mode', 'created', 'transducers': [{'trans_pos', 'focus_pos'}]}
-    with 1-based T1 voxel positions; None when the file is missing or unreadable."""
-    import json
 def measured_ct_file(model: ConfigModel) -> Path | None:
     """The measured CT path.ct_pattern names (as pct_ct_file.m), or None when it is empty or
     matches nothing."""
@@ -129,17 +124,92 @@ def existing_outputs(model: ConfigModel) -> dict[str, bool] | None:
     return dict(_EXISTING[key])
 
 
+def placement_record_path(model: ConfigModel) -> Path | None:
+    """<dir_output>/sub-XXX_placement<affix>.json, without touching the disk."""
     from .study import sanitize_affix
     base, sid = dir_output(model), _subject_id(model)
     if base is None or sid is None:
         return None
     affix = sanitize_affix(model.get("io.output_affix") or "")
-    path = base / f"sub-{sid:03d}_placement{affix}.json"
+    return base / f"sub-{sid:03d}_placement{affix}.json"
+
+
+def placement_record(model: ConfigModel) -> dict | None:
+    """Positions the placement stage resolved (see read_placement_record)."""
+    path = placement_record_path(model)
+    return read_placement_record(path) if path is not None else None
+
+
+def read_placement_record(path: Path) -> dict | None:
+    """The placement stage's positions file (write_placement_positions.m): {'mode', 'created',
+    'transducers': [{'trans_pos', 'focus_pos'}]} with 1-based T1 voxel positions, plus 'path';
+    None when the file is missing or unreadable. Reads only that file."""
+    import json
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(_read_text(path))
     except (OSError, ValueError):
         return None
     if not isinstance(data, dict) or not isinstance(data.get("transducers"), list):
         return None
     data["path"] = str(path)
     return data
+
+def axial_profile_paths(model: ConfigModel) -> tuple[Path, Path] | None:
+    """(axial profile CSV, targeting CSV) the last run would have written, without touching
+    the disk; None without path.sim or a subject."""
+    from .study import sanitize_affix
+    base, sid = dir_output(model), _subject_id(model)
+    if base is None or sid is None:
+        return None
+    medium = str(model.get("simulation.medium") or "layered")
+    affix = sanitize_affix(model.get("io.output_affix") or "")
+    return (base / "img" / f"sub-{sid:03d}_{medium}_axial_profile{affix}.csv",
+            base / f"sub-{sid:03d}_{medium}{affix}_targeting.csv")
+
+
+def axial_profile(model: ConfigModel) -> dict | None:
+    """The last run's on-axis profile (see read_axial_profile); None when missing."""
+    paths = axial_profile_paths(model)
+    return read_axial_profile(*paths) if paths is not None else None
+
+
+def read_axial_profile(path: Path, targeting: Path) -> dict | None:
+    """The on-axis profile <dir_output>/img/sub-XXX_<medium>_axial_profile<affix>.csv
+    (plot_axial_profile.m), as float lists by exit-plane depth [mm]: 'depth_ep', 'intensity'
+    (simulated, W/cm²), 'tissue' (medium layer per sample), 'oneil' (free-water O'Neil of
+    the run's settings, W/cm²) and 'kwave'
+    (free-water k-Wave baseline, W/cm²) when written; plus 'path', 'mtime' and the run's
+    planned focal depth 'planned_ep' (the targeting CSV, NaN if unknown). None when the
+    file is missing or unreadable. Reads only the given files (safe off the GUI thread)."""
+    import csv
+    import io
+
+    def num(v) -> float:
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return float("nan")
+
+    try:
+        rows = list(csv.DictReader(io.StringIO(_read_text(path), newline="")))
+        mtime = path.stat().st_mtime
+    except (OSError, UnicodeDecodeError):
+        return None
+    if not rows or "depth_from_exit_plane_mm" not in rows[0]:
+        return None
+    rows.sort(key=lambda r: num(r["depth_from_exit_plane_mm"]))
+    out = {"path": str(path), "mtime": mtime,
+           "depth_ep": [num(r["depth_from_exit_plane_mm"]) for r in rows],
+           "intensity": [num(r.get("intensity_Wcm2")) for r in rows],
+           "tissue": [str(r.get("tissue") or "") for r in rows]}
+    for key, col in (("oneil", "freewater_oneil_Wcm2"), ("kwave", "freewater_kwave_Wcm2")):
+        if col in rows[0]:
+            out[key] = [num(r.get(col)) for r in rows]
+    out["planned_ep"] = float("nan")
+    try:
+        first = next(csv.DictReader(io.StringIO(_read_text(targeting), newline="")), None)
+        if first is not None:
+            out["planned_ep"] = num(first.get("focal_distance_ep_planned_mm"))
+    except (OSError, UnicodeDecodeError):
+        pass
+    return out

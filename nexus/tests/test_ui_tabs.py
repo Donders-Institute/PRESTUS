@@ -299,22 +299,24 @@ def test_placement_modes_greyed_without_segmentation(window, tmp_path):
     (anat / "sub-003_T1w.nii.gz").write_bytes(b"")
     window.model.set("subject_id", 3)
     window.model.set("path.anat", str(anat))
-    page = window.pages["placement"]
-    page.refresh()
-    ed = _row(page, "placement.mode").editor
-    items = {v: ed.combo.model().item(i) for i, v in enumerate(ed._items)}
+    sel = window.placement_selector                              # the Placement tab's header row
+    assert not any(r.node.path == "placement.mode" for r in window.pages["placement"].rows)
+    sel.refresh()
+    combo = sel.combo
+    items = {combo.itemData(i): combo.model().item(i) for i in range(combo.count())}
     assert items["manual"].isEnabled()
     assert not items["heuristic"].isEnabled()                 # no m2m, no SimNIBS
     assert "unavailable" in items["heuristic"].text()
     assert "simnibs_bin_path" in items["plantus"].toolTip()
     window.model.set("placement.mode", "heuristic")             # current value stays selectable
-    page.refresh()
-    ed = _row(page, "placement.mode").editor
-    assert ed.combo.model().item(ed._items.index("heuristic")).isEnabled()
+    sel.refresh()
+    assert combo.model().item(combo.findData("heuristic")).isEnabled()
+    assert "Cannot run yet" in sel.note.text()
 
 
 def test_plantus_actions_run_placement_only(window, monkeypatch):
     from prestus_nexus.ui.main_window import RUN, VIEWER, PlantusActions
+    from prestus_nexus.ui.plantus_page import TASK
     from prestus_nexus.ui.run_page import RunPage
     ran = []
     monkeypatch.setattr(RunPage, "run_script", lambda self, task, script: ran.append((task, script)) or True)
@@ -323,16 +325,60 @@ def test_plantus_actions_run_placement_only(window, monkeypatch):
     acts.refresh()
     assert acts.isHidden()
     window.model.set("placement.mode", "plantus")
+    window.model.set("placement.plantus.vertex", 12)
     acts.refresh()
     assert not acts.isHidden()
     acts._run(True)
     task, script = ran[0]
-    assert task == PlantusActions.TASK and script.name == "plantus_t.m"
+    assert task == TASK and script.name == "plantus_t.m"
     assert "'placement.plantus.interactive', 1;" in script.read_text()
+    assert window.model.get("placement.plantus.vertex") == []      # maps recomputed: choice cleared
     shown = []
     monkeypatch.setattr(type(window), "show_special", lambda self, key: shown.append(key))
-    window.pages[RUN].finished.emit(PlantusActions.TASK, True)
+    window.pages[RUN].finished.emit(TASK, True)
     assert shown == [VIEWER] and not acts._waiting
+
+
+def test_plantus_page_places_chosen_vertex(window, monkeypatch, tmp_path):
+    from prestus_nexus.ui.main_window import PLANTUS, RUN
+    from prestus_nexus.ui.plantus_page import TASK
+    from prestus_nexus.ui.run_page import RunPage
+    import test_plantus
+    ran = []
+    monkeypatch.setattr(RunPage, "run_script", lambda self, task, script: ran.append((task, script)) or True)
+    page = window.pages[PLANTUS]
+    window.model.set("path.sim", str(tmp_path / "sim"))
+    window.model.set("placement.plantus.target_name", "M1")
+    window.model.set("placement.mode", "plantus")
+    page.refresh()
+    assert page.stack.is_empty()                                    # no maps yet: Compute maps offered
+    path = test_plantus.write_metrics(window.model)
+    page.refresh()
+    assert page.maps is not None and page.maps.path == path
+    assert page.clicked == page.maps.selected
+    page.select(5)
+    page.place()
+    task, script = ran[0]
+    assert task == TASK and "'placement.plantus.interactive', 0;" in script.read_text()
+    assert window.model.get("placement.plantus.vertex") == 5
+    window.pages[RUN].finished.emit(TASK, True)
+    assert not page._waiting
+
+
+def test_plantus_page_submits_job_when_run_tab_submits(window, monkeypatch, tmp_path):
+    from prestus_nexus.ui.main_window import PLANTUS, RUN
+    from prestus_nexus.ui.run_page import RunPage
+    sent = []
+    monkeypatch.setattr(RunPage, "submits_to_cluster", lambda self: True)
+    monkeypatch.setattr(RunPage, "submit_partial", lambda self, name, what, overrides, extra="": sent.append(name) or True)
+    monkeypatch.setattr(RunPage, "run_script", lambda self, *a: pytest.fail("ran locally"))
+    window.model.set("placement.mode", "plantus")
+    page = window.pages[PLANTUS]
+    page.compute()
+    assert sent == ["plantus"] and page._watching and not page._waiting
+    window.pages[RUN].jobs_changed.emit()                          # job update: reloads quietly
+
+
 def test_transducer_tab_cards(window):
     from prestus_nexus.model import TX
     tab = window.tab_pages["transducer"]

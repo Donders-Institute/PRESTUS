@@ -429,6 +429,78 @@ def beam_qc(seg: Volume, trans, focus, bowl: Bowl, step: float = 0.25) -> dict[s
     return out
 
 
+# ── Beam plane: a 2-D section that contains the beam axis ────────────────
+
+def beam_plane_basis(trans, focus, angle_deg: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
+    """(axis, lateral) unit vectors of the plane through the beam axis. At 0° the lateral
+    direction points as close to superior as the axis allows (anterior for a near-vertical
+    beam); angle_deg turns the plane about the axis."""
+    axis = _unit(np.asarray(focus, float) - np.asarray(trans, float))
+    ref = np.array([0, 0, 1.0]) if abs(axis[2]) < 0.9 else np.array([0, 1.0, 0])
+    lat0 = _unit(ref - axis * float(ref @ axis))
+    other = np.cross(axis, lat0)
+    a = math.radians(angle_deg)
+    return axis, math.cos(a) * lat0 + math.sin(a) * other
+
+
+def beam_plane_points(trans, axis, lateral, depth: np.ndarray, offsets: np.ndarray) -> np.ndarray:
+    """RAS points of the plane, shape (len(offsets), len(depth), 3): row i is the line
+    offsets[i] mm to the side of the axis, column j depth[j] mm from the bowl apex."""
+    d, l = np.meshgrid(depth, offsets)
+    return np.asarray(trans, float) + d[..., None] * axis + l[..., None] * lateral
+
+
+def _label_list(v) -> list[int]:
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return [int(v)]
+    return [int(x) for x in v if isinstance(x, (int, float)) and not isinstance(x, bool)] \
+        if isinstance(v, list) else []
+
+
+def segmentation_to_medium(labels: np.ndarray, layers: dict, medium_names: list[str]) -> np.ndarray:
+    """SimNIBS labels -> medium index (1-based position in medium_names), the mapping of
+    preproc_medium_mask.m without its smoothing: layers in config order, later ones win;
+    with both skull_cortical and skull_trabecular, every skull label is cortical and
+    trabecular overlays it. Unmapped voxels are water, as medium_setup.m does."""
+    out = np.zeros(np.shape(labels), dtype=int)
+    names = [n for n in layers if n in medium_names]
+    multi = "skull_cortical" in names and "skull_trabecular" in names
+    skulls = ("skull", "skull_cortical", "skull_trabecular")
+    for n in names:
+        if not (multi and n in skulls):
+            out[np.isin(labels, _label_list(layers[n]))] = medium_names.index(n) + 1
+    if multi:
+        shell = sum((_label_list(layers.get(n)) for n in skulls), [])
+        out[np.isin(labels, shell)] = medium_names.index("skull_cortical") + 1
+        out[np.isin(labels, _label_list(layers["skull_trabecular"]))] = \
+            medium_names.index("skull_trabecular") + 1
+    if "water" in medium_names:
+        out[out == 0] = medium_names.index("water") + 1
+    return out
+
+
+def medium_clearance(medium: np.ndarray, depth: np.ndarray, offsets: np.ndarray, bowl: Bowl,
+                     water_index: int) -> tuple[float, float]:
+    """(on the axis, smallest across the aperture) distance from the exit plane to the first
+    non-water medium voxel in a beam-plane section [mm], searched from the bowl surface
+    forwards. Negative: tissue sits behind the exit plane, inside the transducer's space.
+    0 (outside the simulation grid) counts as no tissue. NaN where no tissue is met."""
+    R, a = bowl.curv_radius, bowl.aperture / 2
+    tissue = (medium != water_index) & (medium != 0)
+    nan = float("nan")
+
+    def gap(i: int) -> float:
+        y = offsets[i]
+        sag = R - math.sqrt(max(R * R - y * y, 0.0))
+        hit = tissue[i] & (depth >= sag)
+        return float(depth[np.argmax(hit)]) - bowl.offset if hit.any() else nan
+
+    rows = [i for i, y in enumerate(offsets) if abs(y) <= a]
+    gaps = np.array([gap(i) for i in rows])
+    centre = gap(int(np.argmin(np.abs(offsets))))
+    return centre, float(np.nanmin(gaps)) if np.isfinite(gaps).any() else nan
+
+
 # ── Trajectory files (Brainsight, 3D Slicer) ─────────────────────────────
 
 @dataclass

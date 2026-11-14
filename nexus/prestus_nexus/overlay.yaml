@@ -945,7 +945,7 @@ display:
   transducer.matrix.steering_correction: {label: Steering correction (inline), group: tx_drive}
 
   # Placement
-  placement.mode: {label: Placement method, help: "How transducer and focus positions are obtained: 'manual' coordinates; 'localite' a recorded neuronavigation pose (ingested with neuronav_gui); 'heuristic' a search from an MNI target; 'mni' MNI coordinates snapped to the scalp; 'plantus' PlanTUS optimisation; 'tus_entry' the TUS_entry R tool."}
+  placement.mode: {label: Placement method, group: __placement_method__, help: "How transducer and focus positions are obtained: 'manual' coordinates; 'localite' a recorded neuronavigation pose (ingested with neuronav_gui); 'heuristic' a search from an MNI target; 'mni' MNI coordinates snapped to the scalp; 'plantus' PlanTUS optimisation; 'tus_entry' the TUS_entry R tool."}
   placement.report: {label: Write placement report}
   placement.reuse: {label: Reuse recorded placement run}
   placement.skin_gap_mm: {label: Gap to the scalp, help: "Gap between scalp and transducer exit plane along the beam axis (e.g. a gel pad); heuristic, MNI, PlanTUS and TUS_entry placement."}

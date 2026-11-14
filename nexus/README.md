@@ -75,9 +75,11 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 | `undo.py` | *Edit ▸ Undo / Redo*: the history of model changes; typing in one field forms one step. |
 | `telemetry.py` | *Tools ▸ Usage statistics…*: reads and writes the consent record `~/.prestus/telemetry.json` that MATLAB uses; sends nothing. |
 | `docs.py` | Links into the documentation (published pages or local `doc/*.md`) and the Help menu. |
+| `multitransducer.py` | Grid orientation of a multi-transducer run under `grid.mode` and each beam's tilt (ports of `mean_beam_axis.m` and `preproc_head.m`). |
 | `proctree.py` | Stopping a started program with everything it started (MATLAB's launcher and binary). |
 | `ui/export.py` | The download button on every figure: SVG, PDF, PNG and copy. |
 | `ui/errors.py` | Unexpected errors as a dialog instead of a crash, logged to `nexus_errors.log` in the cache folder. |
+| `ui/transducers_page.py` | *Placement ▸ Transducers* (2+ transducers): per-transducer table, grid orientation, coupling and timing notes. |
 | `ui/pipeline_options.py` | *Run ▸ Where to run ▸ Pipeline options*: sequential chain, per-stage limits, summary report switch (stored in the session, not the config). |
 | `ui/isppa_sweep.py` | The target ISPPA editor with *Sweep…* for a list of targets (multi-ISPPA). |
 
@@ -124,7 +126,7 @@ When `config_default.yaml` gains or loses keys, run the drift test and update `o
    - *Run locally* via `matlab -batch`, with a live log and success/failure markers.
    - *Submit to cluster* through PRESTUS' own HPC path, and a job list that follows the submitted jobs.
    - *Submit over SSH* from a computer without `sbatch`/`qsub` that sees the study folder on a shared drive.
-   - **Tools menu:** the Localite and Calibration pages, and `neuronav_gui` (pre-filled from the saved study config) and `calibration_gui` (saving to `transducer.library_path`) in an interactive MATLAB session.
+   - **Tools menu:** the Localite, PlanTUS, TUS entry and Calibration sub-tabs, and `neuronav_gui` (pre-filled from the saved study config) and `calibration_gui` (saving to `transducer.library_path`) in an interactive MATLAB session.
 5. **MATLAB GUIs in the Nexus** (`bridge.py`, `ui/calibration_page.py`, `ui/localite_page.py`).
    - One persistent MATLAB session (`nexus_bridge`, `matlab -batch`) serves interactive steps through JSON request/response files; it ends after 30 min idle or with the app.
    - *Transducer ▸ Calibration*: `calibration_gui`'s predict / evaluate / fit / save for the config's transducers, saving to `transducer.library_path`, predicting at the study's focal depths; k-Wave drive check as a Run-tab script. Computed by `nexus_calibration` → `calibration_fit` etc., the same functions `calibration_gui` uses.
@@ -137,6 +139,5 @@ PRESTUS voxels are 1-based MATLAB indices into the T1 array, while MATLAB's `nif
 
 ## Not done yet
 
-- A 3-D view (NiiVue via QtWebEngine) is not included; the viewer uses 2-D orthogonal slices, as BabelBrain does.
-- Non-manual placement modes are edited as forms; the viewer shows their resolved positions read-only (from the last run, see `outputs.placement_record`) but cannot place them interactively.
+- Heuristic, MNI and Localite placements are edited as forms; the viewer shows their resolved positions read-only (from the last run, see `outputs.placement_record`) but cannot place them interactively.
 - The standalone app (`packaging/prestus_nexus.spec`) is not built or signed in CI yet.

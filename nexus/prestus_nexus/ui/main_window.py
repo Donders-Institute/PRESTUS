@@ -488,6 +488,9 @@ class MainWindow(QMainWindow):
     def _build_tools_menu(self) -> None:
         tools = self.menuBar().addMenu("&Tools")
         for text, slot in [("Localite", lambda: self.show_special(LOCALITE)),
+                           ("PlanTUS", lambda: self.show_special(PLANTUS)),
+                           ("TUS entry", lambda: self.show_special(TUS_ENTRY)),
+                           ("Heuristic", lambda: self.show_special(HEURISTIC)),
                            ("Calibration", lambda: self.show_special(CALIBRATION)),
                            (None, None),
                            ("neuronav_gui in MATLAB…", self.open_neuronav_gui),
@@ -753,11 +756,59 @@ class MainWindow(QMainWindow):
                 self.pages[VIEWER] = viewer
                 self._section_tab[VIEWER] = key
                 tab.set_full_tab(viewer, "Viewer")
+                from .beam_view import BeamPage
+                self.beam_page = BeamPage(viewer)
+                self.beam_page.bridge_getter = self.bridge  # free-water prediction (MATLAB)
+                self.beam_page.navigate.connect(self.goto)
+                tab.add_subtab(self.beam_page, "Beam axis")
+                from .view3d import Placement3DPage
+                self.view3d_page = Placement3DPage(viewer)
+                viewer.changed.connect(self.view3d_page.refresh)    # drawn when shown
+                tab.add_subtab(self.view3d_page, "3D")
+                from .transducers_page import TransducersPage      # shown with 2+ transducers
+                self.transducers_page = TransducersPage(self.model, lambda: self.pages.get(VIEWER))
+                self.transducers_page.changed.connect(self._changed)
+                self.transducers_page.navigate.connect(self.goto)
+                self.transducers_page.edit_in_viewer.connect(
+                    lambda ti, v=viewer: (self.show_special(VIEWER), v.show_transducer(ti)))
+                tab.add_subtab(self.transducers_page, "Transducers")
                 from .localite_page import LocalitePage
                 loc = LocalitePage(self)
                 self.pages[LOCALITE] = loc
                 self._section_tab[LOCALITE] = key
                 tab.add_subtab(loc, "Localite")
+                from .heuristic_page import HeuristicPage
+                heuristic = HeuristicPage(self)
+                self.pages[HEURISTIC] = heuristic
+                self._section_tab[HEURISTIC] = key
+                tab.add_subtab(heuristic, "Heuristic")
+                from .plantus_page import PlantusPage
+                plantus = PlantusPage(self)
+                self.pages[PLANTUS] = plantus
+                self._section_tab[PLANTUS] = key
+                tab.add_subtab(plantus, "PlanTUS")
+                from .tus_entry_page import TusEntryPage
+                tus_entry = TusEntryPage(self)
+                self.pages[TUS_ENTRY] = tus_entry
+                self._section_tab[TUS_ENTRY] = key
+                tab.add_subtab(tus_entry, "TUS entry")
+                mode_node = self.model.schema.get("placement.mode")      # same icons as the method drop-down
+                for page_widget, mode in ((loc, "localite"), (plantus, "plantus"), (tus_entry, "tus_entry")):
+                    ic = icons.for_choice(mode_node, mode)
+                    if ic is not None:
+                        tab.subtabs.setTabIcon(tab.subtabs.indexOf(page_widget), ic)
+                from .medium_selector import PLACEMENT_KEY, PLACEMENT_NOTE, MediumSelector
+                self.placement_selector = MediumSelector(
+                    self.model, key=PLACEMENT_KEY, title="Placement method", notes=PLACEMENT_NOTE,
+                    status=checks.placement_mode_status)
+                self.placement_selector.changed.connect(self._changed)
+                self.pages[PLACEMENT_SELECT] = self.placement_selector
+                self._section_tab[PLACEMENT_SELECT] = key
+                tab.add_header(self.placement_selector)
+                from .segmentation_panel import SegmentationPanel
+                self.placement_seg_panel = SegmentationPanel(self, when_needed=True)
+                tab.add_header(self.placement_seg_panel)
+                tab.on_refresh = self._refresh_placement_tab
             elif key == "medium":
                 # cards that follow the sections of their sub-tab
                 tab.section_columns["uncertainty"].addWidget(self.uncertainty_card)
@@ -905,7 +956,9 @@ class MainWindow(QMainWindow):
             if tab.key == "results" and RESULTS in self.pages:
                 self.pages[RESULTS].refresh()
             if tab.subtabs is not None and tab.subtabs.currentWidget() in (
-                    self.pages.get(CALIBRATION), self.pages.get(LOCALITE)):
+                    self.pages.get(CALIBRATION), self.pages.get(LOCALITE), self.pages.get(PLANTUS),
+                    self.pages.get(TUS_ENTRY), self.pages.get(HEURISTIC),
+                    getattr(self, "beam_page", None), getattr(self, "view3d_page", None)):
                 tab.subtabs.currentWidget().refresh()
 
     def _select_tab(self, key: str) -> TabPage | None:
@@ -995,6 +1048,28 @@ class MainWindow(QMainWindow):
         self.medium_subtabs = {"head": tab.settings_page, "acoustic": scroll, "uncertainty": unc_scroll,
                                "pct": split}
         tab.on_refresh = self._refresh_medium_tab
+
+    def _placement_method_page(self) -> QWidget | None:
+        """The Placement sub-tab of the placement method in use (None for MNI placement)."""
+        page = {"manual": VIEWER, "localite": LOCALITE, "plantus": PLANTUS,
+                "tus_entry": TUS_ENTRY, "heuristic": HEURISTIC}.get(str(self.model.get("placement.mode") or "manual"))
+        return self.pages.get(page) if page else None
+
+    def _refresh_placement_tab(self, tab: TabPage) -> None:
+        """The sub-tab of the placement method in use is labelled in bold (the Viewer for manual
+        placement)."""
+        multi_page = getattr(self, "transducers_page", None)
+        if multi_page is not None and tab.subtabs is not None:
+            multi = self.model.n_transducers > 1
+            tab.subtabs.setTabVisible(tab.subtabs.indexOf(multi_page), multi)
+            if not multi and tab.subtabs.currentWidget() is multi_page:
+                tab.subtabs.setCurrentWidget(self.pages[VIEWER])
+        bar = tab.subtabs.tabBar() if tab.subtabs is not None else None
+        if not hasattr(bar, "set_bold"):
+            return
+        widget = self._placement_method_page()
+        index = tab.subtabs.indexOf(widget) if widget is not None else -1
+        bar.set_bold({index} if index >= 0 else set())
 
     def _refresh_medium_tab(self, tab: TabPage) -> None:
         """Water uses no head model and no skull CT; a phantom uses tissue layers but no skull CT."""
@@ -1408,9 +1483,7 @@ class LocaliteActions(QWidget):
 
 
 class PlantusActions(QWidget):
-    """Shown with placement.mode = plantus: run only the placement, then show it in the viewer."""
-
-    TASK = "PlanTUS placement"
+    """Shown with placement.mode = plantus: compute PlanTUS's maps and choose on them."""
 
     def __init__(self, window: MainWindow):
         super().__init__()
@@ -1418,36 +1491,36 @@ class PlantusActions(QWidget):
         self._waiting = False
         h = QHBoxLayout(self)
         h.setContentsMargins(0, 0, 0, 6)
-        note = QLabel("PlanTUS: run only the placement, without simulating. <b>Choose in Workbench</b> "
-                      "opens PlanTUS's maps (needs Connectome Workbench and a display); click a skin "
-                      "position, close Workbench, then use it or choose again in the review dialog. "
-                      "<b>Automatic</b> takes the best composite score. The result opens in the Viewer.")
+        note = QLabel("PlanTUS: <b>Compute maps</b> scores every skin position and places the best "
+                      "composite score, without simulating; choose another position on the "
+                      "<b>PlanTUS page</b>. <b>Choose in Workbench…</b> picks in Connectome Workbench "
+                      "instead (needs Workbench and a display). The result opens in the Viewer.")
         note.setObjectName("CardSub")
         note.setWordWrap(True)
         h.addWidget(note, 1)
-        pick = QPushButton("Choose in Workbench…")
-        pick.setToolTip("Run PlanTUS and pick the transducer position on its criterion maps")
-        pick.clicked.connect(lambda: self._run(True))
-        h.addWidget(pick)
-        auto = QPushButton("Automatic")
+        page = QPushButton("PlanTUS page")
+        page.setToolTip("The criterion maps on the skin: click a position and place the transducer there")
+        page.clicked.connect(lambda: window.show_special(PLANTUS))
+        h.addWidget(page)
+        auto = QPushButton("Compute maps")
         auto.setToolTip("Run PlanTUS and place the transducer at the composite-score optimum")
         auto.clicked.connect(lambda: self._run(False))
         h.addWidget(auto)
+        pick = QPushButton("Choose in Workbench…")
+        pick.setToolTip("Run PlanTUS and pick the transducer position on its maps in Connectome Workbench")
+        pick.clicked.connect(lambda: self._run(True))
+        h.addWidget(pick)
         self.refresh()
 
     def _run(self, interactive: bool) -> None:
-        from .. import launcher
-        if not self.window.save():
-            return
-        script = launcher.write_plantus_script(self.window.model.path, self.window.prestus_root,
-                                               interactive)
-        page = self.window.show_special(RUN)
-        if page.run_script(self.TASK, script) and not self._waiting:
+        from .plantus_page import run_plantus
+        if run_plantus(self.window, interactive, None) == "local" and not self._waiting:
             self._waiting = True
-            page.finished.connect(self._done)
+            self.window.pages[RUN].finished.connect(self._done)
 
     def _done(self, task: str, ok: bool) -> None:
-        if task != self.TASK:
+        from .plantus_page import TASK
+        if task != TASK:
             return
         self.window.pages[RUN].finished.disconnect(self._done)
         self._waiting = False

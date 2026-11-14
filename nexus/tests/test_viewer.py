@@ -1,5 +1,6 @@
 """Placement viewer on a synthetic head, offscreen."""
 
+import math
 import os
 
 import numpy as np
@@ -68,8 +69,8 @@ def test_place_snap_and_match(app, schema, prestus_root, subject, space):
     ep = m.get("transducer.focal_distance_ep")
     assert ep == pytest.approx(np.linalg.norm(trans - focus) - bowl.offset, abs=0.05)
     page._draw()                                   # renders without error
-    assert "Exit plane vs scalp" in page.info.text()
-    assert "rim to scalp" in page.info.text()          # beam QC (placement.beam_qc)
+    assert "Exit plane → scalp" in page.info.text()
+    assert "Rim → scalp" in page.info.text()           # beam QC (placement.beam_qc)
 
 
 def test_qc_issues_flag_depth_mismatch_and_exit_plane_in_scalp(app, schema, prestus_root, subject):
@@ -216,3 +217,69 @@ def test_trajectory_import(app, schema, prestus_root, subject, tmp_path, monkeyp
     np.testing.assert_allclose(focus, [0, 0, 10])
     # transducer on +z at focal_distance_bowl = ep + offset
     assert trans[2] - focus[2] == pytest.approx(60 + page._bowl().offset, abs=0.1)
+
+
+def test_placement_undo_redo(app, schema, prestus_root, tmp_path):
+    import numpy as np
+    from prestus_nexus.model import ConfigModel
+    from prestus_nexus.session import Session
+    from prestus_nexus.ui.main_window import VIEWER, MainWindow
+    m = ConfigModel(schema)
+    m.set("placement.manual.coordinate_space", "ras")
+    w = MainWindow(m, Session(tmp_path / "s.yaml"), prestus_root)
+    v = w.pages[VIEWER]
+    assert not v.undo_btn.isEnabled() and not v.redo_btn.isEnabled()
+    v._write("focus_pos", np.array([1.0, 2.0, 3.0]))
+    app.processEvents()                                   # one undo step per action
+    v._write("focus_pos", np.array([4.0, 5.0, 6.0]))
+    v._write("trans_pos", np.array([0.0, 0.0, -60.0]))   # same action: no extra step
+    app.processEvents()
+    assert len(v._undo) == 2 and v.undo_btn.isEnabled()
+    m.set("transducer.freq_hz", 250e3)                   # an edit elsewhere is kept by undo
+    v.undo()
+    assert m.get("transducer.focus_pos") == [1.0, 2.0, 3.0]
+    assert not m.is_overridden("transducer.trans_pos")
+    assert m.get("transducer.freq_hz") == 250e3
+    v.undo()
+    assert not m.is_overridden("transducer.focus_pos") and not v.undo_btn.isEnabled()
+    v.redo()
+    v.redo()
+    assert m.get("transducer.focus_pos") == [4.0, 5.0, 6.0]
+    assert m.get("transducer.trans_pos") == [0.0, 0.0, -60.0] and not v.redo_btn.isEnabled()
+    v._add_transducer()                                   # adding a transducer undoes too
+    app.processEvents()
+    assert m.n_transducers == 2
+    v.undo()
+    assert m.n_transducers == 1 and m.get("transducer.focus_pos") == [4.0, 5.0, 6.0]
+    w.dirty = False
+    w.close()
+
+
+def test_images_load_in_the_background_and_grid_z_shows_with_two_transducers(
+        app, schema, prestus_root, subject):
+    import time
+    m = ConfigModel(schema, EquipmentLibrary(prestus_root))
+    for k, v in {"subject_id": 4, "path.anat": str(subject), "transducer.serial": "CTX_500_026",
+                 "placement.manual.coordinate_space": "ras",
+                 "transducer.trans_pos": [-30.0, 0.0, 40.0], "transducer.focus_pos": [0.0, 0.0, 0.0]}.items():
+        m.set(k, v)
+    page = PlacementPage(m)
+    page.refresh()                                   # does not wait for the read
+    deadline = time.time() + 20
+    while page.images_loading() and time.time() < deadline:
+        app.processEvents()                          # the relay draws when the read is done
+        time.sleep(0.01)
+    assert not page.images_loading() and page._t1 is not None
+    assert not page.stack.is_empty()
+    assert not page.grid_z_action.isChecked()        # one transducer: off by default
+    m.add_transducer()
+    m.set("transducer.trans_pos", [30.0, 0.0, 40.0], 1)
+    m.set("transducer.focus_pos", [0.0, 0.0, 0.0], 1)
+    page.refresh()
+    assert page.grid_z_action.isChecked()
+    line = page._grid_z_line()
+    d = line[1] - line[0]
+    np.testing.assert_allclose(np.abs(d / np.linalg.norm(d)), [0, 0, 1], atol=1e-6)   # bisector
+    page.grid_z_action.setChecked(False)             # the user's choice sticks
+    page.refresh()
+    assert not page.grid_z_action.isChecked()
