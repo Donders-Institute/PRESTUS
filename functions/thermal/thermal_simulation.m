@@ -53,10 +53,9 @@ function [thermal_diff_obj, time_status_seq, results_heating] = thermal_simulati
 %                  reintegrated by the caller before this function is invoked.
 %                  When using an independent thermal grid, pass the
 %                  kwave_medium_th returned by thermal_grid_setup.
-%   sensor       - struct with sensor.mask (used to define focal axis recording
-%                  window); mask must be sized to kgrid dimensions.  When
-%                  using an independent thermal grid, pass a placeholder struct
-%                  with mask = ones(parameters_th.grid.dims).
+%   sensor       - not used: kWaveDiffusion gets no sensor, and all heating
+%                  results come from the full temperature field. Kept for the
+%                  call signature; any struct, e.g. struct('mask', ones(dims)).
 %   source       - struct; Q is overwritten internally from p_max_all
 %   transf       - affine forward transform (T1 → simulation grid, 4×4).
 %                  Used (a) to resample NIfTI sensor_data into the grid, and
@@ -110,25 +109,8 @@ end
 % thermal parameters, see doc_thermal_simulations.                  %
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
-% Clear the sensor mask
-sensor.mask = zeros(size(sensor.mask));
-
 % Transducer position in grid coordinates
 tr = parameters.transducer(1);
-
-% Place sensor along the focal axis 
-heating_window_dims = ones(2,3);
-for i = 1:2
-    heating_window_dims(:,i) = [...
-        max(1, -parameters.thermal.sensor_xy_halfsize + tr.trans_pos(i)), ...
-        min(parameters.grid.dims(i), parameters.thermal.sensor_xy_halfsize + tr.trans_pos(i))];
-end
-
-% Define a simulation window
-if length(size(parameters.grid.dims))>2
-    heating_window_dims(2,3) = parameters.grid.dims(3);
-end
-sensor.mask(heating_window_dims(1,1):heating_window_dims(2,1), heating_window_dims(1,2):heating_window_dims(2,2), :) = 1;
 
 % [(pseudo-)CT] if 'k-plan' mapping is used for density:
 % skull bone density is fixed for thermal simulation
@@ -227,13 +209,9 @@ else
     kwave_medium = rmfield(kwave_medium, 'perfusion_coeff');
 end
 
-% create kWaveDiffusion object
-% pass sensor only when per-step recording is explicitly requested; otherwise clear it to save memory
-record_every_step = isfield(parameters.thermal, 'record_t_at_every_step') && parameters.thermal.record_t_at_every_step;
-if ~record_every_step
-    sensor = [];
-end
-clear record_every_step;
+% create kWaveDiffusion object without a sensor: the heating results below are
+% taken from the full temperature field (thermal_diff_obj.T, .cem43)
+sensor = [];
 
 % Check if DataCast is supported
 try

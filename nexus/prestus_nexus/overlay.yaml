@@ -255,8 +255,6 @@ fields:
   timing.equal_step_duration: {kind: flag, unit: ''}
   thermal.cem43_iso: {kind: flag}
   thermal.temp_0.*: {unit: °C}
-  thermal.sensor_xy_halfsize: {unit: grid points}
-  thermal.record_t_at_every_step: {kind: flag}
   thermal.log_thermal_updates: {kind: flag}
 
   # ── Backends ─────────────────────────────────────────────────────────
@@ -398,6 +396,8 @@ deprecated:
   calibration.fit_velocity_to_intensity: {use: [], kind: removed, since: v0.6.1, note: "the drive scales with sqrt(ISPPA)"}
   calibration.opt_upper_velocity: {use: [], kind: removed, since: v0.7-pre, note: "the drive scales with sqrt(ISPPA)"}
   calibration.opt_amp_validation: {use: [], kind: removed, since: v0.7-pre, note: "the drive scales with sqrt(ISPPA); kwave_drive_calibration calibrates each depth once"}
+  thermal.sensor_xy_halfsize: {use: [], kind: removed, since: v0.7-pre, note: "the thermal simulation records no sensor; heating results come from the full temperature field"}
+  thermal.record_t_at_every_step: {use: [], kind: removed, since: v0.7-pre, note: "the thermal simulation records no sensor; heating results come from the full temperature field"}
   # Converted where they are read (source):
   transducer.annular.elem_amp: {use: transducer.annular.elem_p_amp, source: validate_annular_transducer.m}
   transducer.matrix.elem_amp: {use: transducer.matrix.elem_p_amp, source: validate_matrix_transducer.m}
@@ -935,8 +935,6 @@ display:
   thermal.*: {advanced: true}
   thermal.cem43_iso: {label: ISO CEM43 variant, help: Use the ISO 14708-3 / ITRUSST form of CEM43 in the HTML report. Both forms are always computed and saved.}
   thermal.temp_0: {label: Initial temperatures}
-  thermal.sensor_xy_halfsize: {label: Temperature sensor half-width}
-  thermal.record_t_at_every_step: {label: Record every time step (memory)}
   thermal.log_thermal_updates: {label: Verbose thermal log}
 
   hpc.exclude: {label: "Excluded nodes"}
@@ -976,8 +974,6 @@ tuning:
   grid.thermal_fov_mm: [speed, memory]
   timing.pt_timestep: [speed, accuracy]
   timing.post_pt_timestep: [speed, accuracy]
-  thermal.sensor_xy_halfsize: [memory]
-  thermal.record_t_at_every_step: [memory]
   jwave.use_gpu: [speed]
   jwave.precision: [accuracy, memory]
   jwave.gmres_maxiter: [speed, accuracy]

@@ -700,22 +700,12 @@ end
         note_lbl(gl, 14, 'Both forms are always computed and saved; this selects the one the HTML report uses. Default: k-Wave kWaveDiffusion (R=0 below 37°C, 0.25 for 37≤T<43, 0.5 for T≥43).');
         sp(gl, 15);
 
-        sec(gl, 16, 'Sensor & Recording');
-        lbl(gl, 17, 1, 'Sensor half-window size');
-        nedt(gl, 17, 2, 'thermal.sensor_xy_halfsize', 100); lbl(gl, 17, 3, 'voxels');
-        note_lbl(gl, 18, 'Max half-size of temperature recording window. Reduce if memory is limited.');
-
-        lbl(gl, 19, 1, 'Record T at every step');
-        chk(gl, 19, 2, 'thermal.record_t_at_every_step', false, ...
-            'Record full sensor window at every timestep (memory intensive)');
-        sp(gl, 20);
-
-        sec(gl, 21, 'Initial Temperature (°C)');
+        sec(gl, 16, 'Initial Temperature (°C)');
         tissues_t = {'water','brain','skin','skull','skull_cortical','skull_trabecular'};
         for i = 1:numel(tissues_t)
-            lbl(gl, 21+i, 1, tissues_t{i});
-            nedt(gl, 21+i, 2, ['thermal.temp_0.' tissues_t{i}], 37);
-            lbl(gl, 21+i, 3, '°C');
+            lbl(gl, 16+i, 1, tissues_t{i});
+            nedt(gl, 16+i, 2, ['thermal.temp_0.' tissues_t{i}], 37);
+            lbl(gl, 16+i, 3, '°C');
         end
     end
 

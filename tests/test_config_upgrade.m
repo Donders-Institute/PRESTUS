@@ -176,6 +176,17 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_config
             tc.verifyEmpty(fieldnames(u));
         end
 
+        function test_thermal_sensor_keys_are_dropped_with_notice(tc)
+            c = struct('thermal', struct('sensor_xy_halfsize', 50, 'record_t_at_every_step', 1, ...
+                'log_thermal_updates', 1));
+            tc.verifyWarning(@() upgrade_config_keys(c, 'x'), 'prestus:renamedConfigKey');
+            u = tc.upgrade_quiet(c);
+            tc.verifyFalse(isfield(u.thermal, 'sensor_xy_halfsize'));
+            tc.verifyFalse(isfield(u.thermal, 'record_t_at_every_step'));
+            tc.verifyEqual(u.thermal.log_thermal_updates, 1);
+            tc.verifyEmpty(tc.unknown(u));
+        end
+
         function test_removed_key_with_unsupported_value_stops(tc)
             tc.verifyError(@() tc.upgrade_quiet(struct('subject_subfolder', 0)), 'prestus:legacyConfigKey');
             labels = charm_seg_labels();

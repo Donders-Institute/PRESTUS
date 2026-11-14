@@ -681,8 +681,6 @@ See [doc_simulations-thermal.md](doc_simulations-thermal.md).
 |---|---|---|---|
 | `cem43_iso` | CEM43 form used in the HTML report (dashboard, safety verdict, methods text): ISO 14708-3 / ITRUSST (`1`) or k-Wave `kWaveDiffusion` (`0`). | `0` | Both forms are always computed and written to CSV, NIfTI and figures. With `thermal_backend: babelbrain` it is set to `0` with a warning (`prestus:cem43IsoBabelBrain`): BabelBrain does not compute the ISO form. |
 | `temp_0.{tissue}` | Initial temperature per tissue compartment [°C]. | `37` | Tissues: `water`, `skull`, `brain`, `skin`, `skull_trabecular`, `skull_cortical` |
-| `sensor_xy_halfsize` | Sensor window half-size for temperature recording [grid units]. | `100` | |
-| `record_t_at_every_step` | Record temperature at every time step for the full sensor window? | `0` | Memory-intensive; disable if out-of-memory errors occur. |
 | `log_thermal_updates` | Show k-Wave's thermal output for every time step. | `0` | `0`: only the first step is shown in full. |
 
 ---

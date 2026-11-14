@@ -5,7 +5,7 @@ Tissue absorbs part of the ultrasound and heats up, and temperature rise and the
 On this page:
 
 - [Protocol Timing](#protocol-timing): describing pulses, pulse trains, repetitions and the post-stimulation period.
-- [Step, Temperature and Sensor Settings](#step-temperature-and-sensor-settings): step sizes, starting temperature and the temperature sensor.
+- [Step, Temperature and Sensor Settings](#step-temperature-and-sensor-settings): step sizes and starting temperature.
 - [Heat Deposition](#heat-deposition): how tissue absorption turns the acoustic field into heat.
 - [Thermal Dose (CEM43) Calculation](#thermal-dose-cem43-calculation): the two CEM43 formulations and their outputs.
 
@@ -60,8 +60,6 @@ timing:
 | `timing.equal_step_duration` | `1`: every on and off period is split into steps of `pt_timestep`. In the first example above (PD 20 ms, PRI 200 ms, PTD 20 s, `pt_timestep` 20 ms), each of the 100 pulses takes 1 step with stimulation and 9 without (10 × 100 = 1,000 steps). `0` (default): every on and off period is one simulation step (2 × 100 = 200 steps), which reduces the computational load. |
 | `timing.post_ptri_dur` | Duration of the post-stimulation period after the PTRD. |
 | `thermal.temp_0` | Starting temperature in degrees, per tissue. |
-| `thermal.sensor_xy_halfsize` | Half-size (grid units) of the rectangular XY sensor window centred on the transducer position. Only voxels in this window enter the temperature sensor mask passed to `kWaveDiffusion`; the full Z extent is always included. A smaller value lowers memory use. |
-| `thermal.record_t_at_every_step` | `0` (default): the sensor is discarded before the simulation and only the final temperature field is kept. `1`: the full sensor window is stored at every time step; needed for the complete temperature time series, but can cause `out of memory` errors for large grids or many time steps. |
 
 ## Heat Deposition
 

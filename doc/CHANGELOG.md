@@ -171,6 +171,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Phantom voxels must be isotropic; an axisymmetric run on a 3D phantom cuts the plane at a 3D `transducer.trans_pos` (warns when the centre is ambiguous)
 - Focus positions with `focus_pos(1) > focus_pos(2)` are no longer turned into column vectors
 - Grid, medium and acoustic caches of phantom runs record the phantom file; a reused acoustic cache is checked against the run's settings (`io.cache_signature_check`)
+- Removed `thermal.sensor_xy_halfsize` and `thermal.record_t_at_every_step`: neither had an effect on results, and configs that set them load with a notice
 
 #### Multi-transducer
 - Incoherent summation of independent-element arrays; exit-plane mask covers all transducers
