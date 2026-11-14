@@ -229,12 +229,15 @@ def load_entry(library, serial: str, ds: str = "", library_path: str = "") -> tu
         return None, cal.path
 
 
-
-
-def hydrophone_csv(entry: dict | None, prestus_root: Path | None) -> Path | None:
-    """meta.char_data resolved as build_transducer_library.m does (CHAR_DATA_ROOT =
-    <PRESTUS>/local/profiles), if that file exists."""
-    rel = ((entry or {}).get("meta") or {}).get("char_data")
+def hydrophone_csv(entry: dict | None, prestus_root: Path | None, library=None) -> Path | None:
+    """meta.char_data, if that file exists: with an equipment library, resolved as
+    resolve_profile_file.m (your own libraries' profiles/ first, then
+    <PRESTUS>/local/profiles); without one, against <PRESTUS>/local/profiles
+    (CHAR_DATA_ROOT of build_transducer_library.m)."""
+    meta = (entry or {}).get("meta") or {}
+    rel = meta.get("char_data")
+    if rel and library is not None:
+        return library.profile_file(str(rel), str(meta.get("tran_serial") or ""))
     if not rel or prestus_root is None:
         return None
     p = Path(str(rel))

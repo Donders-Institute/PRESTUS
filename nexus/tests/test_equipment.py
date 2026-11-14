@@ -29,7 +29,7 @@ def test_devices_load(library):
 
 def test_calibration_lookup_uses_combo_name(library, tmp_path):
     cal = library.calibration("CTX_500_026", "SC_203_035")
-    assert cal.found and not cal.fallback and cal.path.name == "CTX_500_026_SC_203_035.yaml"
+    assert cal.found and not cal.fallback and cal.path.name == "tran-CTX_500_026_ds-SC_203_035_calib.yaml"
     assert cal.intensities                              # e.g. i30 -> 30 W/cm²
     assert not library.calibration("CTX_500_026", "NOPE").found
     # a user library with an entry takes precedence (transducer.library_path)
@@ -128,3 +128,95 @@ def test_changed_entry_is_read_again(tmp_path):
     assert EquipmentLibrary(tmp_path).get("TX_1").name == "first"
     entry.write_text("type: 'transducer'\nserial: 'TX_1'\nname: 'second one'\n")
     assert EquipmentLibrary(tmp_path).get("TX_1").name == "second one"
+
+
+def test_unknown_unit_falls_back_to_its_model(library):
+    assert library.model_for("CTX_500_031") == "CTX_500"
+    assert library.model_for("CTX_250_2ch_007") == "CTX_250_2ch"      # longest model prefix
+    assert library.model_for("CTX_500_026") is None                   # in the library itself
+    assert library.model_for("CTX_500") is None
+    assert library.model_for("NOT_A_DEVICE_001") is None
+    assert library.lookup("CTX_500_031").serial == "CTX_500"
+    assert library.lookup("CTX_500_026").serial == "CTX_500_026"
+    for serial, dev in library.devices.items():                       # every entry names its model
+        if serial != "CTX_500_006":
+            assert dev.model in library.devices, serial
+
+
+def test_model_fallback_is_a_warning_and_resolves_geometry(schema, library):
+    m = ConfigModel(schema, library)
+    m.set("transducer.serial", "CTX_500_031")
+    m.set("transducer.combo.ds_serial", "SC_203_035")
+    m.set("transducer.focal_distance_ep", 50)
+    assert m.effective()["transducer"]["annular"]["curv_radius_mm"] == 62.94
+    issues = checks.library_issues(m)
+    found = {(i.level, i.path) for i in issues}
+    assert ("warning", "transducer.serial") in found
+    assert not any(i.level == "error" for i in issues), [i.message for i in issues]
+
+
+def test_unit_inherits_model_steering_range(library):
+    model, unit = library.get("IS_PCD15287"), library.get("IS_PCD15287_01002")
+    assert (unit.min_foc, unit.max_foc) == (model.min_foc, model.max_foc)
+    assert unit.min_foc < 7.1 and unit.max_foc > 93.92     # hardware range spans the measured depths
+
+
+def test_deprecated_device_is_labelled(library):
+    from dataclasses import replace
+    dev = replace(library.get("CTX_500_026"), status="deprecated", superseded_by="CTX_500")
+    assert dev.deprecated and dev.label().endswith("(deprecated)")
+
+
+def test_opm_variants_are_excluded_but_resolve(library):
+    for serial in ("IS_PCD15473_01001_OPM", "IS_PCD15473_01003_OPM"):
+        dev = library.get(serial)
+        assert dev is not None and dev.excluded and dev.label().endswith("(excluded)")
+        assert dev.geometry                                 # still usable by earlier studies
+    assert not library.get("IS_PCD15473_01001").excluded
+
+
+def test_own_library_folder_adds_equipment(schema, prestus_root, tmp_path):
+    """Equipment entries in transducer.library_path add a unit that inherits its model."""
+    own = tmp_path / "my_library"
+    own.mkdir()
+    (own / "tran-IS_PCD15473_09999_transducer.yaml").write_text(
+        "type: transducer\nserial: IS_PCD15473_09999\nmodel: IS_PCD15473\nname: my unit\n"
+        "combos:\n  IGT_32_ch_comb_10_ch: {}\n")
+    lib = EquipmentLibrary(prestus_root)
+    m = ConfigModel(schema, lib)
+    m.set("transducer.serial", "IS_PCD15473_09999")
+    assert m.device(0).serial == "IS_PCD15473"           # not shipped: falls back to its model
+    m.set("transducer.library_path", str(own))
+    dev = m.device(0)
+    assert dev is not None and dev.user and dev.label().endswith("(own library)")
+    assert dev.geometry == lib.get("IS_PCD15473").geometry     # from the shipped model
+    assert dev.combos["IGT_32_ch_comb_10_ch"].available_ch == 32  # from ds/
+    m.set("transducer.library_path", "")
+    assert m.device(0).serial == "IS_PCD15473"
+
+
+def _unit(folder, name):
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "tran-IS_PCD15473_09998_transducer.yaml").write_text(
+        f"type: transducer\nserial: IS_PCD15473_09998\nmodel: IS_PCD15473\nname: {name}\n")
+
+
+def test_own_libraries_search_order(schema, prestus_root, tmp_path, monkeypatch):
+    """Study library_path before path.transducer_library before PRESTUS_TRANSDUCER_LIBRARY."""
+    study, project, machine = tmp_path / "study", tmp_path / "project", tmp_path / "machine"
+    for folder in (study, project, machine):
+        _unit(folder, folder.name)
+    (machine / "profiles").mkdir()
+    (machine / "profiles" / "p.csv").write_text("x")
+    monkeypatch.setenv("PRESTUS_TRANSDUCER_LIBRARY", str(machine))
+    lib = EquipmentLibrary(prestus_root)
+    m = ConfigModel(schema, lib)
+    m.set("transducer.serial", "IS_PCD15473_09998")
+    assert m.device(0).name == "machine"
+    m.set("path.transducer_library", str(project))
+    assert m.device(0).name == "project"
+    m.set("transducer.library_path", str(study))
+    assert m.device(0).name == "study"
+    assert m.user_library_folders() == [study, project, machine]
+    assert lib.profile_file("p.csv", "IS_PCD15473_09998") == machine / "profiles" / "p.csv"
+    assert lib.profile_file("nope.csv") is None

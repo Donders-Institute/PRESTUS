@@ -414,7 +414,8 @@ class StartPage(QWidget):
         self.dev_combo.clear()
         self.dev_combo.addItem("Choose a device…", "")
         for key, dev in devices.items():
-            self.dev_combo.addItem(dev.label(), key)
+            if not dev.excluded or key == str(serial):     # excluded: listed only when the study names it
+                self.dev_combo.addItem(dev.label(), key)
         idx = self.dev_combo.findData(str(serial)) if not is_empty(serial) else 0
         if idx < 0:
             self.dev_combo.addItem(f"{serial} (not in the library)", str(serial))

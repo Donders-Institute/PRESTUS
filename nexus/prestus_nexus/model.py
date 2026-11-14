@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import os
 import functools
 from dataclasses import dataclass
 from pathlib import Path
@@ -257,14 +258,45 @@ class ConfigModel:
         return tx if isinstance(tx, list) else [tx]
 
     # ── equipment library layer ─────────────────────────────────────────
+    def user_library_folders(self) -> list[Path]:
+        """Your own transducer libraries, most specific first, as
+        transducer_library_folders.m: transducer.library_path (this study),
+        path.transducer_library (this project), PRESTUS_TRANSDUCER_LIBRARY (this machine).
+        They may hold equipment entries next to calibration entries; relative paths are
+        taken from the study file's folder."""
+        values: list = []
+        for ti in range(len(self.tx)):
+            values.append(self._tx_value("transducer.library_path", ti))
+        project = self.get("path.transducer_library")
+        values += project if isinstance(project, list) else [project]
+        env = os.environ.get("PRESTUS_TRANSDUCER_LIBRARY", "").strip()
+        values += env.split(os.pathsep) if env else []
+        out: list[Path] = []
+        for value in values:
+            if is_empty(value) or not isinstance(value, str) or not value.strip():
+                continue
+            p = Path(value.strip()).expanduser()
+            if not p.is_absolute() and self.path is not None:
+                p = self.path.parent / p
+            if p not in out and p.is_dir():
+                out.append(p)
+        return out
+
+    def _sync_library(self) -> None:
+        if self.library is not None:
+            self.library.set_user_folders(self.user_library_folders())
+
     def device(self, ti: int = 0) -> "Device | None":
         """Library device named by transducer ti's serial, if any."""
         if self.library is None:
             return None
-        return self.library.get(self._tx_value("transducer.serial", ti))
+        self._sync_library()
+        return self.library.lookup(self._tx_value("transducer.serial", ti))
 
     def _resolve_serial(self, tx: dict) -> dict:
-        dev = self.library.get(tx.get("serial")) if self.library else None
+        if self.library is not None:
+            self._sync_library()
+        dev = self.library.lookup(tx.get("serial")) if self.library else None
         if dev is None:
             return tx
         out = _merge_unset(dev.geometry, tx)
@@ -416,6 +448,29 @@ class ConfigModel:
     @property
     def n_transducers(self) -> int:
         return len(self.tx)
+
+    def transducer_name(self, ti: int) -> str:
+        """Transducer ti's serial (its name in the equipment library), '' if unset.
+        Follows the PRESTUS merge rule, so an unset serial inherits transducer 1's."""
+        serial = self.get(f"{TX}.serial", ti)
+        return "" if is_empty(serial) else str(serial)
+
+    def transducer_title(self, ti: int) -> str:
+        """'Transducer N: <serial>', or 'Transducer N' without a serial."""
+        name = self.transducer_name(ti)
+        return f"Transducer {ti + 1}: {name}" if name else f"Transducer {ti + 1}"
+
+    def transducer_tooltip(self, ti: int) -> str:
+        """Hover text naming transducer ti's device: library label and manufacturer when
+        the serial is in the equipment library, else the bare serial."""
+        name = self.transducer_name(ti)
+        if not name:
+            return f"Transducer {ti + 1}: no device set (transducer.serial)"
+        dev = self.library.lookup(name) if self.library is not None else None
+        if dev is None:
+            return f"Transducer {ti + 1}: {name} (not in the equipment library)"
+        maker = f", {dev.manufact}" if dev.manufact else ""
+        return f"Transducer {ti + 1}: {dev.label()}{maker}"
 
     @_recorded("Add transducer")
     def add_transducer(self) -> int:

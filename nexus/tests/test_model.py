@@ -93,3 +93,16 @@ def test_transducer_list_has_identical_top_level_keys(schema):
     again = ConfigModel(schema)
     again.load_dict({"transducer": out})
     assert values_equal(again.effective(), m.effective())
+
+
+def test_transducer_name_title_and_tooltip(schema):
+    m = ConfigModel(schema)
+    m.set("transducer.serial", "")
+    assert m.transducer_title(0) == "Transducer 1"
+    assert "no device set" in m.transducer_tooltip(0)
+    m.set("transducer.serial", "CTX-TEST")
+    m.add_transducer()
+    assert m.transducer_title(1) == "Transducer 2: CTX-TEST"   # inherited from transducer 1
+    m.set("transducer.serial", "NS-TEST", 1)
+    assert m.transducer_name(1) == "NS-TEST"
+    assert m.transducer_tooltip(1).startswith("Transducer 2: NS-TEST")

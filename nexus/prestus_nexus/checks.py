@@ -581,17 +581,29 @@ def library_issues(model: ConfigModel) -> list[Issue]:
     issues: list[Issue] = []
     if model.library is None:
         return issues
+    model._sync_library()                  # equipment entries in transducer.library_path
     for ti, t in enumerate(model.effective_transducers()):
         serial = t.get("serial")
         if is_empty(serial):
             continue
         dev = model.library.get(serial)
         if dev is None:
-            issues.append(Issue("error", f"{TX}.serial",
-                                f"'{serial}' is not in config/equipment", ti))
-            continue
-        ds = (t.get("combo") or {}).get("ds_serial") if isinstance(t.get("combo"), dict) else None
-        if not is_empty(ds) and ds not in dev.combos:
+            fallback = model.library.model_for(serial)
+            if fallback is None:
+                issues.append(Issue("error", f"{TX}.serial",
+                                    f"'{serial}' is not in config/equipment or the study's library_path", ti))
+                continue
+            issues.append(Issue("warning", f"{TX}.serial",
+                                f"'{serial}' is not in config/equipment; PRESTUS uses its model "
+                                f"'{fallback}' (model geometry, geometric calibration)", ti))
+            serial, dev = fallback, model.library.get(fallback)
+        if dev.deprecated or dev.excluded:
+            alt = f"; use '{dev.superseded_by}' for new studies" if dev.superseded_by else ""
+            issues.append(Issue("warning", f"{TX}.serial",
+                                f"'{serial}' is {dev.status} (kept for earlier studies){alt}", ti))
+        ds =(t.get("combo") or {}).get("ds_serial") if isinstance(t.get("combo"), dict) else None
+        is_model = dev.model == dev.serial and not dev.combos   # no driving systems to list
+        if not is_empty(ds) and ds not in dev.combos and not is_model:
             issues.append(Issue("warning", f"{TX}.combo.ds_serial",
                                 f"'{ds}' is not a listed driving system for {serial} "
                                 f"({', '.join(dev.combos) or 'none listed'})", ti))
@@ -599,10 +611,10 @@ def library_issues(model: ConfigModel) -> list[Issue]:
         if _is_num(ep):
             if _is_num(dev.min_foc) and ep < dev.min_foc:
                 issues.append(Issue("warning", f"{TX}.focal_distance_ep",
-                                    f"{ep:g} mm is below the device's min_foc {dev.min_foc:g} mm", ti))
+                                    f"{ep:g} mm is below the hardware steering range (min_foc {dev.min_foc:g} mm)", ti))
             if _is_num(dev.max_foc) and ep > dev.max_foc:
                 issues.append(Issue("warning", f"{TX}.focal_distance_ep",
-                                    f"{ep:g} mm exceeds the device's max_foc {dev.max_foc:g} mm", ti))
+                                    f"{ep:g} mm is beyond the hardware steering range (max_foc {dev.max_foc:g} mm)", ti))
         if t.get("type") != "annular":
             continue
         ann = t.get("annular") or {}

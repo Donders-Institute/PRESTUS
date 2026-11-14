@@ -373,7 +373,6 @@ class MainWindow(QMainWindow):
         self._build_tools_menu()
         self.update_context()
         self._build_tabs()
-        self._refresh_cal_cov()
         self._apply_subtab_icons()
         self._build_help_menu()
         self._build_shortcuts()
@@ -632,6 +631,15 @@ class MainWindow(QMainWindow):
                 study.changed.connect(self._changed)
                 self.pages[STUDY] = study
                 self._section_tab[STUDY] = key
+            if key == "transducer":
+                # calibration coverage lives on the Calibration sub-tab (Library entry view);
+                # built before the sections so the 'calibration' section (focal-depth
+                # reference) goes onto it, not onto Settings
+                from .calibration_page import CalibrationPage
+                calib = CalibrationPage(self)
+                self.pages[CALIBRATION] = calib
+                self._section_tab[CALIBRATION] = key
+                tab.section_columns["calibration"] = calib.settings_column
             for section in spec.get("sections", []):
                 if section != GENERAL and schema.get(section) is None \
                         and not schema.section_is_virtual(section):
@@ -647,6 +655,24 @@ class MainWindow(QMainWindow):
                 page.changed.connect(self._changed)
                 self.pages[section] = page
                 self._section_tab[section] = key
+                if section == TX:
+                    # the cross-section right under the device spec, once a transducer is chosen
+                    from .transducer_view import TransducerSchematic
+                    self.schematic = TransducerSchematic(self.model)
+                    self.schematic.setMinimumHeight(260)
+                    self.schematic_card = self._card(
+                        "Transducer geometry", self.schematic,
+                        "Cross-section along the beam: elements, exit plane, geometric focus, the "
+                        "focal depth setting (✕) and the device's steering range.")
+                    page.add_extra(self.schematic_card)
+                    # several transducers: how they fire is set with the protocol
+                    self.coupling_link = QLabel(
+                        "Several transducers: set how they fire (coherent or async) under "
+                        "<a href='#coupling'>Sonication › Multi-transducer coupling</a>.")
+                    self.coupling_link.setObjectName("CardSub")
+                    self.coupling_link.linkActivated.connect(
+                        lambda _l: self.goto("simulation.transducer_coupling"))
+                    page.add_extra(self.coupling_link)
                 if section == "babelbrain":
                     # BabelBrain's HU mapping and internal air sit with the other CT settings
                     bb_ct_link = QLabel(
@@ -656,6 +682,12 @@ class MainWindow(QMainWindow):
                     bb_ct_link.setWordWrap(True)
                     bb_ct_link.linkActivated.connect(lambda _l: self.goto("pct.enabled"))
                     page.add_extra(bb_ct_link)
+                if section in ("tx_geometry", "tx_drive") and TX in self.pages:
+                    page.follow_transducer(self.pages[TX])     # one transducer selector per tab
+                if section == "tx_geometry":
+                    page.set_auto_collapse(
+                        lambda p=page: bool(self.model.get(f"{TX}.serial", p.ti)),
+                        "from the equipment library")
                 if section == "segmentation":
                     from .segmentation_panel import SegmentationPanel
                     self.segmentation_panel = SegmentationPanel(self)
@@ -712,34 +744,7 @@ class MainWindow(QMainWindow):
                 self.io_preview = IOPreviewPanel(self.model)
                 self.pages["io"].extras_below.addWidget(self.io_preview)   # under the I/O fields
             elif key == "transducer":
-                from .transducer_view import TransducerSchematic
-                self.schematic = TransducerSchematic(self.model)
-                card = self._card("Transducer geometry", self.schematic,
-                                  "Cross-section along the beam: elements, exit plane, geometric focus, the "
-                                  "focal depth setting (✕) and the device's steering range.")
-                from .calibration_plots import CalibrationCoverage
-                self.cal_cov = CalibrationCoverage(height=220)
-                cov_card = self._card("Calibration coverage", self.cal_cov,
-                                      "What the library entry covers, from its YAML: fit quality, drive and "
-                                      "phase corrections per calibrated depth; this study's depths as lines.")
-                # Both cards at their natural height in one scrolling column, so a short
-                # window scrolls instead of squeezing the plot under its caption
-                column = QWidget()
-                cl = QVBoxLayout(column)
-                cl.setContentsMargins(0, 0, 4, 0)
-                cl.setSpacing(12)
-                card.setMinimumHeight(300)
-                cl.addWidget(card, 1)
-                cl.addWidget(cov_card)
-                side = QScrollArea()
-                side.setWidgetResizable(True)
-                side.setWidget(column)
-                tab.set_side(side)
-                from .calibration_page import CalibrationPage
-                calib = CalibrationPage(self)
-                self.pages[CALIBRATION] = calib
-                self._section_tab[CALIBRATION] = key
-                tab.add_subtab(calib, "Calibration")
+                tab.add_subtab(self.pages[CALIBRATION], "Calibration")
             elif key == "placement":
                 from .placement_viewer import PlacementPage
                 viewer = PlacementPage(self.model)
@@ -786,22 +791,6 @@ class MainWindow(QMainWindow):
         if RUN in self.pages and RESULTS in self.pages:
             self.pages[RUN].finished.connect(
                 lambda _task, ok: self.pages[RESULTS].refresh() if ok else None)
-
-    def _refresh_cal_cov(self) -> None:
-        """Calibration coverage of the transducer being edited (library YAML only, no MATLAB)."""
-        if not hasattr(self, "cal_cov"):
-            return
-        from .. import calibration as cal
-        m = self.model
-        tx = self.pages.get(TX)
-        ti = tx.ti if isinstance(tx, SectionPage) else 0
-        serial, ds, lib = (m.get(f"{TX}.serial", ti), m.get(f"{TX}.combo.ds_serial", ti),
-                           m.get(f"{TX}.library_path", ti))
-        serial = "" if is_empty(serial) else str(serial)
-        ds = "" if is_empty(ds) else str(ds)
-        lib = "" if is_empty(lib) else str(lib)
-        depths = cal.study_depths(m, serial, ds) if serial else []
-        self.cal_cov.set_device(m.library, serial, ds, lib, depths)
 
     @staticmethod
     def _card(title: str, widget: QWidget, sub: str = "") -> QFrame:
@@ -1106,8 +1095,11 @@ class MainWindow(QMainWindow):
             self.timing_panel.refresh()
         if hasattr(self, "schematic"):
             tx = self.pages.get(TX)
-            self.schematic.set_transducer(tx.ti if isinstance(tx, SectionPage) else 0)
-            self._refresh_cal_cov()
+            ti = tx.ti if isinstance(tx, SectionPage) else 0
+            self.schematic.set_transducer(ti)
+            chosen = any(not is_empty(self.model.get(f"{TX}.{k}", ti)) for k in ("serial", "type"))
+            self.schematic_card.setVisible(chosen)      # shown once a transducer is selected
+            self.coupling_link.setVisible(self.model.n_transducers > 1)
         if hasattr(self, "io_preview"):
             self.io_preview.refresh()
         run = self.pages.get(RUN)

@@ -333,6 +333,38 @@ def test_plantus_actions_run_placement_only(window, monkeypatch):
     monkeypatch.setattr(type(window), "show_special", lambda self, key: shown.append(key))
     window.pages[RUN].finished.emit(PlantusActions.TASK, True)
     assert shown == [VIEWER] and not acts._waiting
+def test_transducer_tab_cards(window):
+    from prestus_nexus.model import TX
+    tab = window.tab_pages["transducer"]
+    window.tabs.setCurrentWidget(tab)
+    tx, geo, drive = (window.pages[s] for s in ("transducer", "tx_geometry", "tx_drive"))
+    assert [p.section for p in tab.sections[:3]] == ["transducer", "tx_geometry", "tx_drive"]
+    # one transducer selector: the Geometry and Drive cards follow the Transducer card
+    assert tx.tx_bar.isVisibleTo(tx) and not geo.tx_bar.isVisibleTo(geo) and not drive.tx_bar.isVisibleTo(drive)
+    assert any(r.node.path == f"{TX}.target_isppa_wcm2" for r in drive.rows)
+    assert any(r.node.path == f"{TX}.annular.elem_phase_deg" for r in drive.rows)
+    assert not any(r.node.path == f"{TX}.annular.elem_phase_deg" for r in geo.rows)
+    assert any(r.node.path == f"{TX}.annular.elem_od_mm" for r in geo.rows)
+    # the calibration coverage plot is on the Calibration sub-tab only
+    assert not hasattr(window, "cal_cov")
+    tx._add_transducer()                                                  # selects the new transducer
+    tab.refresh()
+    assert geo.ti == 1 and drive.ti == 1
+    tx.tx_combo.setCurrentIndex(0)
+    tab.refresh()
+    # geometry from the library: the card stays listed, collapsed, until opened by hand
+    window.model.set(f"{TX}.type", "annular")
+    window._changed()
+    assert not geo.body.isHidden() and geo.isVisibleTo(tab)
+    if window.model.library is not None and window.model.library.lookup("CTX_500_026") is not None:
+        window.model.set(f"{TX}.serial", "CTX_500_026")
+        window._changed()
+        assert geo.body.isHidden() and geo.isVisibleTo(tab) and "library" in geo.count.text()
+        geo.toggle.click()
+        window._changed()
+        assert not geo.body.isHidden()
+
+
 def test_coupling_on_sonication_tab(window):
     tab = window.tab_pages["sonication"]
     window.tabs.setCurrentWidget(tab)

@@ -331,9 +331,12 @@ class SectionPage(QFrame):
     def _update_tx_combo(self) -> None:
         self.tx_combo.blockSignals(True)
         self.tx_combo.clear()
-        self.tx_combo.addItems([f"Transducer {i + 1}" for i in range(self.model.n_transducers)])
+        for i in range(self.model.n_transducers):
+            self.tx_combo.addItem(self.model.transducer_title(i))
+            self.tx_combo.setItemData(i, self.model.transducer_tooltip(i), Qt.ItemDataRole.ToolTipRole)
         self.ti = min(self.ti, self.model.n_transducers - 1)
         self.tx_combo.setCurrentIndex(self.ti)
+        self.tx_combo.setToolTip(self.model.transducer_tooltip(self.ti))
         self.tx_combo.blockSignals(False)
         self.tx_remove.setEnabled(self.model.n_transducers > 1)
         self.tx_note.setText("Unset values fall back to transducer 1 (PRESTUS merge rule)"

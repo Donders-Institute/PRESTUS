@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QFormLayout, QGroupBox, QHBoxLayout,
+from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
                              QLabel, QPushButton, QRadioButton, QWidget)
 
 from .. import placement as pl
 from ..model import TX, ConfigModel, is_empty, iter_leaves
 from . import style
+from .readout import muted, readout, status
 
 GEOMETRY_GROUPS = ("annular", "matrix")
+# The panel sits inside a card, indented by the group box frame; its label column is that much
+# narrower than the card's (section.LABEL_WIDTH = 290), so its inputs start where the card's do.
+LABEL_COLUMN = 278
+GRID_SPACING = 14
 
 
 class DevicePanel(QGroupBox):
@@ -23,7 +28,22 @@ class DevicePanel(QGroupBox):
         self.model = model
         self.ti = 0
         self._setting = False
-        form = QFormLayout(self)
+        form = QGridLayout(self)
+        form.setHorizontalSpacing(GRID_SPACING)
+        form.setVerticalSpacing(8)
+        form.setColumnMinimumWidth(0, LABEL_COLUMN)
+        form.setColumnStretch(1, 1)
+
+        def add_row(label, item) -> None:
+            r = form.rowCount()
+            if label is None:                       # spans both columns
+                if isinstance(item, QWidget):
+                    form.addWidget(item, r, 0, 1, 2)
+                else:
+                    form.addLayout(item, r, 0, 1, 2)
+                return
+            form.addWidget(QLabel(label), r, 0)
+            form.addWidget(item, r, 1)
 
         self.rb_lib = QRadioButton("Equipment library")
         self.rb_custom = QRadioButton("Custom geometry")
@@ -34,15 +54,15 @@ class DevicePanel(QGroupBox):
         row.addWidget(self.rb_lib)
         row.addWidget(self.rb_custom)
         row.addStretch(1)
-        form.addRow(row)
+        add_row(None, row)
 
         self.device = QComboBox()
         self.ds = QComboBox()
-        form.addRow("Transducer", self.device)
-        form.addRow("Driving system", self.ds)
+        add_row("Transducer", self.device)
+        add_row("Driving system", self.ds)
         self.info = QLabel()
         self.info.setWordWrap(True)
-        form.addRow("", self.info)
+        add_row(None, self.info)
         self.inline = QLabel()
         self.inline.setWordWrap(True)
         self.inline.setStyleSheet(f"color: {style.active()['amber']};")
@@ -51,11 +71,12 @@ class DevicePanel(QGroupBox):
         irow = QHBoxLayout()
         irow.addWidget(self.inline, 1)
         irow.addWidget(self.clear_btn)
-        form.addRow(irow)
+        add_row(None, irow)
 
         devices = model.library.devices if model.library else {}
         for serial, dev in devices.items():
-            self.device.addItem(dev.label(), serial)
+            if not dev.excluded:
+                self.device.addItem(dev.label(), serial)
         if not devices:
             self.rb_lib.setEnabled(False)
             self.rb_lib.setToolTip("No equipment library found (config/equipment)")
@@ -71,6 +92,10 @@ class DevicePanel(QGroupBox):
         m = self.model
         serial = m.get(f"{TX}.serial", ti)
         dev = m.device(ti)
+        own = m.user_library_folders() if m.library is not None else []
+        if m.library is not None:          # the libraries checked, most specific first
+            self.rb_lib.setToolTip("Libraries checked, in order:\n" + "\n".join(
+                [f"own: {p}" for p in own] + ["shipped: config/equipment, config/calibration"]))
         self._setting = True
         uses_lib = not is_empty(serial)
         self.rb_lib.setChecked(uses_lib)
@@ -80,7 +105,13 @@ class DevicePanel(QGroupBox):
         if uses_lib:
             idx = self.device.findData(str(serial))
             if idx < 0:
-                self.device.addItem(f"{serial}  (not in library)", str(serial))
+                known = m.library.get(serial) if m.library else None
+                if known is not None:              # an excluded entry the study names
+                    self.device.addItem(known.label(), str(serial))
+                else:
+                    fallback = m.library.model_for(serial) if m.library else None
+                    note = f"uses model {fallback}" if fallback else "not in library"
+                    self.device.addItem(f"{serial}  ({note})", str(serial))
                 idx = self.device.count() - 1
             self.device.setCurrentIndex(idx)
         self._fill_ds(dev)
@@ -106,33 +137,41 @@ class DevicePanel(QGroupBox):
         dev = m.device(ti)
         if dev is None:
             self.info.setText("Geometry is taken from the fields below." if self.rb_custom.isChecked()
-                              else f"<span style='color:{style.active()['red']}'>Serial not found in config/equipment.</span>")
+                              else status("Serial not found in config/equipment.", "bad"))
             self.inline.setText("")
             self.clear_btn.setVisible(False)
             return
         freq = f"{dev.freq_hz / 1e3:g} kHz" if dev.freq_hz else "?"
-        rng = (f"{dev.min_foc:g}–{dev.max_foc:g} mm" if dev.min_foc is not None and dev.max_foc is not None
-               else "not specified")
         ds = m.get(f"{TX}.combo.ds_serial", ti)
-        lines = [f"<b>{dev.manufact}</b> · {dev.type or '?'} · {dev.n_elem or '?'} elements · {freq}",
-                 f"Focal range (exit plane): {rng}"]
-        ep = m.get(f"{TX}.focal_distance_ep", ti)
-        if isinstance(ep, (int, float)) and dev.min_foc is not None and dev.max_foc is not None:
-            ok = dev.min_foc <= ep <= dev.max_foc
-            colour = style.active()["green"] if ok else style.active()["red"]
-            lines[-1] += f" — requested <span style='color:{colour}'>{ep:g} mm</span>"
+        rows = [("Device", f"<b>{dev.manufact}</b> · {dev.type or '?'} · {dev.n_elem or '?'} elements "
+                           f"· {freq}")]
+        serial = m.get(f"{TX}.serial", ti)
+        if not is_empty(serial) and str(serial) != dev.serial:
+            rows.insert(0, ("Library entry", status(f"model {dev.serial}", "warn")
+                            + muted(f" ({serial} is not in the library: model geometry, "
+                                    "geometric calibration)")))
+        if dev.min_foc is not None and dev.max_foc is not None:
+            rng = f"{dev.min_foc:g}–{dev.max_foc:g} mm" + muted(" from the exit plane")
+            ep = m.get(f"{TX}.focal_distance_ep", ti)
+            if isinstance(ep, (int, float)) and not isinstance(ep, bool):
+                ok = dev.min_foc <= ep <= dev.max_foc
+                rng += "<br>focal depth " + status(f"{ep:g} mm · {'inside' if ok else 'outside'}",
+                                                   "ok" if ok else "bad")
+        else:
+            rng = muted("not specified")
+        rows.append(("Steering range", rng))
         if dev.type == "annular":
             ann_set = all(not is_empty(m.get(f"{TX}.annular.{k}", ti))
                           for k in ("elem_phase_deg", "elem_p_amp"))
             if ann_set:
-                lines.append("Calibration: phases and amplitude set inline (library not used)")
+                rows.append(("Calibration", "phases and amplitude set inline" + muted(" (library not used)")))
             else:
                 cal = m.library.calibration(dev.serial, None if is_empty(ds) else str(ds),
                                             m.get(f"{TX}.library_path", ti) or None)
-                mark = "✓" if cal.found and not cal.fallback else ("⚠" if cal.found else "✗")
-                lines.append(f"Calibration: {mark} {cal.summary()}")
-                lines.append(self._depth_status_line(m, ti, cal))
-        self.info.setText("<br>".join(lines))
+                level = "ok" if cal.found and not cal.fallback else ("warn" if cal.found else "bad")
+                rows.append(("Calibration", status(cal.summary(), level)))
+                rows.append(("At the focal depth", self._depth_status_line(m, ti, cal)))
+        self.info.setText(readout([("Equipment", rows)], label_width=LABEL_COLUMN + GRID_SPACING - 4))
         overrides = self._inline_geometry()
         if overrides:
             self.inline.setText(f"{len(overrides)} geometry value(s) set in this study override the "
@@ -150,19 +189,19 @@ class DevicePanel(QGroupBox):
         bowl = pl.Bowl.from_transducer(txs[ti]) if ti < len(txs) else None
         ep = pl.resolve_focal_distance_ep(txs[ti], bowl) if ti < len(txs) else None
         if ep is None:
-            return "&nbsp;&nbsp;at depth: set focal_distance_ep (or _bowl) to see coverage"
-        status = cal.at_depth(ep)
-        if status is None:
-            return f"&nbsp;&nbsp;at {ep:g} mm: no calibrated depths in this entry"
-        if status.in_range:
-            lo, hi = status.bracket
-            r2 = f", R² ≈ {status.nearest_r2:.2f} nearby" if status.nearest_r2 is not None else ""
-            return (f"&nbsp;&nbsp;at {ep:g} mm: <span style='color:{style.active()['green']}'>within range</span> "
-                    f"(between {lo:g}–{hi:g} mm, {status.phase_model}{r2})")
-        colour = style.active()["amber"] if status.phase_model == "blend" else style.active()["red"]
-        return (f"&nbsp;&nbsp;at {ep:g} mm: <span style='color:{colour}'>"
-                f"{status.extrapolation_mm:.1f} mm past the calibrated range</span> "
-                f"(nearest {status.nearest_mm:g} mm, {status.phase_model})")
+            return "set focal_distance_ep (or _bowl) to see coverage"
+        cov = cal.at_depth(ep)
+        if cov is None:
+            return f"{ep:g} mm: no calibrated depths in this entry"
+        if cov.in_range:
+            lo, hi = cov.bracket
+            r2 = f", R² ≈ {cov.nearest_r2:.2f} nearby" if cov.nearest_r2 is not None else ""
+            return (f"{ep:g} mm: {status('within range', 'ok')} "
+                    f"(between {lo:g}–{hi:g} mm, {cov.phase_model}{r2})")
+        level = "warn" if cov.phase_model == "blend" else "bad"
+        return (f"{ep:g} mm: "
+                + status(f"{cov.extrapolation_mm:.1f} mm past the calibrated range", level) + " "
+                f"(nearest {cov.nearest_mm:g} mm, {cov.phase_model})")
 
     def _inline_geometry(self) -> list[str]:
         t = self.model.tx[self.ti]

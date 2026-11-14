@@ -651,6 +651,12 @@ class CalibrationPage(QWidget):
                          "and save the entry. Runs on the Run tab (minutes per depth).",
         }
 
+        # config sections that belong to calibration (e.g. the focal-depth reference), placed
+        # here by the Transducer tab (TabPage.section_columns) rather than on its Settings sub-tab
+        self.settings_column = QVBoxLayout()
+        self.settings_column.setSpacing(8)
+        col.addLayout(self.settings_column)
+
         self.log = QPlainTextEdit(readOnly=True)
         self.log.setMinimumHeight(110)
         self.log.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
@@ -902,7 +908,8 @@ class CalibrationPage(QWidget):
                 self._record_from = key[:2]
                 self._say(f"Fit settings taken from the entry (meta.fit: {rec.get('mode', '')}, "
                           f"{rec.get('tool', '')}).")
-            csv = cplots.hydrophone_csv(self.entry, self.window.prestus_root)
+            csv = cplots.hydrophone_csv(self.entry, self.window.prestus_root,
+                                        getattr(self.window.model, "library", None))
             if csv is not None and not self.csv.text().strip():
                 self.csv.setText(str(csv))
                 self.auto_csv = str(csv)

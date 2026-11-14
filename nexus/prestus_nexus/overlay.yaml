@@ -174,11 +174,11 @@ fields:
   transducer.type: {kind: str, choices: [annular, matrix]}
   transducer.freq_hz: {kind: number, unit: Hz}
   transducer.target_isppa_wcm2: {kind: numbers, unit: W/cm²}
-  transducer.focal_distance_ep: {kind: number, unit: mm}
-  transducer.focal_distance_bowl: {kind: number, unit: mm}
-  transducer.focal_distance_offset: {kind: number, unit: mm, derived: true}
   transducer.trans_pos: {kind: vec3, group: placement}
   transducer.focus_pos: {kind: vec3, group: placement}
+  transducer.focal_distance_ep: {kind: number, unit: mm, group: tx_drive, group_first: true}
+  transducer.focal_distance_bowl: {kind: number, unit: mm, group: tx_drive, advanced: true}
+  transducer.focal_distance_offset: {kind: number, unit: mm, derived: true, group: tx_drive, advanced: true}
 
   transducer.annular: {visible_if: {key: transducer.type, in: [annular]}}
   transducer.annular.*: {kind: numbers}
@@ -723,7 +723,9 @@ tabs:
   - key: transducer
     label: Transducer
     intro: The device and driving system, its geometry, drive level and focal depth.
-    sections: [transducer, calibration]
+    sections: [transducer, tx_geometry, tx_drive, calibration]
+    doc: doc_nexus_tabs.md#transducer-tab
+    subtab_docs: {Calibration: doc_nexus_calibration-localite.md#calibration-page}
   - key: placement
     label: Placement
     intro: Where the transducer sits and where it focuses, from coordinates, neuronavigation or planning tools.
@@ -905,9 +907,9 @@ display:
 
   # Transducer
   transducer.name: {label: Name}
-  transducer.type: {label: Array type}
-  transducer.freq_hz: {label: Frequency}
-  transducer.target_isppa_wcm2: {label: Target free-water Isppa}
+  transducer.type: {label: Array type, group: tx_geometry}
+  transducer.freq_hz: {label: Frequency, group: tx_geometry}
+  transducer.target_isppa_wcm2: {label: "Target free-water ISPPA", group: tx_drive, group_first: true}
   transducer.trans_pos: {label: Transducer position (bowl apex)}
   transducer.focus_pos:
     label: Target position
@@ -922,21 +924,25 @@ display:
   transducer.combo.ds_serial: {label: Driving-system serial}
   transducer.max_elem_p_amp: {label: Drive limit, advanced: true}
   transducer.align_to_focus: {label: Align to focus, advanced: true}
-  transducer.annular: {label: Annular geometry and drive}
-  transducer.annular.*: {advanced: true}
+  transducer.annular: {label: Annular array, group: tx_geometry}
+  # the element geometry is needed without a library entry, so it is not advanced (the card
+  # starts collapsed when the library fills it)
   transducer.annular.elem_n: {label: Number of elements}
   transducer.annular.elem_id_mm: {label: Element inner diameters}
   transducer.annular.elem_od_mm: {label: Element outer diameters}
-  transducer.annular.elem_p_amp: {label: Element pressure amplitude, advanced: false}
-  transducer.annular.elem_phase_deg: {label: Element phases, advanced: false}
-  transducer.annular.elem_phase_rad: {label: Element phases (rad)}
+  transducer.annular.elem_p_amp: {label: Element pressure amplitude (calibration), advanced: true, group: tx_drive, help: "Drive pressure of each ring [Pa]. Usually left empty: the results are scaled to the target free-water ISPPA, and a library device takes its drive from its calibration entry. Set it only for a drive found by calibration."}
+  transducer.annular.elem_phase_deg: {label: Element phases (calibration), advanced: true, group: tx_drive, help: "Phase of each ring [deg]. Usually left empty: PRESTUS steers to the focal depth setting, with the calibrated phases of a library device or geometric phases otherwise. Set it only for phases found by calibration (or a dephased condition)."}
+  transducer.annular.elem_phase_rad: {label: Element phases (rad), advanced: true, group: tx_drive}
   transducer.annular.curv_radius_mm: {label: Radius of curvature}
   transducer.annular.dist_geom_ep_mm: {label: Exit plane to geometric focus}
-  transducer.annular.depth_mm: {label: Housing depth (display)}
-  transducer.matrix: {label: Matrix geometry and drive}
+  transducer.annular.depth_mm: {label: Housing depth (display), advanced: true}
+  transducer.matrix: {label: Matrix array, group: tx_geometry}
   transducer.matrix.*: {advanced: true}
-  transducer.matrix.elem_p_amp: {label: Element pressure amplitude, advanced: false}
-  transducer.matrix.steering: {label: Steering, advanced: false}
+  transducer.matrix.elem_p_amp: {label: Element pressure amplitude (calibration), advanced: true, group: tx_drive}
+  transducer.matrix.steering: {label: Steering, advanced: false, group: tx_drive}
+  transducer.matrix.elem_phase_override_deg: {label: Calibrated element phases, group: tx_drive}
+  transducer.matrix.use_steering_correction: {label: Apply library steering correction, group: tx_drive}
+  transducer.matrix.steering_correction: {label: Steering correction (inline), group: tx_drive}
 
   # Placement
   placement.mode: {label: Placement method, help: "How transducer and focus positions are obtained: 'manual' coordinates; 'localite' a recorded neuronavigation pose (ingested with neuronav_gui); 'heuristic' a search from an MNI target; 'mni' MNI coordinates snapped to the scalp; 'plantus' PlanTUS optimisation; 'tus_entry' the TUS_entry R tool."}

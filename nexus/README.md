@@ -79,6 +79,7 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 | `ui/export.py` | The download button on every figure: SVG, PDF, PNG and copy. |
 | `ui/errors.py` | Unexpected errors as a dialog instead of a crash, logged to `nexus_errors.log` in the cache folder. |
 | `ui/pipeline_options.py` | *Run ▸ Where to run ▸ Pipeline options*: sequential chain, per-stage limits, summary report switch (stored in the session, not the config). |
+| `ui/isppa_sweep.py` | The target ISPPA editor with *Sweep…* for a list of targets (multi-ISPPA). |
 
 ### YAML compatibility with MATLAB
 

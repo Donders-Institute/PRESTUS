@@ -346,6 +346,9 @@ class CheckEditor(FieldEditor):
 
 
 def make_editor(node: Node, parent: QWidget | None = None) -> FieldEditor:
+    if node.path == "transducer.target_isppa_wcm2":    # line edit + "Sweep…" (multi-ISPPA)
+        from .isppa_sweep import IsppaSweepEditor
+        return IsppaSweepEditor(node, parent)
     if node.kind == "tristate" or node.choices:
         return ChoiceEditor(node, parent)
     if node.kind in ("flag", "bool"):
