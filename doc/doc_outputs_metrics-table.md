@@ -63,7 +63,7 @@ Focal distances come in two references: columns ending in `_ep_mm` count from th
     | `trans_pos_vox` | voxels | Transducer position in simulation grid coordinates |
     | `focus_pos_vox` | voxels | Target focus position in simulation grid coordinates |
 
-    Water/free-field simulations also include `Psptp` (spatial peak temporal peak pressure), `Ptp_target` (temporal peak pressure at the target) and `MI` (global mechanical index from peak rarefaction pressure, unitless; [ITRUSST](https://itrusst.org/) limit 1.9, labelled "MI (free water)" in the report). They also include the ITRUSST focal metrics (`focal_vol_3dB_mm3`, `focal_vol_6dB_mm3`, `focal_centroid_3dB_bowl_mm`, `focal_centroid_3dB_ep_mm`, `focal_flhm_center_bowl_mm`, `focal_flhm_center_ep_mm`), computed beyond the transducer exit plane.
+    Water/free-field simulations also include `Psptp` (spatial peak temporal peak pressure), `Ptp_target` (temporal peak pressure at the target) and `MI` (global mechanical index from peak rarefaction pressure, unitless; [ITRUSST](https://itrusst.org/) limit 1.9, labelled "MI (free water)" in the report). They also include the ITRUSST focal metrics (`focal_vol_3dB_mm3`, `focal_vol_6dB_mm3`, `focal_centroid_3dB_bowl_mm`, `focal_centroid_3dB_ep_mm`, `focal_flhm_center_bowl_mm`, `focal_flhm_center_ep_mm`, `focal_fwhm_axial_mm`, `focal_fwhm_lateral_min_mm`, `focal_fwhm_lateral_max_mm`), computed beyond the transducer exit plane.
 
 ??? note "Tissue-specific acoustic columns (layered simulations only)"
     | Column | Unit | Description |
@@ -88,6 +88,8 @@ Focal distances come in two references: columns ending in `_ep_mm` count from th
     | `focal_centroid_3dB_ep_mm` | mm | Distance from the exit plane to the geometric centroid of the −3 dB focal region |
     | `focal_flhm_center_bowl_mm` | mm | Distance from the bowl apex to the FLHM centre on the beam axis (`calibration.focal_reference`) |
     | `focal_flhm_center_ep_mm` | mm | Distance from the exit plane to the FLHM centre; the manufacturer-style focal distance |
+    | `focal_fwhm_axial_mm` | mm | −3 dB focal width (FWHM of IPA) through the brain peak along the transducer axis (`trans_pos` to `focus_pos`); crossings of half the peak interpolated between grid points. Empty when the focal lobe reaches the grid edge |
+    | `focal_fwhm_lateral_min_mm`, `focal_fwhm_lateral_max_mm` | mm | Narrowest and widest −3 dB focal width through the brain peak in the plane perpendicular to the transducer axis, measured every 5°; equal for a round focus |
 
 ### Thermal Metrics
 

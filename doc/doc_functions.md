@@ -24,6 +24,7 @@ On this page:
 | `axisymmetric_output_mode`              | Form into which axisymmetric results are expanded |
 | `cache_acoustic`                        | Save or load the slim acoustic results cache. |
 | `coherent_drive_calibration`            | Set each transducer's drive to its own ISPPA target (coherent runs) |
+| `compute_focal_fwhm`                    | Axial and lateral −3 dB focal widths (FWHM) through the focal peak, along and across the transducer axis. |
 | `compute_focal_metrics`                 | Compute focal-zone metrics (ITRUSST −3 dB/−6 dB volumes, FLHM span/centre) from a 3D intensity field; FLHM centre threshold is configurable via `focal_reference` (see [doc_calibration.md](doc_calibration.md)). |
 | `fov_backproject_volume`                | Zero-pad a FOV sub-grid volume back to the full acoustic grid. |
 | `fov_restore_transducers`               | Put every transducer back at its full-grid position after an FOV crop. |

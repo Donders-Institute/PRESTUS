@@ -50,7 +50,7 @@ No data, SimNIBS, k-Wave simulation or GPU is needed. A failed test prints its f
 | Area | Files |
 |---|---|
 | Configuration | `test_load_parameters`, `test_config_layering` (toolbox → project → study layering, stale project defaults, unknown keys, non-interactive warnings, `prestus_config_upgrade`), `test_config_upgrade` (keys from v0.5.0 on converted to current names), `test_study` |
-| Intensity scaling | `test_isppa_policy` (`needs_water_baseline`, `isppa_baseline`, `isppa_scale_factor`, `apply_isppa_scaling`), `test_focal_reference` |
+| Intensity scaling | `test_isppa_policy` (`needs_water_baseline`, `isppa_baseline`, `isppa_scale_factor`, `apply_isppa_scaling`), `test_focal_reference`, `test_focal_fwhm` |
 | Caches | `test_cache_signature` |
 | Transducers & calibration | `test_transducer_library`, `test_transducer_model` (tag `model`), `test_library_conditions`, `test_matrix_transducer`, `test_cw_source_matrix`, `test_calibration_session` (the GUI/Nexus calibration steps, `meta.fit`) |
 | Placement & neuronavigation | `test_transducer_placement` (tag `manual`), `test_plantus_placement` (tags `validation`, `dispatch`), `test_neuronav_io`, `test_neuronav_batch`, `test_placement_report`, `test_placement_positions` |

@@ -2062,6 +2062,9 @@ function html = build_focal_zone_table(csv_table)
         '−6 dB focal zone volume',         'focal_vol_6dB_mm3',            'mm³';
         '−3 dB centroid, apex-referenced', 'focal_centroid_3dB_bowl_mm',   'mm';
         '−3 dB centroid, exit-plane-ref.', 'focal_centroid_3dB_ep_mm',     'mm';
+        '−3 dB focal width, axial (FWHM)', 'focal_fwhm_axial_mm',          'mm';
+        '−3 dB focal width, lateral, narrowest (FWHM)', 'focal_fwhm_lateral_min_mm', 'mm';
+        '−3 dB focal width, lateral, widest (FWHM)',    'focal_fwhm_lateral_max_mm', 'mm';
     };
 
     avail = false(size(rows, 1), 1);

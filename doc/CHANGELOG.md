@@ -230,6 +230,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - ⚠️ **Fixed:** `analysis.mni_warp_method: native` placed MNI outputs one subject voxel off along each axis; rerun MNI exports made with it
 
 #### Outputs & reporting
+- Metrics CSV and report: −3 dB focal widths through the focal peak, `focal_fwhm_axial_mm` along the transducer axis and `focal_fwhm_lateral_min_mm` / `focal_fwhm_lateral_max_mm` across it
 - Reports redesigned (`modules.report_style`: `instrument` default, `classic`, `compact`, `paper`); `preview_report_styles` re-renders an output folder in every skin
 - Manuscript-ready Methods section with copy buttons and stated tissue properties
 - Report shows the calibration provenance of the transducer (library entry, k-Wave-verified or analytical only)
