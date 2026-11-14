@@ -37,6 +37,8 @@ prestus_pipeline_start(config_1, options);
 
 Field names in `sequential_configs` must follow the pattern `config_<N>` where `<N>` is a non-negative integer (e.g. `config_2`, `config_3`, `config_11`). The dispatcher picks the field with the lowest numeric value first; only relative order matters. Non-numeric suffixes (e.g. `config_abc`) are silently ignored.
 
+In the Nexus, *Results ▸ Follow-up…* with *Sequential* creates a follow-up config and adds it to the chain under *Run ▸ Where to run ▸ Pipeline options*, which the run script passes as `options.sequential_configs` ([Run tab](doc_nexus_tabs.md#run-tab)).
+
 ## Cache Reuse
 
 When a follow-up simulation is dispatched, PRESTUS decides which results are reused and which are recomputed:

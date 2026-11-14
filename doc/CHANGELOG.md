@@ -249,9 +249,13 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 
 - Fixed: PBS jobs loaded MATLAB R2023b, which does not support the CUDA 11.2 of PBS nodes; they now load R2022b
 #### Nexus & GUIs
+- Label text in the Nexus can be selected and copied
 - Fixed: the Nexus suggested `transducer.target_isppa_wcm2` for the old `set_intensity_w_per_cm2`, which is the drive's calibration ISPPA (`transducer.tx_calibration.isppa_wcm2`)
-- **PRESTUS Nexus** (`nexus/`, *experimental*): standalone PyQt6 app to build, check and run study configs, with tabs per workflow step, a transducer panel backed by the library, a placement viewer with beam checks, Calibration and Localite pages, a study manifest editor, a Results tab and cluster submission (also over SSH). MATLAB entry point: `prestus_nexus`. See [doc_nexus.md](doc_nexus.md)
+- **PRESTUS Nexus** (`nexus/`): standalone PyQt6 app to build, check and run study configs, with tabs per workflow step, a transducer panel backed by the library, a placement viewer with beam checks, Calibration and Localite pages, a study manifest editor, a Results tab and cluster submission (also over SSH). MATLAB entry point: `prestus_nexus`. See [doc_nexus.md](doc_nexus.md)
 - The Nexus Pseudo-CT sub-tab plots the in-skull property distributions against the band of the uncertainty bound variants' skull values, with the fraction of skull voxels outside it; **Predict skull properties** predicts them before a run
+- The Nexus Simulation tab is split into Medium, Sonication and Solver tabs. The Medium tab has the medium choice above its Head model, Acoustic properties and Pseudo-CT sub-tabs. Medium properties show as one tissue × property table for the tissues of the chosen medium, editable after unlocking in advanced mode, with a plot of the values against the uncertainty-variant bounds. The Pseudo-CT sub-tab shows the equations of the selected mappings. More fields appear only when their mode or switch is on (Localite folders, pseudo-CT mapping, thermal model, time reversal)
+- Nexus Transducer tab: the cross-section sits under the device panel; Geometry (collapsed for library devices) and Drive and steering are separate cards; calibration coverage moved to the Calibration sub-tab. Non-k-Wave solvers are marked experimental. The CEM43 form is a selector that shows its formula
+- The Nexus flags a grid coarser than the points-per-wavelength minimum (`grid.min_ppw`) before a run
 - `prestus_gui` is deprecated in favour of the PRESTUS Nexus; it still works and warns on start. `neuronav_gui` and `calibration_gui` remain supported.
 - `neuronav_gui`: stand-alone Localite ingest GUI with series QC, batch window and MNI view of batch targets
 - `calibration_gui` and the Nexus Calibration page expose every calibration fit option and save how an entry was fitted (`meta.fit`)
@@ -259,6 +263,24 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Nexus: tissue-property card is read-only until unlocked; with uncertainty on, a card lists and plots the three variants' properties
 - Nexus: a Start tab sets up a first simulation in four steps (T1, transducer, MNI target, run); pages without their inputs say what is missing; the Issues list opens from the header (View ▸ Issues…, Ctrl+Shift+I)
 - Nexus: with `placement.mode: plantus`, the Placement card runs only the PlanTUS placement, choosing the position in Workbench or automatically, and opens the result in the Viewer
+- Nexus: Placement ▸ PlanTUS shows the PlanTUS maps on the skin; click a position to see its criteria and the transducer there, and place it
+- Nexus: PlanTUS and TUS_entry placement-only runs are submitted as cluster jobs when the Run tab submits to a cluster
+- Nexus: the placement method is chosen at the top of the Placement tab; new TUS entry sub-tab; the sub-tab of the method in use is labelled in bold
+- Nexus: Placement ▸ Heuristic plots and lists the heuristic's candidates; click one to see its criteria and place it
+- Nexus: the segmentation is a step of its own: status and *Run segmentation* (segmentation-only job) on the Medium tab, the Placement tab (when the method needs it) and QuickStart
+- Nexus: Results opens on an ITRUSST reporting overview (Copy as Markdown); the maps moved to a *Spatial* sub-tab
+- Nexus Results overview: axial and lateral −3 dB focal widths (from the CSV, else measured on the run's T1w intensity map) and ISPTA per tissue
+- Nexus: the 3D view has opacity sliders for scalp, brain and mask, marks the target with a crosshair and draws the PlanTUS/TUS_entry target mask
+- Nexus: the Segmentation card selects the SimNIBS environment from the installs found (conda environments, install folders, `/opt`; with SSH submission also on the cluster, including environment modules); settings linked to it follow a change of environment, shows its version and the existing segmentation (with its charm report), and has the re-run switch and a custom charm settings file
+- Nexus: Medium cards regrouped (Segmentation refinement, Smoothing, Grid refinement); *Tissue layers* is advanced and locked; section cards carry icons
+- Nexus: formulas are drawn as vector graphics at text size; figures follow the dark theme; the Start tab is now *QuickStart*
+- Nexus: Results ▸ *Follow-up…* derives a run from an existing one (new intensity, new timing / thermal only, new placement on the same head, a time-reversal pose, or a sequential run with heat carry-over), checks the parent's outputs, and records the parent in the new config; a *Poses* sub-tab lists time-reversal poses
+- Nexus: Run ▸ *Pipeline options* passes sequential chains, per-stage time and memory limits and the summary report to `prestus_pipeline_start`, also for SSH submission
+- Nexus: Placement ▸ *Transducers* (two or more transducers) lists the transducers and shows the grid orientation (`grid.mode`) with figures and each beam's tilt; the viewer can draw the grid z axis
+- Nexus: every figure has an export button (SVG, PDF, PNG at 300/600 dpi, copy); result maps default to the magma colormap
+- Nexus: Help menu and ↗ buttons open the documentation page of each tab and card; Edit ▸ Undo / Redo; Ctrl+1…9 switch tabs; Tools ▸ *Usage statistics…* records the telemetry decision
+- Nexus: new checks for `path.acoustic_input`, multi-transducer runs with water or axisymmetric grids, heating with zero pulse timing, the thermal field of view and elastic shear points per wavelength
+- Nexus: saves are atomic; an unexpected error shows a dialog instead of closing the app; cluster job status and MATLAB requests no longer freeze the window, and MATLAB requests time out
 - Fixed (`prestus_gui`): NaN placeholders wrote `0` into `grid.source_ppw`; 2D phantom coordinates; thermal timing state on config load
 
 #### Telemetry
@@ -368,7 +390,7 @@ Introduces matrix transducer support, an uncertainty quantification pipeline, an
 - [**feature**] Placement dispatch — unified entry point for manual, Localite, and heuristic transducer positioning (see [doc_placement.md](doc_placement.md))
 - [**feature**] `prestus_config_init` — bootstraps a project-specific config directory and `config_default.yaml`; `load_parameters` now resolves the project config automatically so PRESTUS can be called from any working directory
 - [**neuronav**] Unified Localite pipeline via `localite_matrix_to_positions`; `InstrumentMarker` support added; `tracker_to_bowl_mm` parameter
-- [**feature**] PRESTUS GUI — tabbed parameter editor and simulation launcher (see [doc_gui.md](doc_gui.md))
+- [**feature**] PRESTUS GUI — tabbed parameter editor and simulation launcher (see `doc_gui.md`)
 - [**feature**] `prestus_group_start` — new entry point for group-level MNI-space analysis
 - [**feature**] `segmentation_only` pipeline mode
 - [**report**] MItc (mechanical index transcranial) reported across all intracranial tissues

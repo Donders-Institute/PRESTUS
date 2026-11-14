@@ -41,7 +41,7 @@ PRESTUS keeps two kinds of intermediate results apart:
 
 `placement.reuse` is independent of `io.overwrite_files`: a PlanTUS or TUS_entry result is reused while the simulation stages are recomputed. `placement_run.mat` records are also read.
 
-**Pressure map (`path.acoustic_input`).** Point `path.acoustic_input` at a T1w pressure NIfTI from an earlier run. The new run skips the acoustic simulation and the free-water baseline, puts the map onto its own grid (including an acoustic FOV), rescales it to its `transducer.target_isppa_wcm2` using the sidecar's `isppa.level_wcm2`, and then runs acoustic analysis and the thermal stage as after a simulation. It needs the T1 → grid transform (`simulation.medium` layered or phantom, a 3D grid) and the k-Wave grid of the source stage (`modules.run_source_setup: 1`).
+**Pressure map (`path.acoustic_input`).** Point `path.acoustic_input` at a T1w pressure NIfTI from an earlier run. The new run skips the acoustic simulation and the free-water baseline, puts the map onto its own grid (including an acoustic FOV), rescales it to its `transducer.target_isppa_wcm2` using the sidecar's `isppa.level_wcm2`, and then runs acoustic analysis and the thermal stage as after a simulation. It needs the T1 → grid transform (`simulation.medium` layered or phantom, a 3D grid) and the k-Wave grid of the source stage (`modules.run_source_setup: 1`). In the Nexus, *Results ▸ Follow-up…* with *New intensity* or *New timing* writes such a config for you ([Follow-up runs](doc_nexus_tabs.md#follow-up-runs)).
 
 Limits:
 

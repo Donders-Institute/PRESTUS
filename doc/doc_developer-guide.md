@@ -100,7 +100,7 @@ The Nexus builds its forms from `config_default.yaml`: every key becomes a field
 |---|---|
 | `model.py`, `merge.py`, `yamlio.py` | Hold the study config and merge and write it the way MATLAB reads it |
 | `checks.py` | The Issues panel: checks run before MATLAB sees the config |
-| `quickstart.py` | The Start tab's logic |
+| `quickstart.py` | The QuickStart tab's logic |
 | `launcher.py`, `remote.py`, `jobs.py` | Run locally, submit over SSH, follow cluster jobs |
 | `bridge.py` | The persistent MATLAB session for the Calibration and Localite pages (`functions/gui/nexus_bridge.m`) |
 | `results.py` | Finds the runs in a subject's output folder |

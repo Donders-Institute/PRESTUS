@@ -26,7 +26,7 @@ transducer:
   # ... other transducer fields
 ```
 
-PRESTUS then runs one acoustic simulation, caches it, and runs the thermal analysis at each requested intensity, each with its own output files and HTML report, plus a summary report. The free-water baseline that the scaling needs runs automatically (`modules.run_water_baseline: auto`, the default); see [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting).
+PRESTUS then runs one acoustic simulation, caches it, and runs the thermal analysis at each requested intensity, each with its own output files and HTML report, plus a summary report. The free-water baseline that the scaling needs runs automatically (`modules.run_water_baseline: auto`, the default); see [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting). In the Nexus, *Sweep…* next to the target ISPPA (Transducer tab) edits the list.
 
 !!! note
     The older form `calibration.target_isppa_wcm2` is still accepted and is moved to `transducer(1).target_isppa_wcm2` at load time with a deprecation warning.

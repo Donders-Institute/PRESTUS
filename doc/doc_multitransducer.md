@@ -44,7 +44,7 @@ transducer:
 | In separate, non-overlapping windows | `async`: see [Async Multi-Transducer Mode](doc_multitransducer_async.md). |
 | In sequence, or with partial overlap | Use [Sequential Simulations](doc_sequential.md): carry each heating run's temperature and CEM43 maps into the next via `adopted_heatmap` / `adopted_cem43`. This assumes the acoustic fields do not overlap in time. |
 
-In the Nexus, *Multi-transducer coupling* selects the row above and *Target free-water Isppa* is set per transducer on the transducer page.
+In the Nexus, *Multi-transducer coupling* (Sonication tab, shown once the config has more than one transducer) selects the row above, and *Target free-water Isppa* is set per transducer on the Transducer tab. The card can show an analytic prediction of both forms: the at-target intensity when the beams add independently and its range over their relative phase when coherent, and free-water maps of both in the beams' plane. The maps use Gaussian focal spots from each transducer's aperture and focal distance, with no skull and no side lobes; they guide the choice and do not replace the simulation.
 
 ## Grid Setup
 
@@ -57,7 +57,9 @@ grid:
   mode: 'focal_axis'   # default; omit to get the same behaviour
 ```
 
-To align the grid to transducer(1)'s focal axis instead, set `transducer_axis`. See [Preprocessing: Orientation](doc_preproc.md#orientation) for the mode table.
+With three or more transducers whose axes are too spread to average (mean-axis norm below `grid.focal_axis_min_norm`, default 0.5), `focal_axis` falls back to transducer(1)'s axis and warns.
+
+To align the grid to transducer(1)'s focal axis instead, set `transducer_axis`. `ras_plus` keeps the RAS+ orientation without rotation (isotropic rescaling only), so every beam is oblique; it does not work with `grid.axisymmetric`. See [Preprocessing: Orientation](doc_preproc.md#orientation) for the mode table. In the Nexus, *Placement ▸ Transducers* shows the grid z axis and each beam's tilt for the chosen mode.
 
 ### Grid Cropping
 

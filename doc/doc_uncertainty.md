@@ -27,7 +27,7 @@ On this page:
 
 ## Basic Usage
 
-Set `simulation.uncertainty = true` and call the usual entry point:
+Set `simulation.uncertainty = true` (in the Nexus: the *Uncertainty analysis* switch on the Medium tab, *Uncertainty* sub-tab; the variant values and medium files are under *Advanced* below the bounds plot) and call the usual entry point:
 
 ```matlab
 prestus_path = '/path/to/PRESTUS';

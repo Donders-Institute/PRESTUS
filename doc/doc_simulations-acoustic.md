@@ -44,7 +44,7 @@ Accuracy depends on resolving the shortest wavelength in the domain. Two paramet
 PPW = c / (f × dx)
 ```
 
-The worst case is the slowest medium (water or brain, ~1500 m/s). Keep **PPW ≥ 6**; PRESTUS warns below `grid.min_ppw`.
+The worst case is the slowest medium (water or brain, ~1500 m/s). Keep **PPW ≥ 6**; PRESTUS warns below `grid.min_ppw` (jwave stops), and the Nexus flags it before a run.
 
 For head (`layered`) and `phantom` media, a grid coarser than **0.75 mm** staircases the tissue transitions (skull, scalp), which may affect the results; PRESTUS and the Nexus warn above it.
 

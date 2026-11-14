@@ -211,7 +211,7 @@ On this page:
 | `nexus_ping`                            | Answer a NEXUS_BRIDGE health check |
 | `nexus_progress`                        | Report progress of the current NEXUS_BRIDGE request to the Nexus |
 | `prestus_gui`                           | Point-and-click GUI to review and edit a PRESTUS config and start runs [DEPRECATED: use `prestus_nexus`]. |
-| `prestus_nexus`                         | Open the PRESTUS Nexus (standalone PyQt6 config builder, *experimental*; see [doc_nexus.md](doc_nexus.md)). |
+| `prestus_nexus`                         | Open the PRESTUS Nexus (standalone PyQt6 config builder; see [doc_nexus.md](doc_nexus.md)). |
 
 #### HEAD
 

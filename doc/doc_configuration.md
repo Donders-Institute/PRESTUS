@@ -134,12 +134,9 @@ On a workstation without a job scheduler, also set `platform: matlab`: the defau
 
     A config that sets an old key and its current name to different values also stops the run. Conversion covers names only: defaults that changed since your config was written (for example `transducer.target_isppa_wcm2`) apply unless the config sets them, as listed in the [changelog](CHANGELOG.md). `calibration.skip_front_peak_mm` kept its name but is now measured from the exit plane rather than the bowl apex.
 
-Two front ends write the same YAML files:
-- the [PRESTUS Nexus](doc_nexus.md) (experimental), a desktop app that also checks the config as you type and shows a placement viewer, and
-- the [MATLAB GUI](doc_gui.md) (`prestus_gui`, deprecated).
 ## Editing Configs With a GUI
 
-Both write only the values that differ from the defaults, so their files load with `load_parameters` like hand-written ones.
+The [PRESTUS Nexus (GUI)](doc_nexus.md) is a desktop app that writes the same YAML files, checks the config as you type and shows a placement viewer. It writes only the values that differ from the defaults, so its files load with `load_parameters` like hand-written ones.
 
 ## Prompts for Missing Tool Paths
 

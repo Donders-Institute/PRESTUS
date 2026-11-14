@@ -43,8 +43,10 @@ nav:
     - Your First Simulation: doc_getting-started.md
     - Reading Your Results: doc_results.md
     - Configuring a Study: doc_configuration.md
-    - PRESTUS Nexus: doc_nexus.md
-    - MATLAB GUI: doc_gui.md
+    - PRESTUS Nexus (GUI):
+      - Overview: doc_nexus.md
+      - Tabs and Pages: doc_nexus_tabs.md
+      - Calibration and Localite Pages: doc_nexus_calibration-localite.md
   - 🧠 Head Model:
     - Segmentation & Preprocessing: doc_preproc.md
     - Medium Setup: doc_medium.md

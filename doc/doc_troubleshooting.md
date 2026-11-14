@@ -22,8 +22,8 @@ Most entries link to the page that explains the behaviour. If you solve an issue
 | `makeBowl` (or another k-Wave function) is not found | k-Wave is not on the MATLAB path. Clone with submodules and add `external/` ([Installation](doc_installation.md)). |
 | `No HPC system detected (sbatch/qsub)` | `platform: auto` (the default) only detects [SLURM](https://slurm.schedmd.com/) or qsub. On a workstation set `platform: matlab` ([HPC](doc_hpc.md#where-a-run-executes)). |
 | Warning `prestus:unknownConfigKey` | A key in your YAML is not a PRESTUS setting, often a typo; the warning suggests the closest known key ([Configuring a study](doc_configuration.md#how-a-config-is-assembled)). |
-| macOS: files cannot be read when MATLAB is started from the Finder or Dock | Give `MATLAB.app` Full Disk Access ([GUI](doc_gui.md#macos-full-disk-access-required)). |
 | Warning `prestus:staleProjectDefault` | Your project copy of `config_default.yaml` predates settings added since; they take their toolbox default. Refresh it with `prestus_config_upgrade(folder)` ([Configuring a study](doc_configuration.md#project-config-folder)). |
+| macOS: files cannot be read when MATLAB is started from the Finder or Dock | Add `MATLAB.app` under **System Settings → Privacy & Security → Full Disk Access** and restart MATLAB. MATLAB started from a terminal is not affected. |
 | Nexus: `Library not loaded: …QtPrintSupport` | [conda](https://docs.conda.io/)'s `pyqt` mixed with [pip](https://pip.pypa.io/)'s `PyQt6-WebEngine`; install Qt from pip only ([Nexus](doc_nexus.md#installation)). |
 
 ## Segmentation (SimNIBS charm)
