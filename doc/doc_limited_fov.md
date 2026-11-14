@@ -1,5 +1,7 @@
 # Limited Acoustic FOV
 
+![Pipeline steps; this page belongs to 3 Grid & medium](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-medium_diagram.svg){ .stage-strip }
+
 A full acoustic simulation on a whole-head grid is slow and memory-intensive when only the focal zone and near field matter. The acoustic FOV crops the acoustic domain ([k-Wave](https://github.com/ucl-bug/k-wave), [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) or [jwave](https://github.com/ucl-bug/jwave)) to a beam-axis-aligned box before the simulation and back-projects the result onto the full grid afterwards. A box that misses part of the beam or the focus gives a wrong field, so its size has to enclose both.
 
 On this page:

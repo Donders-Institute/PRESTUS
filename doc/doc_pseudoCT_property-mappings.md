@@ -1,5 +1,7 @@
 # Skull Property Mappings
 
+![Pipeline steps; this page belongs to 3 Grid & medium](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-medium_diagram.svg){ .stage-strip }
+
 The pseudo-CT holds pseudo-Hounsfield units, while the simulation needs density, sound speed and attenuation in each skull voxel. Several published mappings make this conversion, and they assume different HU scales and give different skull properties. This page lists the mappings PRESTUS offers for each property, their equations and prerequisites, and how to check the resulting skull properties before simulating.
 
 On this page:

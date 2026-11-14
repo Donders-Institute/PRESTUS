@@ -1,5 +1,7 @@
 # MNI Transducer Placement
 
+![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+
 A transducer site and target given in MNI coordinates let one plan apply to every subject, but each subject's simulation needs both points in its own anatomy. `placement.mode: 'mni'` converts both points to the subject's T1 grid, snaps the transducer to the scalp and sets its exit plane `placement.skin_gap_mm` (default 5 mm) off the scalp; no search is performed, so the result is deterministic. The [heuristic](doc_placement_heuristic.md) mode, by contrast, takes only an MNI target and searches the scalp for a transducer position.
 
 On this page:

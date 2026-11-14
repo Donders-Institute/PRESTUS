@@ -1,5 +1,7 @@
 # Metrics Table Columns
 
+![Pipeline steps; this page belongs to 6 Outputs](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-outputs_diagram.svg){ .stage-strip }
+
 The metrics CSV holds every number a run reports: intensities, pressures, mechanical indices, focal volumes and, with heating, temperatures and thermal doses. Each column has a precise definition and unit, and several are checked against the ITRUSST non-significant risk limits, so the column you quote decides what your reported value means.
 
 On this page:
@@ -32,7 +34,7 @@ All intensity values are **pulse-average intensity (IPA)**, computed from the st
 I = p² / (2ρc)   [W/cm²]
 ```
 
-`p` is the peak pressure amplitude, `ρ` density and `c` sound speed. The factor 2 averages over the sinusoid's cycle. The result is the temporal-peak intensity (ITP). IPA, the time-average intensity *during* the pulse, is ITP times the ramp factor of `timing.pulse_ramp_dur` and `timing.pulse_ramp_shape`; for pulses without a ramp IPA = ITP. The average over the repetition interval (ISPTA) also applies the duty cycle PD/PRI.
+`p` is the peak pressure amplitude, `ρ` density and `c` sound speed. The factor 2 averages over the sinusoid's cycle. The result is the temporal-peak intensity (ITP). IPA, the time-average intensity *during* the pulse, is ITP times the ramp factor of `timing.pulse_ramp_dur` and `timing.pulse_ramp_shape`; for pulses without a ramp IPA = ITP. The average over the repetition interval (ISPTA) also applies the duty cycle PD/PRI: it is the average within a pulse train, without the pulse-train duty cycle PTD/PTRI.
 
 The **spatial peak** of IPA is ISPPA. IPA at a specific location (target point, radius average) is labelled IPA.
 

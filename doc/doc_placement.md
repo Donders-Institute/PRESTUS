@@ -1,5 +1,7 @@
 # Transducer Placement
 
+![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+
 The transducer position decides where the beam enters the head, which part of the skull it crosses and where the focus lies relative to the target, so it shapes every acoustic and thermal result of a head simulation. This page covers how PRESTUS obtains the transducer and focus positions: entered by hand, or derived by one of several placement modes that share one exit-plane geometry.
 
 On this page:
@@ -18,12 +20,12 @@ PRESTUS works with the transducer (`transducer.trans_pos`) and the target (`tran
 
 | Mode | Primary objective | Requires |
 |------|------------------|----------|
-| `manual` | User-specified | Coordinates in config (T1 voxels, RAS+ mm or MNI mm) |
-| `localite` | Recorded neuronavigation pose | [Localite](https://www.localite.de/en/) XML |
-| `mni` | Transducer and focus given in MNI mm; transducer snapped to the scalp | SimNIBS `m2m_sub-XXX` folder |
-| `heuristic` | Skull-surface proximity to MNI target | SimNIBS segmentation |
-| `plantus` | Beam–target overlap + skull acoustics | SimNIBS mesh + [PlanTUS](https://github.com/mlueckel/PlanTUS) install |
-| `tus_entry` | Transducer-scalp coupling geometry | Scalp mask + [TUS_entry](https://github.com/CyrilAtkinson/TUS_entry) [R](https://www.r-project.org/) install |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_place-manual_glyph.svg){ .choice-icon } `manual` | User-specified | Coordinates in config (T1 voxels, RAS+ mm or MNI mm) |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_place-localite_glyph.svg){ .choice-icon } `localite` | Recorded neuronavigation pose | [Localite](https://www.localite.de/en/) XML |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_place-mni_glyph.svg){ .choice-icon } `mni` | Transducer and focus given in MNI mm; transducer snapped to the scalp | SimNIBS `m2m_sub-XXX` folder |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_place-heuristic_glyph.svg){ .choice-icon } `heuristic` | Skull-surface proximity to MNI target | SimNIBS segmentation |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_place-plantus_glyph.svg){ .choice-icon } `plantus` | Beam–target overlap + skull acoustics | SimNIBS mesh + [PlanTUS](https://github.com/mlueckel/PlanTUS) install |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_place-tus-entry_glyph.svg){ .choice-icon } `tus_entry` | Transducer-scalp coupling geometry | Scalp mask + [TUS_entry](https://github.com/CyrilAtkinson/TUS_entry) [R](https://www.r-project.org/) install |
 
 Each mode has its own page: [manual](#manual-coordinate-selection), [MNI](doc_placement_mni.md), [heuristic](doc_placement_heuristic.md), [PlanTUS](doc_placement_plantus.md), [TUS_entry](doc_placement_tus_entry.md) and [Localite](doc_placement_neuronav.md). Whatever the mode, the resolved positions are written to `sub-XXX_placement<affix>.json` in the output folder. Coordinate conventions are described in [Coordinate systems](doc_coordinate_systems.md).
 

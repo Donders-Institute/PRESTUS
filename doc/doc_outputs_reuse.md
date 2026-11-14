@@ -1,5 +1,7 @@
 # Reusing Earlier Outputs and Caches
 
+![Pipeline steps; this page belongs to 6 Outputs](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-outputs_diagram.svg){ .stage-strip }
+
 A run can start from results an earlier run wrote instead of recomputing them: a segmentation, pseudo-CT, placement or pressure map, or the caches in its own `cache/` folder. Reuse saves time, but a reused file built from other settings gives results that do not match the configuration, so PRESTUS records and checks the settings each file depends on.
 
 On this page:

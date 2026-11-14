@@ -1,5 +1,7 @@
 # TUS_entry Transducer Placement
 
+![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+
 A simulated transducer position is useful only if the real transducer can be placed there with good contact on the scalp. `placement.mode: 'tus_entry'` runs the [TUS_entry](https://github.com/CyrilAtkinson/TUS_entry) [R](https://www.r-project.org/) toolbox, which selects the scalp entry point with the smallest coupling geometry error (the standard deviation of the transducer-disk-edge to scalp distances), subject to an optional depth constraint. TUS_entry optimises **mechanical fit** (how perpendicular the transducer disk sits on the scalp); [PlanTUS](https://github.com/mlueckel/PlanTUS) optimises **acoustic objectives** (beam–target overlap, skull thickness).
 
 On this page:

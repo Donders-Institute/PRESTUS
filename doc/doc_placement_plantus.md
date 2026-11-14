@@ -1,5 +1,7 @@
 # PlanTUS Placement
 
+![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+
 The entry point decides which part of the skull the beam crosses and whether the focus can reach the target. Given a T1-weighted image, a [SimNIBS](https://simnibs.github.io/simnibs/) head mesh, a target-ROI mask and a transducer configuration, [PlanTUS](https://github.com/mlueckel/PlanTUS) (`placement.mode: 'plantus'`) scores every skin vertex as a candidate transducer position on skin–target distance, skin and skull angles, skull thickness and beam–target overlap. PRESTUS places the transducer at the vertex with the best weighted score, or at a vertex you choose on the maps on the Nexus PlanTUS page (or in [Connectome Workbench](https://www.humanconnectome.org/software/connectome-workbench)).
 
 On this page:

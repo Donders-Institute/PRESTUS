@@ -1,5 +1,7 @@
 # Thermal Simulations
 
+![Pipeline steps; this page belongs to 5 Thermal](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-thermal_diagram.svg){ .stage-strip }
+
 Tissue absorbs part of the ultrasound and heats up, and temperature rise and thermal dose (CEM43) are the measures safety guidelines use for this effect. PRESTUS computes both from the acoustic field and the sonication protocol, so the predicted heating depends on the timing, step sizes and absorption settings described here. The report compares the results with published reference levels; PRESTUS does not make an independent safety recommendation.
 
 On this page:

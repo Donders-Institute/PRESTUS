@@ -1,5 +1,7 @@
 # Segmentation and Head Preprocessing
 
+![Pipeline steps; this page belongs to 1 Segmentation](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-segmentation_diagram.svg){ .stage-strip }
+
 The skull reflects, attenuates and refracts ultrasound, so how the head is represented in the simulation shapes the predicted focus and intensity. This step turns an MRI into that representation: [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html) labels the tissues, and PRESTUS orients, resamples, smooths and crops the labels into the simulation grid.
 
 On this page:

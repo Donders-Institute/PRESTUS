@@ -1,11 +1,17 @@
 # Transducer Library
 
+A simulation reproduces a real device only if it uses that device's ring geometry, phases and drive. PRESTUS ships a static library that holds these settings for each supported transducer and driving-system combination, fitted to free-water hydrophone axial profiles where profiles exist, so that a study names the device and a focal depth instead of entering element settings. You can refine an entry against your own hydrophone measurements ([Calibration](doc_calibration.md)).
+
+On this page:
+
+- [Using a Library Entry](#using-a-library-entry): selecting an entry, the lookup order, how phases and drive are computed, and the entry schema.
+- [Shipped Entries and Fit Quality](#shipped-entries-and-fit-quality): the shipped entries and how well each fits its hydrophone profiles.
+- [Dephased Conditions](#dephased-conditions): named defocused settings, which are experimental and not validated.
+- [Library Limitations](#library-limitations): where the library is less accurate and how to mitigate it.
+
 !!! note "At a glance"
-    - **What:** The shipped library of transducers and their calibrations, and how a study uses an entry.
     - **When you need it:** Whenever you simulate a device from the library: set `serial`, `combo.ds_serial`, `focal_distance_ep` and `target_isppa_wcm2`.
     - **Before you start:** Nothing. To fit an entry to your own hydrophone profiles, see [Calibration](doc_calibration.md); to add a device, see [Adding & Maintaining Entries](doc_transducer_library_maintenance.md).
-
-PRESTUS ships a static transducer library. You can refine an entry against your own hydrophone measurements ([Calibration](doc_calibration.md)).
 
 | Folder | Content | Purpose |
 |---|---|---|
@@ -13,7 +19,7 @@ PRESTUS ships a static transducer library. You can refine an entry against your 
 | `config/calibration/` | One YAML per transducer–driving-system combo | Per-depth refinements (phases, gains, drive) on geometric steering |
 | your folder (optional) | Same schema | Your own refinements; set `transducer.library_path` |
 
-## Using an entry
+## Using a Library Entry
 
 Name the transducer and driving system, the focal depth and the target intensity:
 
@@ -134,11 +140,11 @@ At a requested depth, the entry gives geometric steering plus a fitted per-ring 
     - **Refinement** (default): one fit per measured depth (`refinement.depths_ep_mm`). Each holds a per-ring phase offset (`elem_phase_correction_deg`), per-ring gains (`elem_amp_weight`) and the drive that gives the reference ISPPA at that depth (`elem_p_amp`). Between refined depths, offsets are interpolated per element on the unit circle; gains and drive are interpolated linearly. Outside that span, the nearest refinement fades back to the global model over `refinement.blend_mm` (default 5 mm).
     - **Global model**: geometric steering with the measured drive per depth (`global_model.amplitude_by_depth`). Some entries hold one depth-independent offset and gains instead (`global_model.elem_phase_correction_deg`, `elem_amp_weight`). These are read but cannot be fitted.
 
-    **Amplitude.** Hydrophone profiles are recorded at a matched focal ISPPA per depth. The fit therefore uses profile *shape* only, with a free scale per depth, and derives the drive that produced the measured peak. For a refinement this is `refinement.elem_p_amp` at `refinement.isppa_wcm2`; for the global model it is `global_model.amplitude_by_depth`. Both are normalised to the reference ISPPA, interpolated in depth and scaled as √I at load time. Entries without either use the depth-independent `amplitude_scaling`. The optional [free-water k-Wave drive calibration](doc_calibration.md#optional-free-water-k-wave-drive-calibration) rescales the refinement drive to the simulated ISPPA.
+    **Amplitude.** Hydrophone profiles are recorded at a matched focal ISPPA per depth. The fit therefore uses profile *shape* only, with a free scale per depth, and derives the drive that produced the measured peak. For a refinement this is `refinement.elem_p_amp` at `refinement.isppa_wcm2`; for the global model it is `global_model.amplitude_by_depth`. Both are normalised to the reference ISPPA, interpolated in depth and scaled as √I at load time. Entries without either use the depth-independent `amplitude_scaling`. The optional [free-water k-Wave drive calibration](doc_calibration_refinement.md#free-water-k-wave-drive-calibration) rescales the refinement drive to the simulated ISPPA.
 
-### Library YAML schema
+### Library YAML Schema
 
-??? note "Details: entry schema"
+??? note "Entry schema"
     ```yaml
     meta:
       tran_serial: CTX_250_001
@@ -187,7 +193,7 @@ At a requested depth, the entry gives geometric steering plus a fitted per-ring 
 
     Per-depth absolute phase tables (`global_model.depths_ep_mm` + `elem_phase_deg`) and parametric `calibration.focal_depths.f*` entries are converted to refinement offsets on load.
 
-## Shipped combos
+## Shipped Entries and Fit Quality
 
 Agreement of the shipped entries (library model v3, `library_mode: per_depth`, built 2026-09-30) with the hydrophone axial profiles they were fitted to, from `meta.quality`. R² is on peak-normalised intensity beyond 10 mm from the exit plane, as a median over measured depths.
 
@@ -195,7 +201,7 @@ Columns: *geo*, geometric steering only; *in-sample*, the refinement at each mea
 
 | Combo | Manufacturer | Depths mm (n) | R² geo | R² in-sample (min) | R² held-out | worst Δ vs geo | Flags |
 |---|---|---|---|---|---|---|---|
-| IS_PCD15287_01001_IGT_128_ch_comb_10_ch | Imasonic | 7–96 (13) | 0.990 | 0.998 (0.930) | 0.998 | +0.000 | n/a |
+| IS_PCD15287_01001_IGT_128_ch_comb_10_ch | [Imasonic](https://www.imasonic.com) | 7–96 (13) | 0.990 | 0.998 (0.930) | 0.998 | +0.000 | n/a |
 | IS_PCD15287_01001_IGT_32_ch_comb_10_ch | Imasonic | 10–90 (10) | 0.986 | 0.998 (0.988) | 0.998 | -0.002 | n/a |
 | IS_PCD15287_01002_IGT_128_ch_comb_10_ch | Imasonic | 7–94 (13) | 0.982 | 0.998 (0.889) | 0.998 | +0.002 | n/a |
 | IS_PCD15287_01002_IGT_32_ch_comb_10_ch | Imasonic | 10–90 (10) | 0.988 | 0.999 (0.955) | 0.999 | +0.001 | n/a |
@@ -203,7 +209,7 @@ Columns: *geo*, geometric steering only; *in-sample*, the refinement at each mea
 | IS_PCD15473_01001_IGT_32_ch_comb_10_ch | Imasonic | 10–90 (10) | 0.983 | 0.998 (0.983) | 0.998 | -0.005 | n/a |
 | IS_PCD15473_01003_IGT_128_ch_comb_10_ch | Imasonic | n/a | n/a | n/a | n/a | n/a | geometric only (no profiles) |
 | IS_PCD15473_01003_IGT_32_ch_comb_10_ch | Imasonic | 10–90 (10) | 0.982 | 0.997 (0.981) | 0.997 | -0.012 | n/a |
-| CTX_250_001_SC_105_010 | Sonic Concepts | 14–61 (12) | 0.786 | 0.984 (0.916) | 0.975 | -0.069 | n/a |
+| CTX_250_001_SC_105_010 | [Sonic Concepts](https://sonicconcepts.com/) | 14–61 (12) | 0.786 | 0.984 (0.916) | 0.975 | -0.069 | n/a |
 | CTX_250_001_SC_203_035 | Sonic Concepts | 14–61 (12) | 0.849 | 0.970 (0.904) | 0.938 | -0.277 | nearfield_excess |
 | CTX_250_009_SC_105_010 | Sonic Concepts | 16–46 (12) | 0.838 | 0.917 (0.607) | 0.926 | -0.002 | nearfield_excess |
 | CTX_250_009_SC_203_035 | Sonic Concepts | 16–38 (10) | 0.845 | 0.912 (0.243) | 0.913 | -0.004 | nearfield_excess |
@@ -220,7 +226,6 @@ Columns: *geo*, geometric steering only; *in-sample*, the refinement at each mea
 
 Geometric steering alone reproduces the Imasonic profiles well (R² ≈ 0.98–0.99). For the Sonic Concepts CTX-500 / CTX-250 it is less accurate (R² ≈ 0.79–0.91), so refinement matters most there.
 
-## Dephased conditions (experimental)
 ### Device Models and Units
 
 Each device has a **model** entry, named after the model (`CTX_500`), and the library's **measured units** of it, named model plus unit id (`CTX_500_026`). A unit's calibration is fitted to that unit's hydrophone profiles, so use the unit's serial when your device is in the library. Otherwise name the model, which gives the model's geometry and a [geometric baseline](doc_transducer_library_maintenance.md#geometric-baseline-entry) calibration: accuracy is that of the *geo* column above. A serial of a unit that is not in the library (`CTX_500_031`) falls back to its model (`CTX_500`), with a warning; to use the unit's own calibration, [add it](doc_transducer_library_maintenance.md#adding-a-transducer-or-driving-system). A model entry has no driving system; with `combo.ds_serial` set, PRESTUS falls back to the model's generic entry and says so. Each entry names its model in `model:`; the naming rules are in `config/equipment/README.md`.
@@ -251,15 +256,16 @@ The shipped limits are estimates for the IGT 128-channel driver from the Radboud
 
 A unit that is retired or replaced gets `status: deprecated`; an entry withheld until it is documented gets `status: excluded` (both optionally with `superseded_by` and `status_note`). Both stay in the library, so earlier studies re-run unchanged, and PRESTUS and the Nexus warn when a study names them. Excluded entries are not listed in the Nexus or `calibration_gui` and are skipped by `build_transducer_library`. The OPM variants of `IS_PCD15473_01001` and `_01003` are excluded until their setup is documented.
 
+## Dephased Conditions
 
 !!! warning "Experimental, not validated"
     No dephased hydrophone measurements have been compared with these predictions yet. Every use prints a `library_condition:experimental` warning. Do not report dephased-condition results without your own validation.
 
 Dephased (defocused) settings drive the rings with explicit phases (e.g. alternate rings shifted by 180°) instead of steering to a focal depth. They cannot be interpolated in depth, so the library entry stores them as named **conditions**. Select one with `transducer.condition: geom_180` (with `serial`, `combo.ds_serial` and `target_isppa_wcm2`). Without `focal_distance_ep`, it defaults to the condition's `setpoint_ep_mm`.
 
-**Before treating a condition as validated:** compare `predicted_r2` and the focal/peak errors with those of the focused depths of the same entry, check `peak_z_ep_mm` against the measured peak, and confirm the free-water ISPPA in a k-Wave water run. Then set `validated: true` in your copy of the entry.
+**Before treating a condition as validated:** compare `predicted_r2` and the focal/peak errors with those of the focused depths of the same entry, check `peak_z_ep_mm` against the measured peak, and confirm the free-water ISPPA in a [k-Wave](https://github.com/ucl-bug/k-wave) water run. Then set `validated: true` in your copy of the entry.
 
-??? note "Details: adding conditions, with or without measurements"
+??? note "Adding conditions, with or without measurements"
     **Without measurements:**
 
     ```matlab
@@ -283,7 +289,7 @@ Dephased (defocused) settings drive the rings with explicit phases (e.g. alterna
 
     `library_ingest_conditions(lib_file, csv_path)` predicts every column, prints the agreement table and writes the conditions to `lib_file` (`struct('DryRun', true)` to only score). Do not pass dephased CSVs to `build_transducer_library` or `refine_transducer_library`, which read every column as a focal depth.
 
-??? note "Details: condition schema and how phases and drive are derived"
+??? note "Condition schema and how phases and drive are derived"
     ```yaml
     conditions:
       geom_180:
@@ -311,7 +317,7 @@ Dephased (defocused) settings drive the rings with explicit phases (e.g. alterna
     - The drive is set so that the Rayleigh free-water on-axis peak beyond 10 mm reaches `isppa_wcm2`.
     - Measured profiles only score the prediction (`predicted_r2`, focal and peak error); they are never fitted.
 
-## Library limitations
+## Library Limitations
 
 | Limitation | Effect | Mitigation |
 |---|---|---|

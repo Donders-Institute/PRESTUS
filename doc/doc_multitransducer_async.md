@@ -63,10 +63,10 @@ The per-transducer acoustic runs always record a free-water baseline, which the 
 
 # Physical Model
 
-**Acoustic safety metrics (ISPPA, MI, peak pressure)** use the per-voxel maximum of the scaled fields. **Thermal heat deposition** uses the incoherent intensity sum, assuming equal, non-overlapping duty cycles that together fill the protocol duty cycle.
+**Acoustic safety metrics (ISPPA, MI, peak pressure)** use the per-voxel maximum of the scaled fields. **Thermal heat deposition** uses the sum of the transducers' intensities, applied during the pulses of the one `timing` block: each transducer is assumed to fire with that block's pulse timing, in windows that do not overlap.
 
 !!! warning "Limitation"
-    The thermal model does not represent the firing schedule. The intensity sum is exact when both DCs are equal and non-overlapping; it over-estimates when $\mathrm{DC}_1 + \mathrm{DC}_2 < $ total protocol DC.
+    The thermal model does not represent the firing schedule. The time-averaged heating is exact when every transducer fires with the `timing` block's duty cycle (DC) in its own window, which requires $N \cdot \mathrm{DC} \le 100\,\%$. If the transducers share the block's on-time between them ($\mathrm{DC}_1 + \mathrm{DC}_2 = \mathrm{DC}$), heating is overestimated by up to $N$ for $N$ transducers, also at each focus. Within a pulse, all intensities are applied at once, which slightly raises the short-term temperature peak but not the average.
 
 ??? note "Equations"
     Acoustic safety metrics:
@@ -87,8 +87,8 @@ The per-transducer acoustic runs always record a free-water baseline, which the 
 
 | `simulation.async_grid_mode` | Grid | Use when |
 |---|---|---|
-| `'shared'` (default) | One grid for all transducers, aligned and cropped as in [Grid alignment](doc_multitransducer.md#grid-alignment) and [Grid cropping](doc_multitransducer.md#grid-cropping). | Default. |
-| `'per_transducer'` | Each transducer gets the grid a solo run would use. `combine_async_intensity` resamples every field onto transducer(1)'s grid via each run's `planimg` sidecar. | Per-transducer focal distance, ISPPA or focal volume must match a solo run, or the transducers are widely separated or steeply angled. |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_asyncgrid-shared_glyph.svg){ .choice-icon } `'shared'` (default) | One grid for all transducers, aligned and cropped as in [Grid alignment](doc_multitransducer.md#grid-alignment) and [Grid cropping](doc_multitransducer.md#grid-cropping). | Default. |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_asyncgrid-per-transducer_glyph.svg){ .choice-icon } `'per_transducer'` | Each transducer gets the grid a solo run would use. `combine_async_intensity` resamples every field onto transducer(1)'s grid via each run's `planimg` sidecar. | Per-transducer focal distance, ISPPA or focal volume must match a solo run, or the transducers are widely separated or steeply angled. |
 
 ??? note "Grid mode choice and accuracy"
     ```yaml

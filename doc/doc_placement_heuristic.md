@@ -1,5 +1,7 @@
 # Heuristic Transducer Placement
 
+![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+
 When only a target is known, the transducer position still has to be chosen, and it decides how much skull lies in front of the transducer. `placement.mode: 'heuristic'` searches the skull surface for a transducer position whose geometric focus reaches an MNI target, keeps candidates whose exit plane intersects little skull and selects the one closest to the target. Besides the target and the focal depth (`transducer.focal_distance_ep` or `focal_distance_bowl`), which sets the search radius, no manual input is needed, which suits automatic end-to-end workflows.
 
 On this page:

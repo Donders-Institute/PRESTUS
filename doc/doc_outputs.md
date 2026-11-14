@@ -1,5 +1,7 @@
 # Simulation Outputs
 
+![Pipeline steps; this page belongs to 6 Outputs](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-outputs_diagram.svg){ .stage-strip }
+
 A run writes its results as files: a metrics table, [NIfTI](https://nifti.nimh.nih.gov/) maps, figures and an HTML report, plus caches and stage outputs that a later run can reuse instead of recomputing. Knowing which file holds a value lets you check that the numbers you report come from the settings you intended.
 
 On this page:

@@ -1,5 +1,7 @@
 # Acoustic Simulations
 
+![Pipeline steps; this page belongs to 4 Acoustic](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-acoustic_diagram.svg){ .stage-strip }
+
 The acoustic simulation computes the pressure field the transducer produces in the head. Every reported intensity, focus position and mechanical index comes from this field, so its settings decide how far the results can be trusted: how finely the grid samples the wave, how long the simulation runs, and which intensity the field is scaled to.
 
 On this page:
@@ -60,7 +62,7 @@ PPP = PPW / CFL
 Rule of thumb: the coarsest grid that satisfies a minimum PPW at frequency `f` in the slowest medium is `dx_max = c_min / (f × PPW_min)`. At 500 kHz in water (1500 m/s) with PPW = 6: `resolution_mm = 0.50 mm`.
 
 ??? note "PPW across tissues, the stability recheck and the CFL default"
-    **PPW varies across tissues.** The check against `grid.min_ppw` uses the slowest medium. At 500 kHz with 0.5 mm resolution, water/brain (1500 m/s) gives PPW ≈ 10 and skull (2800 m/s) PPW ≈ 37. The binding spatial constraint is always in the slow tissues.
+    **PPW varies across tissues.** The check against `grid.min_ppw` uses the slowest medium. At 500 kHz with 0.5 mm resolution, water/brain (1500 m/s) gives PPW = 6 and skull (2800 m/s) PPW ≈ 11. The binding spatial constraint is always in the slow tissues.
 
     **The stability recheck can reduce `dt` below the CFL target.** After source setup, `prestus_pipeline` calls `checkStability`. If the CFL-derived `dt` exceeds the estimated stability limit for the heterogeneous medium, source setup is rerun with a smaller time step scaled by `grid.source_limit_fraction` (default 0.9). The final `dt` can therefore be smaller than `CFL × dx / c_max`. The PPW check runs only on the first source setup call; the adjusted call receives `dt` explicitly and bypasses it.
 

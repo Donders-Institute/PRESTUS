@@ -1,5 +1,7 @@
 # Localite Files, Offset and Coordinates
 
+![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+
 A Localite pose is a 4×4 matrix in the coordinates of the planning image, and its origin is a point on the tracked instrument that need not be the transducer. A wrong origin offset shifts the whole simulation along the beam axis, and converting with the wrong image header displaces positions by tens of millimetres. This page gives the folders PRESTUS reads and writes, how the offset from the tracked origin to the transducer is set, and how positions are converted to voxels and MNI space.
 
 On this page:

@@ -1,5 +1,7 @@
 # From UTE to Pseudo-HU
 
+![Pipeline steps; this page belongs to 3 Grid & medium](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-medium_diagram.svg){ .stage-strip }
+
 The pseudo-CT is only as good as the line that turns UTE intensity into pseudo-Hounsfield units (pHU), and that line returns HU on the scale of the CT it was fitted to. This page describes the available UTE-to-HU mappings, how PRESTUS generates the pseudo-CT, and how to pair each mapping with the HU-to-density calibration of the same CT.
 
 On this page:

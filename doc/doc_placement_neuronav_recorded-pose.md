@@ -1,5 +1,7 @@
 # Placing from a Recorded Pose
 
+![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+
 Localite placement reads one recorded pose per transducer, either from the ingested markers of a session or from a single XML file you name. The series or marker it reads sets the position and beam axis of the simulated transducer, so a wrong `target` or `position` simulates another pose than the one used for stimulation.
 
 On this page:

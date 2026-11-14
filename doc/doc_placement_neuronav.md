@@ -1,5 +1,7 @@
 # Neuronavigation Read-In
 
+![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+
 PRESTUS reads transducer poses recorded with the [Localite](https://www.localite.de/) neuronavigation system and simulates them post hoc, to verify the focus of the realised stimulation. The recorded pose decides where the simulated transducer sits and where its beam points, so the file you read it from and the offset from the tracker to the transducer shape every focus position and intensity the simulation reports. An example demo (without data) is in `examples/demo_localite.m`.
 
 On this page:

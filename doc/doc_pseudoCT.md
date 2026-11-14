@@ -1,5 +1,7 @@
 # CT-Based Skull Mapping
 
+![Pipeline steps; this page belongs to 3 Grid & medium](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-medium_diagram.svg){ .stage-strip }
+
 By default each skull layer of a `layered` simulation takes one value per property, although skull bone properties can vary within and between individuals. A CT gives the skull subject-specific properties instead. With `pct.enabled: 1`, PRESTUS maps the Hounsfield units (HU) of a CT to density, sound speed and attenuation within the skull layer. The CT is one of two images:
 
 - a **measured CT** of the subject (`path.ct_pattern`), or

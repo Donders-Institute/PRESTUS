@@ -1,5 +1,7 @@
 # Medium Properties
 
+![Pipeline steps; this page belongs to 3 Grid & medium](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-medium_diagram.svg){ .stage-strip }
+
 The medium sets the sound speed, density and attenuation the simulated wave travels through, and the thermal properties that govern heating. Whether you simulate free water or a head, and which tissue properties you assume, therefore shapes the predicted focus, intensity and temperature rise. This page shows how to choose the medium and which tissue properties PRESTUS assumes by default.
 
 On this page:
@@ -17,9 +19,9 @@ Set `simulation.medium` to one of three values:
 
 | Medium | What is simulated | Needs |
 |---|---|---|
-| `water` | The transducer in homogeneous water, placed at the inner edge of the requested PML layer. Free-water specifications and measurements refer to this. | No images |
-| `layered` | A head built from the [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html) segmentation. With the default `layers` and a [charm](https://simnibs.github.io/simnibs/build/html/documentation/command_line/charm.html) segmentation: water (including CSF), brain, skin, cortical skull bone and trabecular skull bone; the default `skull` layer has no charm label and is dropped. See [Layer mapping and smoothing](doc_preproc.md#layer-mapping-and-smoothing). The skull can instead take voxel-wise properties from a [(pseudo-)CT](doc_pseudoCT.md). | T1 (and T2/UTE), SimNIBS |
-| `phantom` | A designed test object. The segmentation file is mapped onto medium masks without rotation, cropping or other [preprocessing](doc_preproc.md). | A `final_tissues.nii.gz` in a (dummy) SimNIBS output folder |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_medium-water_glyph.svg){ .choice-icon } `water` | The transducer in homogeneous water, placed at the inner edge of the requested PML layer. Free-water specifications and measurements refer to this. | No images |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_medium-layered_glyph.svg){ .choice-icon } `layered` | A head built from the [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html) segmentation. With the default `layers` and a [charm](https://simnibs.github.io/simnibs/build/html/documentation/command_line/charm.html) segmentation: water (including CSF), brain, skin, cortical skull bone and trabecular skull bone; the default `skull` layer has no charm label and is dropped. See [Layer mapping and smoothing](doc_preproc.md#layer-mapping-and-smoothing). The skull can instead take voxel-wise properties from a [(pseudo-)CT](doc_pseudoCT.md). | T1 (and T2/UTE), SimNIBS |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_medium-phantom_glyph.svg){ .choice-icon } `phantom` | A designed test object. The segmentation file is mapped onto medium masks without rotation, cropping or other [preprocessing](doc_preproc.md). | A `final_tissues.nii.gz` in a (dummy) SimNIBS output folder |
 
 ```yaml
 simulation:

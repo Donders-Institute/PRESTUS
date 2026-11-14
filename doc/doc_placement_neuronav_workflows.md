@@ -1,5 +1,7 @@
 # Localite Ingestion: GUI and Script Workflows
 
+![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+
 [Localite](https://www.localite.de/) placement simulates the transducer pose the operator recorded, and ingestion decides which recorded series become simulated targets and what each is called. A series kept by mistake, or a name given to the wrong series, puts the simulated focus on another target than the one stimulated. This page turns raw Localite exports into the named, averaged targets that `placement.mode: localite` reads.
 
 On this page:

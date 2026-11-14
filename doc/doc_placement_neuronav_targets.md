@@ -1,5 +1,7 @@
 # Named Target Coordinates
 
+![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+
 When a session has several named targets, each simulated focus needs a coordinate and a record of how far that coordinate can be trusted. `neuronav_resolve_target` takes each target's coordinate from the best source available, from a pre-hoc lookup table down to a projection along the tracked transducer axis, and reports which source it used.
 
 On this page:

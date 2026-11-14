@@ -26,9 +26,9 @@ A "focal depth" quoted for a real transducer (e.g. a manufacturer steering table
 
 | `focal_reference` | Threshold | Convention |
 |---|---|---|
-| `flhm_3db` (default) | intensity ≥ peak / 2 | [ITRUSST](https://itrusst.org/) / [Martin et al. (2024)](https://doi.org/10.1016/j.brs.2024.04.013); Sonic Concepts CTX + TPO ("NeuroFUS") steering tables |
-| `flhm_6db` | intensity ≥ peak / 4 (≡ pressure ≥ peak / 2) | Imasonic / IGT steering tables |
-| `peak` | n/a (raw intensity-peak location) | No FLHM centring |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_focalref-flhm-3db_glyph.svg){ .choice-icon } `flhm_3db` (default) | intensity ≥ peak / 2 | [ITRUSST](https://itrusst.org/) / [Martin et al. (2024)](https://doi.org/10.1016/j.brs.2024.04.013); Sonic Concepts CTX + TPO ("NeuroFUS") steering tables |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_focalref-flhm-6db_glyph.svg){ .choice-icon } `flhm_6db` | intensity ≥ peak / 4 (≡ pressure ≥ peak / 2) | Imasonic / IGT steering tables |
+| ![](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/icons/icon_focalref-peak_glyph.svg){ .choice-icon } `peak` | n/a (raw intensity-peak location) | No FLHM centring |
 
 Set `parameters.calibration.focal_reference` to the convention the characterisation data uses. A mismatch produces calibrated depths that look shifted by several mm, although the underlying phases and amplitudes are correct. Default: `flhm_3db`.
 

@@ -218,3 +218,10 @@ html:not([data-dev="on"]) .prestus-dev-nav {
 .md-typeset .p-list li:first-child { border-top: 1px solid var(--p-line); }
 .md-typeset .p-list li > strong a { color: var(--p-brand); font-weight: 600; }
 .md-typeset .p-list li::marker { color: var(--p-ink-3); }
+
+/* Choice icons in option tables (same drawings as the Nexus drop-downs, PRESTUS_bin/img/icons) */
+.md-typeset img.choice-icon { width: 20px; height: 20px; vertical-align: -5px; margin-right: 4px; }
+[data-md-color-scheme="slate"] .md-typeset img.choice-icon { filter: invert(1) hue-rotate(180deg); }
+
+/* "You are here" strip under the title of each pipeline-stage page */
+.md-typeset img.stage-strip { display: block; width: 100%; max-width: 760px; margin: 0 0 1.2em; border-radius: 6px; }

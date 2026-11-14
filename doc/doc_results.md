@@ -1,5 +1,7 @@
 # Reading Your Results
 
+![Pipeline steps; this page belongs to 6 Outputs](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-outputs_diagram.svg){ .stage-strip }
+
 A finished run leaves a folder of files. Before you use its numbers, check that the run simulated the placement and intensity you intended, and compare its exposure with the safety reference levels. This page lists the files to open first, the checks in order, and how to read the safety summary; every file and column is described in [Outputs & Reports](doc_outputs.md), and terms in the [Glossary](doc_glossary.md).
 
 On this page:
