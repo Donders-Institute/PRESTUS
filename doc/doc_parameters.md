@@ -569,9 +569,9 @@ See [TUS_entry placement](doc_placement_tus_entry.md).
 |---|---|---|---|
 | `use_qform` | Force qform reorientation before charm segmentation? | `0` | Set to `1` if charm reports a qform/sform mismatch error. |
 | `debug` | Pass `--debug` to charm for verbose segmentation output? | `0` | `1 = yes`, `0 = no` |
-| `deface` | Create a defaced copy of the SimNIBS m2m folder (`m2m_sub-NNN_defaced/`) for safe sharing? | `0` | `1 = yes`, `0 = no`. Runs [`pydeface`](https://github.com/poldracklab/pydeface) (must be installed in `startup.simnibs_bin_path`) on T1, UTE, bias-corrected, and MNI-space anatomical images. The original m2m folder is never modified. Only affects saved files; see `io.deface_plots` for figure defacing. |
 | `noneck` | Pass `--noneck` to charm: the scan contains no neck. | `0` | `1 = yes`, `0 = no` |
 | `settings_file` | charm settings file (`.ini`), passed as `--usesettings`. | `''` | `''` = the `charm.ini` of the SimNIBS install. Start from a copy of that file. Keep it outside the m2m folder, which charm deletes when it re-runs. |
+| `deface` | Create a defaced copy of the SimNIBS m2m folder (`m2m_sub-NNN_defaced/`) for safe sharing? | `0` | `1 = yes`, `0 = no`. Made again when the segmentation changes. See [Defaced copy for sharing](doc_preproc.md#defaced-copy-for-sharing). Runs [`pydeface`](https://github.com/poldracklab/pydeface) (must be installed in `startup.simnibs_bin_path`) on T1, UTE, bias-corrected, and MNI-space anatomical images. The original m2m folder is never modified. Only affects saved files; see `io.deface_plots` for figure defacing. |
 
 ---
 

@@ -169,6 +169,67 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_cache_
             tc.verifyFalse(isfield(cache_signature(p, 'grid'), 'phantom_file'));
         end
 
+        function test_resegmented_head_is_detected(tc)
+            % A layered head records the segmentation's content: a charm re-run
+            % that rewrites final_tissues (same size here) invalidates every cache
+            root = tempname; mkdir(root);
+            tc.addTeardown(@() rmdir(root, 's'));
+            m2m = fullfile(root, 'm2m_sub-001'); mkdir(m2m);
+            f = fullfile(m2m, 'final_tissues.nii.gz');
+            fid = fopen(f, 'w'); fwrite(fid, uint8(1:10)); fclose(fid);
+            p = tc.params();
+            p.path.seg = root;
+            kinds = {'grid', 'medium', 'acoustic', 'headmodel'};
+            old = struct();
+            for k = kinds, old.(k{1}) = cache_signature(p, k{1}); end
+            tc.verifyTrue(isfield(old.grid, 'segmentation'));
+            % the same content written again (e.g. a copy) still matches
+            fid = fopen(f, 'w'); fwrite(fid, uint8(1:10)); fclose(fid);
+            java.io.File(f).setLastModified(java.lang.System.currentTimeMillis() + 5000);
+            for k = kinds
+                tc.verifyTrue(check_cache_signature('x.mat', old.(k{1}), cache_signature(p, k{1}), p));
+            end
+            fid = fopen(f, 'w'); fwrite(fid, uint8(11:20)); fclose(fid);
+            java.io.File(f).setLastModified(java.lang.System.currentTimeMillis() + 10000);
+            for k = kinds
+                tc.verifyError(@() check_cache_signature('x.mat', old.(k{1}), ...
+                    cache_signature(p, k{1}), p), 'prestus:cache:signatureMismatch');
+            end
+        end
+
+        function test_legacy_cache_compared_by_segmentation_date(tc)
+            % Caches from before the fingerprint: a segmentation written after
+            % the cache counts as a change; the head model's recorded date is compared
+            root = tempname; mkdir(root);
+            tc.addTeardown(@() rmdir(root, 's'));
+            m2m = fullfile(root, 'm2m_sub-001'); mkdir(m2m);
+            f = fullfile(m2m, 'final_tissues.nii.gz');
+            fid = fopen(f, 'w'); fwrite(fid, uint8(1:10)); fclose(fid);
+            cache = fullfile(root, 'cache.mat');
+            fid = fopen(cache, 'w'); fclose(fid);
+            p = tc.params();
+            p.path.seg = root;
+            now_ms = java.lang.System.currentTimeMillis();
+
+            legacy = rmfield(cache_signature(p, 'grid'), 'segmentation');
+            java.io.File(f).setLastModified(now_ms - 60000);        % segmentation older than the cache
+            java.io.File(cache).setLastModified(now_ms);
+            tc.verifyTrue(check_cache_signature(cache, legacy, cache_signature(p, 'grid'), p));
+            java.io.File(f).setLastModified(now_ms + 60000);        % charm ran after the cache
+            [ok, diffs] = check_cache_signature(cache, legacy, cache_signature(p, 'grid'), ...
+                setfield(p, 'io', struct('cache_signature_check', 'warn')));  %#ok<SFLD>
+            tc.verifyFalse(ok);
+            tc.verifyEqual(diffs, {'segmentation'});
+
+            hm = rmfield(cache_signature(p, 'headmodel'), 'segmentation');
+            d = dir(f);
+            hm.segmentation_date = d.datenum;
+            tc.verifyTrue(check_cache_signature(cache, hm, cache_signature(p, 'headmodel'), p));
+            hm.segmentation_date = d.datenum - 1;
+            tc.verifyError(@() check_cache_signature(cache, hm, cache_signature(p, 'headmodel'), p), ...
+                'prestus:cache:signatureMismatch');
+        end
+
         function test_unknown_kind_errors(tc)
             tc.verifyError(@() cache_signature(tc.params(), 'thermal'), 'cache_signature:badKind');
         end

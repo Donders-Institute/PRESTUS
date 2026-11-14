@@ -104,6 +104,7 @@ io:
   save_heatingvideo: 0      # Save a video of incremental heating?
   save_property_maps: 0    # Save per-property NIfTIs to nii/properties/ (layered medium only)
   save_MNI: 1              # Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)
+  deface_plots: 1          # Remove facial anatomy from QC figures (cut plane anchored at the SimNIBS eye label); saved NIfTIs are not changed (see segmentation.deface)
   save_Ipa: 1              # Save pulse-average intensity (Ipa) NIfTI map; suppressed automatically when timing.pd absent
   save_Ita: 1              # Save temporal-average intensity (Ita) NIfTI map; suppressed automatically when timing.pd/.pri absent
   save_p_complex: 0         # Save complex pressure field (p_complex) alongside p_max_all in the acoustic cache? (large)
@@ -532,6 +533,7 @@ segmentation:
   debug: 0          # Pass --debug flag to charm segmentation for verbose output?
   noneck: 0         # Pass --noneck to charm: the scan contains no neck
   settings_file: '' # charm settings (.ini, passed as --usesettings); '' = charm.ini of the SimNIBS install. Keep it outside the m2m folder.
+  deface: 0        # Make a defaced copy of the m2m folder (m2m_sub-XXX_defaced/) for sharing; needs pydeface in the SimNIBS environment. Remade when the segmentation changes.
 
 #------------ Head model processing
 

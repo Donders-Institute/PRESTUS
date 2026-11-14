@@ -9,7 +9,8 @@ function sig = cache_signature(parameters, kind)
 %
 % Paths, I/O, HPC and module flags are excluded (moving data or changing what
 % is run downstream does not change the cached result); a phantom's file is
-% identified by subject, size and modification date. Excluded are the drive level
+% identified by subject, size and modification date, a head segmentation by its
+% content (SEGMENTATION_FINGERPRINT), so a re-run of charm is detected. Excluded are the drive level
 % (target_isppa_wcm2, tx_calibration: they scale the acoustic field, not the
 % grid or medium) and, for grid and medium caches, the partial acoustic FOV
 % (grid.acoustic_fov_*: cropped after these stages).
@@ -41,10 +42,24 @@ function sig = cache_signature(parameters, kind)
         sig.(f{1}) = get_field(parameters, f);
     end
     sig.transducer = strip_drive(get_field(parameters, {'transducer'}));
+    % A measured CT (path.ct_pattern) replaces the pseudo-CT: identify the file
+    % (field only when set, so caches of pseudo-CT and label runs keep their signature)
+    ct = measured_ct_identity(parameters);
+    if ~isempty(ct)
+        sig.measured_ct = ct;
+    end
     % A phantom is read from path.seg/m2m_sub-*/final_tissues.nii.gz: a
     % regenerated phantom changes the grid, medium and field built from it
     if strcmp(sig.medium, 'phantom') && ~strcmp(kind, 'headmodel')
         sig.phantom_file = segmentation_identity(parameters);
+    end
+    % A head is built from the SimNIBS segmentation: a re-run of charm (another
+    % SimNIBS version or other settings) changes everything built from it
+    if strcmp(sig.medium, 'layered') || strcmp(kind, 'headmodel')
+        fp = segmentation_fingerprint(parameters);
+        if ~isempty(fp)
+            sig.segmentation = fp;
+        end
     end
 
     switch kind
@@ -85,7 +100,6 @@ function sig = cache_signature(parameters, kind)
             end
             mp = get_field(parameters, {'medium_properties'});
             if isstruct(mp), sig.tissue_labels = fieldnames(mp); end
-            sig.segmentation_date = segmentation_date(parameters);
         otherwise
             error('cache_signature:badKind', 'Unknown cache kind ''%s'' (grid | medium | acoustic | headmodel).', kind);
     end
@@ -101,12 +115,21 @@ function id = segmentation_identity(parameters)
     end
 end
 
-function d = segmentation_date(parameters)
-% Modification date of the segmentation (final_tissues), so a re-run of charm invalidates the model
-    d = [];
+function id = measured_ct_identity(parameters)
+% Name, size and modification date of the measured CT; [] without one or with pct off
+    id = [];
+    pct = get_field(parameters, {'pct'});
+    if ~(isstruct(pct) && isfield(pct, 'enabled') && isequal(pct.enabled, 1))
+        return
+    end
+    pattern = get_field(parameters, {'path', 'ct_pattern'});
+    if ~((ischar(pattern) || isstring(pattern)) && strlength(string(pattern)) > 0)
+        return
+    end
+    id = struct('name', char(pattern), 'bytes', [], 'date', []);
     try
-        f = dir(fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id), 'final_tissues.nii.gz'));
-        if ~isempty(f), d = f(1).datenum; end
+        f = dir(pct_ct_file(parameters));
+        if ~isempty(f), id.name = f(1).name; id.bytes = f(1).bytes; id.date = round(f(1).datenum * 86400); end   % [s]
     catch
     end
 end

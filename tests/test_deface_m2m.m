@@ -80,6 +80,28 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_deface
             tc.verifyEqual(t1.datenum, t2.datenum, 'Sentinel mtime should not change on re-run');
         end
 
+        function test_remade_after_resegmentation(tc)
+            % The sentinel records the segmentation's checksum: a charm re-run
+            % (new final_tissues) makes the defaced copy again
+            seg = fullfile(tc.M2mDir, 'final_tissues.nii.gz');
+            fid = fopen(seg, 'w'); fwrite(fid, uint8(1:10)); fclose(fid);
+            preproc_deface_m2m(tc.M2mDir, tc.Params);
+            sentinel = fullfile([tc.M2mDir, '_defaced'], '.defaced');
+            first = strtrim(fileread(sentinel));
+            tc.verifyTrue(startsWith(first, 'final_tissues md5: '));
+
+            preproc_deface_m2m(tc.M2mDir, tc.Params);           % unchanged: kept
+            tc.verifyEqual(strtrim(fileread(sentinel)), first);
+
+            fid = fopen(seg, 'w'); fwrite(fid, uint8(11:20)); fclose(fid);
+            java.io.File(seg).setLastModified(java.lang.System.currentTimeMillis() + 10000);
+            preproc_deface_m2m(tc.M2mDir, tc.Params);
+            tc.verifyNotEqual(strtrim(fileread(sentinel)), first);
+            copied = fullfile([tc.M2mDir, '_defaced'], 'final_tissues.nii.gz');
+            fid = fopen(copied); data = fread(fid, inf, '*uint8'); fclose(fid);
+            tc.verifyEqual(data', uint8(11:20), 'the copy holds the new segmentation');
+        end
+
         function test_skips_when_no_simnibs_bin_path(tc)
             p = struct('startup', struct('simnibs_bin_path', ''));
             w = warning('off', 'all');

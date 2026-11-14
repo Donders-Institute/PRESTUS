@@ -310,6 +310,8 @@ On this page:
 | `safe_addpath`                          | Add a directory tree to the MATLAB path, skipping hidden directories |
 | `sample_beam_axis`                      | Interpolate a 2D/3D field along the beam axis from the bowl apex to the grid edge (distances from the apex). |
 | `sanitize_output_affix`                 | Normalise `io.output_affix` to the BIDS `_desc-<label>` form. |
+| `segmentation_file`                     | The SimNIBS segmentation of this subject (final_tissues.nii.gz) |
+| `segmentation_fingerprint`              | Content identity of the SimNIBS segmentation a stage reads |
 | `shell_quote_arg`                       | Quote a string as a single literal argument for system(). |
 | `should_save_output`                    | Decide whether an output is saved: per-step `io` flag, else `io.save_matrices` (matrix outputs), else the built-in default. |
 | `simnibs_env_overrides`                 | Environment for a SimNIBS tool run with RUN_COMMAND |

@@ -5,7 +5,8 @@ function sig = placement_signature(parameters, mode)
 % CHECK_CACHE_SIGNATURE, like CACHE_SIGNATURE for the grid/medium caches:
 % the mode's own settings (placement.<mode>, without the work folder, tool
 % install paths and derived outputs) and the transducers without their
-% positions (the result) and drive level.
+% positions (the result) and drive level; for modes that read the SimNIBS
+% segmentation, its content (SEGMENTATION_FINGERPRINT).
 %
 % Use as:
 %   sig = placement_signature(parameters, mode)
@@ -48,4 +49,12 @@ end
         if isfield(t, f{1}); t = rmfield(t, f{1}); end
     end
     sig.transducer = t;
+    % Modes that read the SimNIBS segmentation (scalp, mesh, MNI warps): a re-run
+    % of charm changes the placement (field only when there is a segmentation)
+    if any(strcmp(mode, {'heuristic', 'mni', 'plantus', 'tus_entry'}))
+        fp = segmentation_fingerprint(parameters);
+        if ~isempty(fp)
+            sig.segmentation = fp;
+        end
+    end
 end

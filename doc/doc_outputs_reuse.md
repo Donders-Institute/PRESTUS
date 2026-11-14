@@ -24,10 +24,10 @@ PRESTUS keeps two kinds of intermediate results apart:
 ??? note "Stage outputs and compared settings"
     | Stage output | Sidecar | Picked up by | Compared settings |
     |---|---|---|---|
-    | Pseudo-CT, `<pct folder>/pseudoCT.nii.gz` | `pseudoCT.json` | every run with `pct.enabled: 1`, when it exists | `pct.skull_mapping` (with `custom_slope` / `custom_intercept`) |
-    | Placement run, `<path.placement>/sub-XXX/<mode>/<target_name>/` | `placement_run.json` | heuristic, PlanTUS and TUS_entry placement, per `placement.reuse` | `placement.<mode>` (without tool install paths) and the transducer without its positions |
-    | Pressure map, `nii/sub-XXX_<medium>_T1w<affix>_pressure.nii.gz` | `…_pressure.json` | a run with `path.acoustic_input` set to the NIfTI | `simulation.medium`, `grid` (without `thermal_*`), `layers`, `headmodel`, `pct`, `medium_properties`, the transducer (geometry and grid positions) and the subject |
     | SimNIBS segmentation, `path.seg/m2m_sub-XXX/` | none (standard SimNIBS output) | every layered run, when `final_tissues.nii.gz` exists (`io.overwrite_simnibs`) | SimNIBS version (`charm_log.html`) and charm settings (`settings.ini`): a warning, see [Segmentation](doc_preproc.md#simnibs-version-and-charm-settings) |
+    | Pseudo-CT, `<pct folder>/pseudoCT.nii.gz` | `pseudoCT.json` | every run with `pct.enabled: 1`, when it exists | `pct.skull_mapping` (with `custom_slope` / `custom_intercept`) and the segmentation (checksum of `final_tissues.nii.gz`) |
+    | Placement run, `<path.placement>/sub-XXX/<mode>/<target_name>/` | `placement_run.json` | heuristic, PlanTUS and TUS_entry placement, per `placement.reuse` | `placement.<mode>` (without tool install paths), the transducer without its positions, and the segmentation (checksum of `final_tissues.nii.gz`) |
+    | Pressure map, `nii/sub-XXX_<medium>_T1w<affix>_pressure.nii.gz` | `…_pressure.json` | a run with `path.acoustic_input` set to the NIfTI | `simulation.medium`, `grid` (without `thermal_*`), `layers`, `headmodel`, `pct`, `medium_properties`, the transducer (geometry and grid positions), the subject and, for `layered`, the segmentation |
 
 `io.cache_signature_check` handles a mismatch (`error` by default, `warn`, `off`). An output without a sidecar (e.g. a pressure map from another tool) is used with the warning `prestus:cache:unverified`.
 
@@ -116,7 +116,7 @@ Grid, medium and acoustic caches are named by subject, medium and affix only. Ea
     | Medium (`*_medium_cache*.mat`) | the grid settings above, plus `medium_properties` |
     | Acoustic (`*_results*.mat`) | the medium settings above except `absorption_coeff` (thermal only), plus `subject_id` and `grid.acoustic_fov_*`; not `grid.thermal_*` |
 
-    For `simulation.medium: phantom`, each also compares the phantom file (size and modification date of `final_tissues.nii.gz`).
+    For `simulation.medium: phantom`, each also compares the phantom file (size and modification date of `final_tissues.nii.gz`). For `layered`, each compares the segmentation by content (checksum of `final_tissues.nii.gz`), so a re-run of charm with another SimNIBS version or other settings is detected, while a copied or moved segmentation still matches. A cache written before the checksum was recorded counts the segmentation as changed when `final_tissues.nii.gz` is newer than the cache file.
 
     Not compared, because they do not change these caches: paths, I/O, HPC and module flags; the drive level (`target_isppa_wcm2`, `tx_calibration`), which only scales the acoustic field; and, for grid and medium caches, the partial acoustic FOV (`grid.acoustic_fov_*`), which is cropped after the grid and medium stages. A run that reuses a cache keeps its own values of these settings.
 

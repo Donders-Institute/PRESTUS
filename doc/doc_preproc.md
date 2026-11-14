@@ -27,6 +27,9 @@ An existing segmentation is reused even when another version or other settings a
 
 In the Nexus, the Segmentation card (Medium tab) lists the SimNIBS installs on this computer, shows the version and the existing segmentation, opens `charm_report.html`, and has the re-run switch. When runs are submitted to a cluster over SSH (Run tab), *Scan cluster* lists the installs there: conda environments, `~/SimNIBS*`, `/opt/simnibs*` and the bin folders of the `simnibs` environment modules. The Nexus keeps the result per host, so it can check a cluster path that does not exist on this computer.
 
+### Defaced Copy for Sharing
+
+`segmentation.deface: 1` writes a copy of the m2m folder, `m2m_sub-XXX_defaced/`, with the face removed from the anatomical images by [pydeface](https://github.com/poldracklab/pydeface) ([install it](doc_installation.md#mri-defacing) in the SimNIBS environment). Tissue labels, surfaces, warps and meshes are copied unchanged, and the original folder is not modified. The copy is made once and again after the segmentation changes. Figures are defaced separately, with `io.deface_plots` (on by default).
 
 Installing SimNIBS: [Installation](doc_installation.md#install-simnibs). Errors: [Troubleshooting](doc_troubleshooting.md#segmentation-simnibs-charm).
 

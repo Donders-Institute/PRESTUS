@@ -87,8 +87,32 @@ function [ok, diffs] = check_cache_signature(filename, stored, current, paramete
         current.grid = rmfield(current.grid, 'focal_axis_min_norm');
     end
 
+    % Caches and stage outputs from before the segmentation fingerprint
+    % (SEGMENTATION_FINGERPRINT) are compared by date: head models recorded
+    % the segmentation's date, the others count a segmentation written after
+    % them (charm re-run) as a change.
+    seg_changed = {};
+    if isfield(current, 'segmentation') && ~isfield(stored, 'segmentation')
+        current = rmfield(current, 'segmentation');
+        seg = [];
+        if ~isempty(segmentation_file(parameters))
+            seg = dir(segmentation_file(parameters));
+        end
+        if isfield(stored, 'segmentation_date')
+            if ~isempty(seg) && ~(isnumeric(stored.segmentation_date) && isscalar(stored.segmentation_date) ...
+                    && abs(stored.segmentation_date - seg(1).datenum) < 1/86400)
+                seg_changed = {'segmentation'};
+            end
+            stored = rmfield(stored, 'segmentation_date');
+        else
+            made = dir(filename);
+            if ~isempty(seg) && ~isempty(made) && seg(1).datenum > made(1).datenum
+                seg_changed = {'segmentation'};
+            end
+        end
+    end
 
-    diffs = struct_diff_keys(stored, current, '');
+    diffs = [seg_changed, struct_diff_keys(stored, current, '')];
     if isempty(diffs)
         return
     end

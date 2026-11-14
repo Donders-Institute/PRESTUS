@@ -3,8 +3,9 @@ function [sig, skull_mapping] = pct_signature(parameters)
 %
 % Recorded in the pseudo-CT's sidecar (pseudoCT.json) when it is generated and
 % compared when an existing pseudo-CT is reused (PREPROC_SEGMENTATION). Only
-% the UTE→HU skull mapping changes pseudoCT.nii.gz; the pct.mapping_* keys act
-% later, in the medium stage, and pct.debug only keeps intermediate files.
+% the UTE→HU skull mapping and the segmentation (SEGMENTATION_FINGERPRINT)
+% change pseudoCT.nii.gz; the pct.mapping_* keys act later, in the medium
+% stage, and pct.debug only keeps intermediate files.
 %
 % Use as:
 %   [sig, skull_mapping] = pct_signature(parameters)
@@ -13,7 +14,7 @@ function [sig, skull_mapping] = pct_signature(parameters)
 %   parameters - PRESTUS parameter struct (pct.skull_mapping, pct.custom_*)
 %
 % Output:
-%   sig           - struct: signature_version, skull_mapping
+%   sig           - struct: signature_version, skull_mapping, segmentation
 %   skull_mapping - mapping passed to pct_create_pseudoCT.sh ('kosciessa', ...,
 %                   or 'custom:<slope>:<intercept>')
 %
@@ -37,4 +38,10 @@ end
     end
 
     sig = struct('signature_version', 1, 'skull_mapping', skull_mapping);
+    % The pseudo-CT uses the SimNIBS segmentation's tissue masks: a re-run of
+    % charm changes it (field only when there is a segmentation)
+    fp = segmentation_fingerprint(parameters);
+    if ~isempty(fp)
+        sig.segmentation = fp;
+    end
 end

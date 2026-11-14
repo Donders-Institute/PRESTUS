@@ -105,6 +105,7 @@ fields:
   modules.run_water_baseline: {choices: [auto, 1, 0]}
   io.overwrite_simnibs: {kind: flag}
   io.save_*: {kind: flag}
+  io.deface_plots: {kind: flag, visible_if: {key: simulation.medium, in: [layered]}}
 
   calibration.focal_reference: {choices: [peak, flhm_3db, flhm_6db]}
 
@@ -237,6 +238,7 @@ fields:
   segmentation.debug: {kind: flag}
   segmentation.noneck: {kind: flag}
   segmentation.settings_file: {kind: file}
+  segmentation.deface: {kind: flag}
 
   headmodel.head_pad_mm: {unit: mm}
   headmodel.csf_expansion: {unit: mm}
@@ -934,6 +936,8 @@ display:
   time_reversal: {label: Time reversal (refocusing, aberration report, pose search)}
   segmentation.noneck: {label: Scan without neck (charm --noneck), advanced: true}
   segmentation.settings_file: {label: Custom charm settings file, advanced: true}
+  segmentation.deface: {label: Defaced copy for sharing (pydeface), advanced: true}
+  io.deface_plots: {label: Deface QC figures}
 
   # Timing
   timing: {label: Sonication protocol}

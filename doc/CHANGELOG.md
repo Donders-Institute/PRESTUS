@@ -139,6 +139,8 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 
 #### Head model & pseudo-CT
 - Automated defacing via pydeface, optionally in the segmentation pipeline
+- ⚠️ **Fixed:** grid, medium and acoustic caches, placement runs and pseudo-CTs of a layered head were reused after the segmentation was re-made (charm re-run). They now record the segmentation's checksum and are checked on reuse; a defaced copy is made again. Re-run simulations of subjects re-segmented after their caches were written.
+- `segmentation.deface` and `io.deface_plots` are in `config_default.yaml`
 - `hpc.ld_library_path` and `placement.plantus.env_path` follow `startup.simnibs_bin_path` while empty: SimNIBS tools get the install's own libraries (`external/lib/linux`) prefixed to `LD_LIBRARY_PATH`, and PlanTUS runs in the install's Python; `env_path` is no longer required
 - Segmentation: SimNIBS 4 or later required (checked from the install); `segmentation.settings_file` (charm `--usesettings`) and `segmentation.noneck`; an existing segmentation made with another SimNIBS version or other charm settings is reused with a warning
 - Grid cropping includes the bowl of every transducer

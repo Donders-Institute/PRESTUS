@@ -89,6 +89,14 @@ end
         end
     else
         fprintf('[preproc_segmentation] %s\n', 'Segmentation available...');
+        % An existing segmentation is reused as is, also when another SimNIBS version or
+        % other charm settings are selected now: say so (io.overwrite_simnibs re-runs charm)
+        diffs = segmentation_check_existing(segmentation_folder, parameters);
+        for i = 1:numel(diffs)
+            warning('preproc_segmentation:segmentationDiffers', ...
+                '%s %s; it is reused as is (set io.overwrite_simnibs: 1 to segment again).', ...
+                segmentation_folder, diffs{i});
+        end
     end
 
     %% SEGMENTATION PIPELINE (charm + pseudoCT share the same pipeline)
