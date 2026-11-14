@@ -91,7 +91,8 @@ fields:
   path.transducer_library: {kind: dir}
   path.localite*: {kind: dir}
   path.localite_t1_pattern: {kind: str}
-  path.pct: {kind: dir}
+  path.pct: {kind: dir, visible_if: [{key: pct.enabled, in: [1, true]}, {key: path.ct_pattern, in: ['', null]}]}
+  path.ct_pattern: {kind: str, visible_if: [{key: simulation.medium, in: [layered]}, {key: pct.enabled, in: [1, true]}]}
   path.acoustic_input: {kind: file}
   startup.*_path: {kind: path}
   startup.modules_to_load: {kind: strlist}
@@ -246,11 +247,15 @@ fields:
   headmodel.skull_wrap_visualize: {kind: flag}
 
   pct.enabled: {kind: flag}
-  pct.debug: {kind: flag}
-  pct.skull_mapping: {choices: [miscouridou, carpino, wiesinger, treeby, kosciessa]}
-  pct.mapping_density: {choices: [k-plan, k-wave, marsac, aubry, air-tissue, none]}
-  pct.mapping_soundspeed: {choices: [k-plan, marsac, aubry, webb, pichardo, mcdannold, none]}
-  pct.mapping_attenuation: {choices: [k-plan, mueller, aubry, webb, pichardo, mcdannold, none]}
+  # The mapping settings apply only with pct.enabled
+  # Pseudo-CT generation (UTE → HU) applies only without a measured CT (path.ct_pattern)
+  pct.debug: {kind: flag, visible_if: [{key: pct.enabled, in: [1, true]}, {key: path.ct_pattern, in: ['', null]}]}
+  pct.skull_mapping: {choices: [miscouridou, carpino, wiesinger, treeby, kosciessa, custom], visible_if: [{key: pct.enabled, in: [1, true]}, {key: path.ct_pattern, in: ['', null]}]}
+  pct.custom_*: {visible_if: [{key: pct.enabled, in: [1, true]}, {key: path.ct_pattern, in: ['', null]}, {key: pct.skull_mapping, in: [custom]}]}
+  pct.mapping_density: {choices: [k-plan, k-wave, marsac, aubry, air-tissue, none], visible_if: {key: pct.enabled, in: [1, true]}}
+  pct.density_calibration: {visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.mapping_density, in: [k-plan]}]}
+  pct.mapping_soundspeed: {choices: [k-plan, marsac, aubry, webb, pichardo, mcdannold, none], visible_if: {key: pct.enabled, in: [1, true]}}
+  pct.mapping_attenuation: {choices: [k-plan, mueller, aubry, webb, pichardo, mcdannold, none], visible_if: {key: pct.enabled, in: [1, true]}}
 
   layers.*: {kind: numbers}
 
@@ -694,6 +699,7 @@ display:
   path.localite_export: {label: Localite export folder, group: placement, advanced: true}
   path.localite: {label: Localite folder (deprecated), group: placement, advanced: true}
   path.pct: {label: Pseudo-CT output folder, advanced: true}
+  path.ct_pattern: {label: Measured CT file pattern (empty = pseudo-CT from UTE), group: pct, group_first: true}
   path.acoustic_input: {label: Start from pressure map (NIfTI), advanced: true}
   path.placement: {label: Placement output folder, group: placement, advanced: true}
   path.transducer_library: {label: Own transducer library (project), advanced: true}

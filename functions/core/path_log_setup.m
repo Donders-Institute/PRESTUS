@@ -170,7 +170,8 @@ end
         % PRESTUS root if path.pct is a relative path.
         pct_enabled = isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && ...
                       parameters.pct.enabled;
-        if pct_enabled && ~isfolder(parameters.io.dir_pct)
+        measured_ct = strlength(string(get_field(parameters, {'path', 'ct_pattern'}, ''))) > 0;
+        if pct_enabled && ~measured_ct && ~isfolder(parameters.io.dir_pct)
             mkdir(parameters.io.dir_pct);
         end
     end

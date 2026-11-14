@@ -7,9 +7,10 @@ function stats = pct_predict_skull_properties(parameters, options)
 % mapped distributions. The skull voxels and HU values come from
 %   'grid'    the head-preprocessing cache (cache/sub-XXX_<medium>_cropped_smoothed.mat),
 %             i.e. exactly what MEDIUM_SETUP maps, when it exists; else from
-%   'native'  pseudoCT.nii.gz and tissues_mask.nii.gz in the pCT folder
-%             (FIND_PSEUDOCT_DIR), skull = layers.skull labels, before
-%             cropping, resampling and smoothing.
+%   'native'  the CT as PCT_LOAD_CT reads it (the measured CT from
+%             path.ct_pattern on the segmentation grid, else the pseudo-CT
+%             in the pCT folder) and its tissue labels, skull =
+%             layers.skull labels, before cropping, resampling and smoothing.
 % Alongside, the homogeneous skull values of the uncertainty bound variants
 % (UNCERTAINTY_VARIANTS) are listed, so the mapped distribution can be
 % compared with the range the bound variants model.
@@ -48,21 +49,12 @@ end
 
     [pseudoCT, skull_idx, source] = load_skull_hu(parameters, cache_dir, options.source);
 
-    % Same calls as MEDIUM_SETUP; arrays outside the skull are not read
-    mapping = struct('density',     mapping_name(parameters, 'mapping_density'), ...
-                     'sound_speed', mapping_name(parameters, 'mapping_soundspeed'), ...
-                     'attenuation', mapping_name(parameters, 'mapping_attenuation'));
+    % Same calls as MEDIUM_SETUP (PCT_MAP_PROPERTIES); arrays outside the skull are not read
     p = parameters;
     if ~isfield(p, 'simulation') || ~isfield(p.simulation, 'debug'); p.simulation.debug = 0; end
+    [props, mapping] = pct_map_properties(p, pseudoCT, skull_idx);
+    density = props.density; sound_speed = props.sound_speed; alpha_coeff = props.alpha_coeff;
     skull = p.medium_properties.skull;
-    density     = repmat(skull.density,     size(pseudoCT));
-    sound_speed = repmat(skull.sound_speed, size(pseudoCT));
-    alpha_coeff = repmat(skull.alpha_coeff, size(pseudoCT));
-    alpha_power = repmat(skull.alpha_power, size(pseudoCT));
-    density = medium_pct_density(p, density, pseudoCT, skull_idx, mapping.density);
-    sound_speed = medium_pct_soundspeed(p, sound_speed, density, pseudoCT, skull_idx, mapping.sound_speed);
-    alpha_coeff = medium_pct_attenuation(p, alpha_coeff, alpha_power, pseudoCT, skull_idx, ...
-                                         mapping.attenuation, density);
 
     stats = struct();
     stats.subject_id   = subject_id;
@@ -117,24 +109,17 @@ function [pseudoCT, skull_idx, source] = load_skull_hu(parameters, cache_dir, so
             pseudoCT  = double(c.pseudoCT_crop);
             skull_idx = find(c.medium_masks == find(strcmp(medium_labels, 'skull')));
         case 'native'
-            pct_dir = find_pseudoct_dir(parameters);
-            if isempty(pct_dir)
+            if isempty(pct_ct_file(parameters)) && isempty(find_pseudoct_dir(parameters))
                 error('pct_predict_skull_properties:notFound', ...
-                    'No pseudoCT.nii.gz found in:\n  %s', get_pct_dir(parameters));
+                    'No CT: path.ct_pattern is empty and no pseudoCT.nii.gz found in:\n  %s', ...
+                    get_pct_dir(parameters));
             end
-            pseudoCT = double(niftiread(fullfile(pct_dir, 'pseudoCT.nii.gz')));
-            mask = niftiread(fullfile(pct_dir, 'tissues_mask.nii.gz'));
+            [pseudoCT, ~, mask] = pct_load_ct(parameters);
+            pseudoCT = double(pseudoCT);
             skull_idx = find(ismember(mask, parameters.layers.skull));
     end
     if isempty(skull_idx)
         error('pct_predict_skull_properties:noSkull', 'No skull voxels found (%s source).', source);
-    end
-end
-
-function name = mapping_name(parameters, key)
-    name = 'none';
-    if isfield(parameters, 'pct') && isfield(parameters.pct, key) && ~isempty(parameters.pct.(key))
-        name = char(parameters.pct.(key));
     end
 end
 

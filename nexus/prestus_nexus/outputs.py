@@ -77,6 +77,17 @@ def placement_record(model: ConfigModel) -> dict | None:
     (write_placement_positions.m): {'mode', 'created', 'transducers': [{'trans_pos', 'focus_pos'}]}
     with 1-based T1 voxel positions; None when the file is missing or unreadable."""
     import json
+def measured_ct_file(model: ConfigModel) -> Path | None:
+    """The measured CT path.ct_pattern names (as pct_ct_file.m), or None when it is empty or
+    matches nothing."""
+    from .paths import resolve_pattern
+    pattern, anat, sid = model.get("path.ct_pattern"), model.get("path.anat"), _subject_id(model)
+    if is_empty(pattern) or is_empty(anat) or sid is None:
+        return None
+    hits = resolve_pattern(anat, pattern, sid)
+    return hits[0] if hits else None
+
+
 
     from .study import sanitize_affix
     base, sid = dir_output(model), _subject_id(model)

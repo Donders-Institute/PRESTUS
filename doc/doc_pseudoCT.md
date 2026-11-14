@@ -1,14 +1,20 @@
-# Pseudo-CT
+# CT-Based Skull Mapping
 
-By default each skull layer of a `layered` simulation takes one value per property, although skull bone properties can vary within and between individuals. A pseudo-CT gives the skull subject-specific properties instead: PRESTUS turns a UTE-based image into pseudo-Hounsfield units (pHU) and maps them to density, sound speed and attenuation within the skull layer.
+By default each skull layer of a `layered` simulation takes one value per property, although skull bone properties can vary within and between individuals. A CT gives the skull subject-specific properties instead. With `pct.enabled: 1`, PRESTUS maps the Hounsfield units (HU) of a CT to density, sound speed and attenuation within the skull layer. The CT is one of two images:
+
+- a **measured CT** of the subject (`path.ct_pattern`), or
+- a **pseudo-CT** that PRESTUS generates from a UTE/PETRA MR image, used when `path.ct_pattern` is empty.
+
+Both feed the same HU-to-property mapping; only the pseudo-CT needs the UTE-to-HU step first.
 
 On this page:
 
 - [Setting Up a Pseudo-CT Run](#setting-up-a-pseudo-ct-run): the scan, the tools, the minimum config and the outputs.
+- [Using a Measured CT](#using-a-measured-ct): the CT's requirements and the minimum config.
 
 !!! note "At a glance"
-    - **When you need it:** When you have a UTE/PETRA scan and want skull properties that follow the individual skull.
-    - **Before you start:** A UTE/PETRA image per subject, [FSL](https://fsl.fmrib.ox.ac.uk/fsl/docs/) and [ANTs](https://github.com/ANTsX/ANTs).
+    - **When you need it:** When you want skull properties that follow the individual skull, and have a CT or a UTE/PETRA scan.
+    - **Before you start:** A CT co-registered to the T1w, or a UTE/PETRA image per subject plus [FSL](https://fsl.fmrib.ox.ac.uk/fsl/docs/) and [ANTs](https://github.com/ANTsX/ANTs).
 
 Subpages:
 
@@ -69,3 +75,25 @@ Outputs go to `<path.pct>/sub-XXX/`, or to `<parent of path.seg>/pct/sub-XXX/` w
     - 352 sagittal slices
     - flip angle: 2°
     - FoV: 294 mm
+
+## Using a Measured CT
+
+Set `path.ct_pattern` to the subject's CT and `pct.enabled: 1`. The run then needs no UTE image and generates no pseudo-CT.
+
+```yaml
+path:
+  ct_pattern: 'sub-%1$03d_CT.nii.gz'  # relative to path.anat, like t1_pattern
+
+pct:
+  enabled: 1
+  density_calibration: ''  # this CT's HU->density table; '' = k-Plan default
+  mapping_density: 'k-plan'
+  mapping_soundspeed: 'k-plan'
+  mapping_attenuation: 'k-plan'
+```
+
+- **Units.** The CT must hold Hounsfield units (NIfTI scaling is applied).
+- **Registration.** The CT must be co-registered to the T1w: PRESTUS resamples it onto the segmentation grid through both images' world coordinates and does not register it. Voxels outside the CT are set to air (-1000 HU). The run logs the median HU of the skull voxels and warns (`PRESTUS:pct:ctMisregistered`) when it is below 300 HU.
+- **Skull voxels.** The skull layer comes from the SimNIBS segmentation, built as for the pseudo-CT. No files are written to the pseudo-CT folder.
+- **Calibration.** HU depend on scanner, kVp and kernel. Set `pct.density_calibration` to this CT's HU-to-density table when you have one; with the k-Plan default, PRESTUS warns (`prestus:pct:ctDefaultCalibration`).
+- **Reuse.** Grid and medium caches record the CT's name, size and date, so replacing the CT rebuilds them.

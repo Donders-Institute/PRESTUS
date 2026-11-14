@@ -149,6 +149,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - `pct.density_calibration` selects the HU→density table of `mapping_density: k-plan` (`kplan_default`, `ucl_lowdose_80kvp`, `cph2025`, or a CSV); default `''` keeps results unchanged. PRESTUS warns when `treeby` is not paired with `ucl_lowdose_80kvp`
 - `pct_skullmapping_fit` exposes the `kosciessa` histogram fit and its settings
 - `pct_predict_skull_properties` predicts the skull properties a pseudo-CT run will model, without simulating
+- New `path.ct_pattern`: the skull mapping (`pct.enabled`) reads a measured CT, co-registered to the T1w, instead of generating a pseudo-CT from a UTE image
 - ⚠️ **Fixed:** `pct.skull_mapping: treeby` used the intercept 3247.9 HU instead of 3274.9 HU; treeby pseudo-CTs are 27 HU low in the skull, regenerate them
 - ⚠️ **Fixed:** the `kosciessa` fit took width crossings around the histogram maximum, not around the identified peaks; rerun `kosciessa` pCTs that warn or whose `pCT_skull_mapping.png` shows a near-zero trabecular mode
 - ⚠️ **Changed:** `smooth_img` pads by edge replication; smoothed masks and maps differ from earlier runs in the outermost voxels

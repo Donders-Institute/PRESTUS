@@ -53,6 +53,8 @@ path:
                         # Empty = <sim>/placement. Point several setups at one folder to share placements across them.
   t1_pattern: 'sub-%1$03d_T1w.nii*' # T1 image path template relative to path.anat; supports %03d-style subject ID substitution
   t2_pattern: '' # T2 image path template relative to path.anat (optional; leave empty to skip T2)
+  ct_pattern: '' # Measured CT (Hounsfield units, co-registered to the T1w) path template relative to path.anat, read by
+                 # the skull mapping with pct.enabled. Empty = the pseudo-CT generated from the UTE image in path.t2_pattern
   # Localite neuronavigation (see doc_placement_neuronav.md, "Localite I/O")
   localite_raw: ''      # Raw Localite exports: <localite_raw>/sub-XXX/ses-XX/[<placement.localite.loc_folder>/]...
   localite_post: ''     # Ingested markers (neuronav_ingest_markers): <localite_post>/sub-XXX/ses-XX/InstrumentMarker_sub-XXX_ses-XX.xml/.json
@@ -551,14 +553,14 @@ headmodel:
 #------------ (pseudo-)CT skull property mapping
 
 pct:
-  enabled: 0                    # Use (p)CT (if available) to inform skull medium properties
-  skull_mapping: 'kosciessa'    # UTE→HU linear mapping algorithm: miscouridou/wiesinger/treeby/kosciessa/custom (carpino: deprecated)
+  enabled: 0                    # Map skull properties from a CT: the measured CT in path.ct_pattern, else a pseudo-CT generated from the UTE image
+  skull_mapping: 'kosciessa'    # Pseudo-CT only: UTE→HU linear mapping algorithm: miscouridou/wiesinger/treeby/kosciessa/custom (carpino: deprecated)
   custom_slope: []              # skull_mapping 'custom': HU = custom_slope * normalised UTE + custom_intercept
   custom_intercept: []          # (skull voxels; soft tissue 42 HU, air -1000 HU as for the other mappings)
   debug: 1                      # Keep intermediate images in pseudoCT/ subfolder (0 to delete)
   mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/aubry/air-tissue
   density_calibration: ''       # HU->density table for mapping_density 'k-plan'. HU depend on scanner, kVp and kernel, so use the
-                                #   table of the CT the UTE->HU line was fitted to: '' = k-Plan default (kplan_default),
+                                #   table of the measured CT, or of the CT the UTE->HU line was fitted to: '' = k-Plan default (kplan_default),
                                 #   a table in config/ct_calibration/ by name ('ucl_lowdose_80kvp' for treeby, 'cph2025'),
                                 #   or a CSV path (two columns: HU, density [kg/m^3]; # comments)
   mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry/webb/pichardo/mcdannold

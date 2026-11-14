@@ -166,6 +166,7 @@ Used when `acoustic_backend: kwave_elastic`.
 | `localite` | **Deprecated.** | `''` | Read as `localite_raw` and as `localite_export` when those are empty. |
 | `t1_pattern` | T1 image path template relative to `path.anat`. | `'sub-%1$03d_T1w.nii*'` | Supports `%03d`-style subject ID substitution |
 | `t2_pattern` | T2 image path template relative to `path.anat`. | `''` | Optional; empty skips the T2 (e.g. `'sub-%1$03d_T2w.nii*'`). |
+| `ct_pattern` | Measured CT path template relative to `path.anat`, read by the skull mapping when `pct.enabled` is 1. | `''` | In Hounsfield units and co-registered to the T1w. Empty = the pseudo-CT generated from the UTE image in `t2_pattern`. See [doc](doc_pseudoCT.md#using-a-measured-ct). |
 
 ---
 
@@ -604,13 +605,13 @@ See [doc_pseudoCT.md](doc_pseudoCT.md).
 
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
-    | `enabled` | Use (pseudo-)CT to inform skull medium properties? | `0` | `1 = yes`, `0 = no`. When enabled, pseudoCT is generated automatically from the UTE image (specified via `path.t2_pattern`) if not already present in the SimNIBS folder. |
-    | `skull_mapping` | UTE→HU linear mapping algorithm used during pseudoCT generation. | `'kosciessa'` | `kosciessa` / `miscouridou` / `wiesinger` / `treeby` / `custom`; `carpino` is deprecated. See [doc](doc_pseudoCT_generation.md#choosing-the-ute-to-hu-mapping). |
+    | `enabled` | Map skull properties from a CT? | `0` | `1 = yes`, `0 = no`. Reads the measured CT in `path.ct_pattern`; when that is empty, a pseudo-CT is generated from the UTE image (`path.t2_pattern`) if not already present in the pseudo-CT folder. |
+    | `skull_mapping` | UTE→HU linear mapping algorithm used during pseudo-CT generation (not with a measured CT). | `'kosciessa'` | `kosciessa` / `miscouridou` / `wiesinger` / `treeby` / `custom`; `carpino` is deprecated. See [doc](doc_pseudoCT_generation.md#choosing-the-ute-to-hu-mapping). |
     | `custom_slope` | Slope of the `custom` UTE→HU map (HU per normalised UTE unit). | `[]` | Scalar; required when `skull_mapping` is `custom`. |
     | `custom_intercept` | Intercept of the `custom` UTE→HU map [HU]. | `[]` | Scalar; required when `skull_mapping` is `custom`. |
     | `debug` | Keep intermediate NIfTI files in the `pseudoCT/` subfolder. | `1` | `1 = keep`, `0 = delete after generation`. |
     | `mapping_density` | HU-to-density mapping algorithm. | `'k-plan'` | `k-plan` / `k-wave` / `marsac` / `aubry` / `air-tissue` / `none`. See [doc](doc_pseudoCT_property-mappings.md#mapping-skull-density). |
-    | `density_calibration` | HU-to-density table for `mapping_density: k-plan`; use the table of the CT the UTE→HU line was fitted to. | `''` | `''` ([k-Plan](https://k-plan.io/) default) / `ucl_lowdose_80kvp` (for `treeby`) / `cph2025` / path to a CSV (HU, density [kg/m³]). See [doc](doc_pseudoCT_property-mappings.md#mapping-skull-density). |
+    | `density_calibration` | HU-to-density table for `mapping_density: k-plan`; use the table of the measured CT, or of the CT the UTE→HU line was fitted to. | `''` | `''` ([k-Plan](https://k-plan.io/) default) / `ucl_lowdose_80kvp` (for `treeby`) / `cph2025` / path to a CSV (HU, density [kg/m³]). See [doc](doc_pseudoCT_property-mappings.md#mapping-skull-density). |
     | `mapping_soundspeed` | HU-to-sound-speed mapping algorithm. | `'k-plan'` | `k-plan` / `marsac` / `aubry` / `webb` / `pichardo` / `mcdannold` / `none`. See [doc](doc_pseudoCT_property-mappings.md#mapping-skull-sound-speed). |
     | `mapping_attenuation` | HU-to-attenuation mapping algorithm. | `'k-plan'` | `k-plan` / `mueller` / `aubry` / `webb` / `pichardo` / `mcdannold` / `none`. See [doc](doc_pseudoCT_property-mappings.md#mapping-skull-attenuation). |
 

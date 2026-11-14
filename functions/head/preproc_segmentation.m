@@ -96,9 +96,13 @@ end
     parameters = simnibs_version(segmentation_folder, parameters);
 
 
-    if parameters.pct.enabled == 1
+    if parameters.pct.enabled == 1 && ~isempty(pct_ct_file(parameters))
+        % A measured CT (path.ct_pattern) is read as is (PCT_LOAD_CT): no UTE, no pseudo-CT
+        fprintf('[preproc_segmentation] Measured CT available: %s\n', pct_ct_file(parameters));
+    elseif parameters.pct.enabled == 1
         if isempty(filename_t2)
-            error('pct.enabled = 1 requires a UTE image. Set path.t2_pattern to the UTE file.');
+            error(['pct.enabled = 1 requires a CT: set path.ct_pattern to a measured CT, or ' ...
+                   'path.t2_pattern to a UTE image to generate a pseudo-CT.']);
         end
         pct_dir = find_pseudoct_dir(parameters);
         if ~isempty(pct_dir)

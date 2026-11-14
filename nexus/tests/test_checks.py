@@ -161,3 +161,25 @@ def test_placement_issues(schema, tmp_path):
     m.set("placement.tus_entry.script_path", str(tmp_path / "missing.R"))
     found = _msgs(checks.placement_issues(m), "error")
     assert found[("placement.tus_entry.script_path", "error")] == "File not found"
+def test_measured_ct_pattern(schema, tmp_path):
+    from prestus_nexus.outputs import measured_ct_file
+    anat = tmp_path / "anat"
+    anat.mkdir()
+    (anat / "sub-003_T1w.nii.gz").write_bytes(b"")
+    m = ConfigModel(schema)
+    for key, value in {"subject_id": 3, "path.anat": str(anat), "path.sim": str(tmp_path / "sim"),
+                       "simulation.medium": "layered", "pct.enabled": 1,
+                       "path.ct_pattern": "sub-%1$03d_CT.nii.gz"}.items():
+        m.set(key, value)
+    assert measured_ct_file(m) is None
+    assert ("path.ct_pattern", "error") in _msgs(checks.subject_issues(m))
+    (anat / "sub-003_CT.nii.gz").write_bytes(b"")
+    checks.clear_status_cache()           # file probes are cached while the settings are unchanged
+    assert measured_ct_file(m) == anat / "sub-003_CT.nii.gz"
+    assert ("path.ct_pattern", "info") in _msgs(checks.subject_issues(m))
+    # pseudo-CT generation keys apply only without a measured CT
+    assert not m.is_visible("pct.skull_mapping") and m.is_visible("pct.mapping_density")
+    m.set("path.ct_pattern", "")
+    assert measured_ct_file(m) is None and m.is_visible("pct.skull_mapping")
+
+

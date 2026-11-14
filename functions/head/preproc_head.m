@@ -95,22 +95,11 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     transducer = parameters.transducer;
 
     if parameters.pct.enabled == 1
-        % Load pseudoCT from the pCT folder (GET_PCT_DIR; a pseudo-CT that older
-        % versions wrote into the SimNIBS m2m folder is still found, with a warning).
-        pct_dir = find_pseudoct_dir(parameters);
-        if isempty(pct_dir)
-            error('PRESTUS:pct:notFound', ...
-                'pct.enabled = 1 but no pseudoCT.nii.gz was found in:\n  %s', get_pct_dir(parameters));
-        end
-        filename_pseudoCT = fullfile(pct_dir, 'pseudoCT.nii.gz');
-        pseudoCT_image = niftiread(filename_pseudoCT);
-        pseudoCT_header = niftiinfo(filename_pseudoCT);
+        % The CT the skull mapping reads (PCT_LOAD_CT): a measured CT
+        % (path.ct_pattern) resampled to the segmentation grid, or the pseudo-CT
+        % generated from the UTE image, each with its tissue labels.
+        [pseudoCT_image, pseudoCT_header, tissues_mask_image, tissues_mask_header] = pct_load_ct(parameters);
         [pseudoCT_image, pseudoCT_header] = ensure_ras_plus(pseudoCT_image, pseudoCT_header);
-
-        % Load pseudoCT tissues mask
-        filename_tissues_mask = fullfile(pct_dir, 'tissues_mask.nii.gz');
-        tissues_mask_image = niftiread(filename_tissues_mask);
-        tissues_mask_header = niftiinfo(filename_tissues_mask);
         [tissues_mask_image, tissues_mask_header] = ensure_ras_plus(tissues_mask_image, tissues_mask_header);
     else
         % Load traditional SimNIBS segmentation

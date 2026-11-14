@@ -437,6 +437,10 @@ On this page:
 | `check_pct_sidecar`                     | Refuse an existing pseudo-CT made with other settings |
 | `fit_pairwiselinear`                    | Perform a pairwise linear fit between HU and density values with optional plot. |
 | `pct_create_pCT_run`                    | Submit a pseudoCT generation job |
+| `pct_ct_file`                           | This subject's measured CT, or '' when the pseudo-CT is used |
+| `pct_load_ct`                           | The CT image the skull mapping reads, with its tissue labels |
+| `pct_map_properties`                    | Skull density, sound speed and attenuation from HU, as MEDIUM_SETUP maps them |
+| `pct_mapping_curves`                    | Skull properties as functions of HU, for the configured mappings |
 | `pct_predict_skull_properties`          | Skull properties a pseudo-CT run will model, without simulating |
 | `pct_signature`                         | Settings a pseudo-CT depends on, and the resolved skull mapping |
 | `pct_skull_mapped`                      | True when the skull layer's properties come from the pseudo-CT |
@@ -444,6 +448,7 @@ On this page:
 | `pct_skullmapping`                      | Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms. [deprecated, debug] |
 | `pct_skullmapping_fit`                  | Subject-specific UTE->HU line from cortical / trabecular UTE histograms |
 | `pct_soft_tissue_peak`                  | Identifies the soft tissue peak from UTE intensity distribution histograms. |
+| `pct_tissues_mask`                      | Tissue labels for a CT-mapped skull, from the SimNIBS segmentation |
 
 #### PLOT
 

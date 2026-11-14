@@ -142,6 +142,14 @@ def subject_issues(model: ConfigModel) -> list[Issue]:
             t2 = g("path.t2_pattern")
             if not is_empty(t2) and not resolve_pattern(anat, t2, sid):
                 issues.append(Issue("warning", "path.t2_pattern", "No T2 image matches this pattern"))
+            ct = g("path.ct_pattern")
+            if g("pct.enabled") in (1, True) and not is_empty(ct):
+                ct_hits = resolve_pattern(anat, ct, sid)
+                if not ct_hits:
+                    issues.append(Issue("error", "path.ct_pattern", "No CT image matches this pattern"))
+                else:
+                    issues.append(Issue("info", "path.ct_pattern",
+                                        f"Measured CT: {ct_hits[0]} (must be co-registered to the T1)"))
 
     seg = g("path.seg")
     seg_root = anat if is_empty(seg) else seg      # load_parameters: seg defaults to anat
