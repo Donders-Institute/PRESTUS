@@ -251,6 +251,7 @@ On this page:
 | `check_cache_signature`                 | Refuse to reuse a cache built from different settings |
 | `check_layers`                          | Match requested layers to those available in the segmentation. For (p)CT, homogenize multi-skull layer into a single `skull `layer. |
 | `check_sidecar_signature`               | Compare a sidecar's recorded settings with the current run's |
+| `check_tool_availability`               | Check that the external tools the requested stages need exist |
 | `compute_ramp_factor`                   | Pulse-average / temporal-peak intensity ratio for a ramped pulse |
 | `config_known_extra_keys`               | Config keys PRESTUS reads that config_default.yaml omits |
 | `config_unknown_keys`                   | Dotted keys of a user config that PRESTUS does not know |

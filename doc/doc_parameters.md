@@ -750,6 +750,7 @@ See [k-Wave](doc_kwave.md) and [HPC](doc_hpc.md).
 | `gpu` | Request a specific GPU. | `''` | e.g. `"nvidia_a100-sxm4-40gb:1"` |
 | `partition` | Request a dedicated queue partition. | `''` | |
 | `reservation` | Request a reserved queue. | `''` | |
+| `exclude` | Nodes to avoid, comma-separated (SLURM `sbatch --exclude`). | `''` | e.g. a node whose GPU is held by a stale process. |
 | `wait_for_job` | Block MATLAB until the submitted HPC job completes? | `false` | |
 | `timelimit` | Job time limit. | `'04:00:00'` | |
 | `memorylimit` | Memory limit [GB]. | `20` | |

@@ -75,7 +75,7 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
     fprintf(fid, '#SBATCH --job-name=%s\n', job_name);
     
     % Partition & GPU detection
-    needs_gpu = (isfield(parameters.simulation, 'code_type') && any(strcmp(parameters.simulation.code_type, {'matlab_gpu', 'cpp_gpu'})));
+    needs_gpu = job_needs_gpu(parameters);
     
     if isfield(parameters.hpc, 'partition') && ~isempty(strtrim(char(parameters.hpc.partition)))
         fprintf(fid, '#SBATCH --partition=%s\n', strtrim(char(parameters.hpc.partition)));
@@ -93,6 +93,11 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
 
     if isfield(parameters.hpc, 'reservation') && ~isempty(strtrim(char(parameters.hpc.reservation)))
         fprintf(fid, '#SBATCH --reservation=%s\n', strtrim(char(parameters.hpc.reservation)));
+    end
+
+    % Nodes to avoid, e.g. a node whose GPU is held by a stale process.
+    if isfield(parameters.hpc, 'exclude') && ~isempty(strtrim(char(parameters.hpc.exclude)))
+        fprintf(fid, '#SBATCH --exclude=%s\n', strtrim(char(parameters.hpc.exclude)));
     end
 
 	if strcmp(parameters.hpc.name, 'snellius')
@@ -193,8 +198,7 @@ function write_qsub_script(temp_qsub_path, parameters, temp_m_file, log_dir)
     subj_id_string = sprintf('sub-%03d', parameters.subject_id);
     job_name = hpc_job_name(parameters);
     
-    needs_gpu = isfield(parameters.simulation, 'code_type') && ...
-        any(strcmp(parameters.simulation.code_type, {'matlab_gpu', 'cpp_gpu'}));
+    needs_gpu = job_needs_gpu(parameters);
 
     fid = fopen(temp_qsub_path, 'w+');
     fprintf(fid, '#!/bin/bash\n');
@@ -219,7 +223,7 @@ function write_qsub_script(temp_qsub_path, parameters, temp_m_file, log_dir)
     elseif isfield(parameters.hpc, 'depend_job_id') && ~isempty(parameters.hpc.depend_job_id)
         fprintf(fid, '#PBS -W depend=%s:%d\n', dep_type, parameters.hpc.depend_job_id);
     end
-	fprintf(fid, 'module load matlab/R2023b\n');
+	fprintf(fid, 'module load matlab/R2022b\n');   % PBS nodes support CUDA 11.2 only, dropped from R2023 on
     fprintf(fid, 'matlab -batch "%s"\n', temp_m_file);
     fclose(fid);
 end
@@ -231,6 +235,46 @@ function job_id = submit_qsub_job(temp_qsub_path, log_dir)
     if status ~= 0, error('qsub submission failed: %s', out); end
     job_id = strtrim(out);
 end
+end
+
+function tf = job_needs_gpu(parameters)
+% True when a solver the job runs computes on a GPU:
+%   k-Wave (acoustic kwave/kwave_elastic, thermal kwave with heating, time
+%     reversal) with simulation.code_type 'matlab_gpu' or 'cpp_gpu';
+%   jwave (acoustic) unless jwave.use_gpu is false (empty = auto-detect);
+%   BabelBrain (acoustic or thermal) unless babelbrain.computing_backend is
+%     'cpu' / 4 (its thermal engine has no CPU backend).
+    acoustic = lower(char(field_or(parameters, {'acoustic_backend'}, 'kwave')));
+    thermal = lower(char(field_or(parameters, {'thermal_backend'}, 'kwave')));
+    heating = logical(field_or(parameters, {'modules', 'run_heating_sims'}, 0));
+    reverse = logical(field_or(parameters, {'time_reversal', 'enabled'}, false));
+
+    kwave_runs = any(strcmp(acoustic, {'kwave', 'kwave_elastic'})) || ...
+        (strcmp(thermal, 'kwave') && heating) || reverse;
+    code_type = char(field_or(parameters, {'simulation', 'code_type'}, ''));
+    tf = kwave_runs && any(strcmp(code_type, {'matlab_gpu', 'cpp_gpu'}));
+
+    if strcmp(acoustic, 'jwave')
+        use_gpu = field_or(parameters, {'jwave', 'use_gpu'}, []);
+        tf = tf || isempty(use_gpu) || logical(use_gpu);
+    end
+
+    if strcmp(acoustic, 'babelbrain') || (strcmp(thermal, 'babelbrain') && heating)
+        backend = field_or(parameters, {'babelbrain', 'computing_backend'}, 'auto');
+        on_cpu = (isnumeric(backend) && isequal(backend, 4)) || ...
+            ((ischar(backend) || isstring(backend)) && strcmpi(backend, 'cpu'));
+        tf = tf || ~on_cpu;
+    end
+end
+
+function v = field_or(s, path, default)
+% Nested field s.(path{1}).(path{2})..., or default when absent or empty.
+    v = default;
+    for k = 1:numel(path)
+        if ~isstruct(s) || ~isfield(s, path{k}), return; end
+        s = s.(path{k});
+    end
+    if ~isempty(s), v = s; end
 end
 
 function dep_type = dependency_type(parameters)

@@ -9,6 +9,9 @@ Notable changes to this project are documented here.
 **Fixes**
 - Sequential chains: the follow-up's start state is the base run's T1w end map (heating, CEM43, CEM43 ISO), resampled into its own grid. The NIfTI stage is enabled for chained runs, and dispatch errors (`sequential_pipeline:missingThermalEnd`) when a map is missing, instead of starting from the water baseline.
 - `convert_final_to_MNI_simnibs`: `subject2mni` runs one volume at a time in the foreground. A failed conversion now raises `PRESTUS:MNIConversionFailed` and fails the job. The previous background path discarded output and reported success when volumes were missing.
+- Startup tool check (`check_tool_availability`): `prestus_pipeline_start` (before HPC submission) and `prestus_pipeline` (inside the job) check the external tools the enabled stages need: JVM, `sbatch`/`qsub`, the SimNIBS binaries (`charm`, `subject2mni`, `mni2subject_coords`) and `m2m/toMNI`, the k-Wave C++ binary for the selected `code_type`, and a GPU. A missing tool stops the run with `prestus:missingTools`, listing every missing tool. Another process holding more than half of a GPU's memory fails the check; more than 5% raises `prestus:gpuInUse`.
+- New `hpc.exclude` (SLURM): nodes passed to `sbatch --exclude`, e.g. a node whose GPU is held by a stale process.
+- HPC jobs request a GPU from the solvers that run and their compute backends (k-Wave `simulation.code_type`, `jwave.use_gpu`, `babelbrain.computing_backend`), not from `simulation.code_type` alone.
 
 Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibration library with per-depth refinement, partial-FOV acoustic simulations, study manifests with group analysis, and the PRESTUS Nexus as the new configuration and run interface. Placement gains MNI and TUS_entry modes, a placement report and reusable placement runs; pseudo-CT gains new skull mappings and CT calibrations. Several result-changing fixes affect MI, simulation duration, axisymmetric sources, coherent multi-transducer runs, RAS coordinate conversion and Localite placement; check the ⚠️ lines below.
 
@@ -217,6 +220,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Fixed: `io.overwrite_simnibs` never passed `--forcerun` to charm; `simnibs_t1_to_mni` respects `overwrite_files`
 - ⚠️ **Fixed:** under `io.overwrite_files: never` or `ask`, a recomputed acoustic or thermal stage kept existing NIfTIs but rewrote the CSV, mixing outputs of two runs. Re-run output folders that were simulated more than once under `never`
 
+- Fixed: PBS jobs loaded MATLAB R2023b, which does not support the CUDA 11.2 of PBS nodes; they now load R2022b
 #### Nexus & GUIs
 - Fixed: the Nexus suggested `transducer.target_isppa_wcm2` for the old `set_intensity_w_per_cm2`, which is the drive's calibration ISPPA (`transducer.tx_calibration.isppa_wcm2`)
 - **PRESTUS Nexus** (`nexus/`, *experimental*): standalone PyQt6 app to build, check and run study configs, with tabs per workflow step, a transducer panel backed by the library, a placement viewer with beam checks, Calibration and Localite pages, a study manifest editor, a Results tab and cluster submission (also over SSH). MATLAB entry point: `prestus_nexus`. See [doc_nexus.md](doc_nexus.md)

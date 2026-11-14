@@ -77,6 +77,14 @@ function [job_id, jobs] = prestus_pipeline_start(parameters, options)
         fprintf('➤ deploying: %s\n', upper(platform));
     end
 
+    % Before submitting, check the tools the requested stages need that can be
+    % checked from this node (shared files, scheduler). The job checks the GPU
+    % itself at the start of PRESTUS_PIPELINE. On 'matlab', PRESTUS_PIPELINE
+    % runs the full check.
+    if ~strcmp(platform, 'matlab')
+        check_tool_availability(parameters, Context="submit");
+    end
+
     % ========== DISPATCH EXECUTION ==========
     switch parameters.platform
         case 'matlab'

@@ -939,6 +939,7 @@ display:
   thermal.record_t_at_every_step: {label: Record every time step (memory)}
   thermal.log_thermal_updates: {label: Verbose thermal log}
 
+  hpc.exclude: {label: "Excluded nodes"}
 # ── Tuning: keys worth revisiting when optimising a run ────────────────
 # Most users never touch these. 'tuning' tags a key (same pattern rules as
 # 'fields') with the goals it trades off; the Nexus then offers them through

@@ -253,7 +253,11 @@ function submit_report_job(study, runs, hpc_ids, log_dir)
     p.hpc.memorylimit = 16;
     p.hpc.depend_job_ids = ids;
     p.hpc.depend_type = 'afterany';
-    p.simulation.code_type = 'matlab_cpu';     % no GPU request
+    % The report job runs no solver: no GPU request (hpc_submit_job derives
+    % it from the solvers and their compute backends).
+    p.simulation.code_type = 'matlab_cpu';
+    p.acoustic_backend = 'kwave';
+    p.thermal_backend = 'kwave';
     % Snellius jobs must name one of its GPU partitions (hpc_submit_job
     % derives cores/memory/time limits from it), so keep it there.
     if ~(isfield(p.hpc, 'name') && strcmp(p.hpc.name, 'snellius'))

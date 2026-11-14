@@ -75,6 +75,35 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_hpc_su
             tc.verifyError(@() hpc_submit_job('slurm', 'job_m', p, tmp), ?MException);
         end
 
+        function test_gpu_request_follows_the_solvers(tc)
+            % The GPU request comes from the solvers that run and their compute
+            % backends, not from simulation.code_type alone.
+            cases = { ...
+                % acoustic, thermal, heating, code_type, jwave.use_gpu, bb backend, GPU?
+                'kwave',      'kwave',      0, 'matlab_gpu', [],    'auto', true; ...
+                'kwave',      'kwave',      0, 'matlab_cpu', [],    'auto', false; ...
+                'babelbrain', 'babelbrain', 1, 'matlab_cpu', [],    'auto', true; ...   % was: no GPU
+                'babelbrain', 'babelbrain', 1, 'matlab_gpu', [],    'cpu',  false; ...  % was: GPU
+                'babelbrain', 'kwave',      1, 'matlab_gpu', [],    'cpu',  true; ...   % k-Wave heating
+                'jwave',      'kwave',      0, 'matlab_cpu', [],    'auto', true; ...   % auto-detect
+                'jwave',      'kwave',      0, 'matlab_gpu', false, 'auto', false};
+            for k = 1:size(cases, 1)
+                tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+                p = hpc_params();
+                [p.acoustic_backend, p.thermal_backend] = cases{k, 1:2};
+                p.modules.run_heating_sims = cases{k, 3};
+                p.simulation.code_type = cases{k, 4};
+                p.jwave.use_gpu = cases{k, 5};
+                p.babelbrain.computing_backend = cases{k, 6};
+                try %#ok<TRYNC>
+                    hpc_submit_job('slurm', 'job_m', p, tmp);
+                end
+                txt = fileread(only_file(tc, tmp, 'temp_slurm_*.sh'));
+                tc.verifyEqual(contains(txt, '--partition=gpu'), cases{k, 7}, ...
+                    sprintf('case %d: %s/%s, code_type %s', k, cases{k, 1}, cases{k, 2}, cases{k, 4}));
+            end
+        end
+
     end
 end
 

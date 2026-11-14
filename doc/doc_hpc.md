@@ -60,7 +60,14 @@ All keys are listed in [Parameters](doc_parameters.md#high-performance-computing
 
 TUS simulations are accelerated by GPUs, but requesting GPUs can lead to longer wait times (on the Donders cluster, the concurrent GPU limit per user is 4). To reduce wait times, run acoustic simulations first (to confirm targeting; they need less RAM) and then run thermal simulations with the final protocol. Avoid blanket simulations (e.g. circling through all participants with all permutations), especially for thermal simulations.
 
-PRESTUS is a MATLAB toolbox and only supports *Nvidia GPUs*. When Nvidia GPUs are digitally partitioned, MATLAB R2024+ can fail to identify the assigned GPU. For SLURM jobs, MATLAB R2023b is deployed by default.
+A job requests a GPU when a solver it runs computes on one:
+- k-Wave with `simulation.code_type` `matlab_gpu` or `cpp_gpu`, for the acoustic stage, k-Wave heating or time reversal;
+- jwave, unless `jwave.use_gpu` is `false`;
+- BabelBrain, unless `babelbrain.computing_backend` is `cpu`.
+
+`hpc.partition` and `hpc.gpu` override the partition and GPU type.
+
+PRESTUS is a MATLAB toolbox and only supports *Nvidia GPUs*. When Nvidia GPUs are digitally partitioned, MATLAB R2024+ can fail to identify the assigned GPU. Submitted SLURM jobs therefore load `matlab/R2023b`, whichever MATLAB version submits them (`MATLAB/2024b` with `hpc.name: 'snellius'`). PBS jobs load `matlab/R2022b`, because the PBS nodes support CUDA 11.2 only.
 
 | Field | Default | Explanation |
 |---|---|---|
