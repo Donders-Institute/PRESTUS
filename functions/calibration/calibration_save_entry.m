@@ -46,6 +46,9 @@ function [file, prof_csv] = calibration_save_entry(lib, fit, out_dir, options)
         combo = [combo '_' char(lib.meta.driving_system)];
     end
     lib.meta.calibration_type = 'user_empirical';
+    if isfield(fit, 'geometry_fingerprint') && ~isempty(fit.geometry_fingerprint)
+        lib.meta.geometry_fingerprint = fit.geometry_fingerprint;
+    end
     lib.meta.refinement_mode  = fit.mode;
     lib.meta.last_updated     = char(datetime('today', 'Format', 'yyyy-MM-dd'));
     try; lib.meta.prestus_version = prestus_version(); catch; lib.meta.prestus_version = 'unknown'; end
@@ -62,7 +65,10 @@ function [file, prof_csv] = calibration_save_entry(lib, fit, out_dir, options)
         write_axial_profiles(fit.prof, prof_csv, struct('combo', combo));
         lib.refinement.calibration_profiles_csv = prof_csv;
     end
-    file = fullfile(out_dir, [combo '.yaml']);
+    ds = '';
+    if isfield(lib.meta, 'driving_system'); ds = char(lib.meta.driving_system); end
+    file = library_entry_file(out_dir, combo, char(lib.meta.tran_serial), ds);
+    if ~isfolder(fileparts(file)); mkdir(fileparts(file)); end
     yaml.dumpFile(file, lib);
 end
 

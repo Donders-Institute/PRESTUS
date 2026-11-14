@@ -1,0 +1,17 @@
+# Device model: the model's geometry, not a measured unit (based on the BabelBrain specification).
+type: transducer
+serial: DPXPC_300
+model: DPXPC_300
+name: NeuroFUS DPX-PC-300 4 ch. (model)
+manufact: Sonic Concepts
+n_elem: 4
+min_foc: 50.0
+max_foc: 120.0
+transducer:
+  annular:
+    elem_n: 4
+    elem_id_mm: [7.7, 30.8, 43.5, 53.2]
+    elem_od_mm: [30.8, 43.5, 53.2, 61.3]
+    curv_radius_mm: 150.0
+    dist_geom_ep_mm: 144.9
+  freq_hz: 300000.0

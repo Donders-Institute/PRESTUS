@@ -99,12 +99,14 @@ function [out_file, fits, report] = refine_transducer_library(combo_name, profil
     shipped   = opt(options, 'ShippedLibrary', fullfile(get_prestus_path(), 'config', 'calibration'));
     assert(ismember(mode, {'per_depth', 'geometric'}), 'refine_transducer_library:mode', ...
         'refine_transducer_library: Mode must be ''per_depth'' or ''geometric'' (''static'' has been removed).');
-    if isempty(equip); equip = load_equipment_config(); end
+    if isempty(equip)   % + equipment entries in your own libraries
+        equip = load_equipment_config([], [{char(out_library_path)}, transducer_library_folders()]);
+    end
 
     %% Base entry ----------------------------------------------------------
     if ~isfolder(out_library_path); mkdir(out_library_path); end
-    out_file  = fullfile(out_library_path, [combo_name '.yaml']);
-    base_file = fullfile(shipped, [combo_name '.yaml']);
+    out_file  = library_entry_file(out_library_path, combo_name);
+    base_file = library_entry_file(shipped, combo_name);
     if isfile(out_file)
         lib = yaml.loadFile(out_file, 'ConvertToArray', true);
     elseif isfile(base_file)

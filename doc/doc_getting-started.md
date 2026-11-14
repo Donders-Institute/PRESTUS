@@ -71,9 +71,9 @@ Real studies rarely type in element geometry and drive. PRESTUS ships an equipme
 ```yaml
 # config_first.yaml
 transducer:
-  serial: CTX_500_026            # config/equipment/CTX_500_026.yaml
+  serial: CTX_500_026            # an entry in config/equipment
   combo:
-    ds_serial: SC_203_035        # config/calibration/CTX_500_026_SC_203_035.yaml
+    ds_serial: SC_203_035        # selects its calibration entry for this driving system
   focal_distance_ep: 50          # focal depth setting, mm from the exit plane
   target_isppa_wcm2: 30          # report results at 30 W/cm² free-water ISPPA
 ```

@@ -182,6 +182,8 @@ function [lib, fits, report, prof, diag] = calibrate_library_entry(lib, tran, me
         disp(kw);
     end
 
+    lib.meta.geometry_fingerprint = equipment_geometry_fingerprint(tran);   % checked on load
+
     %% Report ------------------------------------------------------------------
     after = vertcat_metrics(fits);
     I_after = cell2mat(cellfun(@(f) f.I_model, fits, 'UniformOutput', false)); z_after = fits{1}.z_ep_mm;

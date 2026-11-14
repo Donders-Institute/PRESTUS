@@ -1,0 +1,17 @@
+# Device model: the model's geometry, not a measured unit (based on the BabelBrain specification).
+type: transducer
+serial: CTX_250_2ch
+model: CTX_250_2ch
+name: NeuroFUS CTX-250 2 ch. (model)
+manufact: Sonic Concepts
+n_elem: 2
+min_foc: 20.0
+max_foc: 80.0
+transducer:
+  annular:
+    elem_n: 2
+    elem_id_mm: [0.0, 29.2588]
+    elem_od_mm: [28.7, 40.2]
+    curv_radius_mm: 62.9
+    dist_geom_ep_mm: 56.9
+  freq_hz: 250000.0

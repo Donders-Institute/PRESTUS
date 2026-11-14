@@ -1,0 +1,16 @@
+# Measured unit of model CTX_500: geometry and housing come from the model entry, and so does the steering
+# range unless min_foc/max_foc are given here.
+# Driving systems are described in ../ds/.
+type: transducer
+serial: CTX_500_026
+model: CTX_500
+name: NeuroFUS 4 ch. CTX_500_026
+manufact: Sonic Concepts
+n_elem: 4
+min_foc: 39.6
+max_foc: 79.6
+combos:
+  SC_203_035:
+    char_data_path: CTX_500_026/tran-CTX_500_026_ds-SC_203_035_axial.csv
+  SC_105_010:
+    char_data_path: CTX_500_026/tran-CTX_500_026_ds-SC_105_010_axial.csv

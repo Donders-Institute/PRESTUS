@@ -73,8 +73,18 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - ⚠️ **Fixed:** interpolating a measured axial profile to an unmeasured focal depth put the focus at the same position for every desired depth; re-run calibrations at depths that were not measured
 - ⚠️ **Fixed:** the O'Neil forward model was evaluated 0.5 mm short of the requested depth; affects library entries fitted with the `oneil_phase_only` preset and `babelbrain.profile_calibration` (the default `rayleigh_phase_gain` preset is unchanged)
 - Fixed: `export_babelbrain_weights` wrote a file BabelBrain itself could not read
+- `min_foc`/`max_foc` are the hardware steering range of the device model; a unit without its own range uses its model's. A depth outside the measured range of a library entry warns that the entry extrapolates (`load_transducer_from_library:extrapolated`)
+- Imasonic PCD15287 / PCD15473: exit-plane distances confirmed from the manufacturer drawings; steering ranges 7.05–100.3 mm and 7.12–102.7 mm from the exit plane (were 8–110 and 15–110 mm)
+- Equipment entries can be marked `status: deprecated` or `excluded` (with `superseded_by`); they stay usable for earlier studies and warn when named, and excluded entries are not listed or built
+- `IS_PCD15473_01001_OPM` and `IS_PCD15473_01003_OPM` are excluded until the OPM setup is documented; use `IS_PCD15473_01001` / `_01003` with `IGT_32_ch_comb_10_ch`
+- Equipment and shipped library entries are grouped by device model: `config/equipment/model-<MODEL>/tran-<SERIAL>_transducer.yaml`, driving systems in `config/equipment/ds/`, `config/calibration/model-<MODEL>/tran-<TRAN>_ds-<DS>_calib.yaml`. Units take geometry and steering range from their model entry. Flat folders (`<SERIAL>.yaml`, `<TRAN>_<DS>.yaml`) are still read, so your own equipment folders and `transducer.library_path` libraries work unchanged
+- Your own transducer libraries: equipment entries (`*_transducer.yaml`, `*_driver.yaml`), calibration entries and `profiles/` in a folder of your own add transducers or replace shipped ones. PRESTUS checks `transducer.library_path` (study), new `path.transducer_library` (project) and the `PRESTUS_TRANSDUCER_LIBRARY` environment variable (machine), then the shipped library
+- `calibration_gui` saves new transducers into your own library and no longer writes into `config/equipment` (option `AllowShipped` for maintainers)
+- Calibration entries record the transducer geometry they were fitted for (`meta.geometry_fingerprint`); using one with a different geometry warns (`load_transducer_from_library:geometryMismatch`)
+- Drive limits: `transducer.max_elem_p_amp`, or a combo's `drive_limit` in the equipment entry, warns when the library drive for the target ISPPA exceeds what the driving system delivers (`resolve_transducer_from_serial:driveLimit`); estimates shipped for the IGT 128-channel driver
 - ⚠️ **Fixed:** calibration files (`*-F*mm-I*wpercm2.yaml`) recorded the default `target_isppa_wcm2` instead of their calibrated intensity, so a config built from one was rescaled to 30 W/cm². Set `target_isppa_wcm2` in configs built from older calibration files
 
+- A library transducer (`transducer.serial`) with an empty `target_isppa_wcm2` and no inline drive now stops with a message instead of failing during the simulation
 #### Transducers & sources
 - ⚠️ **Fixed:** matrix transducers with `grid.use_kWaveArray: 0` were not switched to the kWaveArray source as logged; rerun them
 - `elem_phase_deg` and `elem_phase_rad` that disagree warn (`prestus:phaseMismatch`); the source follows `elem_phase_deg`

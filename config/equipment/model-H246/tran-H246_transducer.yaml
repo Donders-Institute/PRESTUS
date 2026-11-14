@@ -1,0 +1,17 @@
+# Device model: the model's geometry, not a measured unit (based on the BabelBrain specification).
+# Flat rings (curv_radius_mm .inf): kWaveArray source only.
+type: transducer
+serial: H246
+model: H246
+name: Sonic Concepts H-246 2 ch., flat (model)
+manufact: Sonic Concepts
+n_elem: 2
+min_foc: 25.0
+max_foc: 95.0
+transducer:
+  annular:
+    elem_n: 2
+    elem_id_mm: [0.0, 24.0]
+    elem_od_mm: [23.3, 33.6]
+    curv_radius_mm: .inf
+  freq_hz: 500000.0

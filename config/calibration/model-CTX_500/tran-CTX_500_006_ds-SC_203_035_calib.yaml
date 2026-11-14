@@ -1,0 +1,60 @@
+meta:
+  geometry_fingerprint: '2c1c29e76827'
+  tran_serial: CTX_500_006
+  driving_system: SC_203_035
+  created_at: '2026-09-30'
+  last_updated: '2026-11-09'
+  library_model_version: 3.0
+  calibration_type: empirical
+  library_mode: per_depth
+  char_data: CTX_500_006/tran-CTX_500_006_ds-SC_203_035_axial.csv
+  quality:
+    mode: per_depth
+    n_depths: 7.0
+    geometric_r2_median: 0.8491276310469031
+    in_sample_r2_median: 0.8730878544055588
+    in_sample_r2_min: 0.4771087601221615
+    interp_r2_median: 0.923812450376756
+    interp_worst_delta_r2: -0.001853742363109867
+    z_shift_mm: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    flags: [nearfield_excess]
+  prestus_version: 74eae2f
+global_model:
+  elem_phase_correction_deg: []
+  steering_sound_speed: 1500.0
+  forward_model: rayleigh
+  fit_depths_ep_mm: [35.8, 40.12, 45.88, 52.52, 59.73, 70.25, 77.87]
+  fit_r2: [0.8366892428628232, 0.8491276310469031, 0.9092124013168019, 0.9566220128744964,
+    0.9266816114019205, 0.763909219430335, 0.4237817179097688]
+  amplitude_scaling: {i30: 111722.0}
+  amplitude_by_depth:
+    depths_ep_mm: [35.8, 40.12, 45.88, 52.52, 59.73, 70.25, 77.87]
+    elem_p_amp: [101474.0, 101178.0, 104554.0, 111722.0, 121906.0, 139194.0, 152711.0]
+    isppa_wcm2: 30.0
+refinement:
+  depths_ep_mm: [35.8, 40.12, 45.88, 52.52, 59.73, 70.25, 77.87]
+  elem_phase_correction_deg:
+  - [356.8290096982168, 3.1709707618124154]
+  - [1.6558286730486664, 358.34417143831485]
+  - [4.318168638186446, 355.68183137375024]
+  - [6.216045625074609, 353.7839543233113]
+  - [6.329599016905912, 353.6704302708608]
+  - [2.4814092701174655, 357.5185407917589]
+  - [4.064346270068758, 355.9357107634189]
+  elem_amp_weight:
+  - [1.17879628239549, 0.8212037176045097]
+  - [0.7951619552727883, 1.2048380447272116]
+  - [0.9464750073586704, 1.0535249926413295]
+  - [1.0065990691990518, 0.9934009308009482]
+  - [1.012692066261161, 0.9873079337388391]
+  - [1.0418079446536699, 0.9581920553463303]
+  - [1.0942031833912038, 0.9057968166087961]
+  fit_z_shift_mm: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  elem_p_amp: [101428.0, 101905.0, 105891.0, 115199.0, 127037.0, 141958.0, 152025.0]
+  isppa_wcm2: 30.0
+  amp_source: [analytical, analytical, analytical, analytical, analytical, analytical,
+    analytical]
+  blend_mm: 5.0
+  forward_model: rayleigh
+  source: CTX_500_006/tran-CTX_500_006_ds-SC_203_035_axial.csv
+  last_updated: '2026-11-09'

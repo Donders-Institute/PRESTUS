@@ -32,7 +32,7 @@ function html_path = generate_calibration_report(combo_name, library_path, outpu
         library_path = fullfile(get_prestus_path(), 'config', 'calibration');
     end
 
-    yaml_path = fullfile(library_path, [combo_name, '.yaml']);
+    yaml_path = library_entry_file(library_path, combo_name);
     if ~isfile(yaml_path)
         error('generate_calibration_report: library file not found:\n  %s', yaml_path);
     end

@@ -1,0 +1,19 @@
+# Measured unit of model IS_PCD15287: geometry and housing come from the model entry, and so does the steering
+# range unless min_foc/max_foc are given here.
+# Driving systems are described in ../ds/.
+type: transducer
+serial: IS_PCD15287_01002
+model: IS_PCD15287
+name: Imasonic 10 ch. IS_PCD15287_01002
+manufact: Imasonic
+n_elem: 10
+combos:
+  IGT_128_ch_comb_10_ch:
+    char_data_path: IS_PCD15287_01002/tran-IS_PCD15287_01002_ds-IGT_128_ch_comb_10_ch_axial.csv
+    drive_limit:
+      max_elem_p_amp_pa: 169000
+      source: 'Estimated from the Radboud characterisation report (Fig. 21): the IGT 128 ch. driver reaches 100
+        % amplitude for a 1.00 MPa focus at about 89 mm (FLHM centre); value = library drive at that depth scaled
+        to 1.00 MPa. Approximate; per-ring gains not included.'
+  IGT_32_ch_comb_10_ch:
+    char_data_path: IS_PCD15287_01002/tran-IS_PCD15287_01002_ds-IGT_32_ch_comb_10_ch_axial.csv

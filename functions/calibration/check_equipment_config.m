@@ -1,7 +1,8 @@
 function report = check_equipment_config(equipment_path)
 % CHECK_EQUIPMENT_CONFIG  Validate equipment configuration YAML files
 %
-% Iterates over all *.yaml files in equipment_path and checks required fields,
+% Checks every transducer entry in equipment_path (as load_equipment_config
+% reads it, so a unit includes what it takes from its model) for required fields,
 % physical plausibility (ring overlap, focal range, frequency sanity), and
 % dimension consistency. Prints a formatted report and returns a struct array.
 %
@@ -26,27 +27,22 @@ function report = check_equipment_config(equipment_path)
         equipment_path = fullfile(get_prestus_path(), 'config', 'equipment');
     end
 
-    files = dir(fullfile(equipment_path, '*.yaml'));
-    if isempty(files)
-        error('check_equipment_config: no YAML files found in:\n  %s', equipment_path);
+    % Check entries as PRESTUS uses them: a unit with the fields it takes from its model
+    equip = load_equipment_config(equipment_path);
+    serials = fieldnames(equip.trans);
+    if isempty(serials)
+        error('check_equipment_config: no transducer entries found in:\n  %s', equipment_path);
     end
 
-    report = struct('serial', {}, 'file', {}, 'issues', {}, 'valid', {});
+    report = struct('serial', {}, 'file', {}, 'issues', {}, 'valid', {}, 'entry', {});
 
-    for fi = 1:numel(files)
-        fpath = fullfile(equipment_path, files(fi).name);
-
+    for fi = 1:numel(serials)
+        d          = equip.trans.(serials{fi});
         rec        = struct();
-        rec.file   = fpath;
-        rec.serial = strrep(files(fi).name, '.yaml', '');
+        rec.file   = equip.files.(serials{fi});
+        rec.serial = serials{fi};
         rec.issues = {};
-
-        d = yaml.loadFile(fpath, 'ConvertToArray', true);
-
-        % Skip non-transducer entries (e.g. equipment_info.yaml)
-        if ~isfield(d, 'type') || ~strcmp(d.type, 'transducer')
-            continue;
-        end
+        rec.entry  = d;
 
         if isfield(d, 'serial')
             rec.serial = d.serial;
@@ -115,7 +111,7 @@ function report = check_equipment_config(equipment_path)
             if numel(ann.elem_od_mm) == n && numel(ann.elem_id_mm) == n && n > 1
                 od = ann.elem_od_mm(:)';
                 id = ann.elem_id_mm(:)';
-                overlaps = od(1:end-1) >= id(2:end);
+                overlaps = od(1:end-1) > id(2:end);     % touching sub-rings (ring profile) are allowed
                 if any(overlaps)
                     idx_str = num2str(find(overlaps));
                     rec.issues{end+1} = sprintf('Ring overlap detected at gap(s): %s', idx_str);
@@ -144,10 +140,14 @@ function report = check_equipment_config(equipment_path)
         if isfield(d, 'min_foc') && ~isempty(d.min_foc) && d.min_foc < 0
             rec.issues{end+1} = sprintf('min_foc (%.1f) < 0', d.min_foc);
         end
-        if isfield(d, 'max_foc') && isfield(ann, 'curv_radius_mm') && ...
-                ~isempty(d.max_foc) && d.max_foc > ann.curv_radius_mm
-            rec.issues{end+1} = sprintf('max_foc (%.1f) > curv_radius_mm (%.1f)', ...
-                d.max_foc, ann.curv_radius_mm);
+        % min_foc/max_foc are distances from the exit plane; steering beyond
+        % the geometric focus is allowed, so they are not bounded by curv_radius_mm.
+        if isfield(d, 'min_foc') && isfield(d, 'max_foc') && ~isempty(d.min_foc) && ...
+                ~isempty(d.max_foc) && d.min_foc > d.max_foc
+            rec.issues{end+1} = sprintf('min_foc (%.1f) > max_foc (%.1f)', d.min_foc, d.max_foc);
+        end
+        if isfield(d, 'status') && ~any(strcmp(char(d.status), {'active', 'deprecated', 'excluded'}))
+            rec.issues{end+1} = sprintf('status ''%s'' is not active, deprecated or excluded', char(d.status));
         end
 
         rec.valid = isempty(rec.issues);
@@ -161,7 +161,7 @@ function report = check_equipment_config(equipment_path)
     fprintf('%s\n', repmat('-', 1, 100));
     for ri = 1:numel(report)
         r   = report(ri);
-        d   = yaml.loadFile(r.file, 'ConvertToArray', true);
+        d   = r.entry;
         type_str = '';
         if isfield(d, 'type'), type_str = d.type; end
         n_el_str = n_elem_str(r);

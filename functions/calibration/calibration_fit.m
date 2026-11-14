@@ -117,6 +117,9 @@ function [fit, msg] = calibration_fit(tran, prof, options)
     fit.entry = calibration_fit_entry(lib, fit, char(opt(options, 'TranSerial', '')), ...
         char(opt(options, 'DrivingSystem', '')), isppa, source);
 
+    fit.geometry_fingerprint = equipment_geometry_fingerprint(tran);
+    if isfield(fit.entry, 'meta'); fit.entry.meta.geometry_fingerprint = fit.geometry_fingerprint; end
+
     fo_rec = rmfield_if(fo, 'Prior');
     fit.record = struct('tool', char(opt(options, 'Tool', 'calibration_fit')), 'mode', mode, ...
         'calibrate_at', char(opt(options, 'CalibrateAt', 'measured')), ...

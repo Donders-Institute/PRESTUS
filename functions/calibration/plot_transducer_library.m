@@ -109,7 +109,7 @@ end
 % -------------------------------------------------------------------------
 function [lib, tran, knots] = load_library_entry(combo_name, library_path, equip_param)
 % Library struct, transducer struct and the depths the entry was fitted at.
-    lib_file = fullfile(library_path, [combo_name '.yaml']);
+    lib_file = library_entry_file(library_path, combo_name);
     if ~isfile(lib_file)
         error('plot_transducer_library: library file not found:\n  %s', lib_file);
     end

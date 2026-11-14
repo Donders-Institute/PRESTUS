@@ -45,8 +45,8 @@ function report = validate_transducer_library(library_path, equipment_path)
     tran_keys  = fieldnames(eq.trans);
 
     % Also include trans-only keys (no combo) as potential library entries
-    all_lib_files = dir(fullfile(library_path, '*.yaml'));
-    lib_names     = cellfun(@(f) strrep(f, '.yaml', ''), {all_lib_files.name}, 'UniformOutput', false);
+    [~, ~, lib_index] = library_entry_file(library_path);   % flat and nested entries
+    lib_names = {lib_index.key};
 
     % Build report entries for all equipment combos
     all_serials = union(combo_keys, tran_keys);
@@ -63,8 +63,8 @@ function report = validate_transducer_library(library_path, equipment_path)
         rec.combo  = entry_name;
         rec.issues = {};
 
-        lib_file = fullfile(library_path, [entry_name '.yaml']);
-        if ~isfile(lib_file)
+        [lib_file, has_entry] = library_entry_file(library_path, entry_name);
+        if ~has_entry
             rec.lib_file    = '';
             rec.n_depths    = 0;
             rec.depth_range = [];

@@ -1,0 +1,23 @@
+# Device model: the model's geometry, not a measured unit. Rings and curvature: Imasonic cdc15473-2.
+# dist_geom_ep_mm: 100 - (114.2 - 21.5) mm from drawing 15473A 01 000 00 (exit plane 7.3 mm in front of the
+# bowl surface on axis, as in the Radboud characterisation report).
+# Steering range (hardware, from the exit plane; units inherit it, measured ranges are in the library):
+#   min_foc: shallowest focus (FLHM centre) in the Radboud IGT 32 ch. addendum for 01003, 7.12 mm.
+#   max_foc: IGT set focus of 110 mm (from the bowl surface; assumed as for PCD15287) minus 7.3 mm.
+#   BabelBrain R15473 lists 15-110 mm from the exit plane; its 110 mm appears to be the set focus.
+type: transducer
+serial: IS_PCD15473
+model: IS_PCD15473
+name: Imasonic PCD15473 10 ch. (model)
+manufact: Imasonic
+n_elem: 10
+min_foc: 7.12
+max_foc: 102.7
+transducer:
+  annular:
+    elem_n: 10
+    elem_id_mm: [10.0, 22.1, 29.8, 36.0, 41.4, 46.3, 50.7, 54.9, 58.7, 62.4]
+    elem_od_mm: [21.1, 28.8, 35.0, 40.4, 45.3, 49.7, 53.9, 57.8, 61.5, 65.0]
+    curv_radius_mm: 100.0
+    dist_geom_ep_mm: 92.7
+  freq_hz: 300000.0

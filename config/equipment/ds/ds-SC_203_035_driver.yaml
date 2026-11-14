@@ -1,0 +1,6 @@
+# Driving system. Combos in transducer entries refer to it by serial.
+type: driving_system
+serial: SC_203_035
+name: NeuroFUS 1 x 4 ch. or 1 x 2 ch. TPO junior SC_203_035
+manufact: Sonic Concepts
+available_ch: 4

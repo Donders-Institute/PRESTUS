@@ -1,0 +1,20 @@
+# Device model: the model's geometry, not a measured unit (based on the BabelBrain specification).
+type: transducer
+serial: CTX_500
+model: CTX_500
+name: NeuroFUS CTX-500 4 ch. (model)
+manufact: Sonic Concepts
+n_elem: 4
+min_foc: 33.6
+max_foc: 82.5
+housing:              # display only (Nexus 3D view): front face in the exit plane
+  diameter_mm: 70      # case of PlanTUS v1's CTX-500 device model
+  depth_mm: 20
+transducer:
+  annular:
+    elem_n: 4
+    elem_id_mm: [0.0, 31.6988, 44.2688, 53.6688]
+    elem_od_mm: [31.14, 43.71, 53.11, 60.83]
+    curv_radius_mm: 62.94
+    dist_geom_ep_mm: 52.38
+  freq_hz: 500000.0

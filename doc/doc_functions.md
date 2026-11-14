@@ -87,6 +87,7 @@ On this page:
 | `check_equipment_config`                | Validate equipment configuration YAML files |
 | `compute_flhm_center`                   | Compute the FLHM (Focal Length at Half Maximum) centre/span of an axial intensity profile at a configurable threshold fraction of peak (0.5 = −3 dB default, 0.25 = −6 dB). |
 | `compute_phases`                        | Calculate per-element transducer phases (degrees) for electronic focusing by computing fractional wavelength delays to steer waves constructively to a target point relative to the exit plane. |
+| `equipment_geometry_fingerprint`        | Short hash of the transducer geometry a calibration was fitted for |
 | `evaluate_library_entry`                | Model the axial profiles a study gets from a library entry, at any depths |
 | `extract_real_intensity_profile`        | Extract or spline-interpolate axial intensity profiles between available measured focal depths (wrt exit plane), aligns peaks, skips near-field for max, and plots/saves results. |
 | `field_transfer_matrix`                 | Complex pressure per unit element drive at points off the axis |
@@ -101,6 +102,7 @@ On this page:
 | `library_add_conditions`                | Add dephased drive conditions to a library entry [EXPERIMENTAL] |
 | `library_add_refinements`               | Merge depth-specific phase offsets (and drives) into a library entry |
 | `library_condition`                     | Phases, gains and drive of a dephased library condition [EXPERIMENTAL] |
+| `library_entry_file`                    | Path of a calibration-library entry in a flat or nested library. |
 | `library_entry_from_model`              | Write a FIT_TRANSDUCER_MODEL result into a library struct |
 | `library_ingest_conditions`             | Add dephased conditions from a profile CSV + sidecar [EXPERIMENTAL] |
 | `library_model_at_depth`                | Phases, gains and drive of a library entry at any focal depth |
@@ -124,6 +126,7 @@ On this page:
 | `read_offaxis_scans`                    | Hydrophone plane and volume scans as off-axis data for FIT_RING_PROFILE |
 | `read_steering_measurements`            | Read hydrophone focal peaks of a steered matrix array |
 | `refine_transducer_library`             | Optional refinement of a library entry to your own hydrophone profiles |
+| `resolve_profile_file`                  | Hydrophone-profile CSV named by an equipment entry's char_data_path |
 | `resolve_transducer_from_serial`        | Populate transducer struct from equipment and calibration library |
 | `ring_profile_drive`                    | Simulation drive of an annular transducer with a ring profile |
 | `ring_profile_transducer`               | Annular transducer with a within-ring velocity profile |
@@ -135,6 +138,7 @@ On this page:
 | `steering_correction_factor`            | Measured / modelled focal peak at steering targets |
 | `steering_path_lengths`                 | Ring-centre to target distances used for geometric steering |
 | `steering_quad_terms`                   | Design matrix of a full quadratic surface in three coordinates |
+| `transducer_library_folders`            | Your own transducer libraries, most specific first |
 | `update_transducer_library`             | Add depth-specific refinements to a library YAML |
 | `validate_transducer_library`           | Validate calibration library against equipment configs |
 | `water_baseline`                        | Measure free-water ISPPA at the current source amplitude |
@@ -533,6 +537,7 @@ On this page:
 | `convert_to_element_pos`                | Generate element positions for matrix transducers |
 | `exit_plane_depth_mm`                   | Distance from the bowl apex to the exit plane used for placement |
 | `extract_element_pos`                   | Read matrix transducer element positions from file |
+| `fill_annular_drive`                    | Steering phases and drive of an annular transducer from its depth setting |
 | `focal_distance_calculation`            | Compute expected focal distances for (multi-)transducer setup. |
 | `get_arc`                               | Generates the coordinates of an arc in 2D space. |
 | `get_trans_pos_from_trigger_markers`    | Determines transducer and target positions using Localite trigger marker files. |

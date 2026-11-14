@@ -35,7 +35,7 @@ A matrix (2D) array's delivered focal peak can differ from the geometric model b
         struct('out_file', fullfile('config', 'calibration', '<serial>.yaml'), 'serial', '<serial>'));
     ```
 
-`resolve_transducer_from_serial` attaches the entry to a matrix transducer given by `serial` (`<serial>_<ds_serial>.yaml` first, then `<serial>.yaml`, or `transducer.library_path`). Without an entry the array is simulated uncorrected. The entry stores the fit, its cross-validated errors, `elem_p_amp_ref` and `drive_ref_v`. An inline `transducer.matrix.steering_correction` takes precedence.
+`resolve_transducer_from_serial` attaches the entry to a matrix transducer given by `serial` (the entry for `<serial>` with `combo.ds_serial` first, then the driving-system-agnostic one, or `transducer.library_path`; see [Library keys](doc_transducer_library.md#using-a-library-entry)). Without an entry the array is simulated uncorrected. The entry stores the fit, its cross-validated errors, `elem_p_amp_ref` and `drive_ref_v`. An inline `transducer.matrix.steering_correction` takes precedence.
 
 **Limits.** Only the focal peak is corrected, not side lobes or field shape. The model assumes the beam along +z of the transducer frame and does not support Clover setups. The Rayleigh model treats each element as a baffled piston in free water; check it against k-Wave with a free-water run at a few targets.
 

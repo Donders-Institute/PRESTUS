@@ -1,0 +1,17 @@
+# Device model: the model's geometry, not a measured unit (based on the BabelBrain specification).
+type: transducer
+serial: DPX_500
+model: DPX_500
+name: NeuroFUS DPX-500 4 ch. (model)
+manufact: Sonic Concepts
+n_elem: 4
+min_foc: 50.0
+max_foc: 120.0
+transducer:
+  annular:
+    elem_n: 4
+    elem_id_mm: [0.0, 32.43857, 45.82899, 55.97536]
+    elem_od_mm: [31.2153, 44.64872, 54.83928, 63.28742]
+    curv_radius_mm: 150.0
+    dist_geom_ep_mm: 144.9
+  freq_hz: 500000.0

@@ -1,0 +1,4 @@
+meta: {geometry_fingerprint: '0682b9cb9193', tran_serial: DPX_500, created_at: '2026-11-13', last_updated: '2026-11-13',
+  calibration_type: geometric, prestus_version: d018b87a}
+global_model:
+  elem_phase_correction_deg: []

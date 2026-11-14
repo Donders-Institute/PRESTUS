@@ -1,0 +1,21 @@
+# Device model: the model's geometry, not a measured unit (based on the BabelBrain specification).
+# Fixed focus; exit plane 3.0 mm in front of the bowl rim. Housing 70 mm diameter x 34 mm.
+type: transducer
+serial: BSonix_35mm
+model: BSonix_35mm
+name: BrainSonix BSonix 35mm, single element (model)
+manufact: BrainSonix
+n_elem: 1
+min_foc: 32.68
+max_foc: 32.68
+housing:              # display only (Nexus 3D view): front face in the exit plane
+  diameter_mm: 70
+  depth_mm: 34         # BabelBrain's BSonix case (CaseDiameter 70 mm, CaseHeight 34 mm)
+transducer:
+  annular:
+    elem_n: 1
+    elem_id_mm: [0.0]
+    elem_od_mm: [48.0]
+    curv_radius_mm: 43.0
+    dist_geom_ep_mm: 32.68
+  freq_hz: 650000.0

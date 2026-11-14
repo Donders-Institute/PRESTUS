@@ -43,12 +43,16 @@ function fig = calibration_gui(options)
 %                          'OutputPath',  '/path/to/my_library'))
 %
 % Input (options, all optional):
-%   .EquipPath   - equipment folder (default config/equipment/); new
-%                  transducers are saved here
+%   .EquipPath   - shipped equipment folder (default config/equipment/)
 %   .LibraryPath - shipped library (default config/calibration/)
-%   .ProfileRoot - folder that char_data_path in the equipment YAML is relative to
-%                  (default local/profiles/)
-%   .OutputPath  - folder to save entries to (default: ask on save)
+%   .OutputPath  - your own library: calibration entries and new transducers are
+%                  saved here, and its equipment entries (*_transducer.yaml) are
+%                  loaded (default: the first folder in PRESTUS_TRANSDUCER_LIBRARY,
+%                  else ask on save)
+%   .ProfileRoot - folder that a relative char_data_path is resolved against after
+%                  your own libraries' profiles/ folders (default: <OutputPath>/profiles
+%                  if it exists, else local/profiles/)
+%   .AllowShipped - maintainers: save transducers into EquipPath (default false)
 %   .SimConfig   - study/simulation YAML for the k-Wave drive calibration (grid, code_type,
 %                  platform/hpc); default: config_default
 %   .ExportFolder - write "Export profiles…" / "Export settings…" CSVs here
@@ -66,10 +70,16 @@ function fig = calibration_gui(options)
     root = get_prestus_path();
     st.equip_path = opt(options, 'EquipPath',   fullfile(root, 'config', 'equipment'));
     st.lib_path   = opt(options, 'LibraryPath', fullfile(root, 'config', 'calibration'));
-    st.prof_root  = opt(options, 'ProfileRoot', fullfile(root, 'local', 'profiles'));
-    st.out_path   = opt(options, 'OutputPath',  '');
+    env_libs      = transducer_library_folders();      % PRESTUS_TRANSDUCER_LIBRARY
+    st.out_path   = opt(options, 'OutputPath',  first_or(env_libs, ''));
+    default_prof  = fullfile(root, 'local', 'profiles');
+    if ~isempty(st.out_path) && isfolder(fullfile(st.out_path, 'profiles'))
+        default_prof = fullfile(st.out_path, 'profiles');
+    end
+    st.prof_root  = opt(options, 'ProfileRoot', default_prof);
+    st.allow_shipped = opt(options, 'AllowShipped', false);   % maintainers: save into config/equipment
     st.export_dir = opt(options, 'ExportFolder', '');
-    st.equip      = load_equipment_config(st.equip_path);
+    st.equip      = load_equipment_config(st.equip_path, [{st.out_path}, env_libs]);   % + your own libraries
     st.meas = [];           % measured profiles (READ_AXIAL_PROFILES), [] = none loaded
     st.prof = [];           % profiles on view: st.meas, or the desired depths of Predict with
                             % their measured/derived profiles (.profile_type)
@@ -186,7 +196,8 @@ function fig = calibration_gui(options)
              'ButtonPushedFcn', @(~,~) on_evaluate_measured());
     uibutton(ab, 'Text', 'Fit', 'FontWeight', 'bold', 'ButtonPushedFcn', @(~,~) on_fit());
     lab('Save to folder', 25);
-    ui.out = at(uieditfield(L, 'text', 'Value', st.out_path), 25, 2);
+    ui.out = at(uieditfield(L, 'text', 'Value', st.out_path, ...
+        'ValueChangedFcn', @(~, ~) reload_equipment()), 25, 2);
     sb = at(uigridlayout(L, [1 2], 'Padding', 0), 26, [1 2]);
     uibutton(sb, 'Text', 'Browse…', 'ButtonPushedFcn', @(~,~) on_browse_out());
     uibutton(sb, 'Text', 'Save entry', 'ButtonPushedFcn', @(~,~) on_save());
@@ -244,9 +255,9 @@ function fig = calibration_gui(options)
             return;
         end
         if isfield(tran, 'combos') && isfield(tran.combos, ds) && isfield(tran.combos.(ds), 'char_data_path')
-            cand = char(tran.combos.(ds).char_data_path);
-            if ~is_absolute(cand); cand = fullfile(st.prof_root, cand); end
-            if isfile(cand); ui.csv.Value = cand; end
+            cand = resolve_profile_file(char(tran.combos.(ds).char_data_path), st.equip, ui.tran.Value, ...
+                own_libraries(), st.prof_root);
+            if ~isempty(cand); ui.csv.Value = cand; end
         end
         st.lib = load_entry();
         say(sprintf('%s: %s', combo_name(), ternary(isempty(st.lib), 'no library entry', ...
@@ -263,7 +274,23 @@ function fig = calibration_gui(options)
 
     function on_browse_out()
         p = uigetdir(ui.out.Value, 'Folder for the library entry');
-        if ~isequal(p, 0); ui.out.Value = p; end
+        if ~isequal(p, 0)
+            ui.out.Value = p;
+            reload_equipment();      % the folder may hold your own equipment entries
+        end
+    end
+
+    function libs = own_libraries()
+        % output folder first, then PRESTUS_TRANSDUCER_LIBRARY
+        libs = [{char(ui.out.Value)}, transducer_library_folders()];
+        libs = libs(~cellfun(@isempty, libs));
+    end
+
+    function reload_equipment()
+        cur = ui.tran.Value;
+        st.equip = load_equipment_config(st.equip_path, own_libraries());
+        ui.tran.Items = transducer_serials(st.equip);
+        if any(strcmp(ui.tran.Items, cur)); ui.tran.Value = cur; end
     end
 
     function on_load()
@@ -702,14 +729,30 @@ function fig = calibration_gui(options)
                                 'Options', {'Save anyway', 'Cancel'}, 'DefaultOption', 2, 'Icon', 'warning');
                 if ~strcmp(sel, 'Save anyway'); return; end
             end
-            f = fullfile(st.equip_path, [t.serial '.yaml']);
+            own = char(ui.out.Value);
+            is_own = isfield(st.equip.user, t.serial) && st.equip.user.(t.serial);
+            if isfield(st.equip.files, t.serial) && (is_own || st.allow_shipped)
+                f = st.equip.files.(t.serial);            % rewrite your own (or, maintainers, the shipped) file
+            elseif ~isempty(own) && isfolder(own)         % into your own library; replaces a shipped serial
+                f = fullfile(own, ['tran-' t.serial '_transducer.yaml']);
+            elseif st.allow_shipped && isfield(t, 'model') && ~isempty(t.model) && ...
+                    isfolder(fullfile(st.equip_path, ['model-' char(t.model)]))
+                f = fullfile(st.equip_path, ['model-' char(t.model)], ['tran-' t.serial '_transducer.yaml']);
+            elseif st.allow_shipped
+                f = fullfile(st.equip_path, [t.serial '.yaml']);
+            else
+                nt.msg.Value = {'Not saved: choose the folder of your own library first (Output folder),', ...
+                    'or set PRESTUS_TRANSDUCER_LIBRARY. The shipped config/equipment is not changed.'};
+                return;
+            end
             if isfile(f)
                 sel = uiconfirm(d, sprintf('%s already exists. Overwrite it?', f), 'Overwrite', ...
                                 'Options', {'Overwrite', 'Cancel'}, 'DefaultOption', 2);
                 if ~strcmp(sel, 'Overwrite'); return; end
             end
+            if ~isfield(t, 'type'); t.type = 'transducer'; end
             yaml.dumpFile(f, t);
-            st.equip = load_equipment_config(st.equip_path);
+            st.equip = load_equipment_config(st.equip_path, own_libraries());
             ui.tran.Items = transducer_serials(st.equip);
             ui.tran.Value = t.serial;
             close(d);
@@ -1270,8 +1313,9 @@ function fig = calibration_gui(options)
     function lib = load_entry()
         lib = [];
         for folder = {ui.out.Value, st.lib_path}
-            f = fullfile(folder{1}, [combo_name() '.yaml']);
-            if ~isempty(folder{1}) && isfile(f)
+            if isempty(folder{1}); continue; end
+            [f, has] = library_entry_file(folder{1}, combo_name());
+            if has
                 lib = yaml.loadFile(f, 'ConvertToArray', true); return;
             end
         end
@@ -1380,7 +1424,8 @@ end
 function s = transducer_serials(equip)
     s = fieldnames(equip.trans);
     s = s(cellfun(@(x) isfield(equip.trans.(x), 'transducer') && ...
-                       any(isfield(equip.trans.(x).transducer, {'annular', 'matrix'})), s));
+                       any(isfield(equip.trans.(x).transducer, {'annular', 'matrix'})) && ...
+                       ~(isfield(equip.trans.(x), 'status') && strcmp(char(equip.trans.(x).status), 'excluded')), s));
 end
 
 function tf = is_matrix(t)
@@ -1530,4 +1575,8 @@ end
 function set_msg(dlg, msg)
 % Progress text for CALIBRATION_FIT_DEPTHS (uiprogressdlg is a handle object)
     dlg.Message = msg;
+end
+
+function v = first_or(c, d)
+    if isempty(c); v = d; else; v = c{1}; end
 end

@@ -1351,17 +1351,17 @@ end
                 set_lib_status('Library folder missing.');
                 return
             end
-            d = dir(fullfile(lib_path, '*.yaml'));
+            [~, ~, d] = library_entry_file(lib_path);   % flat and nested entries
             if isempty(d)
                 lb.Items     = {'(no entries yet)'};
                 lb.ItemsData = {};
                 set_lib_status('Run update_transducer_library() to populate.');
             else
-                names  = cellfun(@(n) strrep(n, '.yaml', ''), {d.name}, 'UniformOutput', false);
+                names  = {d.key};
                 labels = cell(size(names));
                 for ki = 1:numel(names)
                     try
-                        m = yaml.loadFile(fullfile(lib_path, [names{ki}, '.yaml']), 'ConvertToArray', true);
+                        m = yaml.loadFile(d(ki).file, 'ConvertToArray', true);
                         cal_type = '';
                         if isfield(m, 'meta') && isfield(m.meta, 'calibration_type')
                             cal_type = m.meta.calibration_type;
@@ -1392,7 +1392,7 @@ end
                 load_btn.Enable = 'off';
                 return
             end
-            yaml_path = fullfile(active_lib_path(), [combo_name, '.yaml']);
+            yaml_path = library_entry_file(active_lib_path(), combo_name);
             if ~isfile(yaml_path)
                 detail.Value = {'File not found.'};
                 load_btn.Enable = 'off';
@@ -1915,7 +1915,7 @@ end
         end
         try
             lib_path  = fullfile(get_prestus_path(), 'config', 'calibration');
-            yaml_path = fullfile(lib_path, [serial_val '.yaml']);
+            yaml_path = library_entry_file(lib_path, serial_val);
             if isfile(yaml_path)
                 lib = yaml.loadFile(yaml_path, 'ConvertToArray', true);
                 if isfield(lib, 'global_model') && isfield(lib.global_model, 'depths_ep_mm')

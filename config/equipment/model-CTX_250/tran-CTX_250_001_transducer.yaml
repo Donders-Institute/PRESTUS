@@ -1,0 +1,16 @@
+# Measured unit of model CTX_250: geometry and housing come from the model entry, and so does the steering
+# range unless min_foc/max_foc are given here.
+# Driving systems are described in ../ds/.
+type: transducer
+serial: CTX_250_001
+model: CTX_250
+name: NeuroFUS 4 ch. CTX_250_001
+manufact: Sonic Concepts
+n_elem: 4
+min_foc: 13.79
+max_foc: 61.48
+combos:
+  SC_203_035:
+    char_data_path: CTX_250_001/tran-CTX_250_001_ds-SC_203_035_axial.csv
+  SC_105_010:
+    char_data_path: CTX_250_001/tran-CTX_250_001_ds-SC_105_010_axial.csv

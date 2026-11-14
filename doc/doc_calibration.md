@@ -92,7 +92,7 @@ Most entries stay at the analytical amplitude level unless someone runs the k-Wa
     `calibrate_library_entry` reads and writes no files; the callers decide where the result goes.
 
 ??? developer "Library build and run-time loading"
-    The shipped library is built by `build_transducer_library.m` from the profiles in `local/profiles/`: every measured depth becomes a refinement fitted by `fit_transducer_model` (phase offsets and gains on top of geometric steering from `set_real_phases`, plus the drive that reproduces the measured peak), written to `config/calibration/{combo_name}.yaml` (`LIBRARY_PATH`). The entry schema is documented in the [library YAML schema](doc_transducer_library.md#library-yaml-schema). At run time, `load_transducer_from_library(combo_name, focal_depth_ep, isppa, equip_param)` loads the calibrated parameters.
+    The shipped library is built by `build_transducer_library.m` from the profiles in `local/profiles/`: every measured depth becomes a refinement fitted by `fit_transducer_model` (phase offsets and gains on top of geometric steering from `set_real_phases`, plus the drive that reproduces the measured peak), written to `config/calibration/model-<MODEL>/tran-<TRAN>_ds-<DS>_calib.yaml` (`LIBRARY_PATH`). The entry schema is documented in the [library YAML schema](doc_transducer_library.md#library-yaml-schema). At run time, `load_transducer_from_library(combo_name, focal_depth_ep, isppa, equip_param)` loads the calibrated parameters.
 
 ### Fit Presets
 
@@ -128,7 +128,7 @@ The acoustic simulation runs at the drive `elem_p_amp`. A short free-water basel
 
 The typical workflow:
 
-1. **Once per transducer (library build)**: run `build_transducer_library.m` to fit every measured depth. Results are stored in `config/calibration/{combo_name}.yaml`.
+1. **Once per transducer (library build)**: run `build_transducer_library.m` to fit every measured depth. Results are stored in `config/calibration/` ([layout](doc_transducer_library.md#using-a-library-entry)).
 2. **Optionally, at chosen depths**: run `calibration_transducer` (or `refine_transducer_library`) with your own profiles or at unmeasured depths, writing a user library entry (`transducer.library_path`). Calibrated depths are used exactly there and blended into the rest of the entry within `blend_mm`.
 3. **Per subject simulation**: set `transducer.serial`, `combo.ds_serial` and `focal_distance_ep` (PRESTUS loads the calibrated parameters via `load_transducer_from_library`) and `transducer.target_isppa_wcm2` to the desired free-water intensity. The water baseline and scaling handle the rest; the acoustic simulation is not re-run when the target intensity changes.
 

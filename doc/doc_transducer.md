@@ -5,7 +5,7 @@ The transducer definition sets the source of the simulated pressure field: its f
 On this page:
 
 - [Transducer Fields](#transducer-fields): the fields of a transducer and a full inline definition.
-- [Amplitude and Phases](#amplitude-and-phases): the calibrated drive and phases per element.
+- [Amplitude and Phases](#amplitude-and-phases): the drive, set by the focal depth setting and target ISPPA, and the calibrated phases and amplitudes behind it.
 - [Transducer and Focus Positions](#transducer-and-focus-positions): the transducer and focus positions.
 - [Transducer-Target Distance](#transducer-target-distance): exit-plane and bowl distances to the focus.
 - [Annular Array](#annular-array): ring geometry, including flat elements.
@@ -33,8 +33,6 @@ transducer:
     elem_od_mm: [21.1, 28.8, ...]
     curv_radius_mm: 100.0
     dist_geom_ep_mm: 92.7
-    elem_phase_deg: [0, 45, 90, ...]
-    elem_p_amp: [150000, 150000, ...]
 ```
 
 The fields fall into three groups:
@@ -42,15 +40,20 @@ The fields fall into three groups:
 | Group | Fields | Where described |
 |---|---|---|
 | Type and geometry | `type` (`annular` or `matrix`), `freq_hz`, and the sub-struct of that type (`annular` or `matrix`) | [Annular definition](doc_parameters.md#annular-array-definition-annular), [matrix definition](doc_parameters.md#matrix-array-definition-matrix) |
-| Drive and phases | `annular.elem_p_amp`, `annular.elem_phase_deg`; matrix arrays steer automatically | [Amplitude and phases](#amplitude-and-phases) |
+| Drive and steering | `focal_distance_ep` and `target_isppa_wcm2`; calibrated `annular.elem_phase_deg` and `annular.elem_p_amp` (advanced); matrix arrays steer automatically | [Amplitude and phases](#amplitude-and-phases) |
 | Position and target | `trans_pos`, `focus_pos`, `focal_distance_ep` or `focal_distance_bowl` | [Transducer and focus positions](#transducer-and-focus-positions), [Transducer-target distance](#transducer-target-distance) |
 
 ## Amplitude and Phases
 
-Amplitude and phases are calibrated against free-water hydrophone measurements of the device: see [transducer calibration](doc_calibration.md). The library fills them in for a known `serial`.
+An annular array is driven by two settings: the focal depth setting (`transducer.focal_distance_ep`) steers it, and the target free-water ISPPA (`transducer.target_isppa_wcm2`) sets the drive level. PRESTUS derives the element phases and amplitudes from them:
 
-- `transducer.annular.elem_p_amp`: amplitude of the acoustic source per element (Pa). Calibrated.
-- `transducer.annular.elem_phase_deg`: phase of the acoustic source per element (degrees). Calibrated.
+- With a library `serial`, from the device's calibration entry at that depth (the [transducer library](doc_transducer_library.md)).
+- Without one (custom geometry), geometric steering phases to that depth (`compute_phases`, as a library device's geometric baseline) and a nominal uniform drive, which ISPPA targeting then scales. Flat rings (`curv_radius_mm: .inf`) need element phases.
+
+The element values are advanced settings, for a drive found by [calibration](doc_calibration.md) against free-water hydrophone measurements:
+
+- `transducer.annular.elem_p_amp`: amplitude of the acoustic source per element (Pa). Without a target ISPPA (`target_isppa_wcm2: []`) it sets the drive level and is required.
+- `transducer.annular.elem_phase_deg`: phase of the acoustic source per element (degrees). Replaces the steering to the focal depth setting.
 
 !!! note
     Per-element calibration of phases, gains and drive against axial hydrophone profiles (the [transducer library](doc_transducer_library.md)) is implemented only for annular arrays. Matrix arrays can instead get a [steering correction](doc_calibration_matrix-steering.md#steering-correction-of-matrix-arrays), which scales the element amplitudes by the measured focal-peak factor at each steering target. For matrix arrays, PRESTUS computes the phase of each element from `transducer.trans_pos` and `transducer.focus_pos`. Calibrated phases (one per element) can replace the geometric phases via `transducer.matrix.elem_phase_override_deg`.

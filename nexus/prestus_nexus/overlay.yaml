@@ -88,6 +88,7 @@ fields:
   path.sim: {kind: dir}
   path.seg: {kind: dir}
   path.placement: {kind: dir}
+  path.transducer_library: {kind: dir}
   path.localite*: {kind: dir}
   path.localite_t1_pattern: {kind: str}
   path.pct: {kind: dir}
@@ -454,15 +455,19 @@ extra:
   transducer.serial:
     kind: str
     default: ''
-    help: Equipment serial (config/equipment/<serial>.yaml); geometry is filled in from the library.
+    help: Equipment serial (an entry in config/equipment); geometry is filled in from the library.
   transducer.library_path:
     kind: dir
     default: ''
-    help: Folder with your own calibration entries (e.g. from refine_transducer_library); used when it holds one for this transducer.
+    help: Folder with your own calibration entries (e.g. from refine_transducer_library), used when it holds one for this transducer, and your own equipment entries (*_transducer.yaml), which add or replace transducers.
   transducer.combo.ds_serial:
     kind: str
     default: ''
-    help: Driving-system serial; selects the calibration entry <serial>_<ds_serial>.yaml.
+    help: Driving-system serial; selects the calibration entry for this transducer with this driving system.
+  transducer.max_elem_p_amp:
+    kind: number
+    unit: Pa
+    help: "Largest drive your driving system delivers (as elem_p_amp). A library drive above it warns, with the largest ISPPA reachable at that depth. Empty: the drive_limit of the combo in the equipment entry, if any."
   grid.z_beyond_focus_mm:
     kind: number
     default: 40
@@ -689,6 +694,7 @@ display:
   path.pct: {label: Pseudo-CT output folder, advanced: true}
   path.acoustic_input: {label: Start from pressure map (NIfTI), advanced: true}
   path.placement: {label: Placement output folder, group: placement, advanced: true}
+  path.transducer_library: {label: Own transducer library (project), advanced: true}
 
   # Environment
   startup.simnibs_bin_path: {label: SimNIBS bin folder}
@@ -773,12 +779,13 @@ display:
     help: "The planned target (focus_pos). With trans_pos it sets the beam axis; its distance from the exit plane is the planned target depth, which the placement viewer shows next to the focal depth setting."
   transducer.focal_distance_ep:
     label: Focal depth setting (exit plane)
-    help: "The depth the device is set to focus at, from the exit plane: the value set on the equipment. For annular arrays it selects the calibrated phases and drive, so the simulated focus lands here even when the target (focus_pos) is deeper or shallower. Use Set to target depth in the placement viewer to make them equal."
+    help: "The depth the device is set to focus at, from the exit plane: the value set on the equipment. For annular arrays it sets the steering: the calibrated phases of a library device, or geometric phases for a custom one (when no element phases are given). The simulated focus lands here even when the target (focus_pos) is deeper or shallower; Set focal depth to target in the placement viewer makes them equal."
   transducer.focal_distance_bowl: {label: Focal depth setting (bowl apex), advanced: true}
   transducer.focal_distance_offset: {label: Bowl-to-exit-plane offset, advanced: true}
   transducer.serial: {label: Equipment serial}
   transducer.library_path: {label: Own calibration library}
   transducer.combo.ds_serial: {label: Driving-system serial}
+  transducer.max_elem_p_amp: {label: Drive limit, advanced: true}
   transducer.align_to_focus: {label: Align to focus, advanced: true}
   transducer.annular: {label: Annular geometry and drive}
   transducer.annular.*: {advanced: true}

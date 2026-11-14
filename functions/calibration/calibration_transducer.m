@@ -87,7 +87,10 @@ function [lib, report, out] = calibration_transducer(...
     tmp   = upgrade_config_keys(struct('calibration', parameters.calibration), 'parameters.calibration');
     parameters.calibration = tmp.calibration;
     cal   = parameters.calibration;
-    equip = load_equipment_config();
+    own_lib = '';
+    if isfield(cal, 'path_output'); own_lib = fullfile(char(cal.path_output), 'library'); end
+    own_libs = [{char(get_or(cal, 'library_path', own_lib))}, transducer_library_folders(parameters)];
+    equip = load_equipment_config([], own_libs(~cellfun(@isempty, own_libs)));   % + your own equipment entries
 
     %% Equipment -------------------------------------------------------------
     combo = char(string(equipment_name));
@@ -141,8 +144,8 @@ function [lib, report, out] = calibration_transducer(...
 
     %% Base entry: user library, else shipped, else new ----------------------
     lib_path = char(get_or(cal, 'library_path', fullfile(cal.path_output, 'library')));
-    out_file = fullfile(lib_path, [combo '.yaml']);
-    shipped  = fullfile(get_prestus_path(), 'config', 'calibration', [combo '.yaml']);
+    out_file = library_entry_file(lib_path, combo);
+    shipped  = library_entry_file(fullfile(get_prestus_path(), 'config', 'calibration'), combo);
     if isfile(out_file)
         lib = yaml.loadFile(out_file, 'ConvertToArray', true);
     elseif isfile(shipped)

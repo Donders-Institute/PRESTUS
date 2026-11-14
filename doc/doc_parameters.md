@@ -160,6 +160,7 @@ Used when `acoustic_backend: kwave_elastic`.
 | `localite_t1` | Folder with the planning T1s loaded into Localite (`[sub-XXX/]<localite_t1_pattern>`). | `''` | Empty = `localite_raw`. |
 | `localite_t1_pattern` | File-name template of the planning T1; `%s` = `sub-XXX`. | `'%s_*T1*.nii*'` | Replaces `neuronav_t1_pattern` (still read). |
 | `localite_export` | Output folder for files to import into Localite (heuristic placement), per subject `sub-XXX/`. | `''` | Resolved into `io.dir_localite_export`. |
+| `transducer_library` | Your own transducer library for every study of this project: equipment entries (`*_transducer.yaml`, `*_driver.yaml`), calibration entries and `profiles/`. | `''` | A folder or a list of folders. Set it in the project copy of `config_default.yaml`. Checked after `transducer.library_path` and before the `PRESTUS_TRANSDUCER_LIBRARY` environment variable and the shipped library. See [Your own transducers and calibrations](doc_transducer_library.md#your-own-transducers-and-calibrations). |
 | `pct` | Pseudo-CT outputs, per subject `<pct>/sub-NNN/`. | `''` | Empty = `<parent of path.seg>/pct/sub-NNN/`, next to the SimNIBS folder (never inside it). Resolved into `io.dir_pct`. |
 | `acoustic_input` | Start from a prior pressure map instead of simulating: a peak-pressure NIfTI [Pa] in this subject's T1w space, e.g. an earlier run's `nii/*_T1w*_pressure.nii.gz`. | `''` | Its JSON sidecar is checked against the current settings and used to rescale the map to `transducer.target_isppa_wcm2`; acoustic analysis and thermal simulation then run as usual. Replaces `io.external_acoustic_nifti` (still read). See [Starting from earlier stage outputs](doc_outputs_reuse.md#starting-from-earlier-stage-outputs). |
 | `localite` | **Deprecated.** | `''` | Read as `localite_raw` and as `localite_export` when those are empty. |
@@ -275,8 +276,9 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 | `type` | Type of transducer array. | `annular` / `matrix`. Mandatory. |
 | `freq_hz` | Fundamental frequency [Hz]. | Shared across all elements. |
 | `serial` | Equipment serial; geometry, phases and drive come from the equipment config and transducer library. | See [doc_transducer_library.md](doc_transducer_library.md). Values set in the study config take precedence. |
-| `combo.ds_serial` | Driving-system serial. | Selects `<serial>_<ds_serial>.yaml`; without it only `<serial>.yaml` is looked up. |
-| `library_path` | Folder with your own library entries. | Used when it holds an entry for this combo, otherwise the shipped `config/calibration/` (with a warning). |
+| `combo.ds_serial` | Driving-system serial. | Selects the calibration entry for `<serial>` with this driving system; without it only the driving-system-agnostic entry is looked up. |
+| `library_path` | Folder with your own library entries. | Calibration entries there are used when one exists for this combo, otherwise the shipped `config/calibration/` (with a warning). Equipment entries there (`*_transducer.yaml`, `*_driver.yaml`) add transducers or replace shipped ones. See [Your own transducers and calibrations](doc_transducer_library.md#your-own-transducers-and-calibrations). |
+| `max_elem_p_amp` | Largest drive your driving system delivers [Pa, as `elem_p_amp`]. | Empty = the `drive_limit` of the combo in the equipment entry, if any. A library drive above it warns (`resolve_transducer_from_serial:driveLimit`) with the largest ISPPA reachable at that depth. See [Drive limits](doc_transducer_library.md#drive-limits). |
 | `condition` | **Experimental, not validated.** Dephased library condition (`conditions.<label>` in the library entry). | Replaces the focal-depth lookup; `focal_distance_ep` defaults to the condition's nominal setpoint. See [Dephased conditions](doc_transducer_library.md#dephased-conditions). |
 | `trans_pos` | Transducer position (XYZ, bowl apex). | T1 voxels by default; RAS+ or MNI mm via `placement.manual.coordinate_space`. |
 | `focus_pos` | Focus (target) position (XYZ). | T1 voxels by default; RAS+ or MNI mm via `placement.manual.coordinate_space`. |
@@ -288,8 +290,8 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `elem_p_amp` | Pressure amplitude [Pa]; scalar or one value per element. | Must be calibrated. `elem_amp` is the deprecated name (renamed on load with a warning). |
-| `elem_phase_deg` | Source phase per element [degrees]. | Must be calibrated. |
+| `elem_p_amp` | Pressure amplitude [Pa]; scalar or one value per element. | Advanced: from calibration. Empty with a target ISPPA: a nominal drive scaled to it. `elem_amp` is the deprecated name (renamed on load with a warning). |
+| `elem_phase_deg` | Source phase per element [degrees]. | Advanced: from calibration. Empty: steered to `focal_distance_ep` (geometric phases for custom geometry). |
 | `elem_n` | Number of transducer elements. | |
 | `elem_id_mm` | Inner diameter of each element [mm]. | |
 | `elem_od_mm` | Outer diameter of each element [mm]. | |
@@ -301,7 +303,7 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 
 | **Parameter** | **Description** | **Comments** |
 |---|---|---|
-| `elem_p_amp` | Pressure amplitude [Pa]; scalar or one value per element. | Must be calibrated. `elem_amp` is the deprecated name (renamed on load with a warning). |
+| `elem_p_amp` | Pressure amplitude [Pa]; scalar or one value per element. | Advanced: from calibration. Empty with a target ISPPA: a nominal drive scaled to it. `elem_amp` is the deprecated name (renamed on load with a warning). |
 | `depth_mm` | Transducer depth [mm]. | Visualization only. |
 | `steering` | Steering mode of the transducer. | `1D` = axial only, `3D` = volumetric steering. |
 | `elem_shape` | Shape of individual elements. | Options: `rect`, `disc`, `bowl`. Element area is defined using the rectangular dimensions and projected onto the selected shape, unless `elem_diameter_mm` is set. |

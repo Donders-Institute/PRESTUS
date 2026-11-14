@@ -49,7 +49,9 @@ end
         % them from the calibration library.  Inline fields always take
         % precedence over library values.
         if any(has_serial)
-            equip_param = load_equipment_config();
+            % Your own libraries (transducer.library_path, path.transducer_library,
+            % PRESTUS_TRANSDUCER_LIBRARY) may hold equipment entries too.
+            equip_param = load_equipment_config([], transducer_library_folders(parameters));
             library_path = fullfile(get_prestus_path(), 'config', 'calibration');
             % Resolve each serial-bearing transducer.  Because resolution may
             % add fields (e.g. type, freq_hz) that were absent from the
@@ -62,7 +64,8 @@ end
             for t_i = find(has_serial)
                 before = resolved{t_i};
                 resolved{t_i} = resolve_transducer_from_serial( ...
-                    resolved{t_i}, equip_param, library_path, t_i);
+                    resolved{t_i}, equip_param, library_path, t_i, ...
+                    transducer_library_folders(parameters, t_i));
                 parameters = record_library_drive(parameters, t_i, before, resolved{t_i});
             end
             % Collect all field names across all elements, then rebuild.
@@ -107,9 +110,27 @@ end
             switch tr.type
 
                 case 'matrix'
+                    % no drive given: a nominal one, scaled to the target ISPPA
+                    % (the phases steer to focus_pos geometrically)
+                    if isfield(tr, 'matrix') && isstruct(tr.matrix) && ...
+                            (~isfield(tr.matrix, 'elem_p_amp') || isempty(tr.matrix.elem_p_amp)) && ...
+                            ~(isfield(tr.matrix, 'elem_amp') && ~isempty(tr.matrix.elem_amp)) && ...
+                            isfield(tr, 'target_isppa_wcm2') && ~isempty(tr.target_isppa_wcm2)
+                        tr.matrix.elem_p_amp = 100e3;
+                        fprintf(['[transducer %d] Nominal drive (100 kPa per element); results are ' ...
+                                 'scaled to target_isppa_wcm2.\n'], t_i);
+                    end
                     [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i);
 
                 case 'annular'
+                    % drive from the focal depth setting and target ISPPA where
+                    % phases / amplitudes are not given (custom geometry)
+                    c_water = 1500;
+                    if isfield(parameters, 'medium_properties') && isfield(parameters.medium_properties, 'water') ...
+                            && isfield(parameters.medium_properties.water, 'sound_speed')
+                        c_water = parameters.medium_properties.water.sound_speed;
+                    end
+                    tr = fill_annular_drive(tr, c_water, t_i);
                     tr = validate_annular_transducer(tr, t_i);
 
                 otherwise

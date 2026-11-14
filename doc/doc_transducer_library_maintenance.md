@@ -18,7 +18,7 @@ How studies use the library is described in [Transducer Library](doc_transducer_
 
 ### New Driving System for an Existing Transducer
 
-1. Add a combo entry to `config/equipment/{tran_serial}.yaml`:
+1. Add a combo entry to the transducer's entry in `config/equipment/` (`model-<MODEL>/tran-<TRAN>_transducer.yaml`), and describe a new driving system in `config/equipment/ds/ds-<DS>_driver.yaml`:
 
     ```yaml
     combos:
@@ -36,15 +36,15 @@ How studies use the library is described in [Transducer Library](doc_transducer_
 
 ### New Transducer by Hand
 
-1. Create `config/equipment/{MY_SERIAL}.yaml`, copying an existing file as a template. Required fields for annular arrays:
+1. Create `config/equipment/model-<MODEL>/tran-<MY_SERIAL>_transducer.yaml`, copying an existing file as a template (a flat `config/equipment/<MY_SERIAL>.yaml` is read as well). A measured unit of a model already in the library needs only `type`, `serial`, `model`, `name` and its combos; it takes the geometry and steering range from the model entry. Required fields for a device model of an annular array:
 
     ```yaml
     type: transducer
     serial: MY_SERIAL
     name: Human-readable name
     manufact: Imasonic    # or: Sonic Concepts
-    min_foc: 30.0         # minimum steerable focal distance from exit plane [mm]
-    max_foc: 90.0
+    min_foc: 30.0         # hardware steering range from the exit plane [mm]; a unit may omit it
+    max_foc: 90.0         # and use its model's
     transducer:
       annular:
         elem_n: 10
@@ -65,7 +65,7 @@ Click **New…** under the transducer list in `calibration_gui`. The form takes 
 - **Annular:** ring inner and outer diameters and the number of physical channels, plus optionally one driving system with its profile CSV.
 - **Matrix:** steering (1D/3D), curved or flat, aperture diameter, element shape and size, and a `define_here` grid (`rect` rows × columns with spacing, `fibonacci` count and kerf, or `fermat` count). Coordinate-file layouts (`extract_from_file`) are not offered in the form.
 
-**Copy from** fills the form from an existing transducer. A side view and a face view update as you type: rings coloured by channel, or matrix element footprints, with the exit plane, geometric focus and steering range. The message box reports the ring/channel count or the element count and median pitch, and flags overlapping rings or elements. On save the GUI writes `{serial}.yaml` to its equipment folder (`EquipPath`, default `config/equipment/`) and selects the new transducer. For an annular transducer, the geometric prediction is shown right away. Serial-based study configs (`transducer.serial`) always read `config/equipment/`, so save there if the pipeline should resolve the new serial.
+**Copy from** fills the form from an existing transducer. A side view and a face view update as you type: rings coloured by channel, or matrix element footprints, with the exit plane, geometric focus and steering range. The message box reports the ring/channel count or the element count and median pitch, and flags overlapping rings or elements. On save the GUI writes the entry to its equipment folder (into its existing file, else `model-<MODEL>/tran-<SERIAL>_transducer.yaml` when the model folder exists, else `<SERIAL>.yaml`) (`EquipPath`, default `config/equipment/`) and selects the new transducer. For an annular transducer, the geometric prediction is shown right away. Serial-based study configs (`transducer.serial`) always read `config/equipment/`, so save there if the pipeline should resolve the new serial.
 
 ??? note "What the form checks and stores"
     On save the GUI:
@@ -91,7 +91,7 @@ This writes an entry with an empty offset (pure geometric steering). Accuracy eq
 
 ## Rebuilding a Shipped Entry
 
-Maintainers only. Set `char_data_path` in `config/equipment/{serial}.yaml` and run `build_transducer_library`. `CHAR_DATA_ROOT` defaults to `local/profiles/` (see [Input file formats](doc_calibration_refinement.md#input-file-formats)), and `LIBRARY_PATH` to `config/calibration/`. A missing profile CSV is an error; it does not fall back silently to a geometry-only entry. Then check the entry:
+Maintainers only. Set `char_data_path` in the transducer's equipment entry and run `build_transducer_library`. `CHAR_DATA_ROOT` defaults to `local/profiles/` (see [Input file formats](doc_calibration_refinement.md#input-file-formats)), and `LIBRARY_PATH` to `config/calibration/`. A missing profile CSV is an error; it does not fall back silently to a geometry-only entry. Then check the entry:
 
 ```matlab
 validate_transducer_library(library_path, equip_path)   % must report no 'error'

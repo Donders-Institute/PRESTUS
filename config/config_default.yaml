@@ -62,6 +62,10 @@ path:
   localite: ''          # DEPRECATED: read as localite_raw when that is empty, and as localite_export when that is empty
   pct: ''               # Base output directory for pseudoCT files: <pct>/sub-NNN/. Empty = <parent of seg>/pct/sub-NNN/
                         # (next to the SimNIBS folder; the m2m folders are only read).
+  transducer_library: '' # Your own transducer library for every study of this project (set it in the project copy of
+                         # config_default.yaml): equipment entries (*_transducer.yaml), calibration entries and profiles/.
+                         # A folder or a list of folders. Checked after transducer.library_path, before the
+                         # PRESTUS_TRANSDUCER_LIBRARY environment variable and the shipped library.
   acoustic_input: ''    # Start from a prior pressure map instead of simulating: a peak-pressure NIfTI [Pa] in this
                         # subject's T1w space, e.g. an earlier run's nii/*_T1w*_pressure.nii.gz. Its .json sidecar is
                         # used to check the settings and rescale to transducer.target_isppa_wcm2; acoustic analysis
@@ -215,9 +219,10 @@ transducer:
   type: []              # 'annular' for Annular array or 'matrix' for Matrix array
   freq_hz: []           # Fundamental frequency [Hz]
   target_isppa_wcm2: 30 # Target free-water ISPPA [W/cm²]; scalar or vector (see above)
-  # serial: ''            # Equipment serial (config/equipment/<serial>.yaml); fills in geometry and library phases/drive
-  # combo: {ds_serial: ''} # Driving-system serial; selects config/calibration/<serial>_<ds_serial>.yaml
-  # library_path: ''      # Folder with your own library entries (refine_transducer_library / calibration_gui); used when it holds this combo
+  # serial: ''            # Equipment serial (an entry in config/equipment); fills in geometry and library phases/drive
+  # combo: {ds_serial: ''} # Driving-system serial; selects the calibration entry for <serial> with this driving system
+  # library_path: ''      # Folder with your own library entries (refine_transducer_library / calibration_gui); used when it holds this combo. Equipment entries there (*_transducer.yaml) add or replace transducers
+  # max_elem_p_amp: []    # Largest drive your driving system delivers [Pa, as elem_p_amp]; [] = the combo's drive_limit in the equipment entry, if any
   # condition: ''        # EXPERIMENTAL, not validated: dephased library condition (lib.conditions.<label>) instead of focal_distance_ep
 
   trans_pos: []              # Transducer position (bowl apex) [T1 voxels by default; see placement.manual.coordinate_space]

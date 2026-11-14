@@ -24,12 +24,12 @@ transducer:
     ds_serial: IGT_32_ch_comb_10_ch
   target_isppa_wcm2: 32.0
   focal_distance_ep: 60.0
-  # resolves config/calibration/IS_PCD15473_01001_IGT_32_ch_comb_10_ch.yaml
+  # resolves config/calibration/model-IS_PCD15473/tran-IS_PCD15473_01001_ds-IGT_32_ch_comb_10_ch_calib.yaml
 ```
 
-PRESTUS resolves geometry and calibrated parameters at load time: the ring geometry from `config/equipment/`, and the phases, per-ring gains and drive at `focal_distance_ep` from the calibration entry. Fields already set in the study config override library values. [Shipped combos](#shipped-combos) lists the entries and how well each one fits its hydrophone profiles.
+PRESTUS resolves geometry and calibrated parameters at load time: the ring geometry from `config/equipment/`, and the phases, per-ring gains and drive at `focal_distance_ep` from the calibration entry. Fields already set in the study config override library values. [Shipped entries](#shipped-entries-and-fit-quality) lists the entries and how well each one fits its hydrophone profiles.
 
-To use an entry you refined yourself ([Calibration](doc_calibration.md#refining-a-library-entry-to-your-hydrophone-profiles)), add `library_path`:
+To use an entry you refined yourself ([Calibration](doc_calibration_refinement.md#refining-a-library-entry)), add `library_path`:
 
 ```yaml
 transducer:
@@ -43,28 +43,86 @@ transducer:
 
 The run records what was used: `transducer.tx_calibration.phase_model` (`geometric`, `static`, `refined` or `blend`), `amplitude_source` (`refinement`, `blend` or `global`) and `library_meta` (the library model version). Record the version with your results; results are not comparable across versions.
 
-To bypass the library, give the full geometry, phases and drive inline: see [Transducer definition](doc_transducer.md#what-to-set).
+To bypass the library, give the full geometry, phases and drive inline: see [Transducer definition](doc_transducer.md#transducer-fields).
 
-??? note "Details: library keys and fallback chain"
-    | Filename | When used |
-    |---|---|
-    | `{tran_serial}_{ds_serial}.yaml` | DS-specific calibration (all shipped entries) |
-    | `{tran_serial}.yaml` | DS-agnostic entry (none shipped at present) |
+??? note "Library keys and layout"
+    Each entry has a key: `<TRAN>_<DS>` for a transducer with a driving system, `<TRAN>` for an entry without one (the geometric baselines of the device models). A library folder holds entries in either of two layouts, and PRESTUS reads both:
 
-    PRESTUS resolves in order:
+    | Layout | File | Used by |
+    |---|---|---|
+    | Nested | `model-<MODEL>/tran-<TRAN>_ds-<DS>_calib.yaml`, `model-<MODEL>/tran-<TRAN>_calib.yaml` | the shipped library (`config/calibration/`) |
+    | Flat | `<TRAN>_<DS>.yaml`, `<TRAN>.yaml` | your own libraries (`transducer.library_path`) and libraries from earlier versions |
+
+    `library_entry_file(library_path, key)` returns the file of an entry. PRESTUS resolves in order:
 
     1. `transducer.library_path` (your folder), if set and it contains an entry for this transducer
-    2. `config/calibration/{tran_serial}_{ds_serial}.yaml`
-    3. `config/calibration/{tran_serial}.yaml`, with a warning
+    2. the shipped entry `<TRAN>_<DS>`
+    3. the shipped entry `<TRAN>`, with a warning
     4. If none exists, an error with instructions
 
-    Without `combo.ds_serial`, PRESTUS looks only for `{tran_serial}.yaml`.
+    Without `combo.ds_serial`, PRESTUS looks only for the entry `<TRAN>`.
 
-### How phases are computed
+### Your Own Transducers and Calibrations
+
+Keep your own devices, calibrations and hydrophone profiles in a library folder of your own, outside the PRESTUS folder, so that updating PRESTUS never touches them. Do not add them to `config/equipment` or `config/calibration`. Name the folder in one of three places; PRESTUS checks them in this order, then its shipped library:
+
+| Setting | Scope |
+|---|---|
+| `transducer.library_path` | This study (per transducer) |
+| `path.transducer_library` | Every study of a project: set it in the project copy of `config_default.yaml` ([project defaults](doc_configuration.md#project-config-folder)). A folder or a list |
+| `PRESTUS_TRANSDUCER_LIBRARY` | This machine or user: an environment variable, folders separated by `:` (`;` on Windows). `calibration_gui` and the Nexus read it too |
+
+The first library that has an entry wins: an equipment entry replaces entries with the same serial from later libraries and from the shipped library (with a message), and a calibration entry for the driving system is taken from the first library that has one. The folder can hold:
+
+| File | Content |
+|---|---|
+| `tran-<SERIAL>_transducer.yaml` | An equipment entry: a new unit, or a replacement for a shipped entry with the same serial |
+| `ds-<DS>_driver.yaml` | A driving system, optionally with its drive limit |
+| `<TRAN>_<DS>.yaml` (or `tran-<TRAN>_ds-<DS>_calib.yaml`) | A calibration entry for that transducer and driving system |
+| `profiles/` | Hydrophone profiles; a relative `char_data_path` is found here first, then in `local/profiles/` |
+
+A unit of a model in the library needs only its identity and combos; it takes geometry and steering range from the model entry:
+
+```yaml
+# my_library/tran-IS_PCD15473_01001_OPM_transducer.yaml
+type: transducer
+serial: IS_PCD15473_01001_OPM
+model: IS_PCD15473
+name: Imasonic 10 ch. IS_PCD15473_01001 (OPM setup)
+combos:
+  IGT_32_ch_comb_10_ch:
+    char_data_path: tran-IS_PCD15473_01001_ds-IGT_32_ch_comb_10_ch_acq-OPM_axial.csv   # in my_library/profiles/
+```
+
+```yaml
+# study config
+transducer:
+  serial: IS_PCD15473_01001_OPM
+  combo: {ds_serial: IGT_32_ch_comb_10_ch}
+  library_path: /path/to/my_library
+```
+
+Create the calibration entry from your hydrophone profiles with `calibration_gui`, `refine_transducer_library` or `calibration_transducer`. `calibration_gui` saves entries and new transducers into its output folder, by default the first folder in `PRESTUS_TRANSDUCER_LIBRARY`; it does not write into `config/equipment` (option `AllowShipped` for maintainers), and an edited shipped transducer is saved as a replacement in your library. If your driving system gives you phases per depth instead, write a short entry by hand:
+
+```yaml
+# my_library/IS_PCD15473_01001_OPM_IGT_32_ch_comb_10_ch.yaml
+meta: {tran_serial: IS_PCD15473_01001_OPM, driving_system: IGT_32_ch_comb_10_ch, calibration_type: user}
+global_model:
+  depths_ep_mm: [30, 50, 70]
+  elem_phase_deg:                 # absolute phase of each ring at each depth [deg]
+  - [0, 12, 25, 37, 50, 62, 75, 87, 100, 112]
+  - [...]
+  - [...]
+  amplitude_by_depth: {depths_ep_mm: [30, 50, 70], elem_p_amp: [88000, 103000, 132000], isppa_wcm2: 30}
+```
+
+Between the given depths, PRESTUS interpolates the phases, and outside them it extrapolates and warns. Entries fitted by PRESTUS record the geometry they were fitted for (`meta.geometry_fingerprint`). When the equipment entry in use has another geometry, for example because your folder replaces a shipped entry, the entry still loads and PRESTUS warns (`load_transducer_from_library:geometryMismatch`). The Nexus reads the equipment entries in `transducer.library_path` as well and labels them "(own library)".
+
+### How Phases Are Computed
 
 At a requested depth, the entry gives geometric steering plus a fitted per-ring correction, and the drive that reaches the reference ISPPA.
 
-??? note "Details: phase and drive at a requested depth"
+??? note "Phase and drive at a requested depth"
     For any requested focal depth *d* (mm from the exit plane):
 
     ```
@@ -143,10 +201,8 @@ Columns: *geo*, geometric steering only; *in-sample*, the refinement at each mea
 | IS_PCD15287_01002_IGT_32_ch_comb_10_ch | Imasonic | 10–90 (10) | 0.988 | 0.999 (0.955) | 0.999 | +0.001 | n/a |
 | IS_PCD15473_01001_IGT_128_ch_comb_10_ch | Imasonic | 11–93 (11) | 0.981 | 0.996 (0.980) | 0.995 | -0.001 | n/a |
 | IS_PCD15473_01001_IGT_32_ch_comb_10_ch | Imasonic | 10–90 (10) | 0.983 | 0.998 (0.983) | 0.998 | -0.005 | n/a |
-| IS_PCD15473_01001_OPM_IGT_32_ch_comb_10_ch | Imasonic | 10–90 (10) | 0.980 | 0.998 (0.975) | 0.997 | -0.043 | n/a |
 | IS_PCD15473_01003_IGT_128_ch_comb_10_ch | Imasonic | n/a | n/a | n/a | n/a | n/a | geometric only (no profiles) |
 | IS_PCD15473_01003_IGT_32_ch_comb_10_ch | Imasonic | 10–90 (10) | 0.982 | 0.997 (0.981) | 0.997 | -0.012 | n/a |
-| IS_PCD15473_01003_OPM_IGT_32_ch_comb_10_ch | Imasonic | 10–90 (10) | 0.982 | 0.997 (0.984) | 0.997 | -0.003 | n/a |
 | CTX_250_001_SC_105_010 | Sonic Concepts | 14–61 (12) | 0.786 | 0.984 (0.916) | 0.975 | -0.069 | n/a |
 | CTX_250_001_SC_203_035 | Sonic Concepts | 14–61 (12) | 0.849 | 0.970 (0.904) | 0.938 | -0.277 | nearfield_excess |
 | CTX_250_009_SC_105_010 | Sonic Concepts | 16–46 (12) | 0.838 | 0.917 (0.607) | 0.926 | -0.002 | nearfield_excess |
@@ -165,6 +221,36 @@ Columns: *geo*, geometric steering only; *in-sample*, the refinement at each mea
 Geometric steering alone reproduces the Imasonic profiles well (R² ≈ 0.98–0.99). For the Sonic Concepts CTX-500 / CTX-250 it is less accurate (R² ≈ 0.79–0.91), so refinement matters most there.
 
 ## Dephased conditions (experimental)
+### Device Models and Units
+
+Each device has a **model** entry, named after the model (`CTX_500`), and the library's **measured units** of it, named model plus unit id (`CTX_500_026`). A unit's calibration is fitted to that unit's hydrophone profiles, so use the unit's serial when your device is in the library. Otherwise name the model, which gives the model's geometry and a [geometric baseline](doc_transducer_library_maintenance.md#geometric-baseline-entry) calibration: accuracy is that of the *geo* column above. A serial of a unit that is not in the library (`CTX_500_031`) falls back to its model (`CTX_500`), with a warning; to use the unit's own calibration, [add it](doc_transducer_library_maintenance.md#adding-a-transducer-or-driving-system). A model entry has no driving system; with `combo.ds_serial` set, PRESTUS falls back to the model's generic entry and says so. Each entry names its model in `model:`; the naming rules are in `config/equipment/README.md`.
+
+The model geometry is based on the [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) specification, and for Imasonic on the manufacturer's specification and drawings; where the library also has measured units, the unit geometry is identical.
+
+| Model | Device | Rings | ROC mm | Exit plane → geometric focus mm | Steering range mm | Frequency kHz | Measured units |
+|---|---|---|---|---|---|---|---|
+| `CTX_500` | NeuroFUS CTX-500 | 4 | 62.94 | 52.38 | 33.6–82.5 | 500 | `CTX_500_026` |
+| `CTX_250` | NeuroFUS CTX-250 | 4 | 62.94 | 52.38 | 25–60 | 250 | `CTX_250_001`, `_026` |
+| `CTX_250_2ch` | NeuroFUS CTX-250, 2 ch. | 2 | 62.9 | 56.9 | 20–80 | 250 | `CTX_250_009`, `_014` |
+| `DPX_500` | NeuroFUS DPX-500 | 4 | 150 | 144.9 | 50–120 | 500 | |
+| `DPXPC_300` | NeuroFUS DPX-PC-300 | 4 | 150 | 144.9 | 50–120 | 300 | |
+| `IS_PCD15287` | Imasonic PCD15287 | 10 | 75 | 65.3 | 7.05–100.3 | 300 | `IS_PCD15287_01001`, `_01002` |
+| `IS_PCD15473` | Imasonic PCD15473 | 10 | 100 | 92.7 | 7.12–102.7 | 300 | `IS_PCD15473_01001`, `_01003` |
+| `H246` | Sonic Concepts H-246 (flat) | 2 | flat | n/a | 25–95 | 500 | |
+| `BSonix_35mm` … `_80mm` | BrainSonix BSonix | 1 | 43 / 68.5 / 74 / 87.5 | 32.68 / 55.66 / 64.92 / 80.51 | fixed | 650 | |
+
+The steering range (`min_foc`–`max_foc`, from the exit plane) is the hardware range of the model; a unit without its own range uses its model's. The measured range is the span of depths with hydrophone profiles in the calibration entry (column *Depths mm* above). Within the steering range but outside the measured range, PRESTUS extrapolates the fitted model and warns (`load_transducer_from_library:extrapolated`); outside the steering range it warns that the device cannot be set there. For the Imasonic models, the provenance of each value is in the equipment YAML. `CTX_500_006` (2-channel CTX-500, 500 kHz) has no model entry. `H246` has flat rings and needs the kWaveArray source ([Flat Elements](doc_transducer.md#flat-elements)).
+
+### Drive Limits
+
+A driving system delivers a limited drive per channel, so at deep foci it may not reach the target ISPPA. With a limit, PRESTUS compares the library drive for `target_isppa_wcm2` with it and warns (`resolve_transducer_from_serial:driveLimit`), giving the largest free-water ISPPA reachable at that depth. The limit is `transducer.max_elem_p_amp` in the study config, else the combo's `drive_limit.max_elem_p_amp_pa` in the equipment entry. Without either, there is no check. The drive is compared as one value; per-ring gains are not included.
+
+The shipped limits are estimates for the IGT 128-channel driver from the Radboud characterisation (full amplitude for a 1.00 MPa focus at about 83–89 mm): `IS_PCD15287_01001` and `_01002`, and `IS_PCD15473_01001`. Their source is in the equipment entry. Your amplifier may differ (for example the optional 10 W channels), so set `transducer.max_elem_p_amp` for your setup.
+
+### Deprecated and Excluded Entries
+
+A unit that is retired or replaced gets `status: deprecated`; an entry withheld until it is documented gets `status: excluded` (both optionally with `superseded_by` and `status_note`). Both stay in the library, so earlier studies re-run unchanged, and PRESTUS and the Nexus warn when a study names them. Excluded entries are not listed in the Nexus or `calibration_gui` and are skipped by `build_transducer_library`. The OPM variants of `IS_PCD15473_01001` and `_01003` are excluded until their setup is documented.
+
 
 !!! warning "Experimental, not validated"
     No dephased hydrophone measurements have been compared with these predictions yet. Every use prints a `library_condition:experimental` warning. Do not report dephased-condition results without your own validation.
@@ -179,7 +265,7 @@ Dephased (defocused) settings drive the rings with explicit phases (e.g. alterna
     ```matlab
     equip = load_equipment_config();
     tran  = equip.trans.CTX_250_001;
-    lib   = yaml.loadFile('config/calibration/CTX_250_001_SC_203_035.yaml', 'ConvertToArray', true);
+    lib   = yaml.loadFile(library_entry_file('config/calibration', 'CTX_250_001_SC_203_035'), 'ConvertToArray', true);
     cond  = struct('label', 'geom_180', 'phase_shift_deg', [0 180 0 180], 'setpoint_ep_mm', 52.38);
     lib   = library_add_conditions(lib, tran, cond, struct('IsppaWcm2', 30));
     yaml.dumpFile('my_library/CTX_250_001_SC_203_035.yaml', lib);   % then transducer.library_path: my_library
@@ -235,4 +321,5 @@ Dephased (defocused) settings drive the rings with explicit phases (e.g. alterna
 | Water-tank basis | Does not account for tissue acoustic properties | Combined with the PRESTUS forward simulation in tissue |
 | Profiles recorded at matched ISPPA per depth | Depth dependence of focal gain is not calibrated | Water-baseline ISPPA rescaling |
 | DS-agnostic fallback | Ignores DS hardware phase offset | Use DS-specific entries |
-| Outside `[min_foc, max_foc]` | Unknown accuracy, warning emitted | Keep `focal_distance_ep` within range |
+| Outside the measured range | Extrapolated from the fitted model, warning emitted | Measure the depths you target |
+| Outside `[min_foc, max_foc]` | Beyond the hardware steering range, warning emitted | Keep `focal_distance_ep` within range |

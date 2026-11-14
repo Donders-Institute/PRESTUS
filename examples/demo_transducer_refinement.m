@@ -31,7 +31,7 @@ prestus_root = fileparts(fileparts(mfilename('fullpath')));
 addpath(genpath(fullfile(prestus_root, 'functions')));
 addpath(genpath(fullfile(prestus_root, 'external')));
 equip = load_equipment_config();
-lib0  = yaml.loadFile(fullfile(prestus_root, 'config', 'calibration', [COMBO '.yaml']), 'ConvertToArray', true);
+lib0  = yaml.loadFile(library_entry_file(fullfile(prestus_root, 'config', 'calibration'), COMBO), 'ConvertToArray', true);
 tran  = equip.trans.(char(lib0.meta.tran_serial));
 ann   = tran.transducer.annular;
 

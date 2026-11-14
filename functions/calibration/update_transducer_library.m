@@ -170,7 +170,12 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
     if ~exist(library_path, 'dir')
         mkdir(library_path);
     end
-    lib_yaml = fullfile(library_path, [combo_name '.yaml']);
+    ds_found = '';
+    if startsWith(combo_name, [char(tran_serial_found) '_'])
+        ds_found = combo_name(numel(char(tran_serial_found))+2:end);
+    end
+    lib_yaml = library_entry_file(library_path, combo_name, tran_serial_found, ds_found);
+    if ~isfolder(fileparts(lib_yaml)); mkdir(fileparts(lib_yaml)); end
 
     if isfile(lib_yaml)
         lib = yaml.loadFile(lib_yaml, 'ConvertToArray', true);
@@ -234,6 +239,8 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
     else
         lib.refinement.amplitude_scaling = amp_struct;   % informational
     end
+
+    lib.meta.geometry_fingerprint = equipment_geometry_fingerprint(tran);
 
     %% Write updated YAML
     yaml.dumpFile(lib_yaml, lib);

@@ -18,8 +18,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_librar
             repo_root = fileparts(fileparts(mfilename('fullpath')));
             tc.equip = load_equipment_config();
             tc.tran  = tc.equip.trans.CTX_250_001;
-            tc.lib   = yaml.loadFile(fullfile(repo_root, 'config', 'calibration', ...
-                'CTX_250_001_SC_203_035.yaml'), 'ConvertToArray', true);
+            tc.lib   = yaml.loadFile(library_entry_file(fullfile(repo_root, 'config', 'calibration'), ...
+                'CTX_250_001_SC_203_035'), 'ConvertToArray', true);
         end
     end
 

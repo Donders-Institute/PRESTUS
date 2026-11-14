@@ -99,7 +99,7 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     condition = char(condition);
 
     %% Load calibration library entry
-    yaml_path = fullfile(library_path, [combo_name, '.yaml']);
+    yaml_path = library_entry_file(library_path, combo_name);
     if ~isfile(yaml_path)
         error('load_transducer_from_library: library file not found:\n  %s', yaml_path);
     end
@@ -119,6 +119,17 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
         error('load_transducer_from_library: transducer ''%s'' not found in equip_param.', tran_serial);
     end
     tran        = equip_param.trans.(tran_serial);
+    % The entry was fitted for the geometry it records; warn when the
+    % equipment entry now differs (e.g. a user entry replacing a shipped one)
+    if isfield(lib.meta, 'geometry_fingerprint') && ~isempty(lib.meta.geometry_fingerprint)
+        fp_now = equipment_geometry_fingerprint(tran);
+        if ~isempty(fp_now) && ~strcmp(fp_now, char(lib.meta.geometry_fingerprint))
+            warning('load_transducer_from_library:geometryMismatch', ...
+                ['%s was fitted for another geometry of %s (fingerprint %s, equipment now %s). ' ...
+                 'Refit the entry, or check the equipment entry in use.'], ...
+                yaml_path, tran_serial, char(lib.meta.geometry_fingerprint), fp_now);
+        end
+    end
     tran        = library_transducer(tran, lib);   % sub-rings if the entry has a ring profile
     n_elem      = tran.transducer.annular.elem_n;
     tran.n_elem = n_elem;
@@ -181,6 +192,20 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     parameters.transducer.tx_calibration.amp_kwave_verified     = amp_kwave_calibrated;
     parameters.transducer.tx_calibration.amp_kwave_ref_depth_mm = m.amp_kwave_nearest_depth_mm;
 
+    % Measured range: depths with hydrophone profiles. Beyond it the entry
+    % extrapolates (refinements blend back to the global model); the hardware
+    % range (min_foc/max_foc) is checked by resolve_transducer_from_serial.
+    measured = library_measured_range(lib);
+    parameters.transducer.tx_calibration.measured_range_ep_mm = measured;
+    parameters.transducer.tx_calibration.extrapolated = ~isempty(measured) && isempty(condition) && ...
+        (focal_distance_ep < measured(1) || focal_distance_ep > measured(2));
+    if parameters.transducer.tx_calibration.extrapolated
+        warning('load_transducer_from_library:extrapolated', ...
+            ['%s @ %.1f mm: outside the measured range %.4g–%.4g mm of this entry; phases and ' ...
+             'drive are extrapolated from the fitted model.'], ...
+            combo_name, focal_distance_ep, measured(1), measured(2));
+    end
+
     if ~isempty(elem_p_amp) && ~amp_kwave_calibrated && isempty(condition)
         if isfinite(m.amp_kwave_nearest_depth_mm)
             nearest_str = sprintf(['nearest k-Wave drive calibration is at %.1f mm from the exit plane ' ...
@@ -206,6 +231,19 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     end
     fprintf('Library loaded (%s, %s): %s | focal %.1f mm | %s (w=%.2f) | %s\n', ...
         phase_model, cal_type, combo_name, focal_distance_ep, phase_model, w, amp_str);
+end
+
+function r = library_measured_range(lib)
+% [min max] of the depths with measured profiles, [] for a geometric entry.
+    d = [];
+    if isfield(lib, 'global_model') && isfield(lib.global_model, 'fit_depths_ep_mm')
+        d = double(lib.global_model.fit_depths_ep_mm(:));
+    end
+    if isempty(d) && isfield(lib, 'refinement') && isfield(lib.refinement, 'depths_ep_mm')
+        d = double(lib.refinement.depths_ep_mm(:));
+    end
+    d = d(isfinite(d));
+    if isempty(d); r = []; else; r = [min(d), max(d)]; end
 end
 
 function v = field_or(s, f, d)

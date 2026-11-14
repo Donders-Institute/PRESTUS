@@ -87,7 +87,9 @@ function S = open_combo(args)
     S.lib_path   = fullfile(root, 'config', 'calibration');
     S.prof_root  = char(get_nonempty_field(args, 'profile_root', fullfile(root, 'local', 'profiles')));
     S.user_path  = char(get_nonempty_field(args, 'library_path', ''));
-    S.equip = load_equipment_config(S.equip_path);
+    S.user_libs  = [{S.user_path}, transducer_library_folders()];   % study folder, then PRESTUS_TRANSDUCER_LIBRARY
+    S.user_libs  = S.user_libs(~cellfun(@isempty, S.user_libs));
+    S.equip = load_equipment_config(S.equip_path, S.user_libs);   % + equipment entries in your own libraries
     S.serial = char(args.serial);
     if ~isfield(S.equip.trans, S.serial)
         error('nexus_calibration:serial', 'Transducer %s is not in %s.', S.serial, S.equip_path);
@@ -98,9 +100,10 @@ function S = open_combo(args)
     if ~isempty(S.ds); S.combo = [S.serial '_' S.ds]; end
     S.matrix = ~isfield(S.tran.transducer, 'annular') && isfield(S.tran.transducer, 'matrix');
     S.lib = []; S.lib_file = '';
-    for folder = {S.user_path, S.lib_path}
-        f = fullfile(folder{1}, [S.combo '.yaml']);
-        if ~isempty(folder{1}) && isfile(f)
+    for folder = [S.user_libs, {S.lib_path}]
+        if isempty(folder{1}); continue; end
+        [f, has] = library_entry_file(folder{1}, S.combo);
+        if has
             S.lib = yaml.loadFile(f, 'ConvertToArray', true); S.lib_file = f; break;
         end
     end
@@ -108,9 +111,8 @@ function S = open_combo(args)
     csv = char(get_nonempty_field(args, 'csv', ''));
     if isempty(csv) && isfield(S.tran, 'combos') && isfield(S.tran.combos, S.ds) ...
             && isfield(S.tran.combos.(S.ds), 'char_data_path')
-        csv = char(S.tran.combos.(S.ds).char_data_path);
-        if ~java.io.File(csv).isAbsolute(); csv = fullfile(S.prof_root, csv); end
-        if ~isfile(csv); csv = ''; end
+        csv = resolve_profile_file(char(S.tran.combos.(S.ds).char_data_path), S.equip, S.serial, ...
+            S.user_libs, S.prof_root);
     end
     if ~isempty(csv) && ~S.matrix; S = load_profiles(S, csv); end
 end

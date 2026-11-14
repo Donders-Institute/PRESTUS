@@ -92,6 +92,10 @@ combo_list = {};   % {combo_name, tran_serial, ds_serial, has_char}
 for si = 1:numel(all_serials)
     tran_serial = all_serials{si};
     tran        = equip_param.trans.(tran_serial);
+    if isfield(tran, 'status') && strcmp(char(tran.status), 'excluded')
+        fprintf('  %s: excluded (status: excluded), skipped\n', tran_serial);
+        continue;
+    end
 
     if ~isfield(tran, 'combos') || isempty(tran.combos)
         combo_name = tran_serial;
@@ -147,7 +151,7 @@ for ci = 1:n_total
 
     try
         if strcmp(level, 'geometric')
-            build_geometric_entry(tran_serial, ds_serial, library_path);
+            build_geometric_entry(tran_serial, ds_serial, library_path, tran);
         else
             combo_entry = tran.combos.(ds_serial);
             rp_opts = [];
@@ -191,7 +195,7 @@ end
 
 %% ═══════════════════════ Local helpers ════════════════════════════════════════
 
-function build_geometric_entry(tran_serial, ds_serial, library_path)
+function build_geometric_entry(tran_serial, ds_serial, library_path, tran)
 % Write a geometry-only library entry (no empirical phase correction).
 %
 % Stores an empty global_model.elem_phase_correction_deg so that
@@ -205,7 +209,8 @@ function build_geometric_entry(tran_serial, ds_serial, library_path)
         combo_key = [tran_serial '_' ds_serial];
     end
 
-    out_file = fullfile(library_path, [combo_key '.yaml']);
+    out_file = library_entry_file(library_path, combo_key, tran_serial, ds_serial);
+    if ~isfolder(fileparts(out_file)); mkdir(fileparts(out_file)); end
     if isfile(out_file)
         lib = yaml.loadFile(out_file, 'ConvertToArray', true);
     else
@@ -219,6 +224,7 @@ function build_geometric_entry(tran_serial, ds_serial, library_path)
     end
     lib.meta.last_updated     = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
     lib.meta.calibration_type = 'geometric';
+    lib.meta.geometry_fingerprint = equipment_geometry_fingerprint(tran);
     try; lib.meta.prestus_version = prestus_version(); catch; lib.meta.prestus_version = 'unknown'; end
 
     % Drop any legacy per-depth phase tables; phases are computed at load time.
@@ -304,7 +310,8 @@ function build_per_depth_entry(combo_name, tran_serial, ds_serial, tran, combo_e
         q.in_sample_r2_min, q.interp_r2_median, q.interp_worst_delta_r2, q.geometric_r2_median, ...
         mat2str(round(dz, 1)));
 
-    out_file = fullfile(library_path, [combo_name '.yaml']);
+    out_file = library_entry_file(library_path, combo_name, tran_serial, ds_serial);
+    if ~isfolder(fileparts(out_file)); mkdir(fileparts(out_file)); end
     if isfile(out_file); lib = yaml.loadFile(out_file, 'ConvertToArray', true); else; lib = struct(); end
     for f = {'global_model', 'refinement'}
         if isfield(lib, f{1}); lib = rmfield(lib, f{1}); end
@@ -317,6 +324,7 @@ function build_per_depth_entry(combo_name, tran_serial, ds_serial, tran, combo_e
     lib.meta.last_updated          = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
     lib.meta.library_model_version = LIBRARY_MODEL_VERSION;
     lib.meta.calibration_type      = 'empirical';
+    lib.meta.geometry_fingerprint  = equipment_geometry_fingerprint(tran);
     lib.meta.library_mode          = 'per_depth';
     lib.meta.char_data             = char_rel;
     lib.meta.quality               = q;

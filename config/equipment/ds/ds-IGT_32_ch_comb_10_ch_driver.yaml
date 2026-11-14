@@ -1,0 +1,8 @@
+# Driving system. Combos in transducer entries refer to it by serial.
+# Amplifier (IGT generator slides; which IGT system the slides describe is not stated):
+#   class AB, 4.5 W per channel (10 W optional), 15.5 Vrms into 50 ohm.
+type: driving_system
+serial: IGT_32_ch_comb_10_ch
+name: IGT 32 ch. - 10 ch.
+manufact: IGT
+available_ch: 32
