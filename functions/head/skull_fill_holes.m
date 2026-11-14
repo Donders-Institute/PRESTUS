@@ -52,7 +52,13 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
         skull_continuous = convn(skull_continuous, se, 'same') == nnz(se);   % erode
     end
     skull_new = skull_continuous & ~skull; % Identify voxels that were not part of the original skull mask
-    medium_masks(skull_new) = skull_i(1);  % Only add new voxels as cortical bone (if differentiated)
+    % Add new voxels as cortical bone when the skull is differentiated
+    % (skull_i lists trabecular before cortical, in medium_properties order)
+    fill_i = skull_i(1);
+    if numel(skull_i) > 1
+        fill_i = find(strcmp(labels_medium, 'skull_cortical'));
+    end
+    medium_masks(skull_new) = fill_i;
 
     % [DEBUG] Plot skull expansion at focus y-slice
     if parameters.simulation.debug == 1

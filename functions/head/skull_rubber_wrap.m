@@ -123,14 +123,14 @@ function [SKULL_BALLON] = skull_rubber_wrap(parameters, BW, medium_masks, segmen
     tissues_available = fieldnames(parameters.layers);
     medium_labels = fieldnames(parameters.medium_properties);
 
-    if ismember(tissues_available, 'brain')
+    if any(strcmp(tissues_available, 'brain'))
         BRAIN_LABEL   = find(strcmp(medium_labels, 'brain'));
         BRAIN = (T == BRAIN_LABEL);
     else
         BRAIN = zeros(size(T));
     end
-    
-    if ismember(tissues_available, 'brain')
+
+    if any(strcmp(tissues_available, 'skin'))
         SKIN_LABEL = find(strcmp(medium_labels, 'skin'));
         SKIN = (T == SKIN_LABEL);
     else

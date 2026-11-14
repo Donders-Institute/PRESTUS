@@ -129,6 +129,76 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_head_p
             tc.verifyGreaterThanOrEqual(sum(filled(:) > 0), n_before);
         end
 
+        function test_skull_fill_adds_cortical_bone(tc)
+            % with a differentiated skull, filled voxels become cortical, not trabecular
+            dims = [31, 31, 31];
+            [X, Y, Z] = ndgrid(1:dims(1), 1:dims(2), 1:dims(3));
+            c = (dims+1)/2;
+            R = sqrt((X-c(1)).^2 + (Y-c(2)).^2 + (Z-c(3)).^2);
+            seg = zeros(dims, 'uint8');
+            seg(R >= 8 & R <= 10) = 7;   % cortical shell (charm label 7)
+            seg(R < 8)            = 1;
+
+            p = tc.params;
+            p.headmodel.skull_fill_method = 'imclose';
+            p.layers = rmfield(p.layers, 'skull');
+            p.layers.skull_trabecular = 8;
+            p.layers.skull_cortical   = 7;
+            p.medium_properties.skull_trabecular = struct();
+            p.medium_properties.skull_cortical   = struct();
+            labels = fieldnames(p.medium_properties);
+            cortical_i   = find(strcmp(labels, 'skull_cortical'));
+            trabecular_i = find(strcmp(labels, 'skull_trabecular'));
+
+            medium_masks = zeros(dims);
+            medium_masks(seg == 7) = cortical_i;
+            hole = R >= 8 & R <= 10 & abs(X - c(1)) <= 1 & abs(Y - c(2)) <= 1 & Z > c(3);
+            medium_masks(hole) = 0;
+
+            filled = skull_fill_holes(p, medium_masks, round(c), seg);
+            added  = filled ~= medium_masks;
+            tc.assertTrue(any(added(:)), 'the hole is filled');
+            tc.verifyTrue(all(filled(added) == cortical_i), 'filled voxels are cortical');
+            tc.verifyFalse(any(filled(:) == trabecular_i), 'no trabecular voxels are added');
+        end
+
+        function test_rubber_wrap_closes_gap_between_brain_and_skin(tc)
+            % a skull gap where brain meets skin is part of the wrapped skull
+            tc.assumeTrue(logical(license('test', 'Image_Toolbox')), ...
+                'Image Processing Toolbox not available (niftiwrite)');
+            % Flat layers: a curved voxel shell is too thin near its pole for
+            % the wrap's closing to bridge a hole
+            dims = [30, 30, 24];
+            [X, Y, Z] = ndgrid(1:dims(1), 1:dims(2), 1:dims(3));
+            seg = zeros(dims, 'uint8');
+            seg(:, :, 1:9)   = 1;   % brain
+            seg(:, :, 10:14) = 4;   % skull
+            seg(:, :, 15:18) = 5;   % skin
+            % 3x3 gap through the skull: brain below, one empty voxel, skin above
+            col = abs(X - 15) <= 1 & abs(Y - 15) <= 1;
+            seg(col & Z >= 10 & Z <= 12) = 1;
+            seg(col & Z == 13) = 0;
+            seg(col & Z == 14) = 5;
+            gap = col & Z == 13;
+
+            labels = fieldnames(tc.params.medium_properties);
+            medium_masks = zeros(dims, 'single');
+            medium_masks(seg == 1) = find(strcmp(labels, 'brain'));
+            medium_masks(seg == 5) = find(strcmp(labels, 'skin'));
+            medium_masks(seg == 4) = find(strcmp(labels, 'skull'));
+
+            % skull_rubber_wrap reads the T1 header from path.anat
+            tmp = tempname; mkdir(tmp);
+            tc.addTeardown(@() rmdir(tmp, 's'));
+            niftiwrite(zeros(dims, 'single'), fullfile(tmp, 'T1.nii'));
+            p = tc.params;
+            p.path.anat = tmp; p.path.t1_pattern = 'T1.nii'; p.subject_id = '';
+
+            wrapped = skull_rubber_wrap(p, seg == 4, medium_masks, seg);
+            tc.verifyTrue(all(wrapped(gap)), 'gap voxels between brain and skin are skull');
+            tc.verifyFalse(any(wrapped(medium_masks == find(strcmp(labels, 'brain')))), 'no brain voxel becomes skull');
+        end
+
     end
 
 

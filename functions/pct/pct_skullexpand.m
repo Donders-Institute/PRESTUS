@@ -44,9 +44,6 @@ function pct_skullexpand(seg_path, path_pct)
     % segmented_img: SimNIBS tissue labeling volume
     segmented_img = final_tissues;
 
-    % medium_masks: your pipeline assumes identical masks/seg image
-    medium_masks = segmented_img;
-
     %% --- Parameters ---
     parameters = struct();
     parameters.simulation.debug = 1;
@@ -86,6 +83,13 @@ function pct_skullexpand(seg_path, path_pct)
     parameters.medium_properties.skull          = struct();
     parameters.medium_properties.skull_cortical = struct();
     parameters.medium_properties.skull_trabecular = struct();
+
+    % medium_masks: medium labels (position in medium_properties), as in the
+    % pipeline; skull_rubber_wrap reads brain and skin from these labels
+    medium_labels = fieldnames(parameters.medium_properties);
+    medium_masks  = zeros(size(segmented_img), 'single');
+    medium_masks(ismember(segmented_img, parameters.layers.brain)) = find(strcmp(medium_labels, 'brain'));
+    medium_masks(ismember(segmented_img, parameters.layers.skin))  = find(strcmp(medium_labels, 'skin'));
 
     %% --- Run skull wrap (must exist on path) ---
     skull_rubber_wrap(parameters, BW, medium_masks, segmented_img);
