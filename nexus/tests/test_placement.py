@@ -48,6 +48,19 @@ def test_bowl_geometry():
     assert pl.Bowl.from_transducer({"type": "annular", "annular": {}}) is None
 
 
+def test_bowl_without_dist_geom_ep_uses_rim():
+    # as validate_annular/matrix_transducer.m: exit plane at the rim of the aperture
+    ann = pl.Bowl.from_transducer({"type": "annular", "annular": {
+        "curv_radius_mm": 63.2, "elem_od_mm": [32.3, 45.4, 55.4, 64]}})
+    assert ann.offset == pytest.approx(ann.sagitta)
+    assert ann.dist_geom_ep == pytest.approx(math.sqrt(63.2 ** 2 - 32 ** 2))
+    mat = pl.Bowl.from_transducer({"type": "matrix", "matrix": {
+        "is_curved": 1, "curv_radius_mm": 72, "outer_diameter_mm": 60}})
+    assert mat.offset == pytest.approx(mat.sagitta) and mat.aperture == 60
+    assert pl.Bowl.from_transducer({"type": "matrix", "matrix": {
+        "is_curved": 0, "curv_radius_mm": 72, "outer_diameter_mm": 60}}) is None
+
+
 def test_fov_box_geometry():
     trans, focus = np.array([0.0, 0, 0]), np.array([0.0, 0, 50])
     box = pl.fov_box(trans, focus, diameter_mm=20, length_mm=120)

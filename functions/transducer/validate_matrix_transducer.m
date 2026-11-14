@@ -84,7 +84,8 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
         assert(isfield(matrix_tr, 'curv_radius_mm'), ...
             'Transducer %i; Missing curv_radius_mm field for matrix transducer. Please specify radius of curvature.', t_i);
 
-        % Calculate distance to transducer plane if not provided
+        % Not provided: exit plane at the bowl rim (outer_diameter_mm), the
+        % same plane EXIT_PLANE_DEPTH_MM and the Nexus derive
         if ~isfield(matrix_tr, 'dist_geom_ep_mm') || isempty(matrix_tr.dist_geom_ep_mm)
             assert(matrix_tr.curv_radius_mm > matrix_tr.outer_diameter_mm/2, ...
                 'Transducer %i; curv_radius_mm must exceed aperture radius.', t_i);
@@ -92,7 +93,7 @@ function [parameters, tr] = validate_matrix_transducer(parameters, tr, t_i)
             matrix_tr.dist_geom_ep_mm = sqrt(matrix_tr.curv_radius_mm^2 - ...
                 (matrix_tr.outer_diameter_mm / 2)^2);
 
-            fprintf('Transducer %i; Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
+            fprintf('Transducer %i; dist_geom_ep_mm not set, derived from the bowl rim: %.2f mm\n', ...
                 t_i, matrix_tr.dist_geom_ep_mm);
         else
             matrix_tr.dist_geom_ep_mm = matrix_tr.dist_geom_ep_mm;

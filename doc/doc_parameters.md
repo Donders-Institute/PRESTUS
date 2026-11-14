@@ -294,7 +294,7 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 | `elem_id_mm` | Inner diameter of each element [mm]. | |
 | `elem_od_mm` | Outer diameter of each element [mm]. | |
 | `curv_radius_mm` | Radius of curvature of the transducer bowl [mm]. | `Inf` (YAML `.inf`) = flat element, e.g. a plane piston: its face at `trans_pos` is the exit plane; needs `grid.use_kWaveArray: 1`, in 3D a single disc. See [Flat elements](doc_transducer.md#flat-elements). |
-| `dist_geom_ep_mm` | Distance from geometric focus to transducer plane [mm]. | Calculated automatically from `curv_radius_mm` if not provided (`Inf` for flat elements). |
+| `dist_geom_ep_mm` | Distance from geometric focus to transducer plane [mm]. | If not provided, the exit plane is the bowl rim: √(`curv_radius_mm`² − (max(`elem_od_mm`)/2)²) (`Inf` for flat elements). |
 | `depth_mm` | Transducer depth [mm]. | Visualization only. |
 
 #### Matrix Array Definition (`matrix`)
@@ -314,7 +314,7 @@ Except `target_isppa_wcm2` (default `30`), the fields have no defaults and must 
 | `outer_diameter_mm` | Outer diameter of the transducer [mm]. | Defines active aperture boundary. |
 | `is_curved` | Whether the array has a curved surface. | `false` = flat array: every element faces +z, `curv_radius_mm` is not used, `elem_shape` must be `rect` or `disc`. |
 | `curv_radius_mm` | Radius of curvature (ROC) of the transducer bowl [mm]. | Defines natural focus. Depends on `is_curved`. |
-| `dist_geom_ep_mm` | Distance from geometric focus to transducer plane [mm]. | Calculated automatically from `curv_radius_mm` and `outer_diameter_mm` if not provided. Depends on `is_curved`. |
+| `dist_geom_ep_mm` | Distance from geometric focus to transducer plane [mm]. | If not provided, the exit plane is the bowl rim: √(`curv_radius_mm`² − (`outer_diameter_mm`/2)²). Depends on `is_curved`. |
 | `is_clover_setup` | Enables Clover (multi-array) configuration. | Replicates array into multiple leaves. |
 | `matrix_shape.type` | Method used to define element positions. | Options: `define_here`, `extract_from_file`. |
 

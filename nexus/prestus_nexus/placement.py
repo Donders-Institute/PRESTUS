@@ -152,12 +152,15 @@ class Bowl:
             od = sub.get("elem_od_mm")
             D = max(od) if isinstance(od, list) and od else _num(od)
         else:
+            if sub.get("is_curved") in (0, False):       # flat (validate_matrix_transducer)
+                return None
             D = _num(sub.get("outer_diameter_mm"))
         if R is None or D is None or not math.isfinite(R):
             return None
         ep = _num(sub.get("dist_geom_ep_mm"))
         if ep is None:
-            ep = math.sqrt(max(R ** 2 - (D / 2) ** 2, 0.0))     # validate_annular_transducer default
+            # exit plane at the bowl rim, as validate_annular/matrix_transducer.m
+            ep = math.sqrt(max(R ** 2 - (D / 2) ** 2, 0.0))
         return cls(R, D, ep)
 
     def outline(self, apex, axis, n: int = 72) -> dict[str, np.ndarray]:

@@ -115,6 +115,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Fixed: heuristic placement without `transducer.focal_distance_ep` / `focal_distance_bowl` never finished; it now stops with a message
 - ⚠️ **Fixed:** the heuristic placement's Localite mm export (`loc_*_mm`) was one voxel high along each axis; re-export heuristic positions before entering them in Localite
 - Fixed: Localite placement with empty transducer geometry stopped with a dimension error instead of using `placement.localite.reference_distance_mm`
+- A transducer without `dist_geom_ep_mm` gets its exit plane at the bowl rim (outer diameter of the largest element, or `outer_diameter_mm` for matrix arrays), with a notice; the Nexus draws the same plane and no bowl for flat matrix arrays
 
 #### Neuronavigation (Localite)
 - Batch ingestion (`neuronav_ingest_batch`), session inventory, target-label maps (`neuronav.target_labels`) and target-name suggestions from planned targets

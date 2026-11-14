@@ -55,7 +55,8 @@ function tr = validate_annular_transducer(tr, t_i)
             annular_tr.dist_geom_ep_mm = Inf;
         end
 
-    % Calculate distance to transducer plane if not provided
+    % Not provided: exit plane at the bowl rim, the largest element's outer edge
+    % (the same plane EXIT_PLANE_DEPTH_MM and the Nexus derive)
     elseif ~isfield(annular_tr, 'dist_geom_ep_mm') || isempty(annular_tr.dist_geom_ep_mm)
         assert(annular_tr.curv_radius_mm > max(annular_tr.elem_od_mm)/2, ...
             'Transducer %i; curv_radius_mm must exceed aperture radius.', t_i);
@@ -63,7 +64,7 @@ function tr = validate_annular_transducer(tr, t_i)
         annular_tr.dist_geom_ep_mm = sqrt(annular_tr.curv_radius_mm^2 - ...
                                 (max(annular_tr.elem_od_mm) / 2)^2);
 
-        fprintf('Transducer %i; Distance to transducer plane is not provided, calculated as %.2f mm\n', ...
+        fprintf('Transducer %i; dist_geom_ep_mm not set, derived from the bowl rim: %.2f mm\n', ...
                 t_i, annular_tr.dist_geom_ep_mm);
     end
 
