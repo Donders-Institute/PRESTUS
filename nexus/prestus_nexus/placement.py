@@ -27,24 +27,30 @@ import numpy as np
 class Volume:
     """A NIfTI volume with RAS <-> voxel helpers (needs nibabel).
 
-    Only the header is read up front. The voxels are read on first use in one go:
-    nibabel's own .nii.gz reader fetches the file in small chunks, which on a network
-    drive costs a round trip each (several seconds per volume)."""
+    Only the header is read up front, from one read of the file's start. The voxels are
+    read on first use in one go: nibabel's own .nii.gz reader opens the file several times
+    and fetches it in small chunks, which on a network drive costs a round trip each
+    (several seconds per volume)."""
 
     def __init__(self, path: str | Path):
         import nibabel as nib
         from nibabel.orientations import inv_ornt_aff, io_orientation
         self.path = Path(path)
-        img = nib.load(str(self.path))
-        self.affine = np.asarray(img.affine, dtype=float)       # 0-based voxel -> RAS
+        self._img = None
+        hdr = _read_header(self.path)
+        if hdr is None:                                         # not a plain NIfTI file
+            self._img = nib.load(str(self.path))
+            affine, shape = self._img.affine, self._img.shape
+        else:
+            affine, shape = hdr.get_best_affine(), hdr.get_data_shape()
+        self.affine = np.asarray(affine, dtype=float)           # 0-based voxel -> RAS
         self.inv_affine = np.linalg.inv(self.affine)
-        self.shape = img.shape[:3]
-        self._img = img
+        self.shape = tuple(int(n) for n in shape[:3])
         self._data = None
         # Closest-canonical (RAS) orientation, as nibabel.as_closest_canonical
-        ornt = io_orientation(img.affine)
+        ornt = io_orientation(affine)
         self._ornt = None if np.array_equal(ornt, [[0, 1], [1, 1], [2, 1]]) else ornt
-        canon_affine = img.affine if self._ornt is None else img.affine.dot(inv_ornt_aff(ornt, img.shape))
+        canon_affine = affine if self._ornt is None else np.asarray(affine).dot(inv_ornt_aff(ornt, shape[:3]))
         self.canon_affine = np.asarray(canon_affine, dtype=float)
         self.canon_inv = np.linalg.inv(self.canon_affine)
         self._canon = None
@@ -52,10 +58,17 @@ class Volume:
     @property
     def data(self) -> np.ndarray:
         if self._data is None:
-            self._data = _read_voxels(self.path, self._img)
+            self._data = _read_voxels(self.path, self._nib_image)
             if self._data.ndim > 3:
                 self._data = self._data[..., 0]
         return self._data
+
+    def _nib_image(self):
+        """The nibabel image, opened only when the voxels are read from the original."""
+        if self._img is None:
+            import nibabel as nib
+            self._img = nib.load(str(self.path))
+        return self._img
 
     @property
     def canon(self) -> np.ndarray:
@@ -99,7 +112,82 @@ class Volume:
         return out
 
 
-def _read_voxels(path: Path, img) -> np.ndarray:
+VOXEL_CACHE_KEEP = 8          # decompressed volumes kept in the user's cache folder
+
+
+def _voxel_cache_file(path: Path) -> Path | None:
+    """Where the decompressed voxels of ``path`` are kept: named by its absolute path,
+    size and modification time, so an edited or replaced image is read again."""
+    import hashlib
+
+    from .localcopy import cache_root
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    tag = f"{path.absolute()}|{st.st_size}|{st.st_mtime_ns}"
+    return cache_root() / "volumes" / (hashlib.sha1(tag.encode()).hexdigest()[:16] + ".npy")
+
+
+def _read_header(path: Path):
+    """The NIfTI-1/2 header of a single-file .nii or .nii.gz from one read of its first
+    64 kB; None for anything else or when that is not enough (nibabel then opens it)."""
+    import io
+    import zlib
+
+    import nibabel as nib
+    name = path.name.lower()
+    if not (name.endswith(".nii") or name.endswith(".nii.gz")):
+        return None
+    try:
+        with open(path, "rb") as f:
+            head = f.read(1 << 16)
+        if name.endswith(".gz"):
+            head = zlib.decompressobj(16 + zlib.MAX_WBITS).decompress(head, 1 << 16)
+        for cls in (nib.Nifti1Header, nib.Nifti2Header):
+            if len(head) < cls.sizeof_hdr:
+                continue
+            size = (int.from_bytes(head[:4], "little"), int.from_bytes(head[:4], "big"))
+            if cls.sizeof_hdr not in size:
+                continue
+            hdr = cls.from_fileobj(io.BytesIO(head), check=False)
+            if hdr["magic"].item() not in (b"n+1", b"n+2"):
+                return None
+            return hdr
+    except Exception:
+        return None
+    return None
+
+
+def _read_voxels(path: Path, load_img) -> np.ndarray:
+    """The image's (scaled) voxel array. The project volume is slow for whole images
+    (several seconds each), so the array is also kept in the user's cache folder and
+    read from there while the image is unchanged (the original stays the only source).
+    load_img() returns the nibabel image; it is called only when the cache misses."""
+    cached = _voxel_cache_file(path)
+    if cached is not None and cached.is_file():
+        try:
+            data = np.load(cached, allow_pickle=False)
+            os.utime(cached)                      # most recently used: kept longest
+            return data
+        except Exception:
+            pass
+    data = _read_voxels_from(path, load_img())
+    if cached is not None:
+        try:
+            cached.parent.mkdir(parents=True, exist_ok=True)
+            tmp = cached.with_suffix(".tmp.npy")
+            np.save(tmp, np.asarray(data), allow_pickle=False)
+            os.replace(tmp, cached)
+            old = sorted(cached.parent.glob("*.npy"), key=lambda p: p.stat().st_mtime, reverse=True)
+            for stale in old[VOXEL_CACHE_KEEP:]:
+                stale.unlink(missing_ok=True)
+        except Exception:
+            pass
+    return data
+
+
+def _read_voxels_from(path: Path, img) -> np.ndarray:
     """The image's (scaled) voxel array; a .nii.gz is read whole and decompressed in
     memory, falling back to nibabel's reader for anything that fails."""
     if path.name.endswith(".gz"):

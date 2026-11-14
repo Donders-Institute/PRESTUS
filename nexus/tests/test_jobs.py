@@ -109,3 +109,23 @@ def test_read_log_through_folder_mapping(tmp_path):
 def test_cancel_command():
     assert jobs.cancel_command(["1", "2"], "slurm") == ["scancel", "1", "2"]
     assert jobs.cancel_command(["77.torque01"], "qsub") == ["qdel", "77.torque01"]
+
+
+def test_run_replaces_undecodable_output():
+    import sys
+    out = jobs._run([sys.executable, "-c",
+                     "import sys; sys.stdout.buffer.write(b'ok \\xff\\xfe end\\n')"])
+    assert out.startswith("ok ") and out.rstrip().endswith("end") and "�" in out
+
+
+def test_run_timeout_and_missing_program_return_empty():
+    import sys
+    assert jobs._run([sys.executable, "-c", "import time; time.sleep(5)"], timeout=0.3) == ""
+    assert jobs._run(["prestus-no-such-program-xyz"]) == ""
+
+
+def test_run_swallows_unexpected_errors(monkeypatch):
+    def boom(*a, **k):
+        raise ValueError("bad argv")
+    monkeypatch.setattr(jobs.subprocess, "run", boom)
+    assert jobs._run(["squeue"]) == ""

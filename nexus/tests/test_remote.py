@@ -11,6 +11,15 @@ from prestus_nexus import remote as rmt
 from prestus_nexus.model import ConfigModel
 
 
+def _wait_until(app, cond, timeout=10.0):
+    import time
+    t0 = time.monotonic()
+    while not cond() and time.monotonic() - t0 < timeout:
+        app.processEvents()
+        time.sleep(0.01)
+    return cond()
+
+
 def _exe(path, body):
     path.write_text("#!/bin/sh\n" + body)
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
@@ -113,6 +122,26 @@ def test_map_value():
     assert r.map_value("data/simnibs") is None
 
 
+def test_map_value_windows_paths():
+    r = rmt.RemoteHost("h", path_map=[("Z:\\2425122.01", "/project/2425122.01"),
+                                      ("\\\\fileserver\\project", "/project")])
+    assert r.map_value("Z:\\2425122.01\\data\\sub-%03d\\T1.nii") == \
+        "/project/2425122.01/data/sub-%03d/T1.nii"
+    assert r.map_value("z:\\2425122.01\\data") == "/project/2425122.01/data"      # drive letter case
+    assert r.map_value("Z:/2425122.01/Data") == "/project/2425122.01/Data"          # forward slashes
+    assert r.map_value("Z:\\2425122.01") == "/project/2425122.01"
+    assert r.map_value("Z:\\2425122.010\\x") is None
+    assert r.map_value("Y:\\2425122.01\\x") is None
+    assert r.map_value("\\\\fileserver\\project\\2425122.02\\sim") == "/project/2425122.02/sim"
+    assert r.map_value("\\\\FILESERVER\\Project\\x") == "/project/x"            # UNC, any case
+    assert r.map_value("//fileserver/project/x") == "/project/x"
+    assert r.map_value("\\\\otherserver\\project\\x") is None
+    lower = rmt.RemoteHost("h", path_map=[("z:/2425122.01", "/project/2425122.01")])
+    assert lower.map_value("Z:\\2425122.01\\a") == "/project/2425122.01/a"
+    posix = rmt.RemoteHost("h", path_map=[("/Volumes/P", "/project/p")])
+    assert posix.map_value("/volumes/P/x") is None                                # POSIX stays case-sensitive
+
+
 def test_path_overrides(schema):
     m = ConfigModel(schema)
     m.set("path.anat", "/Volumes/2425122.01/v05/data/simnibs")
@@ -203,6 +232,7 @@ def test_run_page_submits_over_ssh(schema, prestus_root, tmp_path, monkeypatch):
     page.submit()
     loop.exec()
     assert results == [("Submit", True)], page.log.toPlainText()
+    _wait_until(app, lambda: not page.jobs_busy())         # the scheduler query runs in the background
     assert [j.job_id for j in page.jobs] == ["4242"], page.log.toPlainText()
     assert page.job_kind == "slurm" and page.job_remote is not None
     assert page.jobs[0].state == "PENDING"            # squeue ran through the fake ssh
@@ -261,6 +291,7 @@ def test_run_page_shows_selected_job_log(schema, prestus_root, tmp_path, monkeyp
     m = ConfigModel(schema)
     m.save(tmp_path / "config_v.yaml")
     window = MainWindow(m, Session(tmp_path / "s.yaml"), prestus_root)
+    app = QApplication.instance()
     page = window._page(RUN)
     page.job_kind = "slurm"
     page.job_remote = rmt.RemoteHost("h", path_map=[(str(tmp_path / "proj"), "/project/x")])
@@ -277,6 +308,7 @@ def test_run_page_shows_selected_job_log(schema, prestus_root, tmp_path, monkeyp
     from prestus_nexus.ui import style
     assert item.foreground(4).color().name() == style.active()["red"]      # time running out
     item.setSelected(True)
+    _wait_until(app, lambda: jv.views["output"].toPlainText() != "")    # read on a worker thread
     assert jv.views["output"].toPlainText() == "Running k-Wave simulation...\n"
     assert "sub-001_slurm_output_4242.log" in jv.path_label.text()
     assert jv.timer.isActive()                               # following a running job
@@ -286,6 +318,9 @@ def test_run_page_shows_selected_job_log(schema, prestus_root, tmp_path, monkeyp
     page.pop_out_jobs()
     pv = page.jobs_window.view
     assert pv.selected_id() == "4242"
+    _wait_until(app, lambda: pv.views["output"].toPlainText() != "")
     assert pv.views["output"].toPlainText() == "Running k-Wave simulation...\n"
     pv.timer.stop()
     page.jobs_window.close()
+
+

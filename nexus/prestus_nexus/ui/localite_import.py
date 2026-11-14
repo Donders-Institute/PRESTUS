@@ -7,10 +7,11 @@ from pathlib import Path
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
                              QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
-                             QRadioButton, QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget)
+                             QRadioButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from .. import neuronav_import as ni
 from ..study import Manifest
+from . import icons
 
 HELP = ("Reads what the Localite page (or <tt>neuronav_gui</tt>) writes under <tt>path.localite_post</tt>: "
         "<tt>neuronav_ingest_summary.csv</tt> (batch window) and the per-session "
@@ -37,7 +38,7 @@ class LocaliteImportDialog(QDialog):
         row.addWidget(QLabel("Ingested markers folder"))
         self.folder = QLineEdit(str(self.model.get("path.localite_post") or ""))
         row.addWidget(self.folder, 1)
-        b = QToolButton(text="…")
+        b = icons.PathButton("dir", "Choose the ingested markers folder")
         b.clicked.connect(self._browse)
         row.addWidget(b)
         scan = QPushButton("Scan")

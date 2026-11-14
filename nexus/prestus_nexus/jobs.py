@@ -18,6 +18,7 @@ once the report job has run, <subj>_job<id>_report.txt (hpc_job_report).
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import shutil
@@ -90,11 +91,17 @@ def parse_submissions(text: str) -> list[Job]:
 
 
 def _run(argv: list[str], timeout: float = 15) -> str:
+    """stdout of argv; '' when it cannot run, times out or fails in any other way (callers
+    treat '' as "no news" and keep the jobs' last known state)."""
+    kwargs = {}
+    if os.name == "nt":                  # no console window flashing up on every poll
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     try:
-        out = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False)
-    except (OSError, subprocess.TimeoutExpired):
+        out = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=timeout, check=False, **kwargs)
+    except Exception:                    # OSError, TimeoutExpired, ValueError, ...
         return ""
-    return out.stdout
+    return out.stdout or ""
 
 
 def _on(argv: list[str], remote=None) -> str:

@@ -140,3 +140,46 @@ def test_labels_are_readable(schema):
     for node in schema.leaves():
         text = labels.label(node)
         assert text and (node.label or "_" not in text), f"{node.path}: label {text!r}"
+
+
+def test_overlay_entries_have_known_attributes(schema):
+    """An unquoted comma in a flow-style value ({label: a, b}) silently splits it into a
+    truncated value and a stray key; quote such values."""
+    from prestus_nexus import yamlio
+    from prestus_nexus.schema import OVERLAY_PATH
+    overlay = yamlio.load(OVERLAY_PATH.read_text())
+    known = {"label", "advanced", "group", "group_first", "help", "kind", "choices", "choice_labels",
+             "choice_math", "unit", "visible_if", "derived", "min", "max", "default", "locked", "doc"}
+    for section in ("fields", "display", "extra"):
+        for key, rule in (overlay.get(section) or {}).items():
+            if isinstance(rule, dict):
+                assert not set(rule) - known, f"overlay {section}.{key}: unknown {set(rule) - known}"
+
+
+def test_labels_read_as_words(schema):
+    from prestus_nexus import labels
+    assert labels.humanize("is_curved") == "Curved"
+    assert labels.humanize("minimal_distance_cm") == "Minimal distance"
+    assert labels.humanize("elem_n") == "Number of elements"
+    assert labels.label(schema.get("transducer.target_isppa_wcm2")) == "Target free-water ISPPA"
+    # a section has one name: the card title (overlay 'sections'), also for its config group
+    assert labels.label(schema.get("time_reversal")) == schema.section_label("time_reversal") == "Time reversal"
+    assert "pose search" in schema.section_subtitle("time_reversal")
+
+
+def test_overlay_has_no_duplicate_keys():
+    """YAML keeps only the last of two equal keys in a mapping, silently dropping the first rule."""
+    import re
+    from prestus_nexus.schema import OVERLAY_PATH
+    block, seen, dups = None, {}, []
+    for i, ln in enumerate(OVERLAY_PATH.read_text(encoding="utf-8").splitlines(), 1):
+        m = re.match(r"^([a-z_]+):\s*$", ln)
+        if m:
+            block, seen = m.group(1), {}
+            continue
+        m = re.match(r"^  ([A-Za-z0-9_.*\-]+):", ln)
+        if m and block:
+            if m.group(1) in seen:
+                dups.append(f"{block}.{m.group(1)} (lines {seen[m.group(1)]}, {i})")
+            seen[m.group(1)] = i
+    assert not dups, dups

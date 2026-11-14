@@ -3,10 +3,9 @@ study, run), the issues panel and the review."""
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QByteArray, Qt, QTimer
 from PyQt6.QtGui import QAction, QColor, QIcon, QKeySequence, QPainter, QPixmap
 from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout,
                              QLabel, QMainWindow, QMessageBox, QPlainTextEdit, QPushButton, QScrollArea,
@@ -14,14 +13,19 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QF
                              QVBoxLayout, QWidget)
 
 from .. import checks
+from ..fsio import copy_atomic
+from ..telemetry import show_consent_dialog
+from ..undo import History
 from ..model import TX, ConfigModel, is_empty, iter_leaves
 from ..paths import DEFAULT_NAME, base_default_for, toolbox_default
 from ..project_defaults import carry_pinned_values, replace_project_default
 from ..schema import GENERAL, Schema
 from ..session import Session
-from . import style
+from . import icons, style
+from .errors import guarded
 from .placement_viewer import QC_PATH
 from .section import SectionPage
+from .tabbar import tab_widget
 
 REVIEW = "__review__"
 VIEWER = "__viewer__"
@@ -34,6 +38,14 @@ LOCALITE = "__localite__"
 START = "__start__"
 SPECIAL = (REVIEW, VIEWER, RUN, STUDY, RESULTS, PCT, CALIBRATION, LOCALITE, START)
 SUBTAB_PAGES = (VIEWER, PCT, RESULTS, CALIBRATION, LOCALITE)
+TUNE_FOR = False                     # 'Tune for' control: off until it suggests values (overlay 'tuning' kept)
+# Sub-tab label -> icon (ui/icons.py)
+SUBTAB_ICONS = {
+    "Settings": "advanced", "Calibration": "chart", "Viewer": "mri", "Beam axis": "wave", "3D": "cube",
+    "Transducers": "tx_annular", "Localite": "place_localite", "Heuristic": "place_heuristic",
+    "PlanTUS": "place_plantus", "TUS entry": "place_tus_entry", "Head model": "segmentation",
+    "Plan": "report", "Review YAML": "file", "Launch": "play", "Jobs": "jobs", "Results": "chart",
+}
 LEVEL_ICON = {"error": "✗", "warning": "⚠", "info": "ℹ"}
 LEVEL_COLOR_KEY = {"error": "red", "warning": "amber", "info": "info"}
 _OPEN_WINDOWS: list = []          # keeps windows opened from File > New / Open alive
@@ -104,6 +116,21 @@ class ReviewPage(QWidget):
             f"{n_err} error(s), {n_warn} warning(s) — see Issues in the header.")
 
 
+MAX_FORM_WIDTH = 1240     # cards of a tab without a side panel: wider lines are hard to read
+
+
+def _centred(body: QWidget) -> QWidget:
+    """`body`, at most MAX_FORM_WIDTH wide and centred in the space it is given."""
+    body.setMaximumWidth(MAX_FORM_WIDTH)
+    holder = QWidget()
+    h = QHBoxLayout(holder)
+    h.setContentsMargins(0, 0, 0, 0)
+    h.addStretch(1)
+    h.addWidget(body, 100)
+    h.addStretch(1)
+    return holder
+
+
 class TabPage(QWidget):
     """One tab: intro, 'Show advanced options', section cards (+ extras), optional side panel."""
 
@@ -116,6 +143,10 @@ class TabPage(QWidget):
         self.side: QWidget | None = None
         self.subtabs: QTabWidget | None = None
         self.settings_page: QWidget | None = None     # the 'Settings' sub-tab, once there are sub-tabs
+        self.headers: list[QWidget] = []               # rows between the intro and the cards
+        self.columns: list[QVBoxLayout] = []           # card columns of further sub-tabs
+        self.section_columns: dict[str, QVBoxLayout] = {}   # section -> column other than 'Settings'
+        self.on_refresh = None                          # tab-specific refresh (e.g. sub-tab visibility)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(14, 10, 14, 6)
@@ -127,7 +158,9 @@ class TabPage(QWidget):
         self.hidden = QLabel()
         self.hidden.setObjectName("CardSub")
         head.addWidget(self.hidden)
-        self.advanced = QCheckBox("Show advanced options")
+        self.advanced = QPushButton(icons.icon("advanced"), "Advanced")
+        self.advanced.setObjectName("AdvancedToggle")
+        self.advanced.setCheckable(True)
         self.advanced.setToolTip("Show the settings most studies leave at their defaults. "
                                  "Advanced settings that hold a value are always shown.")
         self.advanced.setChecked(bool(window.session.get(f"advanced_{self.key}", False)))
@@ -158,7 +191,8 @@ class TabPage(QWidget):
         self.column = QVBoxLayout(body)
         self.column.setContentsMargins(0, 4, 6, 12)
         self.column.setSpacing(12)
-        self.scroll.setWidget(body)
+        self._body = body
+        self.scroll.setWidget(_centred(body))
         self.split.addWidget(self.scroll)
         outer.addWidget(self.split, 1)
 
@@ -166,15 +200,45 @@ class TabPage(QWidget):
         self.cards.append(widget)
         self.column.addWidget(widget)
 
-    def add_section(self, page: SectionPage) -> None:
+    def add_section(self, page: SectionPage, column: QVBoxLayout | None = None) -> None:
         page.set_show_advanced(self.advanced.isChecked())
         page.advanced_toggled.connect(self.refresh)
         self.sections.append(page)
-        self.column.addWidget(page)
+        if column is None:                  # (an empty layout is falsy: no 'or' chain)
+            column = self.section_columns.get(page.section, self.column)
+        column.addWidget(page)
+
+    def add_header(self, widget: QWidget) -> None:
+        """A row under the intro, above the cards and sub-tabs (refreshed with the tab)."""
+        self.headers.append(widget)
+        self.layout().insertWidget(len(self.headers), widget)
+
+    @staticmethod
+    def new_column() -> tuple[QScrollArea, QVBoxLayout]:
+        """A scrolling column of cards, as the 'Settings' one, for another sub-tab."""
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        body = QWidget()
+        column = QVBoxLayout(body)
+        column.setContentsMargins(0, 4, 6, 12)
+        column.setSpacing(12)
+        scroll.setWidget(_centred(body))
+        return scroll, column
+
+    def subtab_of(self, widget: QWidget) -> QWidget | None:
+        """The sub-tab page that holds `widget`."""
+        if self.subtabs is None:
+            return None
+        for i in range(self.subtabs.count()):
+            page = self.subtabs.widget(i)
+            if page is widget or page.isAncestorOf(widget):
+                return page
+        return None
 
     def set_side(self, widget: QWidget, stretch: tuple[int, int] = (3, 2)) -> None:
         self.side = widget
         self.scroll.setMinimumWidth(560)
+        self._body.setMaximumWidth(16_777_215)      # beside a panel the cards take their share
         self.split.addWidget(widget)
         self.split.setStretchFactor(0, stretch[0])
         self.split.setStretchFactor(1, stretch[1])
@@ -188,8 +252,7 @@ class TabPage(QWidget):
         self.side = widget
         outer = self.layout()
         outer.removeWidget(self.split)
-        self.subtabs = QTabWidget()
-        self.subtabs.setDocumentMode(True)
+        self.subtabs = tab_widget()
         self.subtabs.addTab(self.scroll, "Settings")
         self.settings_page = self.scroll
         self.subtabs.addTab(widget, label)
@@ -203,8 +266,7 @@ class TabPage(QWidget):
         if self.subtabs is None:
             outer = self.layout()
             outer.removeWidget(self.split)
-            self.subtabs = QTabWidget()
-            self.subtabs.setDocumentMode(True)
+            self.subtabs = tab_widget()
             self.subtabs.addTab(self.split, "Settings")
             self.settings_page = self.split
             self.subtabs.currentChanged.connect(self._sub_tab_changed)
@@ -218,7 +280,9 @@ class TabPage(QWidget):
 
     def finish(self) -> None:
         self.column.addStretch(1)
-        tunable = any(r.node.tune for page in self.sections for r in page.rows)
+        for column in self.columns:
+            column.addStretch(1)
+        tunable = TUNE_FOR and any(r.node.tune for page in self.sections for r in page.rows)
         self.tune_label.setVisible(tunable)
         self.tune.setVisible(tunable)
 
@@ -248,13 +312,21 @@ class TabPage(QWidget):
                     and not page.matches_goal():
                 n_hidden += 1
                 visible = False
-            page.setVisible(visible and any(r.block.isVisibleTo(page) for r in page.rows)
-                            or (visible and page.section == TX))
+            page.setVisible(visible and any(page._row_shown(r) for r in page.rows)   # also while collapsed
+                            or (visible and (page.section == TX or page.table is not None)))
             n_hidden += page.hidden_advanced() if visible else 0
-        for card in self.cards:
+        for card in [*self.cards, *self.headers]:
             if hasattr(card, "refresh"):
                 card.refresh()
-        self.hidden.setText(f"{n_hidden} advanced hidden" if n_hidden and not show else "")
+        if self.on_refresh is not None:
+            self.on_refresh(self)
+        # the count of hidden settings sits in the toggle itself
+        self.hidden.setText("")
+        self.advanced.setText(f"Advanced ({n_hidden})" if n_hidden and not show else "Advanced")
+        self.advanced.setToolTip(
+            (f"{n_hidden} advanced setting{'s' if n_hidden != 1 else ''} hidden on this tab. " if n_hidden and not show
+             else "") + "Show the settings most studies leave at their defaults. "
+            "Advanced settings that hold a value are always shown.")
 
 
 class MainWindow(QMainWindow):
@@ -269,7 +341,9 @@ class MainWindow(QMainWindow):
         self.tab_pages: dict[str, TabPage] = {}
         self._section_tab: dict[str, str] = {}
         self.tune_goal: str | None = None    # 'Tune for' goal, shared by all tabs (not remembered)
-        self.resize(1320, 900)
+        self.history = History(model, parent=self)      # Edit ▸ Undo / Redo
+        self.history.restored.connect(self._history_restored)
+        self._restore_geometry()
 
         central = QWidget()
         cv = QVBoxLayout(central)
@@ -278,16 +352,23 @@ class MainWindow(QMainWindow):
         cv.addWidget(self._header())
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
+        self.tabs.tabBar().setExpanding(True)       # the workflow steps span the window
+        self.tabs.tabBar().setUsesScrollButtons(False)
         cv.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
 
         self.issue_popup = self._issue_popup()
 
         self._build_menu()
+        self._build_edit_menu()
         self._build_view_menu()
         self._build_tools_menu()
+        self.update_context()
         self._build_tabs()
         self._refresh_cal_cov()
+        self._apply_subtab_icons()
+        self._build_help_menu()
+        self._build_shortcuts()
         if hasattr(self, "io_preview"):
             self.io_preview.refresh()
         self.tabs.currentChanged.connect(self._tab_changed)
@@ -324,11 +405,11 @@ class MainWindow(QMainWindow):
         self.header_issues.setToolTip("Show the issues (Ctrl+Shift+I)")
         self.header_issues.clicked.connect(self.show_issues)
         h.addWidget(self.header_issues)
-        open_btn = QPushButton("Open…")
+        open_btn = QPushButton(icons.icon("folder", style.C["ink2"]), "Open…")
         open_btn.setToolTip("Open a study config (File ▸ Open…)")
         open_btn.clicked.connect(lambda: self.open_study())
         h.addWidget(open_btn)
-        save = QPushButton("Save")
+        save = QPushButton(icons.icon("save", "#ffffff"), "Save")
         save.setProperty("primary", True)
         save.clicked.connect(self.save)
         h.addWidget(save)
@@ -399,13 +480,15 @@ class MainWindow(QMainWindow):
 
     def _build_tools_menu(self) -> None:
         tools = self.menuBar().addMenu("&Tools")
-        for text, slot in [("Localite ingestion", lambda: self.show_special(LOCALITE)),
-                           ("Transducer calibration", lambda: self.show_special(CALIBRATION)),
+        for text, slot in [("Localite", lambda: self.show_special(LOCALITE)),
+                           ("Calibration", lambda: self.show_special(CALIBRATION)),
                            (None, None),
                            ("neuronav_gui in MATLAB…", self.open_neuronav_gui),
                            ("calibration_gui in MATLAB…", self.open_calibration_gui),
                            (None, None),
-                           ("Update project defaults…", self.update_project_defaults)]:
+                           ("Update project defaults…", self.update_project_defaults),
+                           (None, None),
+                           ("Usage statistics…", lambda: show_consent_dialog(self, self.prestus_root))]:
             if text is None:
                 tools.addSeparator()
                 continue
@@ -424,10 +507,87 @@ class MainWindow(QMainWindow):
         issues.triggered.connect(self.show_issues)
         view.addAction(issues)
 
+    def _build_edit_menu(self) -> None:
+        edit = self.menuBar().addMenu("&Edit")
+        self.undo_action = QAction("Undo", self)
+        self.undo_action.setShortcut(QKeySequence.StandardKey.Undo)
+        self.undo_action.triggered.connect(self.history.undo)
+        self.redo_action = QAction("Redo", self)
+        self.redo_action.setShortcuts([QKeySequence.StandardKey.Redo, QKeySequence("Ctrl+Shift+Z")])
+        self.redo_action.triggered.connect(self.history.redo)
+        edit.addAction(self.undo_action)
+        edit.addAction(self.redo_action)
+        self.history.changed.connect(self._update_undo_actions)
+        self._update_undo_actions()
+
+    def _update_undo_actions(self) -> None:
+        self.undo_action.setEnabled(self.history.can_undo())
+        self.undo_action.setText(self.history.undo_text())
+        self.redo_action.setEnabled(self.history.can_redo())
+        self.redo_action.setText(self.history.redo_text())
+
+    def _history_restored(self, _label: str) -> None:
+        for page in self.pages.values():
+            page.refresh()
+        self._changed()
+
+    def _current_tab(self):
+        """(tab key, sub-tab label) shown now, for Help ▸ Docs for this tab."""
+        w = self.tabs.currentWidget()
+        for key, tab in self.tab_pages.items():
+            if tab is w:
+                subs = getattr(tab, "subtabs", None)
+                return key, (subs.tabText(subs.currentIndex()) if subs is not None else None)
+        return "quickstart"
+
+    def _build_help_menu(self) -> None:
+        from .. import docs
+        help_menu = self.menuBar().addMenu("&Help")
+        tab_docs = docs.build_help_menu(help_menu, self._current_tab, parent=self, session=self.session)
+        tab_docs.setShortcut(QKeySequence("F1"))
+
+    def _build_shortcuts(self) -> None:
+        """Ctrl+1…9 jump to the workflow tabs; Ctrl+Shift+V validates, Ctrl+R runs locally."""
+        for i in range(min(9, self.tabs.count())):
+            action = QAction(self)
+            action.setShortcut(QKeySequence(f"Ctrl+{i + 1}"))
+            action.triggered.connect(lambda _c=False, i=i: self.tabs.setCurrentIndex(i))
+            self.addAction(action)
+        run = self.pages.get(RUN)
+        if run is not None:
+            for keys, slot in (("Ctrl+Shift+V", run.validate), ("Ctrl+R", run.run)):
+                action = QAction(self)
+                action.setShortcut(QKeySequence(keys))
+                action.triggered.connect(lambda _c=False, slot=slot: (self.show_special(RUN), slot()))
+                self.addAction(action)
+
     def _set_dark_mode(self, dark: bool) -> None:
         style.apply(QApplication.instance(), self.prestus_root, dark=dark)
         self.session.set("dark_mode", dark)
         self.session.save()
+        self._apply_subtab_icons()
+        for page in self.pages.values():
+            if isinstance(page, SectionPage):
+                page.retint()
+
+    def update_context(self) -> None:
+        """Facts about this computer that visibility rules read (ConfigModel.context):
+        '__scheduler' when sbatch/qsub is here or runs are submitted over SSH."""
+        from .. import jobs as hpc_jobs
+        self.model.context["__scheduler"] = bool(hpc_jobs.scheduler()) or \
+            bool(self.session.get("remote_enabled", False))
+
+    def _apply_subtab_icons(self) -> None:
+        """An icon per sub-tab (SUBTAB_ICONS), in the active palette."""
+        for i in range(self.tabs.count()):
+            tab = self.tabs.widget(i)
+            subtabs = getattr(tab, "subtabs", None)
+            if subtabs is None:
+                continue
+            for j in range(subtabs.count()):
+                name = SUBTAB_ICONS.get(subtabs.tabText(j))
+                if name:
+                    subtabs.setTabIcon(j, icons.icon(name))
 
     def _tab_specs(self) -> list[dict]:
         schema = self.model.schema
@@ -443,7 +603,7 @@ class MainWindow(QMainWindow):
         start = StartPage(self)
         start.goto_tab.connect(self._start_goto)
         self.pages[START] = start
-        self.tabs.addTab(start, "Start")
+        self.tabs.addTab(start, "QuickStart")
         self.tabs.setTabToolTip(0, "A first simulation in four steps; everything else keeps its default")
         for spec in self._tab_specs():
             tab = TabPage(self, spec)
@@ -455,13 +615,17 @@ class MainWindow(QMainWindow):
                 self.pages[STUDY] = study
                 self._section_tab[STUDY] = key
             for section in spec.get("sections", []):
-                if section != GENERAL and schema.get(section) is None:
+                if section != GENERAL and schema.get(section) is None \
+                        and not schema.section_is_virtual(section):
                     continue
                 nodes = schema.display_nodes(section)
                 if not nodes:
                     continue
                 page = SectionPage(self.model, section, nodes, schema.section_label(section),
-                                   locked=schema.section_is_locked(section))
+                                   subtitle=schema.section_subtitle(section),
+                                   locked=schema.section_is_locked(section),
+                                   icon=schema.sections.get(section, {}).get("icon"))
+                page.lock_note = str(schema.sections.get(section, {}).get("lock_note") or "")
                 page.changed.connect(self._changed)
                 self.pages[section] = page
                 self._section_tab[section] = key
@@ -482,10 +646,10 @@ class MainWindow(QMainWindow):
                 tab.add_section(page)
                 if section == "study":
                     tab.add_card(self.pages[STUDY])
-            if key == "setup":
+            if key == "setup" and "io" in self.pages:
                 from .io_preview import IOPreviewPanel
                 self.io_preview = IOPreviewPanel(self.model)
-                tab.set_side(self.io_preview, (3, 2))
+                self.pages["io"].extras_below.addWidget(self.io_preview)   # under the I/O fields
             elif key == "transducer":
                 from .transducer_view import TransducerSchematic
                 self.schematic = TransducerSchematic(self.model)
@@ -738,7 +902,8 @@ class MainWindow(QMainWindow):
         tab = self._select_tab(self._section_tab.get(section, ""))
         if tab is not None:
             if tab.subtabs is not None:
-                tab.subtabs.setCurrentWidget(tab.settings_page)   # the field lives under 'Settings'
+                holder = tab.subtab_of(page) or tab.settings_page
+                tab.subtabs.setCurrentWidget(holder)      # the sub-tab the field lives on
             tab.refresh()
             row = next((r for r in page.rows if r.node.path == path), None)
             if not page.isVisibleTo(tab):
@@ -898,8 +1063,12 @@ class MainWindow(QMainWindow):
             if not path:
                 return None
         path = Path(path).resolve()
-        model = ConfigModel.from_file(Schema(base_default_for(path, self.prestus_root), toolbox_path=toolbox_default(self.prestus_root)), path,
-                                      self.model.library)
+        with guarded(self, f"Opening {path.name}") as g:
+            model = ConfigModel.from_file(Schema(base_default_for(path, self.prestus_root),
+                                                 toolbox_path=toolbox_default(self.prestus_root)),
+                                          path, self.model.library)
+        if g.failed:
+            return None
         return self._switch_to(model)
 
     def new_study(self, target: str | Path | None = None, copy_default: bool | None = None) -> "MainWindow | None":
@@ -920,10 +1089,14 @@ class MainWindow(QMainWindow):
                     f"Copy {DEFAULT_NAME} into {target.parent}?\n\nThis pins the defaults for this study, "
                     "as prestus_config_init does; load_parameters then merges onto that copy.") \
                     == QMessageBox.StandardButton.Yes
+        with guarded(self, "Creating the study config") as g:
             if copy_default:
-                shutil.copy2(toolbox_default(self.prestus_root), local)
-        model = ConfigModel(Schema(base_default_for(target, self.prestus_root), toolbox_path=toolbox_default(self.prestus_root)), self.model.library)
-        model.save(target, header=study_header(target))
+                copy_atomic(toolbox_default(self.prestus_root), local)
+            model = ConfigModel(Schema(base_default_for(target, self.prestus_root),
+                                       toolbox_path=toolbox_default(self.prestus_root)), self.model.library)
+            model.save(target, header=study_header(target))
+        if g.failed:
+            return None
         return self._switch_to(model)
 
     def update_project_defaults(self) -> "MainWindow | None":
@@ -960,15 +1133,18 @@ class MainWindow(QMainWindow):
         clicked = box.clickedButton()
         if clicked not in (keep, plain):
             return None
-        if clicked is keep:
-            carry_pinned_values(self.model, schema.pinned)
-        self.model.save(header=study_header(self.model.path))
-        backup = replace_project_default(schema.project_path, toolbox_default(self.prestus_root))
-        self.dirty = False
-        model = ConfigModel.from_file(
-            Schema(base_default_for(self.model.path, self.prestus_root),
-                   toolbox_path=toolbox_default(self.prestus_root)),
-            self.model.path, self.model.library)
+        with guarded(self, "Updating the project defaults") as g:
+            if clicked is keep:
+                carry_pinned_values(self.model, schema.pinned)
+            self.model.save(header=study_header(self.model.path))
+            self.dirty = False
+            backup = replace_project_default(schema.project_path, toolbox_default(self.prestus_root))
+            model = ConfigModel.from_file(
+                Schema(base_default_for(self.model.path, self.prestus_root),
+                       toolbox_path=toolbox_default(self.prestus_root)),
+                self.model.path, self.model.library)
+        if g.failed:
+            return None
         window = self._switch_to(model)
         window.statusBar().showMessage(f"Project defaults refreshed; backup: {backup.name}", 10000)
         return window
@@ -976,7 +1152,11 @@ class MainWindow(QMainWindow):
     def save(self) -> bool:
         if self.model.path is None:
             return self.save_as()
-        self.model.save(header=study_header(self.model.path))
+        with guarded(self, "Saving the study config") as g:
+            self.model.save(header=study_header(self.model.path))
+        if g.failed:
+            return False
+        self.history.seal()
         self.dirty = False
         self.session.add_recent(self.model.path)
         self.session.save()
@@ -997,8 +1177,11 @@ class MainWindow(QMainWindow):
                 f"In this folder, load_parameters will merge onto\n{new_base}\n"
                 f"instead of\n{self.model.schema.default_path}.\n\n"
                 "Reopen the file to edit it against those defaults.")
-        self.model.path = target
-        return self.save()
+        previous, self.model.path = self.model.path, target
+        if not self.save():
+            self.model.path = previous
+            return False
+        return True
 
     def prune_defaults(self) -> None:
         n = self.model.prune_defaults()
@@ -1014,7 +1197,12 @@ class MainWindow(QMainWindow):
         if self.dirty and QMessageBox.question(self, "Reload", "Discard unsaved changes?") \
                 != QMessageBox.StandardButton.Yes:
             return
-        self.model.load_dict(ConfigModel.from_file(self.model.schema, self.model.path, self.model.library).override_dict())
+        with guarded(self, f"Reloading {self.model.path.name}") as g:
+            fresh = ConfigModel.from_file(self.model.schema, self.model.path, self.model.library)
+        if g.failed:
+            return
+        self.model.load_dict(fresh.override_dict())
+        self.history.clear()
         self.dirty = False
         for page in self.pages.values():
             page.refresh()
@@ -1039,8 +1227,28 @@ class MainWindow(QMainWindow):
                     (answer == QMessageBox.StandardButton.Save and not self.save()):
                 event.ignore()
                 return
+        self.session.set("window_geometry", bytes(self.saveGeometry().toBase64()).decode())
         self.session.save()
         event.accept()
+
+    def _restore_geometry(self) -> None:
+        """Where the window was last closed; the first time, most of the screen (capped, so a
+        large monitor does not get a window of mostly empty margins), centred."""
+        self.setMinimumSize(900, 560)
+        saved = self.session.get("window_geometry")
+        if isinstance(saved, str) and saved and \
+                self.restoreGeometry(QByteArray.fromBase64(saved.encode())):
+            return
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            self.resize(1320, 900)
+            return
+        area = screen.availableGeometry()
+        w = min(1500, int(area.width() * 0.9))
+        h = min(980, int(area.height() * 0.9))
+        self.resize(max(w, 900), max(h, 560))
+        self.move(area.x() + (area.width() - self.width()) // 2,
+                  area.y() + (area.height() - self.height()) // 2)
 
 
 class LocaliteActions(QWidget):

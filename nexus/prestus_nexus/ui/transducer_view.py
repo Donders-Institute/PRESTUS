@@ -9,7 +9,7 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QSizePolicy, QWidget
 
-from .style import C
+from .export import PaintedExportable, attach_painted
 
 
 def _num(v):
@@ -26,13 +26,17 @@ def _nums(v) -> list[float]:
     return []
 
 
-class TransducerSchematic(QWidget):
+class TransducerSchematic(PaintedExportable, QWidget):
+    export_name = "transducer"
+
     def __init__(self, model, parent: QWidget | None = None):
         super().__init__(parent)
         self.model = model
         self.ti = 0
         self.setMinimumSize(320, 220)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        from .export import subject_stem
+        self.export_button = attach_painted(self, filename_hint=subject_stem(model, "transducer"))
 
     def set_transducer(self, ti: int) -> None:
         self.ti = ti
@@ -63,16 +67,16 @@ class TransducerSchematic(QWidget):
                 "min_foc": getattr(dev, "min_foc", None), "max_foc": getattr(dev, "max_foc", None),
                 "name": (dev.label() if dev else g("transducer.name", ti)) or ""}
 
-    def paintEvent(self, _event) -> None:  # noqa: N802
-        qp = QPainter(self)
-        qp.setRenderHint(QPainter.RenderHint.Antialiasing)
-        qp.fillRect(self.rect(), QColor(C["surface"]))
+    def paint(self, qp: QPainter, rect: QRectF, C: dict) -> None:
+        """The schematic in palette ``C`` (style.active() on screen, export.py for files)."""
+        qp.fillRect(rect, QColor(C["surface"]))
         geo = self._geometry()
+        if self.export_button is not None:
+            self.export_button.set_available(geo is not None)
         if geo is None:
             qp.setPen(QColor(C["ink3"]))
-            qp.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
+            qp.drawText(rect, Qt.AlignmentFlag.AlignCenter,
                         "Choose a device or enter the element\ndiameters to see the transducer.")
-            qp.end()
             return
         a, R = geo["a"], geo["R"]
 
@@ -85,7 +89,7 @@ class TransducerSchematic(QWidget):
         z_ep = R - geo["dist_geom_ep"] if R and geo["dist_geom_ep"] is not None else z_rim
         marks = [z_rim + 5, (R or 0), z_ep + (geo["fd"] or 0), z_ep + (geo["max_foc"] or 0)]
         z_max = max(marks) * 1.1 + 5
-        W, H = self.width(), self.height()
+        W, H = rect.width(), rect.height()
         pad = 28
         s = min((W - 2 * pad) / z_max, (H - 2 * pad - 18) / (2.4 * a))
         X = lambda z: pad + z * s  # noqa: E731
@@ -101,11 +105,13 @@ class TransducerSchematic(QWidget):
             r = QRectF(QPointF(X(z_ep + geo["min_foc"]), Y(a * 0.35)), QPointF(X(z_ep + geo["max_foc"]), Y(-a * 0.35)))
             qp.fillRect(r, QColor(C["accent_soft"]))
             qp.setPen(QColor(C["ink3"]))
-            qp.drawText(QRectF(r.left(), r.bottom() + 2, max(120.0, r.width()), 14), Qt.AlignmentFlag.AlignLeft,
-                        f"steering range {geo['min_foc']:g}–{geo['max_foc']:g} mm")
+            label = f"steering range {geo['min_foc']:g}–{geo['max_foc']:g} mm"
+            tw = qp.fontMetrics().horizontalAdvance(label) + 4
+            qp.drawText(QRectF(min(r.left(), W - 8 - tw), r.bottom() + 2, tw, 14), Qt.AlignmentFlag.AlignLeft, label)
 
         # bowl and elements (both sides)
-        colours = [QColor(C["accent"]), QColor("#4f96d0")]
+        # alternate rings: the accent and a lighter tint of it, in either theme
+        colours = [QColor(C["accent"]), QColor(C["accent"]).lighter(135)]
         for k, (ri, ro) in enumerate(geo["rings"]):
             pen = QPen(colours[k % 2], 5)
             pen.setCapStyle(Qt.PenCapStyle.FlatCap)
@@ -128,7 +134,7 @@ class TransducerSchematic(QWidget):
         if R:
             qp.setPen(QPen(QColor(C["ink3"]), 1))
             qp.drawEllipse(QPointF(X(R), yc), 3, 3)
-            qp.drawText(QPointF(X(R) - 20, yc - 8), "geometric")
+            qp.drawText(QPointF(X(R) - 20, yc - 14), "geometric")   # clear of the focus marker
         if geo["fd"]:
             zf = z_ep + geo["fd"]
             qp.setPen(QPen(QColor(C["thermal"]), 2))
@@ -138,6 +144,8 @@ class TransducerSchematic(QWidget):
             qp.drawText(QPointF(X(zf) - 30, yc + 22), f"focus {geo['fd']:g} mm")
 
         qp.setPen(QColor(C["ink2"]))
-        qp.drawText(QRectF(8, 4, W - 16, 16), Qt.AlignmentFlag.AlignLeft,
-                    f"{geo['name']}  ·  aperture {2 * a:.3g} mm" + (f"  ·  ROC {R:g} mm" if R else ""))
-        qp.end()
+        # Elide the device name, not the dimensions, when the header is too wide.
+        dims = f"  ·  aperture {2 * a:.3g} mm" + (f"  ·  ROC {R:g} mm" if R else "")
+        fm = qp.fontMetrics()
+        name = fm.elidedText(geo["name"], Qt.TextElideMode.ElideRight, max(0, int(W - 16 - fm.horizontalAdvance(dims))))
+        qp.drawText(QRectF(8, 4, W - 16, 16), Qt.AlignmentFlag.AlignLeft, name + dims)

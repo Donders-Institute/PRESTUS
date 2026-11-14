@@ -21,11 +21,12 @@ connection open for CONTROL_PERSIST; every later command reuses it (ControlPath)
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import stat
 import sys
 from dataclasses import dataclass, field
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from . import launcher
 
@@ -41,6 +42,33 @@ def control_path() -> str:
 def sharing_supported() -> bool:
     """OpenSSH on Windows has no connection sharing."""
     return os.name != "nt"
+
+
+_WINDOWS_PATH = re.compile(r"^(?:[A-Za-z]:(?:[\\/]|$)|\\\\|//[^/])")
+
+
+def _windows_style(text: str) -> bool:
+    """A drive-letter (Z:\\, z:/) or UNC (\\\\server\\share, //server/share) path."""
+    return bool(_WINDOWS_PATH.match(text))
+
+
+def _under(path: str, prefix: str, fold: bool) -> bool:
+    """path is prefix or lies below it (forward slashes); fold: ignore case (Windows)."""
+    head = path[:len(prefix)]
+    if fold:
+        head, prefix = head.lower(), prefix.lower()
+    return head == prefix and (len(path) == len(prefix) or path[len(prefix)] == "/")
+
+
+def _local_prefixes(local: str) -> set[str]:
+    """A mapped local folder as written and resolved, with forward slashes."""
+    if _windows_style(local):
+        out = {PureWindowsPath(local).as_posix().rstrip("/")}
+        if os.name == "nt":              # a mapped drive may resolve to its UNC path
+            out.add(Path(local).expanduser().resolve().as_posix().rstrip("/"))
+        return out
+    return {Path(local).expanduser().as_posix().rstrip("/"),
+            Path(local).expanduser().resolve().as_posix().rstrip("/")}
 
 
 class PathMapError(ValueError):
@@ -62,7 +90,7 @@ class RemoteHost:
         best: tuple[str, str] | None = None
         for lp, rp in self.path_map:
             lp_n = Path(lp).expanduser().resolve().as_posix().rstrip("/")
-            if (local == lp_n or local.startswith(lp_n + "/")) and \
+            if _under(local, lp_n, _windows_style(local) or _windows_style(lp_n)) and \
                     (best is None or len(lp_n) > len(best[0])):
                 best = (lp_n, rp.rstrip("/"))
         if best is None:
@@ -75,12 +103,16 @@ class RemoteHost:
 
         Prefix match on the text as written (it may be a pattern such as sub-%03d, so
         it is not resolved), also against the resolved local folder (/tmp vs /private/tmp).
+        Windows paths (Z:\\data, \\\\server\\share) are compared with forward slashes and,
+        as Windows does, without regard to case.
         """
+        win = _windows_style(text)
+        if win:
+            text = PureWindowsPath(text).as_posix()
         best: tuple[str, str] | None = None
         for lp, rp in self.path_map:
-            for prefix in {Path(lp).expanduser().as_posix().rstrip("/"),
-                           Path(lp).expanduser().resolve().as_posix().rstrip("/")}:
-                if prefix and (text == prefix or text.startswith(prefix + "/")) and \
+            for prefix in _local_prefixes(lp):
+                if prefix and _under(text, prefix, win or _windows_style(prefix)) and \
                         (best is None or len(prefix) > len(best[0])):
                     best = (prefix, rp.rstrip("/"))
         return None if best is None else best[1] + text[len(best[0]):]

@@ -25,12 +25,13 @@ from .empty_state import EmptyStack
 from .matlab_status import MatlabStatus
 
 try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+    from .mpl_theme import ThemedCanvas as FigureCanvasQTAgg   # drawn in the Nexus theme
     from matplotlib.figure import Figure
+    from matplotlib.lines import Line2D
 except ImportError:                                    # pragma: no cover
     FigureCanvasQTAgg = None
 
-PALETTE = ["#0072b2", "#d95f02", "#009e73", "#cc79a7", "#e69f00", "#56b4e9", "#a6761d", "#666666"]
+PALETTE = style.SERIES          # colour-blind-safe categorical set (series, MNI groups)
 SERIES_COLS = ["Write", "#", "Coil", "Target name", "Name from", "Colour", "Pulses",
                "Pos (mm)", "Pos SD", "Rot (rad)", "Rot SD", "Flag"]
 
@@ -143,12 +144,12 @@ class LocalitePage(QWidget):
         if FigureCanvasQTAgg is not None:
             self.fig_pos = Figure(figsize=(6, 4), layout="constrained")
             self.ax_pos = self.fig_pos.add_subplot(projection="3d")
-            self.canvas_pos = FigureCanvasQTAgg(self.fig_pos)
+            self.canvas_pos = FigureCanvasQTAgg(self.fig_pos, export_name="localite_positions")
             self.pos_stack = EmptyStack(self.canvas_pos)
             tabs.addTab(self.pos_stack, "Positions (3-D)")
             self.fig_dev = Figure(figsize=(6, 4), layout="constrained")
             self.ax_dev = self.fig_dev.add_subplot()
-            self.canvas_dev = FigureCanvasQTAgg(self.fig_dev)
+            self.canvas_dev = FigureCanvasQTAgg(self.fig_dev, export_name="localite_deviation")
             self.dev_stack = EmptyStack(self.canvas_dev)
             tabs.addTab(self.dev_stack, "Deviation per pulse")
         else:
@@ -437,22 +438,36 @@ class LocalitePage(QWidget):
                         ax.plot([m[0], e[0]], [m[1], e[1]], [m[2], e[2]], ":", color=c, lw=1)
             dev = as_floats(s.get("pos_dev"))
             axd.plot(range(1, len(dev) + 1), dev, ".-", color=c, lw=1.1, ms=5, label=label)
+        pal = style.active()
+        has_target = False
         for cand in as_list((self.result or {}).get("candidates")):
             xyz = as_floats(cand.get("xyz"))
             if len(xyz) == 3:
-                ax.scatter([xyz[0]], [xyz[1]], [xyz[2]], marker="x", color="#333333", s=30)
-                ax.text(xyz[0], xyz[1], xyz[2], "  " + str(cand.get("description", "")), fontsize=7, color="#444444")
-        ax.set_xlabel("x (mm)")
-        ax.set_ylabel("y (mm)")
-        ax.set_zlabel("z (mm)")
-        ax.set_title("dots = pulses · ring = mean · arrow = beam (30 mm) · × = planned target", fontsize=8)
+                has_target = True
+                ax.scatter([xyz[0]], [xyz[1]], [xyz[2]], marker="x", color=pal["ink"], s=30)
+                ax.text(xyz[0], xyz[1], xyz[2], "  " + str(cand.get("description", "")),
+                        fontsize=style.PLOT_PT["small"], color=pal["ink2"])
+        ax.set_xlabel("x [mm]")
+        ax.set_ylabel("y [mm]")
+        ax.set_zlabel("z [mm]")
         axd.set_xlabel("Pulse within series")
-        axd.set_ylabel("Distance from series mean (mm)")
+        axd.set_ylabel("Distance from series mean [mm]")
         axd.grid(True, alpha=0.3)
         if series:
-            ax.legend(fontsize=7, loc="upper left")
+            # series by colour, then what each mark means (in the theme's ink)
+            handles, _labels = ax.get_legend_handles_labels()
+            ink = pal["ink3"]
+            handles += [Line2D([], [], ls="none", marker=".", ms=6, color=ink, label="pulse"),
+                        Line2D([], [], ls="none", marker="o", ms=9, mfc="none", mec=ink, mew=1.5,
+                               label="series mean")]
+            if not gum:
+                handles.append(Line2D([], [], color=ink, lw=1.5, label="beam (30 mm)"))
+            if has_target:
+                handles.append(Line2D([], [], ls="none", marker="x", ms=6, color=pal["ink"],
+                                      label="planned target"))
+            ax.legend(handles=handles, fontsize=style.PLOT_PT["small"], loc="upper left")
             if axd.get_legend_handles_labels()[0]:
-                axd.legend(fontsize=7)
+                axd.legend(fontsize=style.PLOT_PT["small"])
         self.canvas_pos.draw_idle()
         self.canvas_dev.draw_idle()
 
@@ -671,7 +686,7 @@ class MniDialog(QDialog):
         if FigureCanvasQTAgg is not None:
             self.fig = Figure(figsize=(7, 6), layout="constrained")
             self.ax = self.fig.add_subplot(projection="3d")
-            self.canvas = FigureCanvasQTAgg(self.fig)
+            self.canvas = FigureCanvasQTAgg(self.fig, export_name="localite_mni_targets")
             self.plot_stack = EmptyStack(self.canvas)
             self.plot_stack.show_empty("No targets mapped yet",
                                        "Map the batch summary to MNI space to see every written "
@@ -760,11 +775,19 @@ class MniDialog(QDialog):
                 pts = [p for p in fo if None not in p]
                 if pts:
                     ax.scatter(*zip(*pts), marker="D", s=26, color=c, label=label)
-        ax.set_xlabel("x MNI (mm, +R)")
-        ax.set_ylabel("y MNI (mm, +A)")
-        ax.set_zlabel("z MNI (mm, +S)")
-        ax.set_title(f"Targets in MNI space ({len(use)} shown) · ● transducer · ◆ focus · line = beam axis",
-                     fontsize=9)
+        ax.set_xlabel("x MNI, +R [mm]")
+        ax.set_ylabel("y MNI, +A [mm]")
+        ax.set_zlabel("z MNI, +S [mm]")
+        ax.set_title(f"Targets in MNI space ({len(use)} shown)", fontsize=style.PLOT_PT["title"])
         if groups:
-            ax.legend(fontsize=7, loc="upper left")
+            # groups by colour, then what each mark means (in the theme's ink)
+            handles, _labels = ax.get_legend_handles_labels()
+            ink = style.active()["ink3"]
+            if self.show_trans.isChecked():
+                handles.append(Line2D([], [], ls="none", marker="o", ms=6, color=ink, label="transducer"))
+            if self.show_focus.isChecked():
+                handles.append(Line2D([], [], ls="none", marker="D", ms=5, color=ink, label="focus"))
+            if self.show_beam.isChecked():
+                handles.append(Line2D([], [], color=ink, lw=0.8, label="beam axis"))
+            ax.legend(handles=handles, fontsize=style.PLOT_PT["small"], loc="upper left")
         self.canvas.draw_idle()

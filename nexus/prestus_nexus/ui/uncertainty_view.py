@@ -96,13 +96,13 @@ def draw_ranges(fig, sets: unc.PropertySets, tissues: tuple[str, ...], c: dict) 
             ax.set_ylim(lo - pad, hi + pad)
         if key in ("attenuation", "absorption"):
             unit = f"{unit} @ {sets.freq_mhz:g} MHz"
-        ax.set_title(f"{label}\n{unit}" if unit else label, fontsize=8, color=c["ink2"])
+        ax.set_title(f"{label}\n[{unit}]" if unit else label, fontsize=style.PLOT_PT["normal"], color=c["ink2"])
         ax.set_xlim(-0.6, len(tissues) - 0.4)
         if len(tissues) > 1:
-            ax.set_xticks(range(len(tissues)), [SKULL_TICK.get(t, t) for t in tissues], fontsize=7)
+            ax.set_xticks(range(len(tissues)), [SKULL_TICK.get(t, t) for t in tissues], fontsize=style.PLOT_PT["small"])
         else:
             ax.set_xticks([])
-        ax.tick_params(labelsize=7, colors=c["ink3"])
+        ax.tick_params(labelsize=style.PLOT_PT["small"], colors=c["ink3"])
         for side in ("top", "right"):
             ax.spines[side].set_visible(False)
         for side in ("left", "bottom"):
@@ -115,7 +115,7 @@ def draw_ranges(fig, sets: unc.PropertySets, tissues: tuple[str, ...], c: dict) 
                Line2D([], [], color=c["ink3"], marker="v", linestyle="none", markersize=5, label="L variant"),
                Line2D([], [], color=c["ink3"], marker="o", markerfacecolor=c["surface"], linestyle="none",
                       markersize=5, label="hollow: not in the variant file, default used")]
-    leg = fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=7, frameon=False,
+    leg = fig.legend(handles=handles, loc="upper center", ncol=3, fontsize=style.PLOT_PT["small"], frameon=False,
                      bbox_to_anchor=(0.5, 1.0))
     for text in leg.get_texts():
         text.set_color(c["ink2"])

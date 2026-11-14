@@ -214,3 +214,22 @@ def test_plantus_actions_run_placement_only(window, monkeypatch):
     monkeypatch.setattr(type(window), "show_special", lambda self, key: shown.append(key))
     window.pages[RUN].finished.emit(PlantusActions.TASK, True)
     assert shown == [VIEWER] and not acts._waiting
+def test_choice_notes_never_become_windows(window, app):
+    """A choice's plain-text note (overlay choice_math '> …') stays inside its field: replacing it
+    on refresh used to leave each old note as a top-level window (the pop-up seen in advanced mode)."""
+    from PyQt6.QtWidgets import QApplication
+    window.model.set("thermal.cem43_iso", 1)
+    window.show()
+    tab = window.tab_pages["sonication"]
+    window.tabs.setCurrentWidget(tab)
+    for on in (True, False, True):
+        tab.advanced.setChecked(on)
+        window._changed()
+        QApplication.processEvents()
+    window.model.set("thermal.cem43_iso", 0)
+    window._changed()
+    QApplication.processEvents()
+    strays = [w for w in QApplication.topLevelWidgets() if w.isVisible() and w is not window]
+    assert not strays, [type(w).__name__ for w in strays]
+
+

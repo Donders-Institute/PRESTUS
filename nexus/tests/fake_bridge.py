@@ -1,10 +1,12 @@
 """A stand-in for functions/gui/nexus_bridge.m that speaks the same file protocol, so the
 Nexus side of the bridge can be tested without MATLAB.
 
-  python fake_bridge.py <bridge_dir> [--fail-start]
+  python fake_bridge.py <bridge_dir> [--fail-start | --never-ready]
 
 nexus_ping echoes its args; args.action == 'fail' answers with an error; args.progress
-writes a progress message and waits a little; args.canned returns that value as result.
+writes a progress message and waits a little; args.canned returns that value as result;
+args.sleep waits that many seconds first (deadline tests). --never-ready starts but never
+reports ready (start-up deadline tests).
 """
 
 import json
@@ -27,6 +29,10 @@ def main() -> None:
         sys.exit(3)
     for sub in ("req", "resp", "progress"):
         (d / sub).mkdir(parents=True, exist_ok=True)
+    if "--never-ready" in sys.argv:
+        print("[fake] licence check hangs", flush=True)
+        while True:
+            time.sleep(0.1)
     write(d / "ready.json", {"pid": os.getpid(), "matlab": "fake"})
     print("[nexus_bridge] ready", flush=True)
     while not (d / "stop").exists():
@@ -35,6 +41,8 @@ def main() -> None:
             f.unlink()
             args = req.get("args") or {}
             rid = req["id"]
+            if args.get("sleep"):
+                time.sleep(float(args["sleep"]))
             if args.get("progress"):
                 (d / "progress" / f"{rid}.txt").write_text(args["progress"], encoding="utf-8")
                 time.sleep(0.4)

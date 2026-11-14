@@ -10,7 +10,9 @@ Only overrides are written to the study YAML.
 
 from __future__ import annotations
 
+import contextlib
 import copy
+import functools
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable
@@ -110,6 +112,20 @@ def iter_leaves(data: dict, prefix: str = "") -> Iterable[tuple[str, Any]]:
             yield path, value
 
 
+def _recorded(label: str, key=None):
+    """A ConfigModel method whose changes the edit history records (ConfigModel.edit);
+    key(*args) names what it changes, so typing in one field coalesces into one step."""
+    def wrap(fn):
+        @functools.wraps(fn)
+        def method(self, *args, **kwargs):
+            if not self.__dict__.get("_edit_hooks"):
+                return fn(self, *args, **kwargs)
+            with self.edit(label, (label,) + (key(*args, **kwargs) if key else ())):
+                return fn(self, *args, **kwargs)
+        return method
+    return wrap
+
+
 @dataclass
 class Issue:
     level: str          # 'error' | 'warning' | 'info'
@@ -133,6 +149,9 @@ class ConfigModel:
         self.tx: list[dict] = [{}]        # sparse override per transducer
         self.tx_as_list = False           # write transducer as a YAML list even if N == 1
         self.path: Path | None = None     # study YAML file
+        # facts about this computer for visibility rules ('__<name>' keys), set by the main
+        # window: '__scheduler' = a scheduler (sbatch/qsub) or an SSH submission host is available
+        self.context: dict = {}
 
     # ── loading / saving ────────────────────────────────────────────────
     @classmethod
@@ -325,6 +344,36 @@ class ConfigModel:
         return self.is_overridden(path, ti) and not values_equal(
             self.get(path, ti), self.baseline(path, ti))
 
+    # ── edit history hooks (undo.History) ───────────────────────────────
+    def snapshot(self) -> tuple:
+        """Copy of everything an edit can change (restore() puts it back)."""
+        return copy.deepcopy((self.overrides, self.tx, self.tx_as_list))
+
+    def restore(self, snap: tuple) -> None:
+        self.overrides, self.tx, self.tx_as_list = copy.deepcopy(snap)
+
+    def add_edit_hook(self, hook) -> None:
+        """hook.begin(label, key) before and hook.end() after every recorded edit."""
+        self.__dict__.setdefault("_edit_hooks", []).append(hook)
+
+    def remove_edit_hook(self, hook) -> None:
+        hooks = self.__dict__.get("_edit_hooks", [])
+        if hook in hooks:
+            hooks.remove(hook)
+
+    @contextlib.contextmanager
+    def edit(self, label: str = "Edit", key: tuple = ()):
+        """Group the changes made inside into one recorded edit (one undo step)."""
+        hooks = list(self.__dict__.get("_edit_hooks", ()))
+        for h in hooks:
+            h.begin(label, key)
+        try:
+            yield
+        finally:
+            for h in hooks:
+                h.end()
+
+    @_recorded("Change", lambda path, value=None, ti=0: (path, ti))
     def set(self, path: str, value: Any, ti: int = 0) -> None:
         """Set a value; setting it back to the baseline removes the override."""
         parts = path.split(".")
@@ -334,6 +383,7 @@ class ConfigModel:
         else:
             set_in(target, key_parts, copy.deepcopy(value))
 
+    @_recorded("Reset", lambda path, ti=0: (path, ti))
     def reset(self, path: str, ti: int = 0) -> None:
         parts = path.split(".")
         if parts[0] == TX:
@@ -341,6 +391,7 @@ class ConfigModel:
         else:
             del_in(self.overrides, parts)
 
+    @_recorded("Remove default values")
     def prune_defaults(self) -> int:
         """Remove overrides whose value equals their baseline; return how many."""
         removed = 0
@@ -366,11 +417,13 @@ class ConfigModel:
     def n_transducers(self) -> int:
         return len(self.tx)
 
+    @_recorded("Add transducer")
     def add_transducer(self) -> int:
         """Append a transducer. It starts from transducer 1's values (PRESTUS semantics)."""
         self.tx.append({})
         return len(self.tx) - 1
 
+    @_recorded("Remove transducer")
     def remove_transducer(self, ti: int) -> None:
         if len(self.tx) == 1:
             self.tx = [{}]
@@ -378,10 +431,21 @@ class ConfigModel:
         del self.tx[ti]
 
     # ── visibility ──────────────────────────────────────────────────────
-    def condition_holds(self, cond: dict | None, ti: int = 0) -> bool:
+    def condition_holds(self, cond: dict | list | None, ti: int = 0) -> bool:
         if not cond:
             return True
-        value = self.get(cond["key"], ti)
+        if isinstance(cond, list):                  # several conditions: all must hold
+            return all(self.condition_holds(c, ti) for c in cond)
+        if "any_of" in cond:                        # alternatives: one must hold
+            return any(self.condition_holds(c, ti) for c in cond["any_of"])
+        # computed keys: '__n_transducers' = number of transducers in the config
+        key = cond["key"]
+        if key == "__n_transducers":
+            value = self.n_transducers
+        elif key.startswith("__"):
+            value = self.context.get(key, False)
+        else:
+            value = self.get(key, ti)
         if "in" in cond:
             return any(values_equal(value, c) for c in cond["in"])
         if "not_in" in cond:

@@ -4,10 +4,12 @@ submitted jobs."""
 
 from __future__ import annotations
 
+import copy
 import html
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
-from PyQt6.QtCore import QProcess, QProcessEnvironment, QTimer, pyqtSignal
+from PyQt6.QtCore import QObject, QProcess, QProcessEnvironment, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
                              QMenu, QMessageBox, QPlainTextEdit, QPushButton, QTextEdit, QToolButton,
@@ -15,12 +17,35 @@ from PyQt6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QHBoxLayout, Q
 
 from .. import jobs as hpc_jobs
 from .. import launcher
+from .. import proctree
 from .. import remote as rmt
 from ..model import ConfigModel
 from ..estimate import estimate
 from ..predict_outputs import predict, save_summary
-from . import style
+from . import icons, style
 from .jobs_view import JobsView, JobsWindow
+
+
+# Scheduler queries, cancels and log reads run here: over SSH they take seconds, and the
+# GUI thread must not wait for them. Results come back through a Relay signal.
+_POOL = ThreadPoolExecutor(max_workers=3, thread_name_prefix="nexus-jobs")
+
+
+def submit_background(fn, *args) -> Future:
+    return _POOL.submit(fn, *args)
+
+
+class Relay(QObject):
+    """Hands a finished Future from a worker thread to the GUI thread."""
+    done = pyqtSignal(object, object)         # tag, Future
+
+    def deliver(self, tag, fut: Future) -> None:
+        def emit(f, t=tag):
+            try:
+                self.done.emit(t, f)
+            except RuntimeError:              # the receiver was closed meanwhile
+                pass
+        fut.add_done_callback(emit)
 
 
 class RunPage(QWidget):
@@ -65,7 +90,7 @@ class RunPage(QWidget):
         row.addWidget(QLabel("MATLAB"))
         self.matlab = QLineEdit()
         self.matlab.setPlaceholderText("path to the matlab binary")
-        browse = QToolButton(text="…")
+        browse = icons.PathButton("file", "Choose the MATLAB binary")
         browse.clicked.connect(self._browse)
         row.addWidget(self.matlab, 1)
         row.addWidget(browse)
@@ -181,6 +206,9 @@ class RunPage(QWidget):
         self.jobs_timer = QTimer(self)
         self.jobs_timer.setInterval(30_000)
         self.jobs_timer.timeout.connect(self.refresh_jobs)
+        self._jobs_poll: Future | None = None     # scheduler query in flight
+        self._relay = Relay(self)
+        self._relay.done.connect(self._background_done, Qt.ConnectionType.QueuedConnection)
         # Shown in the Run section's "Jobs" side tab (main_window) and, on demand, a window
         self.jobs_view = JobsView(self)
         self.jobs_window: JobsWindow | None = None
@@ -413,6 +441,7 @@ class RunPage(QWidget):
         self.proc.readyReadStandardOutput.connect(self._read)
         self.proc.finished.connect(self._done)
         self.proc.errorOccurred.connect(self._error)
+        proctree.new_session(self.proc)       # Stop ends the program and what it started
         self.status.setText(f"<b>{task}</b> running…")
         self.proc.start(argv[0], argv[1:])
         self.refresh()
@@ -535,8 +564,45 @@ class RunPage(QWidget):
             self.show_jobs_tab(new[0].job_id)
 
     def refresh_jobs(self) -> None:
-        if self.jobs:
-            hpc_jobs.query(self.jobs, self.job_kind, self.job_remote)
+        """Ask the scheduler for the jobs' state in the background (one query at a time);
+        jobs_changed follows when the answer is in."""
+        if self._jobs_poll is not None:
+            return
+        if not self.jobs:
+            self._jobs_polled([])
+            return
+        snapshot = copy.deepcopy(self.jobs)       # the worker updates copies, never the shown jobs
+        self._jobs_poll = submit_background(hpc_jobs.query, snapshot, self.job_kind, self.job_remote)
+        self._relay.deliver("query", self._jobs_poll)
+
+    def jobs_busy(self) -> bool:
+        """A scheduler query or cancel is in flight."""
+        return self._jobs_poll is not None
+
+    def _background_done(self, tag, fut: Future) -> None:
+        if tag == "query":
+            self._jobs_poll = None
+            try:
+                updated = fut.result()
+            except Exception as exc:              # keep the last known state
+                self._append(f"Could not query the scheduler: {exc}", style.active()["amber"])
+                updated = []
+            self._jobs_polled(updated)
+        elif tag == "cancel":
+            self._jobs_poll = None
+            try:
+                out = fut.result()
+            except Exception as exc:
+                out = f"Cancel failed: {exc}"
+            if out.strip():
+                self._append(out, "#777")
+            self.refresh_jobs()
+
+    def _jobs_polled(self, updated: list[hpc_jobs.Job]) -> None:
+        fresh = {j.job_id: j for j in updated}
+        for job in self.jobs:                     # jobs added meanwhile keep their state
+            if job.job_id in fresh:
+                job.__dict__.update(fresh[job.job_id].__dict__)
         self.jobs_changed.emit()
         if any(not j.finished for j in self.jobs):
             self.jobs_timer.start()
@@ -565,15 +631,26 @@ class RunPage(QWidget):
         if QMessageBox.question(self, "Cancel jobs", f"Cancel job(s) {', '.join(ids)}?") \
                 != QMessageBox.StandardButton.Yes:
             return
-        out = hpc_jobs.cancel(ids, self.job_kind, self.job_remote)
-        if out.strip():
-            self._append(out, "#777")
-        self.refresh_jobs()
+        if self._jobs_poll is not None:           # after the query in flight
+            QTimer.singleShot(300, lambda: self._cancel_now(ids))
+            return
+        self._cancel_now(ids)
+
+    def _cancel_now(self, ids: list[str]) -> None:
+        if self._jobs_poll is not None:
+            QTimer.singleShot(300, lambda: self._cancel_now(ids))
+            return
+        self._append(f"Cancelling job(s) {', '.join(ids)} …", "#777")
+        self._jobs_poll = submit_background(hpc_jobs.cancel, ids, self.job_kind, self.job_remote)
+        self._relay.deliver("cancel", self._jobs_poll)
 
     def stop(self) -> None:
+        """End the running program and everything it started (MATLAB runs under a launcher)."""
         if self.proc is not None:
             self._append("Stopping…", "#777")
-            self.proc.kill()
+            proctree.kill_tree(int(self.proc.processId() or 0))
+            if self.proc is not None:
+                self.proc.kill()
 
     def _save_log(self) -> None:
         path, _ = QFileDialog.getSaveFileName(self, "Save log", "planner_run.log", "Log (*.log *.txt)")

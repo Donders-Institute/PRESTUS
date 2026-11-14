@@ -35,9 +35,13 @@ class Node:
     is_group: bool = False
     kind: str = "yaml"
     choices: list | None = None
+    choice_labels: dict = field(default_factory=dict)   # choice -> label shown in the drop-down
+    choice_math: dict = field(default_factory=dict)     # choice -> LaTeX line(s) shown under it
+    choice_icons: dict = field(default_factory=dict)    # choice -> glyph name (ui/choice_icons.py), in the drop-down
+    choice_figures: dict = field(default_factory=dict)  # choice -> figure names shown under it
     unit: str = ""
     help: str = ""
-    visible_if: dict | None = None
+    visible_if: dict | list | None = None
     derived: bool = False
     extra: bool = False             # read by PRESTUS but absent from config_default
     minimum: float | None = None
@@ -210,6 +214,24 @@ def _ordered_merge(toolbox: dict, project: dict) -> dict:
     return mergestruct(toolbox, project)
 
 
+_PARSED: dict[str, tuple[tuple[int, int], str, Any]] = {}
+
+
+def _read_yaml(path: Path) -> tuple[str, Any]:
+    """(text, parsed copy) of a YAML file; parsed once while its size and modification
+    time are unchanged (every New/Open/Reload builds a Schema)."""
+    st = path.stat()
+    stamp = (st.st_size, st.st_mtime_ns)
+    hit = _PARSED.get(str(path))
+    if hit is None or hit[0] != stamp:
+        text = path.read_text(encoding="utf-8")
+        hit = (stamp, text, yamlio.load(text))
+        if len(_PARSED) > 16:
+            _PARSED.clear()
+        _PARSED[str(path)] = hit
+    return hit[1], copy.deepcopy(hit[2])
+
+
 class Schema:
     """Key tree for one config_default.yaml."""
 
@@ -222,15 +244,15 @@ class Schema:
         the copy sets differently."""
         self.default_path = Path(default_path)
         self.toolbox_path = Path(toolbox_path) if toolbox_path else TOOLBOX_DEFAULT
-        text = self.default_path.read_text(encoding="utf-8")
-        own: dict = yamlio.load(text) or {}
+        text, own = _read_yaml(self.default_path)
+        own = own or {}
         helps = extract_help(text)
         self.project_path: Path | None = None
         self.stale_keys: list[str] = []
         self.pinned: dict[str, tuple[Any, Any]] = {}
         if self.toolbox_path.is_file() and not _same_file(self.toolbox_path, self.default_path):
-            tb_text = self.toolbox_path.read_text(encoding="utf-8")
-            toolbox = yamlio.load(tb_text) or {}
+            tb_text, toolbox = _read_yaml(self.toolbox_path)
+            toolbox = toolbox or {}
             self.project_path = self.default_path
             self.stale_keys = _missing_keys(toolbox, own)
             self.pinned = _differing_values(own, toolbox)
@@ -238,7 +260,7 @@ class Schema:
             helps = {**helps, **extract_help(tb_text)}
         else:
             self.defaults = own
-        overlay = yamlio.load_file(overlay_path) or {}
+        overlay = copy.deepcopy(yamlio.load_file_cached(overlay_path)) or {}
         self.sections: dict[str, dict] = overlay.get("sections", {}) or {}
         self.tabs: list[dict] = overlay.get("tabs", []) or []
         self.field_rules: dict[str, dict] = overlay.get("fields", {}) or {}
@@ -247,6 +269,8 @@ class Schema:
         self.deprecated: dict[str, dict] = overlay.get("deprecated", {}) or {}
         self.tune_goals: dict[str, dict] = overlay.get("tune_goals", {}) or {}
         self.tuning_rules: dict[str, list] = overlay.get("tuning", {}) or {}
+        self.choice_icon_rules: dict[str, dict] = overlay.get("choice_icons", {}) or {}
+        self.choice_figure_rules: dict[str, dict] = overlay.get("choice_figures", {}) or {}
         self.workflow_keys = self._calibration_keys()
 
         self.root = Node(path="", is_group=True)
@@ -255,6 +279,15 @@ class Schema:
         self._add_extras()
         for node in self._index.values():
             self._apply_rules(node)
+        # one name per section: a top-level group is called what its card is called
+        for key, spec in self.sections.items():
+            node = self._index.get(key)
+            if node is not None and node.is_group and spec.get("label"):
+                node.label = str(spec["label"])
+
+    def section_subtitle(self, section: str) -> str:
+        """overlay 'sections: <name>: sub': one line on what the card decides."""
+        return str(self.sections.get(section, {}).get("sub") or "")
 
     # construction ---------------------------------------------------------
     def _calibration_keys(self) -> set[str]:
@@ -320,6 +353,10 @@ class Schema:
                 node.kind = rule["kind"]
             if "choices" in rule:
                 node.choices = list(rule["choices"])
+            if "choice_labels" in rule:
+                node.choice_labels = dict(rule["choice_labels"])
+            if "choice_math" in rule:
+                node.choice_math = dict(rule["choice_math"])
             if "unit" in rule:
                 node.unit = rule["unit"]
             if "help" in rule:
@@ -343,6 +380,8 @@ class Schema:
         for pat, goals in self.tuning_rules.items():
             if fnmatch.fnmatchcase(node.path, pat):
                 node.tune = list(goals or [])
+        node.choice_icons = dict(self.choice_icon_rules.get(node.path) or {})
+        node.choice_figures = {c: list(v) for c, v in (self.choice_figure_rules.get(node.path) or {}).items()}
         if node.choices and node.kind == "yaml":
             node.kind = "str"
 
@@ -394,6 +433,10 @@ class Schema:
 
     def section_is_locked(self, section: str) -> bool:
         return bool(self.sections.get(section, {}).get("locked", False))
+
+    def section_is_virtual(self, section: str) -> bool:
+        """A section with no config key of its own: it holds only fields moved in with group:."""
+        return bool(self.sections.get(section, {}).get("virtual", False))
 
     def tune_label(self, goal: str) -> str:
         return self.tune_goals.get(goal, {}).get("label", goal.capitalize())

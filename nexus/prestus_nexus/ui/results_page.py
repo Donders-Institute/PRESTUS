@@ -63,6 +63,11 @@ class _OverlayPanel(QWidget):
         tb.addWidget(self.note)
         v.addLayout(tb)
         self.viewer = OrthoViewer()
+        button = getattr(getattr(self.viewer, "canvas", None), "export_button", None)
+        if button is not None:                  # sub-XXX_<medium><affix>_<map>.svg …
+            button.view = f"results_{kind or 'map'}"
+            button.filename_hint = lambda: (f"{self._run.stem}_{self.combo.currentText()}"
+                                            if self._run is not None else button.view)
         v.addWidget(self.viewer, 1)
 
     def load(self, run: rs.Run | None, anat: Path | None, markers) -> None:

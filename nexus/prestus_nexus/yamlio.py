@@ -21,6 +21,8 @@ from typing import Any
 
 import yaml
 
+from .fsio import write_text_atomic
+
 
 class _Loader(yaml.SafeLoader):
     """SafeLoader with SnakeYAML's (lenient) float resolver."""
@@ -46,14 +48,46 @@ _Loader.add_implicit_resolver(
 )
 
 
+# libyaml's parser (when PyYAML was built with it) is ~10x faster; resolving and
+# constructing stay in Python, so the SnakeYAML float rule above applies unchanged.
+if getattr(yaml, "__with_libyaml__", False):
+    class _CLoader(yaml.CSafeLoader):
+        """_Loader on libyaml's parser."""
+
+    _CLoader.yaml_implicit_resolvers = _Loader.yaml_implicit_resolvers
+    _FAST_LOADER: type = _CLoader
+else:                                           # pragma: no cover - pure-Python PyYAML
+    _FAST_LOADER = _Loader
+
+
 def load(text: str) -> Any:
     """Parse YAML text the way PRESTUS' MATLAB loader would."""
-    return yaml.load(text, Loader=_Loader)
+    return yaml.load(text, Loader=_FAST_LOADER)
 
 
 def load_file(path: str | Path) -> Any:
     with open(path, encoding="utf-8") as fh:
         return load(fh.read())
+
+
+_FILE_CACHE: dict[str, tuple[tuple[int, int], Any]] = {}
+
+
+def load_file_cached(path: str | Path) -> Any:
+    """load_file, reused while the file's size and modification time are unchanged: one
+    stat instead of a read (reading a YAML on the project volume can take seconds). The
+    parsed value is shared between callers: treat it as read-only."""
+    path = Path(path)
+    st = path.stat()
+    stamp = (st.st_size, st.st_mtime_ns)
+    hit = _FILE_CACHE.get(str(path))
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
+    data = load_file(path)
+    if len(_FILE_CACHE) > 64:
+        _FILE_CACHE.clear()
+    _FILE_CACHE[str(path)] = (stamp, data)
+    return data
 
 
 # ── Writing ──────────────────────────────────────────────────────────────
@@ -138,4 +172,5 @@ def dump(data: dict, header: str = "") -> str:
 
 
 def dump_file(path: str | Path, data: dict, header: str = "") -> None:
-    Path(path).write_text(dump(data, header), encoding="utf-8")
+    """Write data to path; the old file stays intact if the write fails (fsio)."""
+    write_text_atomic(path, dump(data, header))

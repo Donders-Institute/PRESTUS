@@ -106,6 +106,89 @@ def test_qt_bridge_without_matlab_fails_at_once(app, tmp_path):
     assert errors and "MATLAB not found" in errors[0].message and b.state == "failed"
 
 
+def test_qt_bridge_startup_deadline(app, tmp_path):
+    b = br.MatlabBridge(tmp_path, lambda: "unused", startup_timeout_s=0.5,
+                        command=lambda d: [sys.executable, str(FAKE), str(d), "--never-ready"])
+    errors = []
+    b.call("nexus_ping", {}, on_error=errors.append)
+    assert _wait(app, lambda: bool(errors))
+    assert errors[0].identifier == "nexus_bridge:startTimeout" and "within 0.5 s" in errors[0].message
+    assert b.proc is None and b.state == "failed"
+
+
+def test_qt_bridge_request_deadline_stops_the_session(app, tmp_path):
+    b = br.MatlabBridge(tmp_path, lambda: "unused", request_timeout_s=30,
+                        command=lambda d: [sys.executable, str(FAKE), str(d)])
+    done, errors = [], []
+    b.call("nexus_ping", {"sleep": 20}, on_done=done.append, on_error=errors.append, timeout=0.5)
+    assert _wait(app, lambda: bool(errors))
+    assert not done and errors[0].identifier == "nexus_bridge:timeout"
+    assert "nexus_ping within 0.5 s" in errors[0].message
+    assert b.proc is None and b.client is None
+    # the next call starts a fresh session
+    b.call("nexus_ping", {"a": 2}, on_done=done.append, on_error=errors.append)
+    try:
+        assert _wait(app, lambda: bool(done)) and done[0]["echo"] == {"a": 2}
+    finally:
+        b.stop()
+
+
+def test_qt_bridge_cancel_fails_pending_requests(app, tmp_path):
+    b = br.MatlabBridge(tmp_path, lambda: "unused",
+                        command=lambda d: [sys.executable, str(FAKE), str(d)])
+    errors = []
+    b.call("nexus_ping", {"sleep": 20}, on_error=errors.append)
+    assert _wait(app, lambda: b.state == "busy")
+    t0 = time.monotonic()
+    b.cancel()
+    assert time.monotonic() - t0 < 2
+    assert errors and errors[0].identifier == "nexus_bridge:cancelled"
+    assert b.proc is None and not b.busy()
+
+
+def test_qt_bridge_stop_returns_quickly_when_matlab_hangs(app, tmp_path):
+    b = br.MatlabBridge(tmp_path, lambda: "unused",
+                        command=lambda d: [sys.executable, str(FAKE), str(d), "--never-ready"])
+    b.start()
+    assert _wait(app, lambda: b.proc is not None and b.proc.processId() > 0)
+    pid = b.proc.processId()
+    t0 = time.monotonic()
+    b.stop(wait_ms=300)
+    assert time.monotonic() - t0 < 1.5 and b.proc is None
+    from prestus_nexus import proctree
+    t1 = time.monotonic()
+    while proctree.alive(pid) and time.monotonic() - t1 < br.STOP_GRACE_S + 5:
+        time.sleep(0.2)
+    assert not proctree.alive(pid)
+
+
+def test_heartbeat_runs_without_the_event_loop(tmp_path):
+    c = br.BridgeClient(tmp_path)
+    hb = br._Heartbeat(c, every_s=0.05)
+    try:
+        time.sleep(0.2)                      # no processEvents: a blocked GUI thread
+        assert (tmp_path / "heartbeat").is_file()
+        first = (tmp_path / "heartbeat").stat().st_mtime_ns
+        time.sleep(0.3)
+        assert (tmp_path / "heartbeat").stat().st_mtime_ns >= first
+    finally:
+        hb.stop()
+
+
+def test_poll_reports_unreadable_old_responses(tmp_path):
+    c = br.BridgeClient(tmp_path)
+    bad = tmp_path / "resp" / "000001_abc.json"
+    bad.write_text("{not json", encoding="utf-8")
+    assert c.poll() == [] and bad.exists()          # may still be arriving
+    old = time.time() - br.STALE_RESPONSE_S - 1
+    os.utime(bad, (old, old))
+    out = c.poll()
+    assert len(out) == 1 and out[0]["id"] == "000001_abc" and out[0]["ok"] is False
+    assert out[0]["identifier"] == "nexus_bridge:badResponse" and not bad.exists()
+    with pytest.raises(br.BridgeError):
+        br.result_of(out[0])
+
+
 # ── with MATLAB ──────────────────────────────────────────────────────────
 def _find_matlab():
     cand = [os.environ.get("PRESTUS_MATLAB"), shutil.which("matlab")]

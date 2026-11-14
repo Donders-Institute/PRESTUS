@@ -58,3 +58,20 @@ def test_nested_structures_round_trip():
 def test_header_is_commented():
     text = yamlio.dump({"a": 1}, header="line one\nline two")
     assert text.startswith("# line one\n# line two\n\na: 1")
+
+
+def test_load_file_cached_rereads_a_changed_file(tmp_path, monkeypatch):
+    import os
+    path = tmp_path / "entry.yaml"
+    path.write_text("a: 1\n")
+    assert yamlio.load_file_cached(path) == {"a": 1}
+    calls = []
+    real = yamlio.load_file
+    monkeypatch.setattr(yamlio, "load_file", lambda p: calls.append(p) or real(p))
+    assert yamlio.load_file_cached(path) == {"a": 1}
+    assert calls == []                                   # unchanged: not read again
+    path.write_text("a: 22\n")
+    st = path.stat()
+    os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns + 10**9))
+    assert yamlio.load_file_cached(path) == {"a": 22}
+    assert calls == [path]

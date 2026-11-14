@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .fsio import write_text_atomic
+
 TUS_CALCULATOR_URL = "https://www.socsci.ru.nl/fusinitiative/tuscalculator/"
 
 # PRESTUS key (seconds) -> calculator label (milliseconds)
@@ -244,5 +246,5 @@ def read_settings(path: str | Path) -> dict:
 
 def write_settings(path: str | Path, settings: dict) -> Path:
     path = Path(path)
-    path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+    write_text_atomic(path, json.dumps(settings, indent=2) + "\n")
     return path

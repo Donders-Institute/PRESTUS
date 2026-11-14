@@ -3,11 +3,13 @@
 The jobs themselves (list, scheduler, SSH host, 30 s polling, cancel) live on the
 RunPage; a JobsView only shows them. One view is the Run section's "Jobs" side tab;
 "Pop out" opens another in its own window (JobsWindow), which can be maximised or
-moved to a second screen. Each view follows its selected job's log every 10 s.
+moved to a second screen. Each view follows its selected job's log every 10 s; logs are
+read on a worker thread (over SSH that takes seconds), one read at a time per view.
 """
 
 from __future__ import annotations
 
+import copy
 import html
 
 from PyQt6.QtCore import Qt, QTimer
@@ -108,6 +110,11 @@ class JobsView(QWidget):
         self.timer = QTimer(self)
         self.timer.setInterval(10_000)
         self.timer.timeout.connect(self.refresh_log)
+        self._log_read = None                 # (job id, tab key) of the read in flight
+        self._log_again = False               # selection or tab changed during that read
+        from .run_page import Relay
+        self._relay = Relay(self)
+        self._relay.done.connect(self._log_done, Qt.ConnectionType.QueuedConnection)
         page.jobs_changed.connect(self.show_jobs)
         self.show_jobs()
 
@@ -182,8 +189,38 @@ class JobsView(QWidget):
         if not job.work_dir:              # submitted, not yet seen by squeue/sacct
             self.page.refresh_jobs()
         key = LOG_TABS[self.tabs.currentIndex()][0]
+        if self._log_read is not None:    # one read at a time; read again when it is in
+            self._log_again = self._log_read != (job.job_id, key)
+            return
+        self._log_read = (job.job_id, key)
+        from .run_page import submit_background
+        self._relay.deliver((job.job_id, key),
+                            submit_background(hpc_jobs.read_log, copy.copy(job), key,
+                                              self.page.job_remote))
+
+    def log_busy(self) -> bool:
+        """A log read is in flight."""
+        return self._log_read is not None
+
+    def _log_done(self, tag, fut) -> None:
+        self._log_read = None
+        again, self._log_again = self._log_again, False
+        job = self.selected_job()
+        key = LOG_TABS[self.tabs.currentIndex()][0]
+        if again or job is None or (job.job_id, key) != tag:   # superseded: show what is selected now
+            self.refresh_log()
+            return
+        try:
+            path, text = fut.result()
+        except Exception as exc:
+            path, text = "", ""
+            self.path_label.setText(f"Job {job.job_id}: cannot read the {key} log ({exc}).")
+            self.timer.start()
+            return
+        self._show_log(job, key, path, text)
+
+    def _show_log(self, job: hpc_jobs.Job, key: str, path: str, text: str) -> None:
         view = self.views[key]
-        path, text = hpc_jobs.read_log(job, key, self.page.job_remote)
         if text != view.toPlainText():
             bar = view.verticalScrollBar()
             pos = bar.value()

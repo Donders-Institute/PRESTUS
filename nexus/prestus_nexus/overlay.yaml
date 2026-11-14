@@ -20,9 +20,15 @@
 #             'source'; 'ignored: true' when PRESTUS no longer reads them.
 #   sections: display labels and advanced flags for top-level groups.
 #             locked: true shows the section read-only until its card is unlocked
+#             icon: a glyph (ui/icons.py) left of the card title
 #             (validated constants most studies must not change).
+#             doc: the documentation page of the card (doc_x.md#anchor); tabs
+#             have one too, and subtab_docs: {sub-tab label: page}; 'docs:'
+#             (before 'display') gives single keys their own page.
 #   tune_goals / tuning: what a key can be tuned for (speed, accuracy, …);
 #             see the end of this file.
+#   choice_icons / choice_figures: schematics for drop-down choices
+#             (ui/choice_icons.py); see before 'tune_goals'.
 #
 # Keys found in config/config_calibration.yaml are recognised as belonging to
 # the calibration workflow and are not reported as unknown.
@@ -34,36 +40,47 @@
 #                row vector; yaml = free YAML text, e.g. int-or-'auto')
 #   choices:     allowed values (rendered as a drop-down)
 #   unit:        display unit
-#   visible_if:  {key: <dotted path>, in: [values]}  (or not_in)
+#   visible_if:  {key: <dotted path>, in: [values]}  (or not_in); a list of
+#                such conditions shows the field when all of them hold;
+#                {any_of: [...]} when one of them (a condition or a list) holds;
+#                key '__n_transducers' is the number of transducers in the config
 #   derived:     computed by PRESTUS; shown read-only, never written
 #   help:        replaces the help text taken from config_default.yaml
 
 sections:
-  general:            {label: General}
-  simulation:         {label: Simulation}
-  path:               {label: Paths}
-  startup:            {label: Environment}
-  io:                 {label: Input / output}
-  calibration:        {label: Calibration, advanced: true}
-  modules:            {label: Pipeline stages}
-  study:              {label: Study (group)}
-  hpc:                {label: HPC}
-  snellius:           {label: Snellius partitions, advanced: true}
-  analysis:           {label: Analysis}
-  transducer:         {label: Transducer}
-  placement:          {label: Placement}
-  grid:               {label: Grid}
-  segmentation:       {label: Segmentation, advanced: true}
-  headmodel:          {label: Head model, advanced: true}
-  pct:                {label: Pseudo-CT}
-  layers:             {label: Tissue layers, advanced: true}
-  timing:             {label: Sonication timing}
-  thermal:            {label: Thermal}
-  jwave:              {label: jwave backend}
-  babelbrain:         {label: BabelBrain backend}
-  elastic:            {label: Elastic skull model}
-  time_reversal:      {label: Time reversal, advanced: true}
-  medium_properties:  {label: Medium properties, advanced: true, locked: true}
+  general:            {label: Subject, icon: subject, sub: Which participant this config simulates; the ID numbers the input and output files., doc: doc_parameters.md#subject-and-platform-subject_id-platform}
+  simulation:         {label: Solvers, icon: wave, sub: Which solvers compute the acoustic field and the heating., doc: doc_backend.md}
+  compute:            {label: Compute device, icon: chip, sub: 'Where the solver runs: CPU, GPU or compiled code.', virtual: true, doc: doc_kwave.md#solver-implementations-code_type}
+  tx_geometry:        {label: Geometry, icon: elem_bowl, sub: 'Array type, frequency and element layout.', virtual: true, doc: doc_transducer.md#transducer-fields}   # array type, frequency, element geometry (group: tx_geometry)
+  tx_drive:           {label: Drive and steering, icon: steer_1d, sub: 'Target intensity, focal depth, element amplitudes and phases, and steering.', virtual: true, doc: doc_transducer.md#amplitude-and-phases}
+  coupling:           {label: Multi-transducer coupling, icon: coupling_coherent, sub: Whether several transducers add as pressure fields (coherent) or as intensities (async)., virtual: true, doc: doc_multitransducer.md#configuration}   # Sonication tab; only with several transducers (group: coupling)   # per-run drive: target ISPPA, amplitudes, phases, steering (group: tx_drive)   # the selected solvers' device fields (group: compute)
+  path:               {label: Paths, icon: folder, sub: 'Where PRESTUS finds the anatomical images and segmentation, and where it writes results.', doc: doc_parameters.md#data-paths-path}
+  startup:            {label: Environment, icon: wrench, sub: Locations of SimNIBS and the other external tools., doc: doc_parameters.md#environment-toolbox-paths-startup}
+  io:                 {label: Input and output, icon: io, sub: 'Output naming, the optional outputs that are saved, and how existing outputs are reused.', doc: doc_outputs_reuse.md#overwrite-behaviour}
+  calibration:        {label: Calibration conventions, icon: chart, sub: How the focal depth is referenced when calibration data are matched., advanced: true, doc: doc_calibration.md#focal-depth-convention-flhm}
+  modules:            {label: Pipeline stages, icon: stages, sub: Which stages of the pipeline run., doc: doc_modules.md#pipeline-stages}
+  study:              {label: Study, icon: people, sub: 'Several subjects or conditions, run from one table.', doc: doc_group.md#study-setup}
+  hpc:                {label: Where to run, icon: server, sub: Where the run executes and the cluster resources it requests., doc: doc_hpc.md#where-a-run-executes}
+  snellius:           {label: Snellius partitions, icon: server, sub: GPU partitions on the Snellius cluster., advanced: true, doc: doc_parameters.md#snellius-gpu-partitions-snellius}
+  analysis:           {label: Targeting analysis, icon: target, sub: Targeting accuracy against an intended MNI target or ROI., doc: doc_group.md#targeting-accuracy}
+  transducer:         {label: Transducer, icon: tx_annular, sub: 'The device, chosen from the equipment library, and its calibration.', doc: doc_transducer_library.md#using-a-library-entry}
+  placement:          {label: Placement, icon: target, sub: Where the transducer sits and where it focuses., doc: doc_placement.md#choosing-a-placement-mode}
+  grid:               {label: Simulation grid, icon: grid, sub: 'Resolution, size and orientation of the simulation grid.', doc: doc_simulations-acoustic.md#spatial-and-temporal-sampling}
+  segmentation:       {label: SimNIBS segmentation, icon: segmentation, sub: SimNIBS charm segmentation of the T1 (and T2 or UTE) into tissues., doc: doc_preproc.md#segmentation}
+  headmodel:          {label: Segmentation refinement, icon: refine, sub: 'How the segmentation is cleaned up before simulation, e.g. how holes in the skull are filled.', doc: doc_preproc.md#from-segmentation-to-grid}
+  head_smoothing:     {label: Smoothing, icon: smooth, sub: Smoothing of the tissue boundaries on the simulation grid., virtual: true, doc: doc_preproc.md#layer-mapping-and-smoothing}       # headmodel.smooth_* (group: head_smoothing)
+  grid_refinement:    {label: Head padding, icon: pad, sub: Margin around the head and CSF expansion before the grid is cropped., virtual: true, doc: doc_preproc.md#cropping}  # headmodel.csf_expansion, head_pad_mm
+  pct:                {label: CT-based skull mapping, icon: ct, sub: Subject-specific skull properties from a measured CT or a pseudo-CT made from a UTE image., doc: doc_pseudoCT.md}
+  layers:             {label: Tissue layers, icon: layers, sub: Which SimNIBS labels make up each simulated tissue., advanced: true, locked: true, lock_note: 'These map the SimNIBS charm labels onto the simulated tissues (skin, skull, brain, …). The defaults match charm''s labels; change them only for a different segmentation or a phantom, and report the mapping you used.', doc: doc_preproc.md#layer-mapping-and-smoothing}   # the SimNIBS charm labels per tissue
+  timing:             {label: Sonication protocol, icon: pulse, sub: 'Pulse duration, repetition and the length of the sonication.', doc: doc_simulations-thermal.md#protocol-timing}
+  thermal:            {label: Thermal model, icon: thermometer, sub: 'Time step, sensors and thermal dose of the heating simulation.', doc: doc_simulations-thermal.md#step-temperature-and-sensor-settings}
+  jwave:              {label: jwave options, icon: advanced, sub: Settings of the jwave solver., doc: doc_jwave.md#configuration-reference}
+  babelbrain:         {label: BabelBrain options, icon: advanced, sub: Settings of the BabelBrain solver., doc: doc_babelbrain.md}
+  elastic:            {label: Elastic skull options, icon: tissue_skull, sub: 'Shear waves in the skull, for the k-Wave elastic solver.', doc: doc_kwave.md#elastic-model-settings}
+  time_reversal:      {label: Time reversal, icon: redo, sub: 'Refocusing, aberration report and pose search by time reversal.', advanced: true, doc: doc_time_reversal.md#main-settings}
+  medium_properties:  {label: Tissue properties, icon: table, sub: 'Acoustic and thermal properties of each tissue, shown against the ITRUSST ranges.', locked: true, doc: doc_medium.md#default-tissue-properties}
+  uncertainty:        {label: Uncertainty analysis, icon: range, sub: Repeats the run at the ITRUSST property bounds to bracket the result., virtual: true, doc: doc_uncertainty.md#basic-usage}  # simulation.uncertainty* (group: uncertainty)
+  neuronav:           {label: Localite ingestion, icon: place_localite, sub: Importing recorded Localite neuronavigation poses., doc: doc_placement_neuronav_workflows.md#gui-workflow}   # Localite ingestion (top-level neuronav.*)
 
 fields:
   # ── General ──────────────────────────────────────────────────────────
@@ -74,23 +91,43 @@ fields:
   simulation.medium: {choices: [water, layered, phantom]}
   simulation.code_type:          # k-Wave runs: acoustic, thermal (with heating) or time reversal
     choices: [matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu, cpp_mlx]
+    visible_if:
+      any_of:
+        - {key: acoustic_backend, not_in: [jwave, babelbrain]}
+        - [{key: thermal_backend, not_in: [babelbrain]}, {key: modules.run_heating_sims, in: [1, true]}]
+        - {key: time_reversal.enabled, in: [1, true]}
   simulation.precision: {choices: [single, double]}
   simulation.interactive: {kind: flag}
   simulation.debug: {kind: flag}
-  simulation.transducer_coupling: {choices: [coherent, async]}
+  simulation.transducer_coupling: {choices: [coherent, async], visible_if: {key: __n_transducers, not_in: [0, 1]}}
   simulation.uncertainty_temp_high: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
   simulation.uncertainty_temp_low: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
   simulation.uncertainty_trans_high: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
   simulation.uncertainty_trans_low: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
 
   # ── Paths & environment ──────────────────────────────────────────────
-  path.anat: {kind: dir}
   path.sim: {kind: dir}
-  path.seg: {kind: dir}
+  # Only what the requested setup reads: anatomy and SimNIBS for a head model or a placement
+  # that needs the segmentation (MNI, heuristic, neuronavigation, planning tools)
+  path.anat: {kind: dir, visible_if: {any_of: [{key: simulation.medium, in: [layered, phantom]}, {key: placement.mode, not_in: [manual]}, {key: placement.manual.coordinate_space, in: [mni]}]}}
+  path.seg: {kind: dir, visible_if: {any_of: [{key: simulation.medium, in: [layered, phantom]}, {key: placement.mode, not_in: [manual]}, {key: placement.manual.coordinate_space, in: [mni]}]}}
+  path.t1_pattern: {visible_if: {any_of: [{key: simulation.medium, in: [layered, phantom]}, {key: placement.mode, not_in: [manual]}, {key: placement.manual.coordinate_space, in: [mni]}]}}
+  path.t2_pattern: {visible_if: {key: simulation.medium, in: [layered]}}
+  startup.simnibs_bin_path: {visible_if: {any_of: [{key: simulation.medium, in: [layered, phantom]}, {key: placement.mode, not_in: [manual]}, {key: placement.manual.coordinate_space, in: [mni]}]}}
+  io.save_MNI: {visible_if: {key: simulation.medium, in: [layered]}}
+  analysis: {visible_if: {key: simulation.medium, in: [layered, phantom]}}
+  modules.run_targeting_analysis: {visible_if: {key: simulation.medium, in: [layered, phantom]}}
+  modules.run_posthoc_water_sims: {visible_if: {key: simulation.medium, in: [layered, phantom]}}
   path.placement: {kind: dir}
   path.transducer_library: {kind: dir}
   path.localite*: {kind: dir}
-  path.localite_t1_pattern: {kind: str}
+  path.localite_t1_pattern: {kind: str, visible_if: {key: placement.mode, in: [localite]}}
+  # Localite folders: read by placement.mode 'localite'; the export folder is written by heuristic placement
+  path.localite_raw: {visible_if: {key: placement.mode, in: [localite]}}
+  path.localite_post: {visible_if: {key: placement.mode, in: [localite]}}
+  path.localite_t1: {visible_if: {key: placement.mode, in: [localite]}}
+  path.localite_export: {visible_if: {key: placement.mode, in: [heuristic]}}
+  path.localite: {visible_if: {key: placement.mode, in: [localite, heuristic]}}
   path.pct: {kind: dir, visible_if: [{key: pct.enabled, in: [1, true]}, {key: path.ct_pattern, in: ['', null]}]}
   path.ct_pattern: {kind: str, visible_if: [{key: simulation.medium, in: [layered]}, {key: pct.enabled, in: [1, true]}]}
   path.acoustic_input: {kind: file}
@@ -118,7 +155,10 @@ fields:
   hpc.memorylimit: {unit: GB}
   hpc.ld_library_path: {kind: path}
   # Scheduler settings mean nothing when the pipeline runs in this MATLAB session
-  hpc.*: {visible_if: {key: platform, not_in: [matlab]}}
+  # Scheduler settings only when a run is submitted: 'slurm'/'qsub', or 'auto' on a computer
+  # with sbatch/qsub or an SSH submission host (__scheduler, set by the main window)
+  hpc.*: {visible_if: {any_of: [{key: platform, in: [slurm, qsub]}, [{key: platform, in: [auto]}, {key: __scheduler, in: [true]}]]}}
+  hpc.posthoc_water_*: {visible_if: [{any_of: [{key: platform, in: [slurm, qsub]}, [{key: platform, in: [auto]}, {key: __scheduler, in: [true]}]]}, {key: modules.run_posthoc_water_sims, in: [1, true]}, {key: simulation.medium, in: [layered, phantom]}]}
   snellius: {visible_if: {key: hpc.name, in: [snellius]}}
 
   analysis.focus_area_radius: {unit: mm}
@@ -134,11 +174,11 @@ fields:
   transducer.type: {kind: str, choices: [annular, matrix]}
   transducer.freq_hz: {kind: number, unit: Hz}
   transducer.target_isppa_wcm2: {kind: numbers, unit: W/cm²}
-  transducer.trans_pos: {kind: vec3}
-  transducer.focus_pos: {kind: vec3}
   transducer.focal_distance_ep: {kind: number, unit: mm}
   transducer.focal_distance_bowl: {kind: number, unit: mm}
   transducer.focal_distance_offset: {kind: number, unit: mm, derived: true}
+  transducer.trans_pos: {kind: vec3, group: placement}
+  transducer.focus_pos: {kind: vec3, group: placement}
 
   transducer.annular: {visible_if: {key: transducer.type, in: [annular]}}
   transducer.annular.*: {kind: numbers}
@@ -231,10 +271,15 @@ fields:
   grid.source_ppw: {kind: number}
   grid.use_kWaveArray: {kind: flag}
   grid.axisymmetric: {kind: flag}
-  grid.axisymmetric_output: {choices: [auto, 2d, 3d]}
+  grid.axisymmetric_output: {choices: [auto, 2d, 3d], visible_if: {key: grid.axisymmetric, in: [1, true]}}
   grid.mode: {choices: [focal_axis, transducer_axis, ras_plus]}
   grid.focal_axis_min_norm: {visible_if: [{key: __n_transducers, not_in: [0, 1, 2]}, {key: grid.mode, in: [focal_axis]}]}
 
+  # Head-model sections apply only to media built from a segmentation
+  segmentation: {visible_if: {key: simulation.medium, in: [layered]}}
+  headmodel: {visible_if: {key: simulation.medium, in: [layered]}}
+  pct: {visible_if: {key: simulation.medium, in: [layered]}}
+  layers: {visible_if: {key: simulation.medium, in: [layered, phantom]}}
   segmentation.use_qform: {kind: flag}
   segmentation.debug: {kind: flag}
   segmentation.noneck: {kind: flag}
@@ -265,12 +310,35 @@ fields:
   # ── Timing & thermal ─────────────────────────────────────────────────
   timing.*: {unit: s}
   timing.equal_step_duration: {kind: flag, unit: ''}
-  thermal.cem43_iso: {kind: flag}
+  # Thermal settings apply only when the thermal simulation runs
+  thermal: {visible_if: {key: modules.run_heating_sims, in: [1, true]}}
+  thermal.cem43_iso:
+    kind: flag
+    choices: [0, 1]
+    choice_labels: {0: "k-Wave (kWaveDiffusion)", 1: "ISO 14708-3 / ITRUSST"}
+    choice_math:      # doc_simulations-thermal.md#thermal-dose-cem43-calculation; Δt in s, T in °C
+      0:
+        - '\mathrm{CEM}_{43} = \sum_t \frac{\Delta t}{60}\, R^{43 - T}'
+        - 'R = 0\;(T < 37),\quad 0.25\;(37 \leq T < 43),\quad 0.5\;(T \geq 43)'
+      1:
+        - '\mathrm{CEM}_{43} = \sum_t \frac{\Delta t}{60}\, R^{43 - T}'
+        - 'R = 0\;(T < 39),\quad 0.25\;(39 \leq T < 43),\quad 0.5\;(T \geq 43\ \mathrm{or}\ T_\mathrm{max} \geq 43)'
+        - '\mathrm{CEM}_{43} = \infty\;\;(T\ \mathrm{or}\ T_\mathrm{max} \geq 57)'
+        - '> R stays 0.5 once 43 °C has been reached (no thermotolerance after 43 °C); above 57 °C the ISO formula is not valid, so PRESTUS flags the voxel.'
   thermal.temp_0.*: {unit: °C}
   thermal.log_thermal_updates: {kind: flag}
 
   # ── Backends ─────────────────────────────────────────────────────────
   jwave: {visible_if: {key: acoustic_backend, in: [jwave]}}
+  # Time-reversal options apply only with time_reversal.enabled; search/workflow settings only with their own switch
+  time_reversal.apply_phases: {visible_if: {key: time_reversal.enabled, in: [1, true]}}
+  time_reversal.save_field: {visible_if: {key: time_reversal.enabled, in: [1, true]}}
+  time_reversal.only: {visible_if: {key: time_reversal.enabled, in: [1, true]}}
+  time_reversal.placement_search.*: {visible_if: {key: time_reversal.placement_search.enabled, in: [1, true]}}
+  time_reversal.placement_search: {visible_if: {key: time_reversal.enabled, in: [1, true]}}
+  time_reversal.placement_search.enabled: {visible_if: ~}
+  time_reversal.pose_workflow.*: {visible_if: {key: time_reversal.pose_workflow.enabled, in: [1, true]}}
+  time_reversal.pose_workflow.enabled: {visible_if: ~}
   time_reversal.placement_search.jitter_mm: {kind: yaml, unit: mm}
   time_reversal.placement_search.jitter_mode: {kind: str, choices: [grid, scalp]}
   grid.water_baseline_grid: {kind: str, choices: [beam, full]}
@@ -281,7 +349,7 @@ fields:
   time_reversal.pose_workflow.max_focus_error_mm: {kind: yaml, unit: mm}
   time_reversal.pose_workflow.search_memorylimit: {kind: yaml, unit: GB}
   jwave.python_env: {kind: path}
-  jwave.python_env_gpu: {kind: path}
+  jwave.python_env_gpu: {kind: path, visible_if: {key: jwave.use_gpu, not_in: [false, 0]}}
   jwave.use_gpu: {kind: tristate}
   jwave.precision: {choices: [single, double]}
   jwave.solver: {choices: [helmholtz, pseudo_spectral, finite_differences]}
@@ -427,7 +495,7 @@ extra:
     kind: str
     default: shared
     choices: [shared, per_transducer]
-    visible_if: {key: simulation.transducer_coupling, in: [async]}
+    visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}]
     help: "Async coupling: 'shared' preprocesses one grid for all transducers; 'per_transducer' builds one grid each (parallel on HPC)."
   simulation.uncertainty:
     kind: bool
@@ -451,6 +519,7 @@ extra:
     kind: str
     default: linear
     choices: [linear, tukey]
+    unit: ''              # not a duration (timing.* defaults to s)
     help: "Shape of the pulse ramp: 'linear' or 'tukey' (raised cosine)."
   transducer.annular.elem_phase_rad:
     kind: numbers
@@ -462,11 +531,14 @@ extra:
     kind: str
     default: kwave
     choices: [kwave, kwave_elastic, babelbrain, jwave]
+    choice_labels: {kwave: kwave, kwave_elastic: "kwave_elastic (experimental)", babelbrain: "babelbrain (experimental)", jwave: "jwave (experimental)"}
     help: "Acoustic solver: 'kwave' (default) | 'kwave_elastic' (shear waves in skull) | 'babelbrain' | 'jwave'"
   thermal_backend:
     kind: str
     default: kwave
     choices: [kwave, babelbrain]
+    choice_labels: {kwave: kwave, babelbrain: "babelbrain (experimental)"}
+    visible_if: {key: modules.run_heating_sims, in: [1, true]}
     help: "Thermal solver: 'kwave' (default) | 'babelbrain' (requires acoustic_backend: 'babelbrain')"
   transducer.serial:
     kind: str
@@ -645,6 +717,7 @@ tabs:
     label: Setup
     intro: Subject, input and output folders, software locations and how outputs are written.
     sections: [general, path, startup, io]
+    doc: doc_configuration.md
   - key: transducer
     label: Transducer
     intro: The device and driving system, its geometry, drive level and focal depth.
@@ -657,18 +730,48 @@ tabs:
     label: Simulation
     intro: Medium and solver, the simulation grid, the sonication protocol and the thermal model.
     sections: [simulation, grid, timing, thermal, segmentation, headmodel, pct, layers, medium_properties, jwave, babelbrain, elastic, time_reversal]
+    doc: doc_nexus_tabs.md#placement-viewer
+    subtab_docs: {Settings: doc_placement.md#choosing-a-placement-mode, Viewer: doc_nexus_tabs.md#placement-viewer, Beam axis: doc_nexus_tabs.md#placement-viewer, 3D: doc_nexus_tabs.md#placement-viewer, Localite: doc_nexus_calibration-localite.md#localite-page, PlanTUS: doc_placement_plantus.md#running-plantus, TUS entry: doc_placement_tus_entry.md}
   - key: study
     label: Study
     intro: Many subjects with per-run settings, targeting accuracy and the group report.
     sections: [study, analysis]
+    doc: doc_nexus_tabs.md#study-tab
   - key: run
     label: Run
     intro: Pipeline stages, where to run (this computer or HPC), and the run log.
     sections: [modules, hpc, snellius]
+    doc: doc_nexus_tabs.md#run-tab
+    subtab_docs: {Where to run: doc_hpc.md#where-a-run-executes, Stages: doc_modules.md}
   - key: results
     label: Results
     intro: Acoustic/thermal maps, the HTML report and the output table from the last run.
     sections: []
+    doc: doc_nexus_tabs.md#results-tab
+
+# ── Docs: a key's own page, where it is more specific than its section's ──
+# 'doc:' on a section or tab names the page (doc/*.md, '#anchor' optional) the
+# card's ↗ button, the field help and Help ▸ Docs for this tab open; 'docs:'
+# overrides it per key (same pattern rules as 'fields'; the last match wins).
+# test_docs.py checks that every page is in the mkdocs nav and every anchor exists.
+docs:
+  grid.mode: doc_preproc.md#orientation
+  grid.acoustic_fov_*: doc_limited_fov.md#fov-box-geometry
+  grid.z_beyond_focus_mm: doc_limited_fov.md#fov-box-geometry
+  simulation.async_grid_mode: doc_multitransducer_async.md#grid-geometry-mode
+  simulation.transducer_coupling: doc_multitransducer_async.md#async-configuration
+  transducer.target_isppa_wcm2: doc_simulations-acoustic.md#isppa-targeting
+  modules.run_water_baseline: doc_simulations-acoustic.md#isppa-targeting
+  placement.mode: doc_placement.md#choosing-a-placement-mode
+  placement.manual*: doc_placement.md#manual-coordinate-selection
+  placement.heuristic*: doc_placement_heuristic.md
+  placement.mni*: doc_placement_mni.md#how-a-position-is-resolved
+  placement.localite*: doc_placement_neuronav_coordinates.md
+  placement.plantus*: doc_placement_plantus.md#running-plantus
+  placement.tus_entry*: doc_placement_tus_entry.md#required-configuration
+  simulation.medium: doc_medium.md#choosing-the-medium
+  io.overwrite_files: doc_outputs_reuse.md#overwrite-behaviour
+  io.cache_signature_check: doc_outputs_reuse.md#cache-reuse-checks
 
 # ── Display: labels, advanced flags, placement in the forms ───────────
 # Same pattern rules as 'fields' (applied after them). 'label' replaces the
@@ -700,7 +803,7 @@ display:
   path.sim: {label: Simulation outputs folder}
   path.seg: {label: SimNIBS segmentations folder}
   path.t1_pattern: {label: T1 file pattern}
-  path.t2_pattern: {label: T2 file pattern}
+  path.t2_pattern: {label: T2 / UTE file pattern}
   path.localite_raw: {label: Localite exports (raw), group: placement}
   path.localite_post: {label: Ingested Localite markers, group: placement}
   path.localite_t1: {label: Localite planning T1 folder, group: placement, advanced: true}
@@ -725,8 +828,8 @@ display:
 
   # I/O
   io.output_affix: {label: Output name affix}
-  io.overwrite_files: {label: Overwrite existing outputs, help: "What to do when outputs already exist: 'never' reuses them; 'always' recomputes the outputs (chained pipelines reuse intermediate caches); 'force' also recomputes intermediate stages; any other value asks. See doc_outputs.md#overwrite-behaviour."}
-  io.cache_signature_check: {label: Check reused caches, help: "When a grid or medium cache is reused (overwrite 'never', or intermediate stages of chained pipelines) but was built with different settings: 'error' stops, 'warn' reuses it anyway, 'off' skips the check. See doc_outputs.md#cache-reuse-checks."}
+  io.overwrite_files: {label: Overwrite existing outputs, advanced: true, help: "What to do when outputs already exist: 'never' reuses them; 'always' recomputes the outputs (chained pipelines reuse intermediate caches); 'force' also recomputes intermediate stages; any other value asks. See doc_outputs_reuse.md#overwrite-behaviour."}
+  io.cache_signature_check: {label: Check reused caches, advanced: true, help: "When a grid or medium cache is reused (overwrite 'never', or intermediate stages of chained pipelines) but was built with different settings: 'error' stops, 'warn' reuses it anyway, 'off' skips the check. See doc_outputs_reuse.md#cache-reuse-checks."}
   io.overwrite_simnibs: {label: Re-run SimNIBS segmentation, advanced: true}
   io.save_*: {advanced: true}
   io.save_MNI: {label: Also save MNI-space NIfTIs, advanced: false}
@@ -740,7 +843,6 @@ display:
   io.save_Ita: {label: Save time-average intensity map}
   io.save_p_complex: {label: Save complex pressure field}
 
-  calibration: {label: Calibration conventions}
   calibration.focal_reference: {label: Focal-depth reference, advanced: true}
 
   # Pipeline stages
@@ -780,7 +882,6 @@ display:
   hpc.max_wait_checks: {label: Max. status checks while waiting, advanced: true}
 
   # Analysis
-  analysis: {label: Targeting & analysis}
   analysis.focus_area_radius: {label: Target area radius, advanced: true}
   analysis.target_mni_mm: {label: Intended target (MNI)}
   analysis.target_roi_mni: {label: Target ROI mask (MNI)}
@@ -888,11 +989,10 @@ display:
   placement.tus_entry.target_mask: {label: Target mask}
   placement.tus_entry.mni_target_mm: {label: Target (MNI)}
   placement.tus_entry.return_candidates: {label: Save ranked candidates}
-  placement.tus_entry.minimal_distance_cm: {advanced: false}
-  placement.tus_entry.maximal_distance_cm: {advanced: false}
-  placement.tus_entry.transducer_size_cm: {advanced: false}
+  placement.tus_entry.minimal_distance_cm: {label: "Min. distance", advanced: false}
+  placement.tus_entry.maximal_distance_cm: {label: "Max. distance", advanced: false}
+  placement.tus_entry.transducer_size_cm: {label: "Transducer size", advanced: false}
 
-  neuronav: {label: Localite ingestion (neuronav_gui)}
   neuronav.*: {advanced: true}
   neuronav.coil_map: {label: Coil map}
   neuronav.suggest_names: {label: Name series after planned targets}
@@ -902,7 +1002,6 @@ display:
   neuronav.batch_write: {label: Batch ingestion writes}
 
   # Grid
-  grid: {label: Simulation grid}
   grid.*: {advanced: true}
   grid.resolution_mm: {label: Grid resolution, advanced: false, help: "Isotropic grid spacing [mm]. The frequency sets its upper limit: at least grid.min_ppw (default 6) points per wavelength in the slowest modelled tissue, e.g. 0.5 mm or finer at 500 kHz in water (1500 m/s). Below that PRESTUS warns, and jwave stops. For head and phantom media, a grid coarser than 0.75 mm staircases the tissue transitions (skull, scalp), which may affect the results."}
   grid.default_dims: {label: Free-water grid size, help: "Grid points of free-water simulations. 'auto' (default) sizes the grid to the transducer: aperture + 2 × water_margin_mm laterally, focal distance from the bowl + z_beyond_focus_mm axially; same free-water ISPPA and focus as [144, 144, 400]. Or explicit sizes, e.g. [144, 144, 400] (3D) or [144, 400] (axisymmetric); a matrix transducer placed by grid indices keeps [144, 144, 400] under 'auto'."}
@@ -933,24 +1032,20 @@ display:
   grid.sim_time_us: {label: Fixed simulation duration}
   grid.origin_ras_mm: {label: "RAS origin of voxel [1,1,1]"}
 
-  segmentation: {label: SimNIBS segmentation}
   segmentation.use_qform: {label: Force qform reorientation}
-  segmentation.debug: {label: charm debug output}
-  headmodel: {label: Head model processing}
-  pct: {label: Pseudo-CT skull properties}
-  layers: {label: Tissue layers (SimNIBS labels)}
-  medium_properties: {label: Tissue acoustic & thermal properties}
-  jwave: {label: jwave solver}
-  babelbrain: {label: BabelBrain solver}
-  elastic: {label: Elastic (shear-wave) skull model}
-  time_reversal: {label: Time reversal (refocusing, aberration report, pose search)}
+  segmentation.debug: {label: charm debug output, advanced: true}
   segmentation.noneck: {label: Scan without neck (charm --noneck), advanced: true}
   segmentation.settings_file: {label: Custom charm settings file, advanced: true}
   segmentation.deface: {label: Defaced copy for sharing (pydeface), advanced: true}
   io.deface_plots: {label: Deface QC figures}
+  # Head model: the processing choices are shown; their tuning parameters are advanced
+  headmodel.head_pad_mm: {label: "Head padding", advanced: true}
+  headmodel.smooth_threshold_*: {advanced: true}
+  headmodel.smooth_fwhm_mm: {label: "Smoothing FWHM", advanced: true}
+  headmodel.smooth_properties: {label: "Smooth the property maps too", advanced: true}
+  headmodel.skull_wrap_visualize: {label: "Show the rubber-wrap result", advanced: true}
 
   # Timing
-  timing: {label: Sonication protocol}
   timing.pd: {label: Pulse duration (PD)}
   timing.pri: {label: Pulse repetition interval (PRI)}
   timing.ptd: {label: Pulse train duration (PTD)}
@@ -964,13 +1059,169 @@ display:
   timing.equal_step_duration: {label: Equal on/off step durations, advanced: true}
 
   # Thermal
-  thermal: {label: Thermal model}
   thermal.*: {advanced: true}
-  thermal.cem43_iso: {label: ISO CEM43 variant, help: Use the ISO 14708-3 / ITRUSST form of CEM43 in the HTML report. Both forms are always computed and saved.}
+  thermal.cem43_iso: {label: CEM43 form in the report, advanced: false, help: "Thermal dose form the HTML report uses (dashboard, safety verdict, methods text): k-Wave's kWaveDiffusion form or the ISO 14708-3 / ITRUSST form. Both forms are always computed and saved."}
   thermal.temp_0: {label: Initial temperatures}
   thermal.log_thermal_updates: {label: Verbose thermal log}
 
+  # Readable labels for keys whose names do not read as words (labels.py covers the rest)
   hpc.exclude: {label: "Excluded nodes"}
+  hpc.posthoc_water_timelimit: {label: "Time limit, post-hoc free-water jobs"}
+  hpc.posthoc_water_memorylimit: {label: "Memory limit, post-hoc free-water jobs"}
+  transducer.matrix.elem_shape: {label: "Element shape"}
+  transducer.matrix.is_curved: {label: "Curved array"}
+  transducer.matrix.curv_radius_mm: {label: "Radius of curvature"}
+  transducer.matrix.dist_geom_ep_mm: {label: "Exit plane to geometric focus"}
+  transducer.matrix.depth_mm: {label: "Housing depth (display)"}
+  transducer.matrix.is_clover_setup: {label: "Clover arrangement"}
+  transducer.matrix.clover: {label: "Clover arrangement"}
+  transducer.matrix.clover.n_leaves: {label: "Number of leaves"}
+  transducer.matrix.clover.ROC_parent: {label: "Parent radius of curvature"}
+  transducer.matrix.clover.az_sep_deg: {label: "Azimuthal separation of leaves"}
+  transducer.matrix.clover.elevation_deg: {label: "Leaf tilt"}
+  transducer.matrix.matrix_shape: {label: "Element layout"}
+  transducer.matrix.matrix_shape.type: {label: "Element layout source"}
+  transducer.matrix.matrix_shape.define_here: {label: "Layout defined here"}
+  transducer.matrix.matrix_shape.define_here.grid_shape: {label: "Grid shape"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.type: {label: "Element layout"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.rect: {label: "Rectangular grid"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.rect.elem_n_row: {label: "Rows"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.rect.elem_n_col: {label: "Columns"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.rect.elem_spacing_height_mm: {label: "Row spacing"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.rect.elem_spacing_width_mm: {label: "Column spacing"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.rect.sparsity_factor: {label: "Fraction of elements used"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.fibonacci: {label: "Fibonacci spiral"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.fibonacci.elem_n: {label: "Number of elements"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.fibonacci.kerf_mm: {label: "Kerf"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.fermat: {label: "Fermat spiral"}
+  transducer.matrix.matrix_shape.define_here.grid_shape.fermat.elem_n: {label: "Number of elements"}
+  transducer.matrix.matrix_shape.extract_from_file: {label: "Layout from file"}
+  transducer.matrix.matrix_shape.extract_from_file.file_path: {label: "Element position file"}
+  transducer.matrix.matrix_shape.extract_from_file.start_row: {label: "First data row"}
+  transducer.matrix.matrix_shape.extract_from_file.start_col: {label: "First data column"}
+  transducer.matrix.matrix_shape.extract_from_file.rot_col: {label: "Rotation column"}
+  transducer.matrix.matrix_shape.extract_from_file.elem_n: {label: "Number of elements"}
+  transducer.matrix.matrix_shape.extract_from_file.select_random_subset: {label: "Use a random subset"}
+  transducer.matrix.matrix_shape.extract_from_file.subset: {label: "Random subset"}
+  transducer.matrix.matrix_shape.extract_from_file.subset.random_seed: {label: "Random seed"}
+  transducer.matrix.matrix_shape.extract_from_file.subset.subset_n_elements: {label: "Elements in the subset"}
+  transducer.matrix.matrix_shape.extract_from_file.project_on_new_ROC: {label: "Project onto a new radius of curvature"}
+  transducer.matrix.matrix_shape.extract_from_file.ROC_projection: {label: "Projection"}
+  transducer.matrix.matrix_shape.extract_from_file.ROC_projection.new_ROC_mm: {label: "New radius of curvature"}
+  headmodel.csf_expansion: {label: "CSF mask expansion"}
+  headmodel.smooth_method: {label: "Smoothing filter"}
+  headmodel.smooth_threshold_skull: {label: "Skull mask threshold"}
+  headmodel.smooth_threshold_other: {label: "Other tissue mask threshold"}
+  headmodel.skull_fill_method: {label: "Skull hole filling"}
+  headmodel.skull_wrap_radius: {label: "Rubber-wrap radius"}
+  headmodel.reuse_across_placements: {label: "Reuse the head model across placements"}
+  pct.enabled: {label: "Use CT-based skull mapping"}
+  pct.skull_mapping: {label: "UTE-to-HU mapping"}
+  pct.custom_slope: {label: "Custom mapping slope"}
+  pct.custom_intercept: {label: "Custom mapping intercept"}
+  pct.debug: {label: "Debug outputs"}
+  pct.mapping_density: {label: "HU-to-density mapping"}
+  pct.density_calibration: {label: "HU-to-density table"}
+  pct.mapping_soundspeed: {label: "HU-to-sound-speed mapping"}
+  pct.mapping_attenuation: {label: "HU-to-attenuation mapping"}
+  time_reversal.enabled: {label: "Run time reversal"}
+  time_reversal.apply_phases: {label: "Apply the time-reversal phases"}
+  time_reversal.save_field: {label: "Save the reverse field"}
+  time_reversal.only: {label: "Stop after time reversal"}
+  time_reversal.placement_search: {label: "Placement search"}
+  time_reversal.placement_search.enabled: {label: "Search placements"}
+  time_reversal.placement_search.max_angle_deg: {label: "Max. tilt angle"}
+  time_reversal.placement_search.angle_step_deg: {label: "Tilt step"}
+  time_reversal.placement_search.aim_iterations: {label: "Corrected-aim iterations"}
+  time_reversal.placement_search.jitter_mm: {label: "Apex jitter distances"}
+  time_reversal.placement_search.jitter_mode: {label: "Jitter directions"}
+  time_reversal.pose_workflow: {label: "Pose workflow"}
+  time_reversal.pose_workflow.enabled: {label: "Run the pose workflow"}
+  time_reversal.pose_workflow.n_top: {label: "Best poses to verify"}
+  time_reversal.pose_workflow.poses: {label: "Extra poses to verify"}
+  time_reversal.pose_workflow.aim: {label: "Verification aim"}
+  time_reversal.pose_workflow.verify_fov: {label: "Verification grid"}
+  time_reversal.pose_workflow.target_radius_mm: {label: "Target sphere radius"}
+  time_reversal.pose_workflow.rank_by: {label: "Rank poses by"}
+  time_reversal.pose_workflow.max_focus_error_mm: {label: "Max. focus error"}
+  time_reversal.pose_workflow.final_run: {label: "Final full-grid run"}
+  time_reversal.pose_workflow.search_memorylimit: {label: "Memory limit, search run"}
+  jwave.python_env: {label: "Python environment"}
+  jwave.python_env_gpu: {label: "Python environment (GPU)"}
+  jwave.fd_accuracy: {label: "Finite-difference order"}
+  jwave.gmres_tol: {label: "GMRES tolerance"}
+  jwave.helmholtz_operator: {label: "Helmholtz density term"}
+  jwave.cleanup_cache: {label: "Delete the cache after the run"}
+  elastic.shear_mapping: {label: "Shear property mapping"}
+  elastic.shear_density_min: {label: "Min. density with shear"}
+  elastic.poisson_min: {label: "Min. Poisson ratio"}
+  elastic.alpha_coeff_shear: {label: "Shear attenuation coefficient"}
+  elastic.alpha_power_shear: {label: "Shear attenuation power law"}
+  elastic.alpha_coeff_long: {label: "Longitudinal attenuation coefficient"}
+  elastic.alpha_power_long: {label: "Longitudinal attenuation power law"}
+  elastic.long_attenuation: {label: "Longitudinal attenuation source"}
+  elastic.min_ppw_shear: {label: "Min. points per wavelength (shear)"}
+  # BabelBrain card: environment, resolution and domain up front; solver internals advanced
+  babelbrain.ppw: {label: "Points per wavelength"}
+  babelbrain.do_refocusing: {label: "Refocusing", advanced: true}
+  babelbrain.focal_calibration: {label: "Focal calibration", advanced: true}
+  babelbrain.focal_calibration_target: {label: "Focal calibration target", advanced: true}
+  babelbrain.profile_calibration: {label: "Axial profile calibration", advanced: true}
+  babelbrain.water_amp_calibration: {label: "Free-water amplitude calibration", advanced: true}
+  babelbrain.use_rayleigh_for_water: {label: "Rayleigh integral for free water", advanced: true}
+  babelbrain.q_correction: {label: "Bone Q correction", advanced: true}
+  babelbrain.z_beyond_focus_mm: {label: "Axial extent beyond the focus"}
+  babelbrain.python_env: {label: "Python environment"}
+  babelbrain.cleanup_cache: {label: "Delete the cache after the run", advanced: true}
+  babelbrain.dry_run: {label: "Prepare inputs only (dry run)", advanced: true}
+  babelbrain.tight_narrow_beam: {label: "Narrow-beam domain", advanced: true}
+  transducer.tx_calibration: {label: "Drive calibration record"}
+  transducer.combo: {label: "Device combination"}
+  grid.water_margin_mm: {label: "Lateral water margin"}
+  grid.water_baseline_grid: {label: "Free-water baseline grid"}
+  placement.tus_entry.exclu_mask: {label: "Exclusion mask"}
+  placement.plantus.min_distance_mm: {label: "Min. distance"}
+  placement.plantus.max_distance_mm: {label: "Max. distance"}
+  placement.plantus.optimal_distance_mm: {label: "Optimal distance"}
+
+# ── Choice icons and figures ───────────────────────────────────────────
+# Schematics for drop-down choices, drawn in ui/choice_icons.py. Exact key
+# paths only. 'choice_icons' puts a glyph before a choice in the drop-down;
+# 'choice_figures' shows figures (with captions) under the selected choice.
+# A choice without an entry stays text only. Quote choices YAML would read as
+# booleans ('off'). test_schema checks keys, choices and names.
+choice_icons:
+  simulation.transducer_coupling: {coherent: coupling_coherent, async: coupling_async}
+  simulation.async_grid_mode: {shared: asyncgrid_shared, per_transducer: asyncgrid_per_transducer}
+  simulation.medium: {water: medium_water, layered: medium_layered, phantom: medium_phantom}
+  transducer.type: {annular: tx_annular, matrix: tx_matrix}
+  transducer.matrix.steering: {'1D': steer_1d, '3D': steer_3d}
+  transducer.matrix.elem_shape: {rect: elem_rect, disc: elem_disc, bowl: elem_bowl}
+  transducer.matrix.matrix_shape.define_here.grid_shape.type: {rect: layout_rect, fibonacci: layout_fibonacci, fermat: layout_fermat}
+  placement.mode: {manual: place_manual, localite: place_localite, heuristic: place_heuristic, mni: place_mni, plantus: place_plantus, tus_entry: place_tus_entry}
+  grid.mode: {focal_axis: gridmode_focal_axis, transducer_axis: gridmode_transducer_axis, ras_plus: gridmode_ras_plus}
+  grid.axisymmetric_output: {'2d': axisym_2d, '3d': axisym_3d}
+  grid.water_baseline_grid: {beam: baseline_beam, full: baseline_full}
+  calibration.focal_reference: {peak: focalref_peak, flhm_3db: focalref_flhm_3db, flhm_6db: focalref_flhm_6db}
+  headmodel.smooth_method: {gaussian: smooth_gaussian, box: smooth_box, 'off': smooth_off}
+  headmodel.skull_fill_method: {rubberwrap: fill_rubberwrap, imclose: fill_imclose}
+  timing.pulse_ramp_shape: {linear: ramp_linear, tukey: ramp_tukey}
+  time_reversal.pose_workflow.aim: {geometric: aim_geometric, corrected: aim_corrected, both: aim_both}
+  time_reversal.pose_workflow.rank_by: {target_intensity: rank_target_intensity, focus_error: rank_focus_error}
+  time_reversal.placement_search.jitter_mode: {grid: jitter_grid, scalp: jitter_scalp}
+
+choice_figures:
+  simulation.transducer_coupling:
+    coherent: [coupling_wavefronts_coherent, coupling_traces_coherent]
+    async: [coupling_wavefronts_async, coupling_traces_async]
+  grid.mode:
+    focal_axis: [gridmode_focal_axis_fig]
+    transducer_axis: [gridmode_transducer_axis_fig]
+    ras_plus: [gridmode_ras_plus_fig]
+  simulation.async_grid_mode:
+    shared: [asyncgrid_shared_fig]
+    per_transducer: [asyncgrid_per_transducer_fig]
+
 # ── Tuning: keys worth revisiting when optimising a run ────────────────
 # Most users never touch these. 'tuning' tags a key (same pattern rules as
 # 'fields') with the goals it trades off; the Nexus then offers them through

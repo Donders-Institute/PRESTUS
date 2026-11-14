@@ -12,6 +12,25 @@ from .model import ConfigModel, is_empty
 from .paths import m2m_dir
 
 
+_TEXT_CACHE: dict[str, tuple[tuple[int, int], str]] = {}
+
+
+def _read_text(path: Path) -> str:
+    """The file's text, reused while its size and modification time are unchanged: a stat
+    on the project volume is quick, but each open costs a round trip (about 0.2 s), and
+    the placement views read these files on every redraw. Raises OSError like read_text."""
+    st = path.stat()
+    stamp = (st.st_size, st.st_mtime_ns)
+    hit = _TEXT_CACHE.get(str(path))
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
+    text = path.read_bytes().decode("utf-8")
+    if len(_TEXT_CACHE) > 64:
+        _TEXT_CACHE.clear()
+    _TEXT_CACHE[str(path)] = (stamp, text)
+    return text
+
+
 def _subject_id(model: ConfigModel) -> int | None:
     sid = model.get("subject_id")
     if isinstance(sid, (int, float)) and not isinstance(sid, bool) and sid == int(sid) and 0 <= sid <= 999:

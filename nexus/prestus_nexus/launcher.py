@@ -8,6 +8,8 @@ import os
 import shutil
 from pathlib import Path
 
+from .fsio import write_text_atomic
+
 OK_SENTINEL = "[PRESTUS Nexus] OK"
 FAIL_SENTINEL = "[PRESTUS Nexus] FAILED"
 
@@ -147,7 +149,7 @@ def study_launcher_path(study: Path) -> Path:
 
 def write_study_launcher(study: Path, prestus_root: Path, local: bool = True) -> Path:
     path = study_launcher_path(study)
-    path.write_text(study_script(study, prestus_root, local), encoding="utf-8")
+    write_text_atomic(path, study_script(study, prestus_root, local))
     return path
 
 
@@ -245,7 +247,7 @@ def ingest_script_path(study: Path) -> Path:
 
 def write_ingest_script(study: Path, prestus_root: Path, selection: list[tuple[str, str]]) -> Path:
     path = ingest_script_path(study)
-    path.write_text(ingest_script(study, prestus_root, selection), encoding="utf-8")
+    write_text_atomic(path, ingest_script(study, prestus_root, selection))
     return path
 
 
@@ -291,5 +293,5 @@ def kwave_drive_script(fit_mat: Path, prestus_root: Path, library_path: str | Pa
 
 def write_kwave_drive_script(path: Path, *args, **kwargs) -> Path:
     path = Path(path)
-    path.write_text(kwave_drive_script(*args, **kwargs), encoding="utf-8")
+    write_text_atomic(path, kwave_drive_script(*args, **kwargs))
     return path

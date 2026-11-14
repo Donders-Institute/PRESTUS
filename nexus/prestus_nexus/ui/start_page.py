@@ -1,4 +1,4 @@
-"""Start tab: a first simulation in four steps (head image, transducer, target, run).
+"""QuickStart tab: a first simulation in four steps (head image, transducer, target, run).
 
 Everything a first run needs fits on one page; every other setting keeps its PRESTUS default
 and stays on the other tabs. The page writes the same config keys as those tabs (it is a
@@ -14,11 +14,11 @@ from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QDoubleSpinBox, QFileDialo
                              QHBoxLayout, QLabel, QLineEdit, QPushButton, QRadioButton, QScrollArea,
                              QSpinBox, QVBoxLayout, QWidget)
 
-from .. import labels
+from .. import docs, labels
 from .. import quickstart as qs
 from ..model import TX, ConfigModel, is_empty
 from ..paths import m2m_dir, resolve_pattern
-from . import style
+from . import icons, style
 
 CONTENT_WIDTH = 920
 # Which issues belong to which step (prefixes of Issue.path)
@@ -27,6 +27,11 @@ STEP_KEYS = {
     "transducer": (f"{TX}.", "calibration."),
     "target": ("placement.", "placement viewer"),     # the viewer's checks (QC_PATH)
 }
+# 'Learn more' on each step: the page that explains it (step number -> doc reference)
+STEP_DOCS = {1: "doc_nexus_tabs.md#quickstart-tab",
+             2: "doc_nexus.md#2-check-the-transducer",
+             3: "doc_placement.md#choosing-a-placement-mode",
+             4: "doc_nexus.md#5-run-the-simulation"}
 TARGET_MODES = {"heuristic": "placement.heuristic.mni_target_mm", "mni": "placement.mni.focus_pos_mm"}
 
 
@@ -48,6 +53,11 @@ class _Step(QFrame):
         t.setObjectName("CardTitle")
         head.addWidget(t)
         head.addStretch(1)
+        self.learn = QLabel()                   # set_doc: 'Learn more' link to the docs
+        self.learn.setVisible(False)
+        self.learn.setToolTip("Open documentation")
+        self.learn.linkActivated.connect(docs.open_doc)
+        head.addWidget(self.learn)
         self.status = QLabel()
         head.addWidget(self.status)
         v.addLayout(head)
@@ -59,6 +69,11 @@ class _Step(QFrame):
         self.body.setSpacing(8)
         v.addLayout(self.body)
         self.set_state("todo", "To do")
+
+    def set_doc(self, ref: str) -> None:
+        """Show a 'Learn more' link that opens doc reference `ref`."""
+        self.learn.setText(f"<a href='{ref}'>Learn more</a>")
+        self.learn.setVisible(bool(ref))
 
     def set_state(self, state: str, text: str) -> None:
         c = style.active()
@@ -136,6 +151,7 @@ class StartPage(QWidget):
         self.step_run = self._build_run_step()
         for i, s in enumerate((self.step_image, self.step_tx, self.step_target, self.step_run), 1):
             s.badge.setProperty("n", str(i))
+            s.set_doc(STEP_DOCS.get(i, ""))
             self.col.addWidget(s)
         self.col.addStretch(1)
 
@@ -432,6 +448,11 @@ class StartPage(QWidget):
         self.rb_auto.setToolTip("placement.mode: heuristic (searches the scalp for a good entry point)")
         self.rb_entry = QRadioButton("Target and transducer position")
         self.rb_entry.setToolTip("placement.mode: mni (the transducer point is snapped to the scalp)")
+        node = self.model.schema.get("placement.mode")
+        for b, mode in ((self.rb_auto, "heuristic"), (self.rb_entry, "mni")):
+            ic = icons.for_choice(node, mode)
+            if ic is not None:
+                b.setIcon(ic)
         self.mode_group = QButtonGroup(self)
         for b in (self.rb_auto, self.rb_entry):
             self.mode_group.addButton(b)

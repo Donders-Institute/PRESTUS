@@ -3,39 +3,35 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QMessageBox, QPushButton,
-                             QScrollArea, QToolButton, QToolTip, QVBoxLayout, QWidget)
+                             QScrollArea, QSizePolicy, QToolButton, QVBoxLayout, QWidget)
 
-from .. import labels
+from .. import docs, labels
 from ..checks import check_value, placement_mode_status
-from ..model import TX, ConfigModel
+from ..model import TX, ConfigModel, is_empty
 from ..schema import Node
-from . import style
-from .fields import FieldEditor, display_text, make_editor
+from . import icons, style
+from .fields import PATH_KINDS, FieldEditor, display_text, make_editor
 from .transducer_panel import DevicePanel
 
 LABEL_WIDTH = 290
-# Inputs stay near their label instead of stretching across a wide window: values and
-# choices get a short field, paths and lists a longer one (both still shrink when narrow).
-FIELD_MAX_WIDTH = {"dir": 760, "file": 760, "path": 760, "str": 560, "strlist": 560, "yaml": 760, "numbers": 420}
-FIELD_MAX_DEFAULT = 380
+UNIT_WIDTH = 64         # fixed unit column, so the ? and ↺ buttons of all rows line up
+PANEL_KEYS = {f"{TX}.serial", f"{TX}.combo.ds_serial"}   # the Device panel edits these
 
 
 def _tooltip(node: Node) -> str:
-    """Full help for hover: description, key, default."""
-    title = labels.label(node)
-    parts = [f"<b>{title}</b>"]
-    if node.help:
-        parts.append(node.help.replace("\n", "<br>"))
-    parts.append(f"<span style='color:{style.active()['ink4']}'>Key: {node.path}</span>")
-    if not node.is_group:
-        parts.append(f"<span style='color:{style.active()['ink4']}'>Default: {display_text(node.default) or '(empty)'}</span>")
-    if node.tune:
-        parts.append(f"<span style='color:{style.active()['ink4']}'>Tuning: affects {', '.join(node.tune)}</span>")
-    if node.extra:
-        parts.append(f"<span style='color:{style.active()['ink4']}'>Not in config_default.yaml; read by PRESTUS code.</span>")
-    return "<br>".join(parts)
+    """Full help for hover: description, choices, key, default (ui/tooltip.py)."""
+    from .tooltip import html_for
+    return html_for(node, labels.label(node), None if node.is_group else display_text(node.default))
+
+
+def _help_popup(node: Node, schema, anchor: QWidget) -> None:
+    """The ? button: the same help in a popup whose doc links can be clicked, with the key's
+    documentation page (docs.key_doc)."""
+    from .tooltip import html_for, show_help
+    html = html_for(node, labels.label(node), None if node.is_group else display_text(node.default),
+                    links=True, doc=docs.key_doc(node.path, schema))
+    show_help(html, anchor)
 
 
 class _Row:
@@ -58,15 +54,25 @@ class SectionPage(QFrame):
     advanced_toggled = pyqtSignal()     # the card's own 'advanced' button was used
 
     def __init__(self, model: ConfigModel, section: str, nodes: list[Node],
-                 title: str, parent: QWidget | None = None, subtitle: str = "", locked: bool = False):
+                 title: str, parent: QWidget | None = None, subtitle: str = "", locked: bool = False,
+                 icon: str | None = None):
         super().__init__(parent)
         self.setObjectName("Card")
         self.model = model
         self.section = section
         self.ti = 0
         self.show_advanced = False
+        self.folded: set[str] = set()       # set_fold: rows another control on the card edits
+        self.fold_open = False
         self.goal: str | None = None        # 'Tune for' goal: its keys are shown even when advanced
         self.locked = locked                # read-only until unlocked (overlay 'locked')
+        self.lockable = locked
+        self.lock_note = ""                  # overlay 'lock_note': why the card is locked
+        self.table = None                   # set_table: the section's own keys edited in one widget
+        self.leader: "SectionPage | None" = None    # follow_transducer: card whose selector this follows
+        self.collapse_if = None             # set_auto_collapse: callable -> start collapsed when True
+        self.collapse_note = ""
+        self._user_toggled = False
         self.rows: list[_Row] = []
         self.groups: list[tuple[Node, QFrame]] = []
         self._top_rows: list[_Row] = []
@@ -75,6 +81,13 @@ class SectionPage(QFrame):
         self.vbox = QVBoxLayout(self)
         self.vbox.setContentsMargins(16, 12, 16, 14)
         head = QHBoxLayout()
+        self.icon_name = icon               # overlay 'sections: <name>: icon': a glyph left of the title
+        self.icon = QLabel()
+        self.icon.setVisible(bool(icon))
+        if icon:
+            self.icon.setFixedSize(22, 22)
+        self.retint()
+        head.addWidget(self.icon)
         self.title = QLabel(title)
         self.title.setObjectName("CardTitle")
         head.addWidget(self.title)
@@ -82,17 +95,29 @@ class SectionPage(QFrame):
         self.count.setObjectName("CardSub")
         head.addWidget(self.count)
         head.addStretch(1)
+        self.doc_ref = docs.section_doc(section)      # overlay 'sections: <name>: doc'
+        self.doc_button = QToolButton()
+        self.doc_button.setText("↗")
+        self.doc_button.setToolTip("Open documentation")
+        self.doc_button.setAccessibleName(f"Open documentation: {title}")
+        self.doc_button.clicked.connect(lambda _=False: docs.open_doc(self.doc_ref))
+        self.doc_button.setVisible(bool(self.doc_ref))
+        head.addWidget(self.doc_button)
         self.adv_button = QToolButton()
+        self.adv_button.setIcon(icons.icon("advanced"))
+        self.adv_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.adv_button.setToolTip("Show or hide this card's advanced settings: the ones most studies "
                                    "leave at their defaults.")
         self.adv_button.clicked.connect(self._toggle_card_advanced)
         head.addWidget(self.adv_button)
         self.lock_button = QToolButton()
+        self.lock_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.lock_button.clicked.connect(self._toggle_lock)
         self.lock_button.setVisible(locked)
         head.addWidget(self.lock_button)
-        self.toggle = QToolButton(text="Hide")
-        self.toggle.setToolTip("Collapse / expand")
+        self.toggle = QToolButton()
+        self.toggle.setIcon(icons.icon("collapse"))
+        self.toggle.setToolTip("Collapse this card")
         self.toggle.clicked.connect(self._toggle_body)
         head.addWidget(self.toggle)
         self.vbox.addLayout(head)
@@ -108,8 +133,14 @@ class SectionPage(QFrame):
         self.vbox.addWidget(self.body)
 
         self.device_panel: DevicePanel | None = None
+        # Per-transducer keys shown on another card (positions on Placement) get the same
+        # transducer selector, so each transducer of a study stays editable there.
+        self.has_tx = section == TX or any(n.path.startswith(TX + ".") for n in nodes)
+        if self.has_tx:
+            self.tx_bar = QWidget()
+            self.tx_bar.setLayout(self._transducer_bar())
+            self.body_layout.addWidget(self.tx_bar)
         if section == TX:
-            self.body_layout.addLayout(self._transducer_bar())
             self.device_panel = DevicePanel(model)
             self.device_panel.changed.connect(self._panel_changed)
             self.body_layout.addWidget(self.device_panel)
@@ -119,6 +150,8 @@ class SectionPage(QFrame):
         grid = self._new_grid()
         self.body_layout.addLayout(grid)
         self._top_rows, self._top_groups = self._fill(grid, self.body_layout, nodes)
+        self.extras_below = QVBoxLayout()
+        self.body_layout.addLayout(self.extras_below)
         self.refresh()
 
     # ── construction ────────────────────────────────────────────────────
@@ -142,14 +175,17 @@ class SectionPage(QFrame):
             frame.setToolTip(_tooltip(node))
             v = QVBoxLayout(frame)
             v.setContentsMargins(12, 8, 12, 10)
-            t = QLabel(labels.label(node))
+            t = QLabel(labels.rich_label(node))
+            t.setTextFormat(Qt.TextFormat.RichText)
             t.setObjectName("SubGroupTitle")
             t.setToolTip(_tooltip(node))
             v.addWidget(t)
             inner = self._new_grid()
             inner.setColumnMinimumWidth(0, LABEL_WIDTH - 14)
             v.addLayout(inner)
-            sub_rows, sub_groups = self._fill(inner, v, node.children)
+            # children another card shows (overlay 'group') stay there
+            children = [c for c in node.children if not c.group or c.group == self.section]
+            sub_rows, sub_groups = self._fill(inner, v, children)
             outer.addWidget(frame)
             self.groups.append((node, frame))
             groups.append(_Group(node, frame, sub_rows, sub_groups))
@@ -159,9 +195,10 @@ class SectionPage(QFrame):
         tip = _tooltip(node)
         block = QWidget()
         bl = QVBoxLayout(block)
-        bl.setContentsMargins(0, 0, 0, 0)
+        bl.setContentsMargins(0, 5, 0, 0)      # the label's first line on the input's text line
         bl.setSpacing(1)
-        label = QLabel(labels.label(node))
+        label = QLabel(labels.rich_label(node))
+        label.setTextFormat(Qt.TextFormat.RichText)       # escaped; I<sub>SPPA</sub> (labels.rich)
         label.setObjectName("FieldLabel")
         label.setToolTip(tip)
         label.setWordWrap(True)
@@ -171,41 +208,95 @@ class SectionPage(QFrame):
         editor.setToolTip(tip)
         editor.setEnabled(not node.derived)
         container = QWidget()
+        container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         h = QHBoxLayout(container)
         h.setContentsMargins(0, 0, 0, 0)
         h.addWidget(editor, 1)
-        if node.unit:
-            u = QLabel(node.unit)
-            u.setObjectName("CardSub")
-            h.addWidget(u)
-        helpb = QToolButton(text="?")
+        # every row has the same columns: input | unit | ? | ↺, each top-aligned
+        u = QLabel(node.unit or "")
+        u.setObjectName("CardSub")
+        u.setFixedWidth(UNIT_WIDTH)
+        u.setContentsMargins(0, 5, 0, 0)
+        h.addWidget(u, 0, Qt.AlignmentFlag.AlignTop)
+        # a path has no unit: its field (already offset by the Browse button) takes the unit
+        # column too, so long paths (LD_LIBRARY_PATH) get the width; ? and ↺ stay in line
+        u.setVisible(bool(node.unit) or node.kind not in PATH_KINDS)
+        helpb = QToolButton()
+        helpb.setIcon(icons.icon("help", style.active()["ink3"]))
         helpb.setToolTip("What is this?")
-        helpb.clicked.connect(lambda _=False, t=tip: QToolTip.showText(QCursor.pos(), t, helpb))
-        h.addWidget(helpb)
-        reset = QToolButton(text="↺")
+        helpb.clicked.connect(lambda _=False, n=node: _help_popup(n, self.model.schema, helpb))
+        h.addWidget(helpb, 0, Qt.AlignmentFlag.AlignTop)
+        reset = QToolButton()
+        reset.setIcon(icons.icon("reset", style.active()["ink3"]))
         reset.setToolTip("Reset to default")
-        h.addWidget(reset)
-        container.setMaximumWidth(FIELD_MAX_WIDTH.get(node.kind, FIELD_MAX_DEFAULT))
+        sp = reset.sizePolicy()
+        sp.setRetainSizeWhenHidden(True)        # help icons stay in one column, set or not
+        reset.setSizePolicy(sp)
+        h.addWidget(reset, 0, Qt.AlignmentFlag.AlignTop)
+        # The label column keeps its width; the input fills the rest of the card, so a wide
+        # window gives longer fields rather than empty space beside them.
+        block.setMaximumWidth(LABEL_WIDTH + 40)
         r = grid.rowCount()
         grid.addWidget(block, r, 0, Qt.AlignmentFlag.AlignTop)
-        grid.addWidget(container, r, 1, Qt.AlignmentFlag.AlignTop)
+        grid.addWidget(container, r, 1, Qt.AlignmentFlag.AlignTop)   # full width: the editors expand
         row = _Row(node, label, container, editor, reset, block)
         editor.edited.connect(lambda value, rr=row: self._edited(rr, value))
         reset.clicked.connect(lambda _=False, rr=row: self._reset(rr))
         self.rows.append(row)
         return row
 
-    def add_extra(self, widget: QWidget) -> None:
-        """A widget shown above the fields (diagram, panel, …)."""
-        self.extras.addWidget(widget)
+    def add_extra(self, widget: QWidget, below: bool = False) -> None:
+        """A widget shown above the fields (diagram, panel, …), or below them."""
+        (self.extras_below if below else self.extras).addWidget(widget)
+
+        self.refresh()
+
+    def set_table(self, widget: QWidget) -> None:
+        """Edit the section's own keys in `widget` (below the fields) instead of one row each;
+        keys other sections moved here keep their rows. The widget gets set_locked(bool),
+        refresh(), focus(path) and a `changed` signal."""
+        self.table = widget
+        self.extras_below.addWidget(widget)
+        widget.changed.connect(self._panel_changed)
+        self.refresh()
+
+    def _tabulated(self, node: Node) -> bool:
+        return self.table is not None and node.section == self.section
+
+    def follow_transducer(self, leader: "SectionPage") -> None:
+        """Edit the transducer `leader` selects, without a selector of its own (cards on one
+        tab share the Transducer card's selector)."""
+        self.leader = leader
+        self.tx_bar.setVisible(False)
+        self.refresh()
+
+    def set_fold(self, paths, open_: bool | None = None) -> None:
+        """Hide the rows of `paths` while the fold is closed: values another control on the card
+        edits (e.g. the timing diagram). `open_` opens or closes the fold."""
+        self.folded = set(paths)
+        if open_ is not None:
+            self.fold_open = bool(open_)
+        self.refresh()
+
+    def set_auto_collapse(self, predicate, note: str = "") -> None:
+        """Start collapsed while predicate() holds (e.g. geometry from the equipment library),
+        until the card is opened or closed by hand; `note` follows the title meanwhile."""
+        self.collapse_if, self.collapse_note = predicate, note
 
     def _toggle_body(self) -> None:
-        self.body.setVisible(not self.body.isVisible())
-        self.toggle.setText("Hide" if self.body.isVisible() else "Show")
+        self._user_toggled = True
+        self._set_body(self.body.isHidden())         # isHidden: also right while the card is off-screen
+
+    def _set_body(self, shown: bool) -> None:
+        self.body.setVisible(shown)
+        self.toggle.setIcon(icons.icon("collapse" if shown else "expand"))
+        self.toggle.setToolTip("Collapse this card" if shown else "Expand this card")
 
     def _transducer_bar(self) -> QHBoxLayout:
         bar = QHBoxLayout()
+        bar.setContentsMargins(0, 0, 0, 0)         # flush with the field labels
         self.tx_combo = QComboBox()
+        self.tx_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)   # shows the serial
         self.tx_combo.currentIndexChanged.connect(self._select_transducer)
         add = QPushButton("+")
         add.setToolTip("Add a transducer")
@@ -270,11 +361,12 @@ class SectionPage(QFrame):
 
     def _toggle_lock(self) -> None:
         if self.locked:
-            answer = QMessageBox.warning(
-                self, f"Unlock {self.title.text()}",
+            note = self.lock_note or (
                 "These are the acoustic medium property values that simulated pressures and "
                 "temperatures depend on. Change them only for a documented reason (e.g. a sensitivity "
-                "analysis) and always report the values you used.\n\nUnlock for editing?",
+                "analysis) and always report the values you used.")
+            answer = QMessageBox.warning(
+                self, f"Unlock {self.title.text()}", f"{note}\n\nUnlock for editing?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Cancel)
             if answer != QMessageBox.StandardButton.Yes:
@@ -301,14 +393,29 @@ class SectionPage(QFrame):
     def _ti_for(self, node: Node) -> int:
         return self.ti if node.path.startswith(TX + ".") or node.path == TX else 0
 
+    def retint(self) -> None:
+        """Redraw the card icon in the active palette (after a theme change)."""
+        if self.icon_name:
+            self.icon.setPixmap(icons.icon(self.icon_name, style.active()["accent"], 20).pixmap(20, 20))
     def _row_shown(self, row: _Row) -> bool:
+        if self._tabulated(row.node):
+            return False
         path, ti = row.node.path, self._ti_for(row.node)
+        if row.node.derived and is_empty(self.model.get(path, ti)):
+            return False                    # set by the pipelines (overlay 'derived'); shown once it holds a value
+        if self.device_panel is not None and path in PANEL_KEYS:
+            return False                    # edited in the Device panel above the fields
         if not self.model.is_visible(path, ti):
             return False
+        if path in self.folded and not self.fold_open and not self._matches(row.node) \
+                and not check_value(row.node, self.model.get(path, ti)):
+            return False                    # folded away; an invalid value stays visible
         return self.show_advanced or not row.node.advanced or self.model.is_overridden(path, ti) \
             or self._matches(row.node)
 
     def _group_shown(self, g: _Group) -> bool:
+        if self._tabulated(g.node):
+            return False
         ti = self._ti_for(g.node)
         if not self.model.is_visible(g.node.path, ti):
             return False
@@ -348,7 +455,7 @@ class SectionPage(QFrame):
 
     def _tune_tags(self, node: Node) -> str:
         """' · speed, accuracy' after the label; the 'Tune for' goal highlighted."""
-        if not node.tune or not (self.show_advanced or self.goal):
+        if not node.tune or not self.goal:              # only while a 'Tune for' goal is set
             return ""
         schema = self.model.schema
         tags = [f"<b style='color:{style.active()['accent']}'>{schema.tune_label(g).lower()}</b>" if g == self.goal
@@ -360,7 +467,16 @@ class SectionPage(QFrame):
             w = self.extras.itemAt(i).widget()
             if w is not None and hasattr(w, "refresh"):
                 w.refresh()
-        if self.section == TX:
+        for i in range(self.extras_below.count()):
+            w = self.extras_below.itemAt(i).widget()
+            if w is not None and w is not self.table and hasattr(w, "refresh"):
+                w.refresh()
+        if self.table is not None:
+            self.table.set_locked(self.locked)
+            self.table.refresh()
+        if self.leader is not None:
+            self.ti = min(self.leader.ti, self.model.n_transducers - 1)
+        if self.has_tx:
             self._update_tx_combo()
             if self.device_panel is not None:
                 self.device_panel.refresh(self.ti)
@@ -381,7 +497,7 @@ class SectionPage(QFrame):
                 row.editor.set_error(check_value(row.node, value))
                 if path == "placement.mode" and hasattr(row.editor, "set_item_status"):
                     row.editor.set_item_status(placement_mode_status(self.model))
-                name = labels.label(row.node)
+                name = labels.rich_label(row.node)
                 tags = self._tune_tags(row.node)
                 if self.model.is_modified(path, ti):
                     row.label.setText(f"<b>{name}</b> <span style='color:{style.active()['accent']}'>●</span>{tags}")
@@ -390,30 +506,68 @@ class SectionPage(QFrame):
                 else:
                     row.label.setText(f"{name}{tags}")
                 row.reset.setVisible(self.model.is_overridden(path, ti))
-                row.editor.setEnabled(not row.node.derived and not self.locked)
-                row.reset.setEnabled(not self.locked)
+                # the lock covers the section's own keys, not those moved here from other sections
+                locked = self.locked and row.node.section == self.section
+                row.editor.setEnabled(not row.node.derived and not locked)
+                row.reset.setEnabled(not locked)
         walk(self._top_rows, self._top_groups)
         n_set = sum(1 for r in self.rows if self.model.is_overridden(r.node.path, self._ti_for(r.node)))
         self.count.setText(f"· {n_set} set" if n_set else "")
+        if self.collapse_if is not None:
+            collapse = bool(self.collapse_if())
+            if not self._user_toggled:
+                self._set_body(not collapse)
+            if collapse and self.collapse_note and self.body.isHidden():
+                self.count.setText(f"{self.count.text()}  · {self.collapse_note}".strip())
         n_hidden = self.hidden_advanced()
-        self.adv_button.setVisible(n_hidden > 0 or (self.show_advanced and bool(self._advanced_rows())))
-        self.adv_button.setText("Hide advanced" if self.show_advanced else f"+ {n_hidden} advanced")
-        self.lock_button.setText("🔒 Unlock" if self.locked else "Lock")
+        self.adv_button.setVisible(n_hidden > 0 or (self.show_advanced and bool(self._advanced_rows()))
+                                   or (self.lockable and self.locked))
+        # the advanced icon with the number of hidden settings (greyed); highlighted while shown
+        c = style.active()
+        self.adv_button.setIcon(icons.icon("advanced", c["accent"] if self.show_advanced else None))
+        self.adv_button.setText("" if self.show_advanced or not n_hidden else str(n_hidden))
+        self.adv_button.setStyleSheet(f"QToolButton {{ color: {c['ink4']}; }}")
+        self.adv_button.setToolTip(
+            "Hide this card's advanced settings" if self.show_advanced else
+            f"Show this card's {n_hidden} advanced setting{'s' if n_hidden != 1 else ''}: the ones most "
+            "studies leave at their defaults" if n_hidden else "Show this card's advanced settings")
+        # unlocking is an advanced action; a card unlocked once keeps its 'Lock' button
+        self.lock_button.setVisible(self.lockable and (self.show_advanced or not self.locked))
+        self.lock_button.setText("Unlock" if self.locked else "Lock")
+        self.lock_button.setIcon(icons.icon("lock" if self.locked else "unlock"))
         self.lock_button.setToolTip("Read-only: defaults most studies should not change. Click to edit."
                                     if self.locked else "Make this card read-only again.")
 
     def focus_key(self, path: str, ti: int | None = None) -> None:
         """Scroll to (and focus) the row for a key; reveals advanced fields if needed."""
-        if ti is not None and self.section == TX and ti != self.ti:
+        if ti is not None and self.has_tx and ti != self.ti:
             self.ti = ti
             self.refresh()
+        if self.table is not None and path.startswith(self.section + ".") and self.table.focus(path):
+            if self.body.isHidden():
+                self._set_body(True)
+            w = self.parentWidget()
+            while w is not None and not isinstance(w, QScrollArea):
+                w = w.parentWidget()
+            if isinstance(w, QScrollArea):
+                w.ensureWidgetVisible(self.table)
+            return
+        if self.device_panel is not None and path in PANEL_KEYS:
+            if self.body.isHidden():
+                self._set_body(True)
+            w = self.parentWidget()
+            while w is not None and not isinstance(w, QScrollArea):
+                w = w.parentWidget()
+            if isinstance(w, QScrollArea):
+                w.ensureWidgetVisible(self.device_panel)
+            return
         for row in self.rows:
             if row.node.path != path:
                 continue
             if not row.container.isVisible() and row.node.advanced and not self.show_advanced:
                 self.set_show_advanced(True)
-            if not self.body.isVisible():
-                self._toggle_body()
+            if self.body.isHidden():
+                self._set_body(True)
             w = self.parentWidget()
             while w is not None and not isinstance(w, QScrollArea):
                 w = w.parentWidget()

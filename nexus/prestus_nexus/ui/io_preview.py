@@ -5,14 +5,15 @@ Refreshed on every edit (see MainWindow._changed)."""
 
 from __future__ import annotations
 
+import html
 import os
 
-from PyQt6.QtWidgets import QLabel, QPlainTextEdit, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QLabel, QTextBrowser, QVBoxLayout, QWidget
 
 from ..model import ConfigModel, is_empty
 from ..paths import m2m_dir, matlab_sprintf
 from ..predict_outputs import predict
-from . import style
+from . import icons, style
 
 _COMMON_NOTES = {
     "nii/": "property/acoustic/thermal maps (T1w + MNI)",
@@ -35,25 +36,56 @@ class IOPreviewPanel(QWidget):
         self.model = model
 
         v = QVBoxLayout(self)
-        title = QLabel("I/O setup")
-        title.setObjectName("CardTitle")
+        v.setContentsMargins(0, 8, 0, 0)
+        title = QLabel("I/O preview")
+        title.setObjectName("SubGroupTitle")
         v.addWidget(title)
         sub = QLabel("Example paths for the current subject ID, filled in as you edit the "
-                     "Setup, Transducer and Simulation tabs. Detects async multi-transducer, "
-                     "multi-ISPPA and uncertainty mode the same way prestus_pipeline_start.m does.")
+                     "settings. Detects async multi-transducer, multi-ISPPA and uncertainty "
+                     "mode the same way prestus_pipeline_start.m does.")
         sub.setObjectName("CardSub")
         sub.setWordWrap(True)
         v.addWidget(sub)
-        self.text = QPlainTextEdit(readOnly=True)
-        self.text.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        mono = style.mono_font()
-        self.text.setFont(mono)
+        self.text = QTextBrowser()
+        self.text.setOpenLinks(False)
+        self.text.setLineWrapMode(QTextBrowser.LineWrapMode.NoWrap)
+        self.text.setMinimumHeight(300)
         v.addWidget(self.text, 1)
+        self._shown = ""
 
     def refresh(self) -> None:
-        self.text.setPlainText("\n".join(self._lines()))
+        text = self._html()
+        if text != self._shown:
+            self._shown = text
+            self.text.setHtml(text)
 
-    def _lines(self) -> list[str]:
+    def plain_text(self) -> str:
+        """The preview without markup (tests, copy)."""
+        return "\n".join(f"{label}  {path}  {note}".rstrip() for _k, label, path, note in self._rows()
+                         if label or path)
+
+    def _html(self) -> str:
+        c = style.active()
+        doc = self.text.document()
+        mono = style.mono_font().family()
+        out = ["<table cellspacing='0' cellpadding='2'>"]
+        for kind, label, path, note in self._rows():
+            if kind == "head":
+                out.append(f"<tr><td colspan='3' style='padding-top:6px'><b>{html.escape(label)}</b></td></tr>")
+                continue
+            ic = icons.html_img(doc, kind, c["ink2"]) if kind in ("file", "folder") else \
+                icons.html_img(doc, "warning", c["amber"]) if kind == "warning" else ""
+            indent = "padding-left:18px;" if kind in ("file", "folder") and not label else ""
+            out.append(f"<tr><td style='{indent}'>{ic}</td>"
+                       f"<td style='color:{c['ink3']}'>{html.escape(label)}</td>"
+                       f"<td><span style='font-family:\"{mono}\"'>{html.escape(path)}</span>"
+                       + (f" <span style='color:{c['ink3']}'>{html.escape(note)}</span>" if note else "")
+                       + "</td></tr>")
+        out.append("</table>")
+        return "".join(out)
+
+    def _rows(self) -> list[tuple[str, str, str, str]]:
+        """(kind, label, path, note); kind: head | file | folder | warning | text."""
         g = self.model.get
         sid_raw = g("subject_id")
         sid = int(sid_raw) if _is_num(sid_raw) and sid_raw == int(sid_raw) and 0 <= sid_raw <= 999 else None
@@ -70,50 +102,51 @@ class IOPreviewPanel(QWidget):
         pct = g("path.pct")
         sim = g("path.sim")
 
-        lines = [f"INPUTS  ({tag})"]
+        rows = [("head", f"Inputs ({tag})", "", "")]
         if layered:
             if not is_empty(anat) and sid is not None:
-                t1 = os.path.join(anat, matlab_sprintf(g("path.t1_pattern") or "", sid))
-                lines.append(f"  T1w           {t1}")
+                rows.append(("file", "T1w", os.path.join(anat, matlab_sprintf(g("path.t1_pattern") or "", sid)), ""))
                 t2_pattern = g("path.t2_pattern")
                 if not is_empty(t2_pattern):
-                    t2 = os.path.join(anat, matlab_sprintf(t2_pattern, sid))
-                    lines.append(f"  T2w           {t2}")
+                    rows.append(("file", "T2w / UTE", os.path.join(anat, matlab_sprintf(t2_pattern, sid)), ""))
             else:
-                lines.append("  T1w           (set path.anat)")
+                rows.append(("text", "T1w", "(set path.anat)", ""))
         else:
-            lines.append(f"  ({medium} medium: no anatomical scan needed)")
+            rows.append(("text", "", f"({medium} medium: no anatomical scan needed)", ""))
         if needs_seg:
             if not is_empty(seg_root) and sid is not None:
-                lines.append(f"  segmentation  {m2m_dir(seg_root, sid)}/")
+                rows.append(("folder", "segmentation", f"{m2m_dir(seg_root, sid)}/", ""))
             else:
-                lines.append("  segmentation  (set path.anat or path.seg)")
-        if bool(g("pct.enabled")):
-            if is_empty(pct):
-                lines.append("  pseudo-CT     written into the segmentation m2m folder (path.pct unset)")
-            elif sid is not None:
-                lines.append(f"  pseudo-CT     {os.path.join(pct, tag)}/")
+                rows.append(("text", "segmentation", "(set path.anat or path.seg)", ""))
+        if layered and bool(g("pct.enabled")):
+            ct = g("path.ct_pattern")
+            if not is_empty(ct):
+                where = os.path.join(anat, matlab_sprintf(ct, sid)) if not is_empty(anat) and sid is not None \
+                    else "(set path.anat)"
+                rows.append(("file", "measured CT", where, "co-registered to the T1w"))
+            elif sid is not None and not (is_empty(pct) and is_empty(seg_root)):
+                base = pct if not is_empty(pct) else os.path.join(os.path.dirname(str(seg_root).rstrip("/\\")), "pct")
+                rows.append(("folder", "pseudo-CT", f"{os.path.join(base, tag)}/", "generated from the UTE if missing"))
 
         plan = predict(self.model)
         if plan.mode == "single":
             mode_note = "single-run mode"
-        elif plan.ambiguous:
-            mode_note = f"{plan.mode.replace('_', '-')} mode assumed ({plan.platform_used} dispatch — see warning)"
         else:
             mode_note = f"{plan.mode.replace('_', '-')} mode"
-        lines += ["", f"OUTPUTS  ({mode_note})"]
+            if plan.nested:
+                mode_note += f", {plan.nested.replace('_', '-')} per variant"
+        rows.append(("head", f"Outputs ({mode_note})", "", ""))
         for warning in plan.warnings:
-            lines.append(f"  ! {warning}")
+            rows.append(("warning", "", warning, ""))
         if is_empty(sim):
-            lines.append("  (set path.sim)")
+            rows.append(("text", "", "(set path.sim)", ""))
         else:
-            out = os.path.join(sim, tag)
-            lines.append(f"  {out}/")
-            entries = [(a.name, a.note) for a in plan.artifacts]
-            entries += [(d, _COMMON_NOTES.get(d, "")) for d in plan.common_dirs]
-            width = max(len(name) for name, _ in entries) + 2
-            lines += [f"      {name:<{width}}{desc}" for name, desc in entries]
+            rows.append(("folder", "output", f"{os.path.join(sim, tag)}/", ""))
+            for a in plan.artifacts:
+                rows.append(("file", "", a.name, a.note))
+            for d in plan.common_dirs:
+                rows.append(("folder", "", d, _COMMON_NOTES.get(d, "")))
             if not os.path.isabs(sim):
-                lines.append("")
-                lines.append("  path.sim is relative: PRESTUS resolves it against MATLAB's working folder.")
-        return lines
+                rows.append(("warning", "", "path.sim is relative: PRESTUS resolves it against MATLAB's "
+                             "working folder.", ""))
+        return rows

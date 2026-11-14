@@ -11,11 +11,11 @@ config first, so the effective configuration stays the same.
 from __future__ import annotations
 
 import copy
-import shutil
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .fsio import copy_atomic
 from .model import TX, get_in, set_in
 
 if TYPE_CHECKING:
@@ -32,6 +32,11 @@ def carry_pinned_values(model: "ConfigModel", pinned: dict) -> list[str]:
     written. The values are written directly (not via ConfigModel.set, which
     would drop them as equal to the current, still pinned, baseline).
     """
+    with model.edit("Carry pinned defaults"):        # one undo step
+        return _carry(model, pinned)
+
+
+def _carry(model: "ConfigModel", pinned: dict) -> list[str]:
     written: list[str] = []
     for key, (project_value, _toolbox_value) in pinned.items():
         parts = key.split(".")
@@ -52,6 +57,6 @@ def replace_project_default(project: Path, toolbox: Path) -> Path:
     """Replace the project copy by the toolbox default; return the backup's path."""
     project, toolbox = Path(project), Path(toolbox)
     backup = project.with_name(f"{project.name}.bak-{time.strftime('%Y%m%d-%H%M%S')}")
-    shutil.copy2(project, backup)
-    shutil.copy2(toolbox, project)
+    copy_atomic(project, backup)
+    copy_atomic(toolbox, project)            # the project copy stays intact if the copy fails
     return backup

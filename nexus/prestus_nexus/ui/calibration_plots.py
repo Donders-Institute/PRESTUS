@@ -20,9 +20,10 @@ from PyQt6.QtWidgets import (QButtonGroup, QHBoxLayout, QLabel, QSizePolicy, QSt
                              QToolButton, QVBoxLayout, QWidget)
 
 from . import style
+from .export import PaintedExportable, attach_painted
 
 try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+    from .mpl_theme import ThemedCanvas as FigureCanvasQTAgg   # drawn in the Nexus theme
     from matplotlib.figure import Figure
 except ImportError:                                    # pragma: no cover
     FigureCanvasQTAgg = None
@@ -222,18 +223,12 @@ def load_entry(library, serial: str, ds: str = "", library_path: str = "") -> tu
     if cal.path is None:
         return None, None
     try:
-        stamp = (str(cal.path), cal.path.stat().st_mtime_ns)
-        if stamp not in _ENTRY_CACHE:               # the project volume can be slow: read once
-            data = yamlio.load_file(cal.path)
-            if len(_ENTRY_CACHE) > 32:
-                _ENTRY_CACHE.clear()
-            _ENTRY_CACHE[stamp] = data if isinstance(data, dict) else None
-        return _ENTRY_CACHE[stamp], cal.path
+        data = yamlio.load_file_cached(cal.path)    # the project volume can be slow: read once
+        return (data if isinstance(data, dict) else None), cal.path
     except Exception:
         return None, cal.path
 
 
-_ENTRY_CACHE: dict[tuple[str, int], dict | None] = {}
 
 
 def hydrophone_csv(entry: dict | None, prestus_root: Path | None) -> Path | None:
@@ -331,7 +326,8 @@ class CalibrationCoverage(QWidget):
         if FigureCanvasQTAgg is not None:
             self.fig = Figure(figsize=(4, 2.4), layout="constrained")
             self.ax = self.fig.add_subplot(111)
-            self.canvas = FigureCanvasQTAgg(self.fig)
+            self.canvas = FigureCanvasQTAgg(self.fig, export_name="calibration_coverage",
+                                            filename_hint=lambda: f"calibration_{self.view}")
             self.canvas.setMinimumHeight(140)
             self.stack.addWidget(self.canvas)
         else:                                               # pragma: no cover
@@ -453,10 +449,10 @@ class CalibrationCoverage(QWidget):
             col = c[STATUS_COLOUR[depth_status(a, d)]]
             ax.axvline(d, color=col, lw=1.4, ls="-", zorder=3)
             ax.annotate(f"{d:g}", (d, 1.0), xycoords=("data", "axes fraction"), xytext=(2, -2),
-                        textcoords="offset points", ha="left", va="top", fontsize=7.5, color=col,
+                        textcoords="offset points", ha="left", va="top", fontsize=style.PLOT_PT["small"], color=col,
                         fontweight="bold")
-        ax.set_xlabel("Distance from exit plane (mm)", fontsize=8.5, color=c["ink2"])
-        ax.tick_params(labelsize=8, colors=c["ink3"], length=3)
+        ax.set_xlabel("Distance from exit plane [mm]", fontsize=style.PLOT_PT["normal"], color=c["ink2"])
+        ax.tick_params(labelsize=style.PLOT_PT["small"], colors=c["ink3"], length=3)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
         for s in ("left", "bottom"):
@@ -465,7 +461,7 @@ class CalibrationCoverage(QWidget):
         ax.set_axisbelow(True)
         leg = ax.get_legend_handles_labels()
         if leg[0]:
-            lg = ax.legend(fontsize=7.5, loc="best", frameon=True, framealpha=0.85, borderpad=0.3,
+            lg = ax.legend(fontsize=style.PLOT_PT["small"], loc="best", frameon=True, framealpha=0.85, borderpad=0.3,
                            handlelength=1.6, labelcolor=c["ink2"])
             lg.get_frame().set_facecolor(c["surface"])
             lg.get_frame().set_edgecolor(c["line"])
@@ -484,16 +480,16 @@ class CalibrationCoverage(QWidget):
             ax.axhline(ins, color=c["accent"], ls=":", lw=1.3, label=f"Per-depth fit, median {ins:.2f}")
         vals = [x for x in r2 + [geo, ins] if x is not None and math.isfinite(x)]
         ax.set_ylim(max(-0.2, min(vals + [R2_FAIR]) - 0.05) if vals else 0, 1.02)
-        ax.set_ylabel("R² (profile shape)", fontsize=8.5, color=c["ink2"])
+        ax.set_ylabel("R² (profile shape)", fontsize=style.PLOT_PT["normal"], color=c["ink2"])
         if not d:
             ax.text(0.5, 0.5, "No per-depth R² stored in this entry", transform=ax.transAxes,
-                    ha="center", va="center", fontsize=8, color=c["ink3"])
+                    ha="center", va="center", fontsize=style.PLOT_PT["normal"], color=c["ink3"])
 
     def _draw_drive(self, ax, a: dict, c: dict) -> None:
         d, p = a["drive_depths"], a["drive_pa"]
         if not d:
             ax.text(0.5, 0.5, "No drive per depth in this entry", transform=ax.transAxes,
-                    ha="center", va="center", fontsize=8, color=c["ink3"])
+                    ha="center", va="center", fontsize=style.PLOT_PT["normal"], color=c["ink3"])
             return
         kpa = [x / 1000 for x in p]
         isppa = a.get("drive_isppa")
@@ -506,13 +502,13 @@ class CalibrationCoverage(QWidget):
         if a["drive_source"] == "refinement" and a["global_drive_depths"]:
             ax.plot(a["global_drive_depths"], [x / 1000 for x in a["global_drive_pa"]], "--",
                     color=c["ink3"], lw=1.0, label="Global model", zorder=2)
-        ax.set_ylabel(f"Drive (kPa){f' for {isppa:g} W/cm²' if isppa else ''}", fontsize=8.5, color=c["ink2"])
+        ax.set_ylabel(f"Drive{f' for {isppa:g} W/cm²' if isppa else ''} [kPa]", fontsize=style.PLOT_PT["normal"], color=c["ink2"])
 
     def _draw_phases(self, ax, a: dict, c: dict) -> None:
         d, cols = a["phase_depths"], a["phase_deg"]
         if not d:
             ax.text(0.5, 0.5, "No per-depth phase corrections in this entry", transform=ax.transAxes,
-                    ha="center", va="center", fontsize=8, color=c["ink3"])
+                    ha="center", va="center", fontsize=style.PLOT_PT["normal"], color=c["ink3"])
             return
         n = len(cols)
         if n <= len(RING_COLOURS):                  # identity: fixed categorical order
@@ -530,14 +526,16 @@ class CalibrationCoverage(QWidget):
             ax.scatter(xs, ys, s=40, marker="o", facecolors="none", edgecolors=c["red"], linewidths=1.4,
                        zorder=5, label=f"step > {PHASE_JUMP_DEG:g}°")
         ax.axhline(0, color=c["line2"], lw=0.8)
-        ax.set_ylabel(f"Phase offset (°){'' if n <= 4 else f', {n} rings'}", fontsize=8.5, color=c["ink2"])
+        ax.set_ylabel(f"Phase offset{'' if n <= 4 else f', {n} rings'} [°]", fontsize=style.PLOT_PT["normal"], color=c["ink2"])
 
 
-class R2Strip(QWidget):
+class R2Strip(PaintedExportable, QWidget):
     """Clickable per-depth R² bars (green ≥ R2_GOOD, amber ≥ R2_FAIR, red below, grey: no R²).
     Emits selected(depth) on a click on a bar and selected(nan) on "All"."""
 
     selected = pyqtSignal(float)
+    export_name = "calibration_r2"
+    BUTTON_W = 30                                   # right margin kept clear for the export button
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -550,6 +548,7 @@ class R2Strip(QWidget):
         self.setMouseTracking(True)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.export_button = attach_painted(self)
 
     def sizeHint(self) -> QSize:
         return QSize(600, 70)
@@ -569,8 +568,9 @@ class R2Strip(QWidget):
         self.current = depth
         self.update()
 
-    def _geometry(self) -> tuple[QRectF | None, list[QRectF]]:
-        w, h = self.width(), self.height()
+    def _geometry(self, w: float | None = None, h: float | None = None) -> tuple[QRectF | None, list[QRectF]]:
+        w = (self.width() if w is None else w) - self.BUTTON_W
+        h = self.height() if h is None else h
         x0 = 4.0
         all_rect = None
         if self.allow_all:
@@ -581,14 +581,13 @@ class R2Strip(QWidget):
         bw = max(4.0, min(36.0, slot - 3))
         return all_rect, [QRectF(x0 + i * slot + (slot - bw) / 2, 14, bw, h - 30) for i in range(len(self.depths))]
 
-    def paintEvent(self, _ev) -> None:
-        c = style.active()
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    def paint(self, p: QPainter, rect_all: QRectF, c: dict) -> None:
+        """The strip in palette ``c`` (style.active() on screen, export.py for files)."""
+        p.fillRect(rect_all, QColor(c["surface"]))
         f = QFont(self.font())
         f.setPointSizeF(max(7.0, f.pointSizeF() * 0.8))
         p.setFont(f)
-        all_rect, rects = self._geometry()
+        all_rect, rects = self._geometry(rect_all.width(), rect_all.height())
         if all_rect is not None:
             on = self.current is None
             p.setPen(QPen(QColor(c["brand"] if on else c["line2"]), 1.5 if on else 1))
@@ -621,8 +620,8 @@ class R2Strip(QWidget):
                            f"{r2:.2f}" if ok else "—")
         if not rects:
             p.setPen(QColor(c["ink3"]))
-            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No depths yet")
-        p.end()
+            p.drawText(rect_all, Qt.AlignmentFlag.AlignCenter, "No depths yet")
+        self.export_button.set_available(bool(rects))
 
     def mousePressEvent(self, ev) -> None:
         pos = ev.position()

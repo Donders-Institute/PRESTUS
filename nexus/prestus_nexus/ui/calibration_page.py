@@ -25,18 +25,19 @@ from .. import calibration as cal
 from ..bridge import BridgeError, as_columns, as_floats, as_list
 from ..model import TX, is_empty
 from . import calibration_plots as cplots
-from . import style
+from . import icons, style
 from .matlab_status import MatlabStatus
 
 try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+    from .mpl_theme import ThemedCanvas as FigureCanvasQTAgg   # drawn in the Nexus theme
     from matplotlib.figure import Figure
 except ImportError:                                    # pragma: no cover
     FigureCanvasQTAgg = None
 
-# result kind, colour, legend name (result_styles in calibration_gui.m)
-STYLES = [("geometric", "#999999", "Geometric"), ("library", "#0072b3", "Library"),
-          ("fit", "#d95f02", "Fit"), ("kwave", "#33a02b", "k-Wave")]
+# result kind, colour, legend name (as result_styles in calibration_gui.m, in the colour-blind-
+# safe style.SERIES hues; geometric stays a neutral grey)
+STYLES = [("geometric", "#999999", "Geometric"), ("library", style.SERIES[0], "Library"),
+          ("fit", style.SERIES[1], "Fit"), ("kwave", style.SERIES[2], "k-Wave")]
 PROFILE_LINES = [("measured", "-", "Hydrophone"), ("interpolated", "--", "Interpolated profile"),
                  ("extrapolated", ":", "Extrapolated profile")]
 
@@ -262,7 +263,7 @@ class RingOptionsDialog(QDialog):
         self.file.setToolTip("Sonic Concepts FUS Metrology export (.mat, folder or .zip) or a CSV with "
                              "focus_ep_mm, x_mm, y_mm, z_ep_mm, intensity_wcm2 (read_offaxis_scans)")
         f_row.addWidget(self.file, 1)
-        b = QToolButton(text="…")
+        b = icons.PathButton("file", "Choose the off-axis scan file (.mat, folder or .zip, or CSV)")
         b.clicked.connect(self._browse)
         f_row.addWidget(b)
         form.addRow("File", f_row)
@@ -379,7 +380,7 @@ def _theme_axes(axes, c: dict) -> None:
     """Axes, ticks, grid, title and legend in the active palette (light or dark)."""
     for ax in axes:
         ax.set_facecolor(c["surface"])
-        ax.tick_params(colors=c["ink3"], labelsize=8)
+        ax.tick_params(colors=c["ink3"], labelsize=style.PLOT_PT["small"])
         ax.xaxis.label.set_color(c["ink2"])
         ax.yaxis.label.set_color(c["ink2"])
         ax.title.set_color(c["ink"])
@@ -475,8 +476,7 @@ class CalibrationPage(QWidget):
         self.csv.setPlaceholderText("hydrophone axial-profile CSV")
         self.csv.textChanged.connect(lambda _t: self._update_buttons())
         csv_row.addWidget(self.csv, 1)
-        b = QToolButton(text="…")
-        b.setToolTip("Choose a hydrophone axial-profile CSV")
+        b = icons.PathButton("file", "Choose a hydrophone axial-profile CSV")
         b.clicked.connect(self._browse_csv)
         csv_row.addWidget(b)
         self.load_btn = QPushButton("Load")
@@ -528,8 +528,8 @@ class CalibrationPage(QWidget):
         form.addRow("Calibrate at", self.calat)
         self.isppa = _spin(30, 0.1, 1000, 1)
         self.isppa.setSuffix(" W/cm²")
-        self.isppa.setToolTip("Reference ISPPA of the stored drives; defaults to transducer.target_isppa_wcm2")
-        form.addRow("Reference ISPPA", self.isppa)
+        self.isppa.setToolTip("Reference I<sub>SPPA</sub> of the stored drives; defaults to transducer.target_isppa_wcm2")
+        form.addRow("Reference I<sub>SPPA</sub>", self.isppa)
         a_row = QHBoxLayout()
         self.fit_btn = QPushButton("Fit")
         self.fit_btn.setProperty("primary", True)
@@ -714,7 +714,7 @@ class CalibrationPage(QWidget):
         if FigureCanvasQTAgg is not None:
             self.fig = Figure(figsize=(7, 6), layout="constrained")
             self.ax_prof, self.ax_r2 = self.fig.subplots(2, 1, height_ratios=[1.3, 1])
-            self.canvas = FigureCanvasQTAgg(self.fig)
+            self.canvas = FigureCanvasQTAgg(self.fig, export_name="calibration_profiles")
             self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             v.addWidget(self.canvas, 3)
         else:
@@ -1392,13 +1392,13 @@ class CalibrationPage(QWidget):
         depths = as_floats(v.get("depths"))
         for x in depths if show_all else [float(sel)]:
             ax.axvline(x, ls=":", color=c["line2"], lw=0.8)
-        ax.set_xlabel("Distance from exit plane (mm)")
+        ax.set_xlabel("Distance from exit plane [mm]")
         ax.set_ylabel("Normalised intensity")
         ax.set_title(f"{v.get('combo', '')} — {'all depths' if show_all else sel + ' mm'}"
-                     f"{' (prediction, runtime library path)' if v.get('predicted') else ''}", fontsize=10)
+                     f"{' (prediction, runtime library path)' if v.get('predicted') else ''}", fontsize=style.PLOT_PT["title"])
         ax.grid(True, alpha=0.3)
         if ax.get_legend_handles_labels()[0]:
-            ax.legend(fontsize=8, loc="upper right")
+            ax.legend(fontsize=style.PLOT_PT["normal"], loc="upper right")
 
         predicted = bool(v.get("predicted"))
         for kind, colour, name in STYLES:
@@ -1410,7 +1410,7 @@ class CalibrationPage(QWidget):
         geo = v.get("dist_geom_mm")
         if isinstance(geo, (int, float)):
             ax2.axvline(geo, ls=":", color=c["ink4"], lw=0.8)
-            ax2.annotate("natural focus", (geo, 0.02), xycoords=("data", "axes fraction"), fontsize=7,
+            ax2.annotate("natural focus", (geo, 0.02), xycoords=("data", "axes fraction"), fontsize=style.PLOT_PT["small"],
                          color=c["ink3"], rotation=90)
         if predicted and depths:
             lim = [min(depths), max(depths)]
@@ -1426,17 +1426,17 @@ class CalibrationPage(QWidget):
             span = as_floats(v.get("measured_span"))
             if len(span) == 2:
                 ax2.axvspan(span[0], span[1], color=c["brand"], alpha=0.08, label="Measured range")
-            ax2.set_xlabel("Target depth (mm from EP)")
-            ax2.set_ylabel("Focus, FLHM centre (mm)")
+            ax2.set_xlabel("Target depth from exit plane [mm]")
+            ax2.set_ylabel("Focus, FLHM centre [mm]")
         else:
             lo = min([0.0] + [y for k, *_ in STYLES if res.get(k) for y in as_floats(res[k].get("r2"))
                               if math.isfinite(y)])
             ax2.set_ylim(max(-0.2, lo), 1)
-            ax2.set_xlabel("Focal depth (mm from EP)")
+            ax2.set_xlabel("Focal depth from exit plane [mm]")
             ax2.set_ylabel("R² (profile shape)")
         ax2.grid(True, alpha=0.3)
         if ax2.get_legend_handles_labels()[0]:
-            ax2.legend(fontsize=8, loc="best")
+            ax2.legend(fontsize=style.PLOT_PT["normal"], loc="best")
         _theme_axes((ax, ax2), c)
         self.canvas.draw_idle()
 

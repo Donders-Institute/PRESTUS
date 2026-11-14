@@ -209,3 +209,33 @@ def test_beam_qc_layered_sphere(tmp_path):
     # transducer pushed into the head: the rim cuts into the scalp
     q = pl.beam_qc(seg, np.asarray(apex) - [0, 0, 20], [0, 0, 0], bowl)
     assert q["rim_gap_min_mm"] < 0
+def test_voxels_are_cached_locally_until_the_image_changes(tmp_path, monkeypatch):
+    path = tmp_path / "t1.nii.gz"
+    data = np.arange(24, dtype=np.float32).reshape(2, 3, 4)
+    nib.save(nib.Nifti1Image(data, AFFINE), str(path))
+    np.testing.assert_array_equal(pl.Volume(path).data, data)
+    cached = pl._voxel_cache_file(path)
+    assert cached is not None and cached.is_file()
+
+    reads = []
+    real = pl._read_voxels_from
+    monkeypatch.setattr(pl, "_read_voxels_from", lambda p, img: reads.append(p) or real(p, img))
+    np.testing.assert_array_equal(pl.Volume(path).data, data)
+    assert reads == []                                   # served from the cache
+
+    nib.save(nib.Nifti1Image(data + 1, AFFINE), str(path))
+    import os
+    st = path.stat()
+    os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns + 10**9))   # a newer modification time
+    np.testing.assert_array_equal(pl.Volume(path).data, data + 1)
+    assert reads == [path]                               # changed image: read again
+
+
+def test_voxel_cache_keeps_the_most_recent_volumes(tmp_path, monkeypatch):
+    monkeypatch.setattr(pl, "VOXEL_CACHE_KEEP", 2)
+    for i in range(4):
+        path = tmp_path / f"v{i}.nii.gz"
+        nib.save(nib.Nifti1Image(np.full((2, 2, 2), i, np.float32), AFFINE), str(path))
+        pl.Volume(path).data
+    folder = pl._voxel_cache_file(path).parent
+    assert len(list(folder.glob("*.npy"))) == 2

@@ -12,22 +12,22 @@ from PyQt6.QtWidgets import (QCheckBox, QComboBox, QHBoxLayout, QLabel, QListWid
 
 from .. import results as rs
 from .empty_state import EmptyStack
+from . import style
 
 try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
+    from .mpl_theme import ThemedCanvas as FigureCanvasQTAgg   # drawn in the Nexus theme
     from matplotlib.figure import Figure
     HAVE_MPL = True
 except ImportError:          # pragma: no cover
     HAVE_MPL = False
 
-PALETTE = ("#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b",
-           "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
+PALETTE = style.SERIES          # colour-blind-safe categorical set, one colour per tissue
 
 
 class HeatPanel(QWidget):
     """Metric selector, tissue checklist and a time-course plot."""
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None, filename_hint=None):
         super().__init__(parent)
         self.data: rs.HeatData | None = None
         self._key: tuple | None = None            # (path, mtime) of the loaded file
@@ -81,9 +81,9 @@ class HeatPanel(QWidget):
         plot = QVBoxLayout()
         if HAVE_MPL:
             self.fig = Figure(figsize=(8, 4), tight_layout=True)
-            self.canvas = FigureCanvasQTAgg(self.fig)
+            # export through the canvas's own button (export.py); no matplotlib toolbar
+            self.canvas = FigureCanvasQTAgg(self.fig, export_name="heating", filename_hint=filename_hint)
             self.ax = self.fig.add_subplot(1, 1, 1)
-            plot.addWidget(NavigationToolbar2QT(self.canvas, self))
             plot.addWidget(self.canvas, 1)
         else:
             plot.addWidget(QLabel("Install matplotlib to plot the time courses."), 1)
@@ -200,13 +200,14 @@ class HeatPanel(QWidget):
                               else "This run's HEAT file has no protocol steps "
                                    "(written by PRESTUS since 2026-10-05)")
         ax.set_yscale("log" if self.log.isChecked() and shown else "linear")
-        ax.set_xlabel("Time [s]")
-        ax.set_ylabel(f"{self.metric.currentText()} [{series.unit}]")
+        ax.set_xlabel("Time [s]", fontsize=style.PLOT_PT["normal"])
+        ax.set_ylabel(f"{self.metric.currentText()} [{series.unit}]", fontsize=style.PLOT_PT["normal"])
+        ax.tick_params(labelsize=style.PLOT_PT["small"])
         if len(series.time):
             ax.set_xlim(series.time[0], series.time[-1])
         ax.grid(True, alpha=0.3)
         if shown:
-            ax.legend(frameon=False, fontsize=8)
+            ax.legend(frameon=False, fontsize=style.PLOT_PT["small"])
         self.canvas.draw_idle()
 
 

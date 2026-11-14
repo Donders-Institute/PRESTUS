@@ -31,11 +31,12 @@ from ..uncertainty import VARIANTS, variant_file
 from ..yamlio import load_file
 from . import style
 from .empty_state import EmptyStack
+from .export import subject_stem
 from .matlab_status import MatlabStatus
 from .ortho_view import OrthoViewer
 
 try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+    from .mpl_theme import ThemedCanvas as FigureCanvasQTAgg   # drawn in the Nexus theme
     from matplotlib.figure import Figure
     HAVE_MPL = True
 except ImportError:          # pragma: no cover
@@ -48,7 +49,7 @@ PROPERTIES = [
     ("alpha_coeff", "Attenuation [dB/(cm.MHz)]", "alpha_coeff"),
 ]
 # reference.skull is the config's homogeneous skull value, which a mapped pCT run does not use
-RUN_STYLE = ("Skull layer value (unused when mapped)", "#333333", "--")
+RUN_STYLE = ("Skull layer value (unused when mapped)", "ink", "--")      # colour: palette role
 BAND_STYLE = ("Bound variants (homogeneous skull)", "#d98a1f", 0.22)
 SOURCE_TEXT = {"grid": "grid voxels: the exact preprocessed grid",
                "native": "native voxels: the pCT image before cropping/resampling/smoothing"}
@@ -167,6 +168,9 @@ class PctPage(QWidget):
         v.addWidget(self.banner)
 
         self.viewer = OrthoViewer()
+        if getattr(getattr(self.viewer, "canvas", None), "export_button", None) is not None:
+            self.viewer.canvas.export_button.view = "pct_slices"
+            self.viewer.canvas.export_button.filename_hint = subject_stem(lambda: self.model, "pct_slices")
         v.addWidget(self.viewer, 2)
 
         # The histograms appear only with a cached distribution; else one line says how
@@ -199,7 +203,8 @@ class PctPage(QWidget):
         v.addWidget(self.stats_note)
         if HAVE_MPL:
             self.fig = Figure(figsize=(9, 3.2), tight_layout=True)
-            self.canvas = FigureCanvasQTAgg(self.fig)
+            self.canvas = FigureCanvasQTAgg(self.fig, export_name="pct_properties",
+                                            filename_hint=subject_stem(lambda: self.model, "pct_properties"))
             self.axes = [self.fig.add_subplot(1, 4, i + 1) for i in range(4)]
             v.addWidget(self.canvas, 1)
             self.canvas.hide()
@@ -388,12 +393,12 @@ class PctPage(QWidget):
         reference = stats.get("reference", {}).get("skull", {})
         for ax, (key, label, bound_key) in zip(self.axes, PROPERTIES):
             prop = stats.get("properties", {}).get(key)
-            ax.set_title(label, fontsize=9)
+            ax.set_title(label, fontsize=style.PLOT_PT["title"])
             bars = histogram_bars(prop) if isinstance(prop, dict) else None
             if bars is None:
                 ax.set_xticks([]); ax.set_yticks([])
                 ax.text(0.5, 0.5, "n/a", ha="center", va="center", transform=ax.transAxes,
-                        fontsize=8, color="gray")
+                        fontsize=style.PLOT_PT["normal"], color=style.active()["ink3"])
                 continue
             centers, counts, widths = bars
             band = skull_band(bounds, bound_key) if bound_key is not None else None
@@ -406,7 +411,7 @@ class PctPage(QWidget):
                 hi_x = max(value, band[1]) if band else value
                 ax.set_xlim(lo_x - span * 0.25, hi_x + span * 0.25)
                 ax.text(0.02, 0.96, f"constant {value:g}", ha="left", va="top",
-                        transform=ax.transAxes, fontsize=8, color="#333333")
+                        transform=ax.transAxes, fontsize=style.PLOT_PT["normal"], color=style.active()["ink2"])
             ax.bar(centers, counts, width=widths, color="#8d9db6", edgecolor="none")
             if bound_key is not None:
                 # each ITRUSST property has a lower and an upper bound, so per-variant lines
@@ -418,15 +423,15 @@ class PctPage(QWidget):
                     frac = outside_share(prop, lo, hi)
                     if frac is not None:
                         ax.text(0.98, 0.96, f"{frac:.0%} outside", ha="right", va="top",
-                                transform=ax.transAxes, fontsize=8, color="#333333")
+                                transform=ax.transAxes, fontsize=style.PLOT_PT["normal"], color=style.active()["ink2"])
                 run = reference.get(bound_key)
                 if run is not None:
-                    label_, colour, ls = RUN_STYLE
-                    ax.axvline(run, color=colour, linestyle=ls, linewidth=1.2, label=label_)
-            ax.tick_params(labelsize=7)
+                    label_, role, ls = RUN_STYLE
+                    ax.axvline(run, color=style.active()[role], linestyle=ls, linewidth=1.2, label=label_)
+            ax.tick_params(labelsize=style.PLOT_PT["small"])
         handles, labels = self.axes[1].get_legend_handles_labels()
         if handles:
-            self.fig.legend(handles, labels, loc="upper center", ncol=len(handles), fontsize=8,
+            self.fig.legend(handles, labels, loc="upper center", ncol=len(handles), fontsize=style.PLOT_PT["normal"],
                             bbox_to_anchor=(0.5, 1.08))
         self.canvas.draw_idle()
         self.stats_title.setText(stats_title(stats, stats_file))

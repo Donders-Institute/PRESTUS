@@ -183,3 +183,26 @@ def test_measured_ct_pattern(schema, tmp_path):
     assert measured_ct_file(m) is None and m.is_visible("pct.skull_mapping")
 
 
+def test_io_preview_ct_rows(schema, tmp_path):
+    from PyQt6.QtWidgets import QApplication
+    from prestus_nexus.ui.io_preview import IOPreviewPanel
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    m = ConfigModel(schema)
+    for key, value in {"subject_id": 3, "path.anat": str(tmp_path / "anat"), "path.sim": str(tmp_path / "sim"),
+                       "simulation.medium": "layered", "pct.enabled": 1}.items():
+        m.set(key, value)
+    panel = IOPreviewPanel(m)
+    text = panel.plain_text()
+    assert f"pseudo-CT  {tmp_path / 'pct' / 'sub-003'}/" in text      # next to the segmentation, not in m2m
+    m.set("path.ct_pattern", "sub-%1$03d_CT.nii.gz")
+    assert f"measured CT  {tmp_path / 'anat' / 'sub-003_CT.nii.gz'}" in panel.plain_text()
+    panel.refresh()
+    assert "nexus-icon:folder" in panel._shown
+
+
+def test_path_button_icons():
+    from PyQt6.QtWidgets import QApplication
+    from prestus_nexus.ui.icons import PathButton
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    assert PathButton("file").toolTip() == "Choose a file"
+    assert PathButton("dir").toolTip() == "Choose a folder" and not PathButton("dir").icon().isNull()

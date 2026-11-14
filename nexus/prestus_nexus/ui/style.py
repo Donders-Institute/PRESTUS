@@ -40,6 +40,22 @@ C_DARK = {
 
 _dark = False
 
+# Categorical colours for data series (tissues, recorded series, fit methods): Okabe & Ito's
+# colour-blind-safe set, in an order that stays distinct on the light and the dark surface
+# (their black is left out: it vanishes in the dark theme; yellow comes last, faint on white).
+# Semantic colours (green / amber / red status, accent, thermal) stay in the palettes above.
+SERIES = ("#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#F0E442")
+
+
+def series(i: int) -> str:
+    """The i-th categorical colour (cycles)."""
+    return SERIES[i % len(SERIES)]
+
+
+# Text in every plot, in points at the figures' 100 dpi: 'normal' is the 13 px of the app's
+# own text, so plots and forms read at one size; 'small' for ticks, legends and annotations.
+PLOT_PT = {"small": 8.5, "normal": 9.5, "title": 10.0}
+
 
 def active() -> dict:
     """The palette currently applied to everything except the header bar."""
@@ -150,6 +166,9 @@ QPushButton[primary="true"] {{ background: {c['brand']}; color: {c['on_brand']};
 QPushButton[primary="true"]:disabled {{ background: {c['surface3']}; color: {c['ink4']}; border-color: {c['line2']}; }}
 QPushButton:disabled {{ color: {c['ink4']}; }}
 QPushButton[compact="true"] {{ padding: 2px 0; min-width: 28px; }}
+QPushButton#AdvancedToggle {{ padding: 4px 12px; }}
+QPushButton#AdvancedToggle:checked {{ background: {c['brand_soft']}; border-color: {c['brand']};
+    color: {c['brand']}; font-weight: 600; }}
 QToolButton {{ border: none; padding: 2px 4px; border-radius: 5px; }}
 QToolButton:hover {{ background: {c['surface3']}; }}
 QCheckBox {{ spacing: 6px; }}

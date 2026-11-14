@@ -1,9 +1,9 @@
-"""Start tab logic: everything a first run needs, derived from one T1 image.
+"""QuickStart tab logic: everything a first run needs, derived from one T1 image.
 
 PRESTUS finds its inputs through path.anat + path.t1_pattern (sprintf'd with subject_id),
 looks for the segmentation in <path.seg or path.anat>/m2m_sub-XXX, and needs path.sim for
 its outputs. A user who picks a T1 file should not have to know any of that: from_t1()
-proposes all of these keys, and the Start tab writes them into the model.
+proposes all of these keys, and the QuickStart tab writes them into the model.
 """
 
 from __future__ import annotations

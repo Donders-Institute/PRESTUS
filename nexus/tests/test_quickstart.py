@@ -89,6 +89,7 @@ def test_start_page_writes_the_model(tmp_path, schema, prestus_root, monkeypatch
     assert m.get("subject_id") == 4 and m.get("path.t1_pattern") == "sub-%1$03d_T1w.nii.gz"
     assert m.get("path.sim") == str(tmp_path / "sub-004" / "prestus_sim")
     assert w.dirty
+    assert not start.rb_auto.icon().isNull() and not start.rb_entry.icon().isNull()
     start.rb_auto.click()
     assert m.get("placement.mode") == "heuristic"
     for sp, v in zip(start.focus, (-29, -6, 7)):

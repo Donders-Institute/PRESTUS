@@ -8,6 +8,8 @@ from typing import Any
 
 import yaml
 
+from .fsio import write_text_atomic
+
 MAX_RECENT = 10
 
 
@@ -46,6 +48,6 @@ class Session:
     def save(self) -> None:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(yaml.safe_dump(self.data, sort_keys=True), encoding="utf-8")
+            write_text_atomic(self.path, yaml.safe_dump(self.data, sort_keys=True))
         except OSError:
             pass

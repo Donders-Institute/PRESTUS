@@ -25,16 +25,20 @@ from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QSlider, QVBoxLayou
 
 from .. import placement as pl
 from .empty_state import EmptyStack
+from . import style
 
 try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+    from .mpl_theme import ThemedCanvas as FigureCanvasQTAgg   # drawn in the Nexus theme
     from matplotlib.figure import Figure
     HAVE_MPL = True
 except ImportError:          # pragma: no cover
     HAVE_MPL = False
 
 VIEWS = [("Axial", 2, (0, 1)), ("Coronal", 1, (0, 2)), ("Sagittal", 0, (1, 2))]
-COLORMAPS = ["hot", "plasma", "viridis", "jet", "coolwarm"]
+# Perceptually uniform maps first (magma is the default). No rainbow ('jet': false edges)
+# and no diverging map: every overlay shown here (intensity, pressure, MI, temperature, CEM43,
+# pseudo-CT) is unsigned, so a map centred on zero would mislead.
+COLORMAPS = ["magma", "inferno", "viridis", "plasma", "hot"]
 
 def _fmt(v: float | None) -> str:
     """A map value for the readout: 3 significant digits, no exponent below 1e5."""
@@ -121,6 +125,7 @@ class OrthoViewer(QWidget):
         self.overlay: pl.Volume | None = None
         self.cursor = np.zeros(3)
         self.markers: list[tuple[np.ndarray, str, str]] = []   # (RAS mm, marker, colour)
+        self.marker_texts: list[str] = []         # hover text per marker ('' = none)
         self._anat_lim: tuple[float, float] | None = None
         self._over_lim: tuple[float, float] | None = None
         self._over_same_grid = False
@@ -188,12 +193,14 @@ class OrthoViewer(QWidget):
 
         if HAVE_MPL:
             self.fig = Figure(figsize=(9, 3.2))
-            self.canvas = FigureCanvasQTAgg(self.fig)
+            self.canvas = FigureCanvasQTAgg(self.fig, export_name="slices")
             self.axes = [self.fig.add_subplot(1, 3, i + 1) for i in range(3)]
             # fixed margins (not tight_layout): room for the colour bar below the slices
             self.fig.subplots_adjust(left=0.02, right=0.98, top=0.93, bottom=0.14, wspace=0.06)
             self.canvas.mpl_connect("scroll_event", self._scrolled)
             self.canvas.mpl_connect("button_press_event", self._clicked)
+            from .tooltip import MarkerTips
+            self.marker_tips = MarkerTips(self.canvas)     # hover a marker: its transducer's name
             v.addWidget(self.canvas, 1)
             self.readout = QLabel()
             self.readout.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -334,10 +341,11 @@ class OrthoViewer(QWidget):
                                 and tuple(a.canon.shape[:3]) == tuple(o.canon.shape[:3])
                                 and np.allclose(a.canon_affine, o.canon_affine, atol=1e-4))
 
-    def set_markers(self, markers: list[tuple[np.ndarray, str, str]]) -> None:
-        """Points to draw on every view: (RAS mm, matplotlib marker, colour). A point
-        within two voxels of a slice is drawn solid, otherwise faint (projected)."""
-        self.markers = [(np.asarray(r, float), m, c) for r, m, c in markers]
+    def set_markers(self, markers: list[tuple]) -> None:
+        """Points to draw on every view: (RAS mm, matplotlib marker, colour[, hover text]).
+        A point within two voxels of a slice is drawn solid, otherwise faint (projected)."""
+        self.markers = [(np.asarray(mk[0], float), mk[1], mk[2]) for mk in markers]
+        self.marker_texts = [str(mk[3]) if len(mk) > 3 else "" for mk in markers]
         self._request_draw()
 
     def centre_on(self, ras) -> None:
@@ -430,7 +438,7 @@ class OrthoViewer(QWidget):
                                     aspect=vs[w] / vs[h], interpolation="nearest")
                 hline = ax.axhline(0, color="#4fa3e0", lw=0.6, alpha=0.6)
                 vline = ax.axvline(0, color="#4fa3e0", lw=0.6, alpha=0.6)
-                ax.set_title(title, fontsize=9)
+                ax.set_title(title, fontsize=style.PLOT_PT["title"])
                 ax.set_xlim(-0.5, shape2d[0] - 0.5)
                 ax.set_ylim(-0.5, shape2d[1] - 0.5)
                 self._artists.append({"anat": anat_im, "over": over_im, "k": None, "marks": [],
@@ -459,12 +467,14 @@ class OrthoViewer(QWidget):
             for line in art["marks"]:
                 line.remove()
             art["marks"] = []
-            for ras, marker, colour in self.markers:
+            self.marker_tips.clear(ax)
+            for (ras, marker, colour), tip in zip(self.markers, self.marker_texts):
                 m = self.anat.ras_to_canon(ras)[0]
                 near = abs(m[plane] - k) <= 2
                 art["marks"] += ax.plot(m[h], m[w], marker, color=colour, markersize=8 if near else 6,
                                         markeredgewidth=1.5, alpha=1.0 if near else 0.35,
                                         linestyle="none")
+                self.marker_tips.add(ax, m[h], m[w], tip)
         self._update_colorbar(show_over)
         self._update_readout()
         self.canvas.draw_idle()
@@ -479,12 +489,12 @@ class OrthoViewer(QWidget):
         if self._colorbar is None:
             cax = self.fig.add_axes([0.35, 0.04, 0.3, 0.03])
             self._colorbar = self.fig.colorbar(mappable, cax=cax, orientation="horizontal")
-            self._colorbar.ax.tick_params(labelsize=8)
+            self._colorbar.ax.tick_params(labelsize=style.PLOT_PT["small"])
         else:
             self._colorbar.update_normal(mappable)
         self._colorbar.ax.set_visible(True)
         self._colorbar.set_alpha(1.0)
-        self._colorbar.set_label(self.unit, fontsize=8)
+        self._colorbar.set_label(f"[{self.unit}]" if self.unit else "", fontsize=style.PLOT_PT["normal"])
 
     def _update_readout(self) -> None:
         """RAS of the crosshair and the overlay's value there."""

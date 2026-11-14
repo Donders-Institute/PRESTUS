@@ -329,6 +329,9 @@ def _on_intervals(seq) -> list[tuple[float, float]]:
     return out
 
 
+HEAT_VARIABLES = ("timeseries", "HEAT", "time_status_seq")   # what read_heat uses
+
+
 def _load_mat(path: Path) -> dict:
     """A MATLAB -v7 (scipy) or -v7.3 (h5py) file as nested dicts/lists of arrays."""
     try:
@@ -337,7 +340,8 @@ def _load_mat(path: Path) -> dict:
         sio = None
     if sio is not None:
         try:
-            d = sio.loadmat(str(path), squeeze_me=True, struct_as_record=False)
+            d = sio.loadmat(str(path), squeeze_me=True, struct_as_record=False,
+                            variable_names=HEAT_VARIABLES)
             return {k: _from_scipy(v) for k, v in d.items() if not k.startswith("__")}
         except NotImplementedError:    # -v7.3
             pass

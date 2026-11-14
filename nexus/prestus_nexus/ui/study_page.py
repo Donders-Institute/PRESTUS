@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (QAbstractItemView, QFileDialog, QFrame, QHBoxLayout
 
 from .. import launcher
 from ..study import Manifest, from_neuronav_summary, parse_subject_ids, resolve_manifest
-from . import style
+from . import icons, style
 from .empty_state import EmptyStack
 
 LEAD = ("Simulate many subjects, or several targets per subject, in one go. Each row of the table "
@@ -135,8 +135,7 @@ class StudyPage(QFrame):
         self.path = QLineEdit()
         self.path.setPlaceholderText("set on first save (default: <config name>_runs.tsv next to the config)")
         self.path.editingFinished.connect(self._path_edited)
-        browse = QToolButton(text="…")
-        browse.setToolTip("Choose or create a .tsv/.csv table")
+        browse = icons.PathButton("file", "Choose or create a .tsv/.csv table")
         browse.clicked.connect(self._browse)
         row.addWidget(self.path, 1)
         row.addWidget(browse)
@@ -213,8 +212,9 @@ class StudyPage(QFrame):
         node = self.model.schema.get(re.sub(r"\(\d+\)", "", column))
         if node is None:
             return f"<b>{column}</b><br>Not a key of config_default.yaml."
-        return (f"<b>{column}</b><br>{node.help.replace(chr(10), '<br>') if node.help else ''}"
-                "<br>Empty cell = the study config's value.")
+        from .fields import display_text
+        from .tooltip import html_for
+        return html_for(node, column, display_text(node.default), note="Empty cell = the study config's value.")
 
     def _update_summary(self) -> None:
         m = self.manifest

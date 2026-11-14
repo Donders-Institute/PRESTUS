@@ -21,6 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prestus-root", help="PRESTUS checkout (default: auto-detect)")
     args = parser.parse_args(argv)
 
+    from PyQt6.QtCore import QCoreApplication, Qt
     from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
     from .equipment import EquipmentLibrary
@@ -30,12 +31,15 @@ def main(argv: list[str] | None = None) -> int:
     from .session import Session
     from .ui.main_window import MainWindow
 
-    try:   # Qt allows this only before the QApplication exists (Results ▸ Report uses it)
-        from PyQt6 import QtWebEngineWidgets  # noqa: F401
-    except ImportError:
-        pass
+    # Results ▸ Report imports QtWebEngine on first use; Qt allows that after the
+    # QApplication exists only with shared OpenGL contexts (set before it is created).
+    QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     app = QApplication(sys.argv[:1])
     app.setApplicationName("PRESTUS Nexus")
+    from .ui import errors
+    errors.install_excepthook(app.activeWindow)    # an uncaught error: dialog + log, no exit
+    from .ui import selectable
+    selectable.install(app)                        # all label text can be selected and copied
     from .bridge import shutdown_shared
     app.aboutToQuit.connect(shutdown_shared)       # end the MATLAB session with the app
     session = Session()
@@ -58,12 +62,16 @@ def main(argv: list[str] | None = None) -> int:
     from .ui import style
     style.apply(app, root, dark=bool(session.get("dark_mode", False)))
 
+    model = None
     if args.config:
         path = Path(args.config).resolve()
-        model = ConfigModel.from_file(Schema(base_default_for(path, root), toolbox_path=toolbox_default(root)), path,
-                                      EquipmentLibrary(root))
-        session.add_recent(path)
-    else:           # untitled study; File > New study… / Open… / Open recent
+        with errors.guarded(None, f"Opening {path.name}") as opened:   # falls back to an untitled study
+            model = ConfigModel.from_file(Schema(base_default_for(path, root),
+                                                 toolbox_path=toolbox_default(root)),
+                                          path, EquipmentLibrary(root))
+        if not opened.failed:
+            session.add_recent(path)
+    if model is None:   # untitled study; File > New study… / Open… / Open recent
         model = ConfigModel(Schema(toolbox_default(root), toolbox_path=toolbox_default(root)),
                             EquipmentLibrary(root))
 
