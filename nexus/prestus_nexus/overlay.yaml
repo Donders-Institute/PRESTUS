@@ -876,7 +876,7 @@ display:
   # Grid
   grid: {label: Simulation grid}
   grid.*: {advanced: true}
-  grid.resolution_mm: {label: Grid resolution, advanced: false}
+  grid.resolution_mm: {label: Grid resolution, advanced: false, help: "Isotropic grid spacing [mm]. The frequency sets its upper limit: at least grid.min_ppw (default 6) points per wavelength in the slowest modelled tissue, e.g. 0.5 mm or finer at 500 kHz in water (1500 m/s). Below that PRESTUS warns, and jwave stops. For head and phantom media, a grid coarser than 0.75 mm staircases the tissue transitions (skull, scalp), which may affect the results."}
   grid.default_dims: {label: Free-water grid size, help: "Grid points of free-water simulations. 'auto' (default) sizes the grid to the transducer: aperture + 2 × water_margin_mm laterally, focal distance from the bowl + z_beyond_focus_mm axially; same free-water ISPPA and focus as [144, 144, 400]. Or explicit sizes, e.g. [144, 144, 400] (3D) or [144, 400] (axisymmetric); a matrix transducer placed by grid indices keeps [144, 144, 400] under 'auto'."}
   grid.pml_size: {label: PML thickness}
   grid.source_ppw: {label: Points per wavelength}

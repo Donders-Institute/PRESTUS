@@ -41,6 +41,7 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 > - `launch_web_alignment` and the browser alignment viewer are removed; use the Nexus placement viewer
 
 #### Core / Config
+- New warning `source_sensor_setup:staircasing` for head and phantom media with `grid.resolution_mm` above 0.75 mm: staircasing at tissue transitions may affect results
 - `load_parameters` accepts trailing `{key, value}` overrides, applied after all config layers
 - Unknown study-config keys warn with a suggestion (`prestus:unknownConfigKey`)
 - Configs from v0.5.0 on load as they are: renamed keys are converted to their current names with one warning (`prestus:renamedConfigKey`), and keys without an exact counterpart stop the run with the key to set instead (`prestus:legacyConfigKey`)

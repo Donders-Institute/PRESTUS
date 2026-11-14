@@ -46,6 +46,8 @@ PPW = c / (f × dx)
 
 The worst case is the slowest medium (water or brain, ~1500 m/s). Keep **PPW ≥ 6**; PRESTUS warns below `grid.min_ppw`.
 
+For head (`layered`) and `phantom` media, a grid coarser than **0.75 mm** staircases the tissue transitions (skull, scalp), which may affect the results; PRESTUS and the Nexus warn above it.
+
 **CFL number (`grid.source_cfl`)** sets the time step `dt` relative to `dx` and the fastest medium (skull, ~2800 m/s), which sets the stability limit:
 
 ```
