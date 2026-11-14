@@ -9,7 +9,7 @@
 # -----
 #   bash setup_PRESTUS_env.sh [--no-plantus] [--no-deface] [--no-workbench]
 #
-#   --no-plantus    Skip nilearn / vtk / h5py (PlanTUS python deps)
+#   --no-plantus    Skip nilearn / vtk / h5py / trimesh (PlanTUS python deps)
 #   --no-deface     Skip pydeface (MRI defacing deps)
 #   --no-workbench  Skip Connectome Workbench (wb_command)
 #                   Use this if wb_command is already available as an HPC module
@@ -65,8 +65,8 @@ conda run -n "${ENV_NAME}" pip install "${SIMNIBS_WHL_URL}"
 
 # ── 4. Install PlanTUS Python dependencies (optional) ────────────────────────
 if [ "${INSTALL_PLANTUS}" = true ]; then
-    echo "[4/6] Installing PlanTUS dependencies (nilearn, vtk, h5py, pynput)..."
-    conda run -n "${ENV_NAME}" pip install nilearn vtk h5py pynput
+    echo "[4/6] Installing PlanTUS dependencies (nilearn, vtk, h5py, trimesh, pynput)..."
+    conda run -n "${ENV_NAME}" pip install nilearn vtk h5py trimesh pynput
 else
     echo "[4/6] Skipping PlanTUS dependencies (--no-plantus)."
 fi

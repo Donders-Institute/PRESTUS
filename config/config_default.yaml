@@ -378,6 +378,8 @@ placement:
     criterion_skin_var: []
     criterion_skull_var: []
     expand_step: 0.01
+    candidate: []        # idx of a candidate of the last heuristic run (tpars_sub-XXX_<target>.csv) to place instead of
+                         # the heuristic's choice (set on the Nexus Heuristic page); [] = apply the criteria
   mni:
     # Direct placement from MNI coordinates. The transducer point is snapped to the
     # nearest scalp voxel and offset outward by placement.skin_gap_mm using the same geometry
@@ -409,6 +411,11 @@ placement:
     max_distance_mm: []       # [] = max(focal_distance_list) + max(flhm_list). Set both for a steerable array.
     optimal_distance_mm: []   # Optimum of the distance criterion [mm]; [] = mean(focal_distance_list).
     mask_radius_mm: 2         # Radius of the spherical target mask [mm].
+    skin_smoothing_iterations: 2  # Taubin smoothing passes on the skin surface before the criteria
+                              # are computed (PlanTUS >= 2.0; 0 = raw SimNIBS surface).
+    vertex: []                # 0-based skin vertex to place on the maps of an earlier run in the
+                              # placement run folder, without recomputing them (set by the Nexus
+                              # PlanTUS page). [] = compute the maps and place the optimum.
     # --- Optimisation weights (must sum to 1.0) ---
     weight_skin_target_distances: 0.2     # Penalise transducer-to-target distance
     weight_skin_target_angles: 0.2        # Penalise beam angle at skin
@@ -428,8 +435,8 @@ placement:
                               # [] = follow simulation.interactive. 1 works without the MATLAB desktop
                               # (e.g. from the Nexus) but needs a display; without one PlanTUS runs headless.
     connectome_wb_path: ''    # Connectome Workbench bin/ (wb_command, wb_view); prepended to PATH.
-                              # Empty = wb_command must be on PATH or in the Python env's bin/ (checked at start).
-                              # wb_view is only opened in interactive mode.
+                              # PlanTUS >= 2.0 needs Workbench only for interactive: 1 (wb_view);
+                              # PlanTUS 1.x also needs wb_command. Empty = on PATH or in the Python env's bin/.
 
 #------------ Neuronavigation (Localite ingestion)
 

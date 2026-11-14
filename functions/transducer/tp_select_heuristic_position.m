@@ -50,69 +50,88 @@ for k = 1:numel(fields)
     end
 end
 
-%% STEP 1 — Intersection (adaptive expansion)
+%% Chosen candidate (placement.heuristic.candidate, set on the Nexus Heuristic page)
+% A candidate idx of this run's list (tpars_sub-XXX_<target>.csv) is used as it is; the
+% criteria below are not applied.
+chosen = [];
+if isfield(parameters.placement.heuristic, 'candidate') && ~isempty(parameters.placement.heuristic.candidate)
+    chosen = double(parameters.placement.heuristic.candidate);
+end
 
-if ~isnan(parameters.placement.heuristic.criterion_intersection)
-    criterion = parameters.placement.heuristic.criterion_intersection;
-    tppf = locs(locs.prop_intersect < criterion, :);
+if ~isempty(chosen)
+    i = find(locs.idx == chosen, 1);
+    if isempty(i)
+        error('PRESTUS:heuristic:badCandidate', ...
+            ['placement.heuristic.candidate = %g is not among the %d candidates of this run ', ...
+             '(idx %g-%g). Clear it to let the heuristic choose.'], ...
+            chosen, height(locs), min(locs.idx), max(locs.idx));
+    end
+    fprintf('[TP_HEURISTIC] Using candidate %g (placement.heuristic.candidate).\n', chosen);
+else
+    %% STEP 1 — Intersection (adaptive expansion)
 
-    while isempty(tppf) && criterion < 0.3
-        criterion = criterion + parameters.placement.heuristic.expand_step;
+    if ~isnan(parameters.placement.heuristic.criterion_intersection)
+        criterion = parameters.placement.heuristic.criterion_intersection;
         tppf = locs(locs.prop_intersect < criterion, :);
-    end
-else
-    tppf = locs;
-end
 
-%% STEP 2 — Skin proximity
-if ~isnan(parameters.placement.heuristic.criterion_skin_mean) && ~isempty(tppf)
-    % Use quantile
-    skin_lim = quantile(tppf.mean_dist_skin, parameters.placement.heuristic.criterion_skin_mean);
-    tmp = tppf(tppf.mean_dist_skin <= skin_lim, :);
-    if ~isempty(tmp), tppf = tmp;
-    else, fprintf('[TP_HEURISTIC] Skipping skin_mean criterion.\n'); end
-end
-
-%% STEP 3 — Skull variance
-
-if ~isnan(parameters.placement.heuristic.criterion_skull_var) && ~isempty(tppf)
-    % Use quantile
-    skull_var_lim = quantile(tppf.var_dist_skull, parameters.placement.heuristic.criterion_skull_var);
-    tmp = tppf(tppf.var_dist_skull <= skull_var_lim, :);
-    if ~isempty(tmp), tppf = tmp;
-    else, fprintf('[TP_HEURISTIC] Skipping skull_var criterion.\n'); end
-end
-
-%% STEP 4 — Skull mean distance (always applied)
-if ~isnan(parameters.placement.heuristic.criterion_skull_mean) && ~isempty(tppf)
-    % Use quantile
-    skull_mean_lim = quantile(tppf.mean_dist_skull, parameters.placement.heuristic.criterion_skull_mean);
-    tmp = tppf(tppf.mean_dist_skull <= skull_mean_lim, :);
-    if ~isempty(tmp), tppf = tmp;
-    else, fprintf('[TP_HEURISTIC] Skipping skull_mean criterion.\n'); end
-end
-
-%% STEP 5 — Skin variance
-if ~isnan(parameters.placement.heuristic.criterion_skin_var) && ~isempty(tppf)
-    % Use quantile
-    skin_var_lim = quantile(tppf.var_dist_skin, parameters.placement.heuristic.criterion_skin_var);
-    tmp = tppf(tppf.var_dist_skin <= skin_var_lim, :);
-    if ~isempty(tmp)
-        tppf = tmp;
+        while isempty(tppf) && criterion < 0.3
+            criterion = criterion + parameters.placement.heuristic.expand_step;
+            tppf = locs(locs.prop_intersect < criterion, :);
+        end
     else
-        fprintf('[TP_HEURISTIC] Skipping skin_var criterion.\n');
+        tppf = locs;
     end
-end
 
-%% STEP 6 — Minimum distance to target
+    %% STEP 2 — Skin proximity
+    if ~isnan(parameters.placement.heuristic.criterion_skin_mean) && ~isempty(tppf)
+        % Use quantile
+        skin_lim = quantile(tppf.mean_dist_skin, parameters.placement.heuristic.criterion_skin_mean);
+        tmp = tppf(tppf.mean_dist_skin <= skin_lim, :);
+        if ~isempty(tmp), tppf = tmp;
+        else, fprintf('[TP_HEURISTIC] Skipping skin_mean criterion.\n'); end
+    end
 
-if ~isempty(tppf)
-    tppf = tppf(tppf.dist_to_target == min(tppf.dist_to_target), :);
-    i = find(locs.idx == tppf.idx(1));
-    fprintf('[TP_HEURISTIC] Selected %d final candidate(s).\n', size(tppf,1));
-else
-    warn('[TP_HEURISTIC] No candidates remain.');
-    i = [];
+    %% STEP 3 — Skull variance
+
+    if ~isnan(parameters.placement.heuristic.criterion_skull_var) && ~isempty(tppf)
+        % Use quantile
+        skull_var_lim = quantile(tppf.var_dist_skull, parameters.placement.heuristic.criterion_skull_var);
+        tmp = tppf(tppf.var_dist_skull <= skull_var_lim, :);
+        if ~isempty(tmp), tppf = tmp;
+        else, fprintf('[TP_HEURISTIC] Skipping skull_var criterion.\n'); end
+    end
+
+    %% STEP 4 — Skull mean distance (always applied)
+    if ~isnan(parameters.placement.heuristic.criterion_skull_mean) && ~isempty(tppf)
+        % Use quantile
+        skull_mean_lim = quantile(tppf.mean_dist_skull, parameters.placement.heuristic.criterion_skull_mean);
+        tmp = tppf(tppf.mean_dist_skull <= skull_mean_lim, :);
+        if ~isempty(tmp), tppf = tmp;
+        else, fprintf('[TP_HEURISTIC] Skipping skull_mean criterion.\n'); end
+    end
+
+    %% STEP 5 — Skin variance
+    if ~isnan(parameters.placement.heuristic.criterion_skin_var) && ~isempty(tppf)
+        % Use quantile
+        skin_var_lim = quantile(tppf.var_dist_skin, parameters.placement.heuristic.criterion_skin_var);
+        tmp = tppf(tppf.var_dist_skin <= skin_var_lim, :);
+        if ~isempty(tmp)
+            tppf = tmp;
+        else
+            fprintf('[TP_HEURISTIC] Skipping skin_var criterion.\n');
+        end
+    end
+
+    %% STEP 6 — Minimum distance to target
+
+    if ~isempty(tppf)
+        tppf = tppf(tppf.dist_to_target == min(tppf.dist_to_target), :);
+        i = find(locs.idx == tppf.idx(1));
+        fprintf('[TP_HEURISTIC] Selected %d final candidate(s).\n', size(tppf,1));
+    else
+        warn('[TP_HEURISTIC] No candidates remain.');
+        i = [];
+    end
 end
 
 %% Extract HEURISTIC position

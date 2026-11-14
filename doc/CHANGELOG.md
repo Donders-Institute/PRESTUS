@@ -122,6 +122,10 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 - Fixed: PlanTUS interactive mode hung, did not find its own output, and crashed with a single calibration point; PlanTUS target masks failed on integer T1s
 - Fixed: automatic Localite placement (`placement.localite.file` empty) always errored; file mode now honours `position` / `target`
 - Fixed: `focal_distance_calculation` failed for Localite and PlanTUS placements
+- PlanTUS 2.0 support (Workbench-free); PlanTUS 1.x still works. New `placement.plantus.skin_smoothing_iterations` (default 2, as in PlanTUS 2.0)
+- ⚠️ **Changed:** with PlanTUS 2.0, the skin surface is smoothed and the beam aims at the target centre; placements can differ from PlanTUS 1.x runs. Set `skin_smoothing_iterations: 0` to keep the raw surface.
+- New `placement.plantus.vertex`: places a chosen skin vertex on the maps of an earlier run without recomputing them
+- New `placement.heuristic.candidate`: places a chosen candidate of the heuristic's table instead of applying its criteria
 - Fixed: heuristic placement without `transducer.focal_distance_ep` / `focal_distance_bowl` never finished; it now stops with a message
 - ⚠️ **Fixed:** the heuristic placement's Localite mm export (`loc_*_mm`) was one voxel high along each axis; re-export heuristic positions before entering them in Localite
 - Fixed: Localite placement with empty transducer geometry stopped with a dimension error instead of using `placement.localite.reference_distance_mm`

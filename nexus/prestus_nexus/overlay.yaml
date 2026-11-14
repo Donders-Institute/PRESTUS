@@ -222,6 +222,7 @@ fields:
   placement.plantus.flhm_list: {kind: numbers, unit: mm}
   placement.plantus.max_angle_deg: {unit: deg}
   placement.plantus.interactive: {choices: [0, 1]}
+  placement.plantus.skin_smoothing_iterations: {kind: int, min: 0}
 
   # ── Grid ─────────────────────────────────────────────────────────────
   grid.resolution_mm: {unit: mm}
@@ -860,6 +861,9 @@ display:
   placement.plantus.flhm_list: {label: Focal lengths (FLHM) per depth}
   placement.plantus.max_angle_deg: {label: Max. tilt angle, advanced: true}
   placement.plantus.mask_radius_mm: {label: Target mask radius, advanced: true}
+  placement.plantus.skin_smoothing_iterations: {label: Skin smoothing passes, advanced: true}
+  placement.heuristic.candidate: {label: Chosen candidate, advanced: true, help: "Set on the Heuristic page (Place here): this candidate (idx in tpars_sub-XXX_<target>.csv) is placed as it is, instead of the heuristic's criteria. [] lets the heuristic choose."}
+  placement.plantus.vertex: {label: Chosen skin vertex, advanced: true, help: "Set on the PlanTUS page (Place here): this vertex of the earlier run's maps is placed without recomputing them. [] computes the maps and places the optimum."}
   placement.plantus.weight_*: {advanced: true}
   placement.plantus.weight_skin_target_distances: {label: "Weight: distance to target"}
   placement.plantus.weight_skin_target_angles: {label: "Weight: beam angle at skin"}

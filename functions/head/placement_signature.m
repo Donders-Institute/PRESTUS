@@ -39,6 +39,12 @@ end
     if isfield(s, 'interactive') && isempty(s.interactive)
         s = rmfield(s, 'interactive');
     end
+    if isfield(s, 'vertex') && isempty(s.vertex)    % likewise: no vertex chosen
+        s = rmfield(s, 'vertex');
+    end
+    if isfield(s, 'candidate') && isempty(s.candidate)  % heuristic: no candidate chosen
+        s = rmfield(s, 'candidate');
+    end
     sig.settings = s;
     if isfield(parameters.placement, 'skin_gap_mm')
         sig.skin_gap_mm = parameters.placement.skin_gap_mm;

@@ -144,15 +144,15 @@ Only the `cpp_cpu` and `cpp_gpu` code types need these optional binaries: downlo
 
 ### PlanTUS Dependencies
 
-The optional `plantus` placement mode needs extra Python packages in the SimNIBS environment (the setup script installs them unless `--no-plantus` was given):
+The optional `plantus` placement mode needs [PlanTUS](https://github.com/mlueckel/PlanTUS) 2.0 or later (`git clone https://github.com/mlueckel/PlanTUS`, then `placement.plantus.script_path`) and extra Python packages in the SimNIBS environment (the setup script installs them unless `--no-plantus` was given):
 
 ```bash
 source activate simnibs_v4.6.0
-pip install nilearn vtk h5py pynput
-python -c "import nilearn; import vtk; import h5py; import pynput; print('PlanTUS dependencies OK')"
+pip install nilearn vtk h5py trimesh pynput
+python -c "import nilearn, vtk, h5py, trimesh, pynput; print('PlanTUS dependencies OK')"
 ```
 
-PlanTUS also needs `wb_command` (Connectome Workbench). Without it PlanTUS only warns, but intermediate files are not created and the pipeline fails. Either install it into the SimNIBS environment, where PRESTUS finds it in the environment's `bin/` without further settings:
+Connectome Workbench is needed only to choose the position in Workbench (`wb_view`), and with PlanTUS 1.x, which also calls `wb_command`. Either install it into the SimNIBS environment, where PRESTUS finds it in the environment's `bin/` without further settings:
 
 ```bash
 conda install -c conda-forge connectome-workbench

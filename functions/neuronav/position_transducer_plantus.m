@@ -78,6 +78,12 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
 %   interactive             - 1/true: choose the vertex in Connectome Workbench;
 %                             0/false: headless; [] (default): follow
 %                             simulation.interactive
+%   vertex                  - 0-based skin vertex to place on the maps of an
+%                             earlier run (chosen on the Nexus PlanTUS page);
+%                             [] (default) computes the maps and places the
+%                             optimum (or the vertex picked in Workbench)
+%   skin_smoothing_iterations - Taubin passes on the skin surface (PlanTUS
+%                             >= 2.0; default 2, 0 = raw SimNIBS surface)
 %   connectome_wb_path      - Path to Connectome Workbench bin/ (default '')
 %   save_metrics            - Write per-vertex criteria, composite score and
 %                             selected vertex to <work_dir>/plantus_metrics.mat
@@ -249,6 +255,17 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
                   isfield(parameters.simulation, 'interactive') && ...
                   logical(parameters.simulation.interactive);
     end
+    % placement.plantus.vertex: place that skin vertex (chosen in the Nexus) on
+    % the maps of an earlier run in work_dir, without recomputing or asking.
+    vertex = [];
+    if isfield(pt, 'vertex') && ~isempty(pt.vertex)
+        vertex = double(pt.vertex);
+        if ~isscalar(vertex) || vertex < 0 || vertex ~= round(vertex)
+            error('PRESTUS:plantus:badVertex', ...
+                'placement.plantus.vertex must be a 0-based skin vertex index or [].');
+        end
+        use_gui = false;
+    end
     if use_gui && isunix && ~ismac && isempty(getenv('DISPLAY')) && isempty(getenv('WAYLAND_DISPLAY'))
         warning('PRESTUS:plantus:noDisplay', ...
             'No display for Connectome Workbench (e.g. a cluster job); PlanTUS runs headless.');
@@ -303,6 +320,10 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, target_ras] = ...
     % than by a console prompt; without Qt the last selected vertex is used.
     if use_gui
         plantus_argv = [plantus_argv, {'--selection', 'review'}];
+    end
+    if ~isempty(vertex)
+        plantus_argv = [plantus_argv, {'--do_only_trajectory', sprintf('%d', vertex)}];
+        fprintf('PlanTUS: placing skin vertex %d (placement.plantus.vertex).\n', vertex);
     end
     % Snapshot outputs from earlier runs so only a file this run wrote is used.
     previous_outputs = dir(fullfile(work_dir, '**', '*Localite.mat'));
@@ -450,6 +471,8 @@ function tx_yaml = build_plantus_yaml(parameters, focal_dist_list, flhm_list, ta
         connectome_wb_path = char(pt.connectome_wb_path);
     end
 
+    skin_smoothing = get_weight(pt, 'skin_smoothing_iterations', 2);
+
     save_metrics = true;
     if isfield(pt, 'save_metrics') && ~isempty(pt.save_metrics)
         save_metrics = logical(pt.save_metrics);
@@ -506,14 +529,14 @@ function tx_yaml = build_plantus_yaml(parameters, focal_dist_list, flhm_list, ta
         'flhm_list',                       flhm_list, ...
         'IDTarget',                        target_name, ...
         'connectome_wb_path',              connectome_wb_path, ...
+        'skin_smoothing_iterations',       skin_smoothing, ...
         'weight_skin_target_distances',    weights.skin_target_distances, ...
         'weight_skin_target_angles',       weights.skin_target_angles, ...
         'weight_skin_target_intersections',weights.skin_target_intersections, ...
         'weight_skin_skull_angles',        weights.skin_skull_angles, ...
         'weight_skull_thickness',          weights.skull_thickness, ...
         'save_metrics',                    save_metrics, ...
-        'evaluate',                        evaluate, ...
-        'bUseGenericTransducerModel',      false ...
+        'evaluate',                        evaluate ...
     );
 end
 

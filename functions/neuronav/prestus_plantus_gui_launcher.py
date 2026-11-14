@@ -181,7 +181,7 @@ def main():
     # calibration points, but the geometric fallback yields only one.
     plantus_compat.patch_compute_flhm(PlanTUS)
 
-    # prepare_acoustic_simulation ends with os.system("wb_view ... &") on the
+    # PlanTUS 1.x prepare_acoustic_simulation ends with os.system("wb_view ... &") on the
     # placement scene, before PRESTUS has pointed that scene at the T1. Its
     # wb_view calls are recorded instead and the viewer is opened below.
     import os as _os
@@ -203,7 +203,8 @@ def main():
         # Prepend to PATH so wb_view / wb_command are found
         os.environ["PATH"] = s["connectome_wb_path"] + os.pathsep + os.environ.get("PATH", "")
 
-    missing = pc.check_dependencies()
+    missing = pc.check_dependencies(pc.plantus_major_version(plantus_main_folder),
+                                    need_wb_view=True)
     if missing:
         sys.exit("[prestus_plantus_gui_launcher] Missing PlanTUS dependencies "
                  f"(python: {sys.executable}):\n  " + "\n  ".join(missing))

@@ -84,11 +84,6 @@ def main():
     wb_path = s["connectome_wb_path"] or os.path.dirname(sys.executable)
     os.environ["PATH"] = wb_path + os.pathsep + os.environ.get("PATH", "")
 
-    missing = pc.check_dependencies()
-    if missing:
-        sys.exit("[prestus_plantus_launcher] Missing PlanTUS dependencies "
-                 f"(python: {sys.executable}):\n  " + "\n  ".join(missing))
-
     target_name = os.path.basename(mask_path).replace(".nii.gz", "").replace(".nii", "")
 
     if args.output_dir:
@@ -102,6 +97,12 @@ def main():
     if plantus_root is None:
         sys.exit("[prestus_plantus_launcher] PlanTUS.py not found. Tried:\n  " +
                  "\n  ".join(os.path.join(t, "code") for t in tried))
+    version = pc.plantus_major_version(plantus_root)
+    log(f"PlanTUS {version}.x at {plantus_root}")
+    missing = pc.check_dependencies(version)
+    if missing:
+        sys.exit("[prestus_plantus_launcher] Missing PlanTUS dependencies "
+                 f"(python: {sys.executable}):\n  " + "\n  ".join(missing))
     plantus_code_path = os.path.join(plantus_root, "code")
     planning_template, placement_template = pc.scene_templates(plantus_root)
 
@@ -118,7 +119,7 @@ def main():
         return _orig_create_scene(scene_template_filepath, *args, **kwargs)
     PlanTUS.create_scene = _patched_create_scene
 
-    # PlanTUS.prepare_acoustic_simulation unconditionally calls
+    # PlanTUS 1.x prepare_acoustic_simulation unconditionally calls
     # os.system("wb_view ... scene.scene") after writing the placement scene.
     # Headless mode writes the same scenes as the GUI mode (so they can be
     # opened later) but must not open a viewer: no-op wb_view calls.
@@ -139,8 +140,11 @@ def main():
     if args.do_only_trajectory >= 0:
         vtx = args.do_only_trajectory
         log(f"--do_only_trajectory {vtx}: skipping metric computation.")
-        pc.place_vertex(PlanTUS, vtx, output_path, pc.stage_mask(mask_path, output_path),
-                        t1_path, s, placement_template)
+        mask_path = pc.stage_mask(mask_path, output_path)
+        errors = pc.check_maps_for_vertex(PlanTUS, output_path, mask_path, vtx, log)
+        if errors:
+            sys.exit("[prestus_plantus_launcher] " + "\n  ".join(errors))
+        pc.place_vertex(PlanTUS, vtx, output_path, mask_path, t1_path, s, placement_template)
         if s["save_metrics"]:
             pc.update_selected_vertex(output_path, vtx, "manual", log)
         pc.run_evaluation(output_path, s, log)

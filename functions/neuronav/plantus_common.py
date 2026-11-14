@@ -101,6 +101,8 @@ def read_config(cfg):
         "save_metrics":        _as_bool(cfg.get("save_metrics", True)),
         "evaluate":            _as_bool(cfg.get("evaluate", True)),
         "connectome_wb_path":  str(cfg.get("connectome_wb_path", "") or "").strip(),
+        # PlanTUS >= 2.0 only (Taubin passes on the skin surface; 0 = raw mesh)
+        "skin_smoothing_iterations": int(cfg.get("skin_smoothing_iterations", 2) or 0),
     }
     s["optimal_distance"] = float(cfg.get(
         "optimal_distance", (s["min_distance"] + s["max_distance"]) / 2))
@@ -126,23 +128,42 @@ def resolve_plantus_root(cli_root, launcher_file):
     return None, candidates
 
 
-def check_dependencies():
+def plantus_major_version(plantus_root):
+    """2 for PlanTUS >= 2.0 (no Connectome Workbench), else 1.
+
+    Read from the source rather than by importing it, so the dependency check
+    can run before the import (which itself fails on a missing module).
+    """
+    path = os.path.join(plantus_root, "code", "PlanTUS.py")
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            src = fh.read()
+    except OSError:
+        return 1
+    return 2 if "def convert_simnibs_mesh_to_surfaces(" in src else 1
+
+
+def check_dependencies(version=1, need_wb_view=False):
     """Return a list of missing PlanTUS runtime dependencies (empty if none).
 
-    PlanTUS shells out to wb_command via os.system and ignores failures, so a
-    missing Workbench only surfaces later as unrelated fslmaths/GIFTI errors;
-    nilearn is imported lazily deep inside the metric computation. Checking
-    both up front turns those into one actionable message.
+    PlanTUS 1.x shells out to wb_command via os.system and ignores failures,
+    so a missing Workbench only surfaces later as unrelated fslmaths/GIFTI
+    errors; nilearn is imported lazily deep inside the metric computation.
+    Checking up front turns those into one actionable message. PlanTUS 2.x
+    needs no Workbench; need_wb_view is set by the Workbench picker.
     """
     import shutil
     import importlib.util
     missing = []
-    if shutil.which("wb_command") is None:
-        missing.append("wb_command (Connectome Workbench): set "
-                       "placement.plantus.connectome_wb_path to its bin/ "
-                       "directory, or install connectome-workbench into the "
-                       "Python env")
-    for mod in ("nilearn", "vtk", "h5py"):
+    tools = (["wb_command"] if version < 2 else []) + (["wb_view"] if need_wb_view else [])
+    for tool in tools:
+        if shutil.which(tool) is None:
+            missing.append(f"{tool} (Connectome Workbench): set "
+                           "placement.plantus.connectome_wb_path to its bin/ "
+                           "directory, or install connectome-workbench into the "
+                           "Python env")
+    modules = ("nilearn", "vtk", "h5py") + (("trimesh", "pandas") if version >= 2 else ())
+    for mod in modules:
         if importlib.util.find_spec(mod) is None:
             missing.append(f"Python module '{mod}': pip install {mod} into "
                            "the env at placement.plantus.env_path")
@@ -374,6 +395,24 @@ def skull_thickness_along_normals(points, normals, labels_path,
     return thickness
 
 
+def is_v2(PlanTUS):
+    """PlanTUS >= 2.0: Workbench-free, renamed mesh conversion, own viewer."""
+    return hasattr(PlanTUS, "convert_simnibs_mesh_to_surfaces")
+
+
+def mesh_to_surface(PlanTUS, mesh_path, tags, name, output_path, smoothing=0):
+    """<name>.surf.gii and <name>.stl from tagged SimNIBS mesh elements.
+
+    PlanTUS 2.x renamed convert_simnibs_mesh_to_surface(s) and added skin
+    smoothing; 1.x has no smoothing, so it is ignored there.
+    """
+    if is_v2(PlanTUS):
+        PlanTUS.convert_simnibs_mesh_to_surfaces(
+            mesh_path, tags, name, output_path, smoothing_iterations=int(smoothing))
+    else:
+        PlanTUS.convert_simnibs_mesh_to_surface(mesh_path, tags, name, output_path)
+
+
 def compute_metrics(PlanTUS, mesh_path, mask_path, output_path, s, log):
     """Run PlanTUS steps 2–4 and write the metric maps into output_path.
 
@@ -386,9 +425,10 @@ def compute_metrics(PlanTUS, mesh_path, mask_path, output_path, s, log):
     import nibabel as nib
 
     log("Converting SimNIBS mesh to surfaces...")
-    PlanTUS.convert_simnibs_mesh_to_surface(mesh_path, [1005], "skin",  output_path)
+    mesh_to_surface(PlanTUS, mesh_path, [1005], "skin", output_path,
+                    s.get("skin_smoothing_iterations", 0))
     PlanTUS.add_structure_information(output_path + "/skin.surf.gii",  "CORTEX_LEFT")
-    PlanTUS.convert_simnibs_mesh_to_surface(mesh_path, [1007, 1008], "skull", output_path)
+    mesh_to_surface(PlanTUS, mesh_path, [1007, 1008], "skull", output_path)
     PlanTUS.add_structure_information(output_path + "/skull.surf.gii", "CORTEX_RIGHT")
 
     log("Computing avoidance mask...")
@@ -563,6 +603,8 @@ def fix_placement_scene(output_path, vertex, t1_path):
         return None
     with open(scene_path, "r", encoding="utf-8") as f:
         txt = f.read()
+    if "../../../T1.nii.gz" not in txt:
+        return scene_path       # PlanTUS 2.x writes absolute paths to the T1 it was given
     # The file name is also the scene's name for the T1's display state.
     marker = "\0T1_FILEPATH\0"
     txt = (txt.replace("../../../T1.nii.gz", marker)
@@ -581,26 +623,62 @@ def place_vertex(PlanTUS, vertex, output_path, mask_path, t1_path, s,
                  placement_scene_template):
     """Run PlanTUS.prepare_acoustic_simulation for one vertex.
 
-    PlanTUS appends to *_Localite_XML.txt, so a re-run for the same vertex
-    would accumulate duplicate markers; the file is removed first. Returns
-    the vertex's placement scene (transducer and focus on skin and T1), or
-    None if PlanTUS wrote none.
+    PlanTUS appends to its Localite XML snippet, so a re-run for the same
+    vertex would accumulate duplicate markers; the file is removed first.
+    PlanTUS 2.x would open its own results dialog after placing; it is
+    skipped (the placement is shown in PRESTUS). Returns the vertex's
+    placement scene (transducer and focus on skin and T1), or None if PlanTUS
+    wrote none.
     """
     mask_name = os.path.basename(mask_path).replace(".nii.gz", "").replace(".nii", "")
-    xml_path = os.path.join(output_path, "vtx" + str(vertex),
-                            "position_matrix_" + mask_name + "_vtx" + str(vertex)
-                            + "_Localite_XML.txt")
-    if os.path.isfile(xml_path):
-        os.remove(xml_path)
-    PlanTUS.prepare_acoustic_simulation(
-        vertex, output_path, mask_path, t1_path,
-        s["max_distance"], s["min_distance"],
-        s["transducer_diameter"], s["max_angle"],
-        s["plane_offset"], s["additional_offset"],
-        "",  # no transducer surface model (generic model)
-        s["focal_distance_list"], s["flhm_list"],
-        placement_scene_template)
+    vtx = "vtx" + str(vertex)
+    for xml_name in ("position_matrix_" + mask_name + "_" + vtx + "_Localite_XML.txt",   # 1.x
+                     mask_name + "_" + vtx + "_TransducerPosition_Localite_dummyXML.txt"):  # 2.x
+        xml_path = os.path.join(output_path, vtx, xml_name)
+        if os.path.isfile(xml_path):
+            os.remove(xml_path)
+    args = (vertex, output_path, mask_path, t1_path,
+            s["max_distance"], s["min_distance"],
+            s["transducer_diameter"], s["max_angle"],
+            s["plane_offset"], s["additional_offset"],
+            "",  # no transducer surface model (generic model)
+            s["focal_distance_list"], s["flhm_list"],
+            placement_scene_template)
+    if is_v2(PlanTUS):
+        PlanTUS.prepare_acoustic_simulation(*args, skip_viewer=True)
+    else:
+        PlanTUS.prepare_acoustic_simulation(*args)
     return fix_placement_scene(output_path, vertex, t1_path)
+
+
+def check_maps_for_vertex(PlanTUS, output_path, mask_path, vertex, log, tol_mm=1.0):
+    """Errors (list of str) that stop placing a chosen vertex on existing maps.
+
+    The vertex index refers to skin.surf.gii of an earlier full run in
+    output_path. It is only valid while that surface and the target are the
+    ones the maps were computed for: the target centre must match the one in
+    plantus_metrics.mat. The target's 3D model is rebuilt from the current
+    mask, as prepare_acoustic_simulation reads it.
+    """
+    skin = os.path.join(output_path, "skin.surf.gii")
+    metrics = os.path.join(output_path, METRICS_FILENAME)
+    if not (os.path.isfile(skin) and os.path.isfile(metrics)):
+        return [f"No PlanTUS maps in {output_path}: run PlanTUS once without "
+                "placement.plantus.vertex (and with save_metrics) first."]
+    d = scipy.io.loadmat(metrics, variable_names=["skin_coordinates", "target_center"])
+    n = len(d["skin_coordinates"])
+    if not 0 <= vertex < n:
+        return [f"placement.plantus.vertex = {vertex} is not on the skin surface "
+                f"({n} vertices, 0-based)."]
+    now = np.asarray(PlanTUS.roi_center_of_gravity(mask_path), dtype=float).ravel()
+    then = np.asarray(d["target_center"], dtype=float).ravel()
+    shift = float(np.linalg.norm(now - then))
+    if shift > tol_mm:
+        return [f"The target moved {shift:.1f} mm since the PlanTUS maps were computed; "
+                "clear placement.plantus.vertex and run PlanTUS again."]
+    PlanTUS.stl_from_nii(mask_path, 0.25)
+    log(f"Placing vertex {vertex} on the maps in {output_path}.")
+    return []
 
 
 def remove_stale_metrics(output_path, log):

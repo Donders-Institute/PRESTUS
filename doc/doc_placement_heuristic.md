@@ -62,7 +62,7 @@ The accepted intersection with the skull is set by `placement.heuristic.criterio
 | `criterion_skin_var` | `[]` (off) | [Quantile] Coherent transducer exit plane toward skin (e.g. little curvature) |
 | `criterion_skull_var` | `[]` (off) | [Quantile] Coherent transducer exit plane toward skull surface (irregular bone distorts phase and the wavefront) |
 
-Among the candidates that meet the criteria, the one closest to the target is selected. The output table gives its coordinates in **voxel (grid space)**, **mm (Localite space)** and **mm (RAS+ space)**, based on the image header of the segmentation image.
+Among the candidates that meet the criteria, the one closest to the target is selected. To place another candidate instead, set `placement.heuristic.candidate` to its `idx` in the candidate table; the criteria are then not applied (an `idx` the table does not hold stops the run). The Nexus *Heuristic* sub-tab sets it: it plots and lists the candidates of the last run, and *Place here* places the one you click, reusing the candidate table rather than recomputing it. The output table gives its coordinates in **voxel (grid space)**, **mm (Localite space)** and **mm (RAS+ space)**, based on the image header of the segmentation image.
 
 !!! warning
     Localite mm coordinates assume that the Localite planning image has `canonical_affine_transform` applied (see [Localite planning image](#localite-planning-image)). They are the 0-based voxel indices ([MATLAB](https://www.mathworks.com/products/matlab.html) index − 1) rescaled by the voxel sizes in the header, with no affine transformation. Always verify coordinates visually.

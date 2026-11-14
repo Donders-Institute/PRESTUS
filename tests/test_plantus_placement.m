@@ -326,6 +326,35 @@ classdef (SharedTestFixtures = {prestus_paths}) test_plantus_placement < matlab.
             end
         end
 
+        function test_vertex_places_on_existing_maps(tc)
+            % placement.plantus.vertex runs the headless launcher's fast path
+            % (--do_only_trajectory N), also when interactive is set.
+            python_bin = find_system_python();
+            tc.assumeNotEmpty(python_bin, ...
+                'No Python 3 found — skipping integration test.');
+            p      = make_plantus_parameters(tc.TmpDir);
+            t1_hdr = write_synthetic_t1(tc.TmpDir, p);
+            write_fake_mesh(tc.TmpDir, p);
+            script_dir = fullfile(tc.TmpDir, 'mock_plantus');
+            make_fake_plantus_install(script_dir);
+            launcher_path = fullfile(tc.TmpDir, 'mock_launcher.py');
+            write_python_launcher(launcher_path, 'argv');
+            p.placement.plantus.script_path = script_dir;
+            p.placement.plantus.env_path = make_fake_simnibs_env(tc.TmpDir, python_bin);
+            p.placement.plantus.launcher_py_override = launcher_path;
+            p.transducer(1).focus_pos = [100, 100, 130];
+            p.placement.plantus.mni_target_mm = [];
+            p.placement.plantus.interactive = 1;
+            p.placement.plantus.vertex = 7;
+            evalc('position_transducer_plantus(p, t1_hdr);');
+            argv_file = dir(fullfile(tc.TmpDir, '**', 'argv.txt'));
+            argv = fileread(fullfile(argv_file(1).folder, argv_file(1).name));
+            tc.verifySubstring(argv, '--do_only_trajectory 7');
+            tc.verifyFalse(contains(argv, '--selection'));
+            p.placement.plantus.vertex = -1;
+            tc.verifyError(@() position_transducer_plantus(p, t1_hdr), 'PRESTUS:plantus:badVertex');
+        end
+
         function test_ras_to_voxel_round_trip(tc)
             % The known position_matrix written by the mock wrapper has
             % translation = [10 20 30] mm (RAS) and direction = [0 0 1].

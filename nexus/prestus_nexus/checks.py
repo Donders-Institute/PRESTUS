@@ -267,8 +267,10 @@ def _tool_status(model: ConfigModel, mode: str) -> ModeStatus:
     g = model.get
     todo = []
     if mode == "plantus":
-        if is_empty(g("placement.plantus.script_path")) or is_empty(g("placement.plantus.env_path")):
-            todo.append("set the PlanTUS paths (placement.plantus.script_path, env_path)")
+        if is_empty(g("placement.plantus.script_path")) or \
+                (is_empty(g("placement.plantus.env_path")) and is_empty(g("startup.simnibs_bin_path"))):
+            todo.append("set the PlanTUS paths (placement.plantus.script_path; startup.simnibs_bin_path "
+                        "or placement.plantus.env_path)")
         if is_empty(g("placement.plantus.focal_distance_list")):
             todo.append("set placement.plantus.focal_distance_list / flhm_list")
     elif mode == "tus_entry":

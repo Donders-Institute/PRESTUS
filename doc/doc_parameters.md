@@ -458,6 +458,7 @@ See [doc_placement_heuristic.md](doc_placement_heuristic.md).
     | `criterion_skin_var` | Variance of EP voxel distance from skin [quantile]. | `[]` | |
     | `criterion_skull_var` | Variance of EP voxel distance from skull [quantile]. | `[]` | |
     | `expand_step` | Expansion step for skin intersection criterion. | `0.01` | 1% |
+    | `candidate` | Candidate to place instead of the heuristic's choice. | `[]` | `idx` in `tpars_sub-XXX_<target>.csv` of the last run; the criteria are not applied. Set by *Place here* on the Nexus Heuristic page. See [position selection](doc_placement_heuristic.md#position-selection). |
 
 #### MNI Placement (`placement.mni`)
 
@@ -488,6 +489,7 @@ See [doc_placement_plantus.md](doc_placement_plantus.md).
     | `flhm_list` | Focal length at half maximum per entry of `focal_distance_list` [mm]. | `[]` | Required. |
     | `max_angle_deg` | Maximum transducer tilt [deg]. | `10` | |
     | `mask_radius_mm` | Radius of the spherical target mask [mm]. | `2` | |
+    | `skin_smoothing_iterations` | Taubin smoothing passes on the skin surface before the criteria are computed. | `2` | PlanTUS 2.0 or later; `0` = raw SimNIBS surface. |
     | `min_distance_mm` | Smallest eligible skin–target distance [mm]. | `[]` | `[]` = `min(focal_distance_list) − max(flhm_list)`. For a steerable array, set it and `max_distance_mm` to the steering range; the default margin otherwise admits spots the focus cannot reach. |
     | `max_distance_mm` | Largest eligible skin–target distance [mm]. | `[]` | `[]` = `max(focal_distance_list) + max(flhm_list)`. |
     | `optimal_distance_mm` | Optimum of the distance criterion [mm]. | `[]` | `[]` = `mean(focal_distance_list)`. |
@@ -499,7 +501,8 @@ See [doc_placement_plantus.md](doc_placement_plantus.md).
     | `save_metrics` | Write per-vertex criteria, score and selected vertex to `plantus_metrics.mat`. | `true` | Both modes. Used by the criteria evaluation and offline re-scoring. |
     | `evaluate` | Evaluate the placement from `plantus_metrics.mat` (weight sweep, diagnostics, figures). | `true` | Both modes; needs `save_metrics`. Shown in the placement report. See [criteria evaluation](doc_placement_plantus.md#5a-combine-and-evaluate-scores). |
     | `interactive` | Choose the vertex in [Connectome Workbench](https://www.humanconnectome.org/software/connectome-workbench). | `[]` | `1` = interactive, `0` = headless, `[]` = follow `simulation.interactive`. `1` needs a display but not the MATLAB desktop; without a display PlanTUS runs headless. |
-    | `connectome_wb_path` | Connectome Workbench `bin/` directory. | `''` | Needed unless `wb_command` is on PATH or in the env's `bin/`; interactive mode also needs `wb_view`. |
+    | `vertex` | Skin vertex (0-based) to place on the maps of an earlier run, without recomputing them. | `[]` | Set by *Place here* on the Nexus PlanTUS page. `[]` = compute the maps and place the optimum (or the Workbench pick). Stops if the target moved since the maps were computed. See [choosing the position](doc_placement_plantus.md#choosing-the-position). |
+    | `connectome_wb_path` | Connectome Workbench `bin/` directory. | `''` | Needed for `interactive: 1` (`wb_view`), and with PlanTUS 1.x for `wb_command`, unless they are on PATH or in the env's `bin/`. |
 
 #### TUS_entry Placement (`placement.tus_entry`)
 
