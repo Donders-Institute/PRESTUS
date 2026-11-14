@@ -3,8 +3,8 @@ function coords_mni = subject2mni_coords_LDfix(coords_subject, subdir, parameter
 %
 % Writes coords_subject to a temporary CSV in SimNIBS Generic format, calls the
 % subject2mni_coords command-line tool, and reads back the result. An optional
-% LD_LIBRARY_PATH override is set on the child process's environment when
-% parameters.hpc.ld_library_path is set — this hotfix is required on some HPC
+% LD_LIBRARY_PATH is prefixed on the child process's environment with
+% hpc.ld_library_path, else the install's libraries (SIMNIBS_ENV_OVERRIDES) — this hotfix is required on some HPC
 % systems where SimNIBS bash scripts do not inherit the library path correctly
 % (see: https://github.com/simnibs/simnibs/issues/106). Has a large per-call
 % overhead due to the external process call; do not call inside tight loops.
@@ -48,10 +48,8 @@ fn_out = [tempname,'.csv'];
 
 % include LD fix. run_command's Env option sets LD_LIBRARY_PATH natively
 % on the child process -- no `export ...;` shell syntax needed at all.
-env_overrides = struct();
-if isfield(parameters.hpc,'ld_library_path')
-    env_overrides.LD_LIBRARY_PATH = parameters.hpc.ld_library_path;
-end
+% (hpc.ld_library_path, else the selected install's libraries: SIMNIBS_ENV_OVERRIDES)
+env_overrides = simnibs_env_overrides(parameters);
 
 % Run subject2mni_coords
 simnibs_bin = parameters.startup.simnibs_bin_path;

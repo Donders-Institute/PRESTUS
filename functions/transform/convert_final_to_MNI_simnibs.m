@@ -26,8 +26,8 @@ function convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_out
 %   native path globally; PRESTUS callers propagate this via options.method.
 %
 % SimNIBS method ('simnibs'):
-%   Calls the subject2mni CLI. An optional LD_LIBRARY_PATH export is
-%   prepended when parameters.hpc.ld_library_path is set. Because SimNIBS
+%   Calls the subject2mni CLI, with LD_LIBRARY_PATH prefixed by
+%   hpc.ld_library_path or else the install's libraries (SIMNIBS_ENV_OVERRIDES). Because SimNIBS
 %   appends '_MNI' to the output filename, each result is renamed to the
 %   requested path. Inputs are converted one after another in the foreground.
 %   Each exit status and output file is checked, and any failure raises
@@ -89,11 +89,8 @@ end
 function convert_simnibs(input_list, output_list, n, m2m_folder, parameters, options)
     % run_command's Env option sets LD_LIBRARY_PATH natively on the child
     % process -- no `export ...;` shell syntax needed at all.
-    env_overrides = struct();
-    if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'ld_library_path') && ...
-            ~isempty(parameters.hpc.ld_library_path) && ~ispc
-        env_overrides.LD_LIBRARY_PATH = parameters.hpc.ld_library_path;
-    end
+    % (hpc.ld_library_path, else the selected install's libraries: SIMNIBS_ENV_OVERRIDES)
+    env_overrides = simnibs_env_overrides(parameters);
     subject2mni_bin = fullfile(parameters.startup.simnibs_bin_path, 'subject2mni');
 
     % SimNIBS always appends '_MNI' to the output stem

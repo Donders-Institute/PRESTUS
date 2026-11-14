@@ -139,6 +139,8 @@ Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibrat
 
 #### Head model & pseudo-CT
 - Automated defacing via pydeface, optionally in the segmentation pipeline
+- `hpc.ld_library_path` and `placement.plantus.env_path` follow `startup.simnibs_bin_path` while empty: SimNIBS tools get the install's own libraries (`external/lib/linux`) prefixed to `LD_LIBRARY_PATH`, and PlanTUS runs in the install's Python; `env_path` is no longer required
+- Segmentation: SimNIBS 4 or later required (checked from the install); `segmentation.settings_file` (charm `--usesettings`) and `segmentation.noneck`; an existing segmentation made with another SimNIBS version or other charm settings is reused with a warning
 - Grid cropping includes the bowl of every transducer
 - `headmodel.reuse_across_placements` (default `false`) builds the smoothed head model once per subject and only rotates and crops it for each placement; in rotated grid modes the smoothing then precedes the rotation, so results differ slightly
 - New skull property mappings: `air-tissue` density, `webb` sound speed and attenuation, `pichardo` and `mcdannold` sound speed and attenuation

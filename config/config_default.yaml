@@ -74,7 +74,7 @@ path:
 #------------ Startup (environment & toolbox paths)
 
 startup:
-  simnibs_bin_path: ''  # Path to the SimNIBS environment (please use full paths)
+  simnibs_bin_path: ''  # Full path to the bin folder of a SimNIBS 4 install (holds charm); selects the SimNIBS version used for segmentation
   matlab_bin_path: ''   # Path to MATLAB binary, required for pseudoCT generation on HPC (e.g. /opt/matlab/R2024a/bin/matlab)
   fsl_bin_path: ''      # Path to FSL bin directory, required for pseudoCT generation (e.g. /opt/fsl/bin); used to set PATH
   ants_bin_path: ''     # Path to ANTs bin directory, required for pseudoCT generation (e.g. /opt/ants/bin); used to set PATH
@@ -171,7 +171,7 @@ hpc:
   memorylimit: 20
   posthoc_water_timelimit: '05:00:00'  # Wall time for the post-hoc free-water jobs (modules.run_posthoc_water_sims)
   posthoc_water_memorylimit: 40        # Memory [GB] for the post-hoc free-water jobs
-  ld_library_path: '' # [qsub] /opt/gcc/7.2.0/lib64 | [slurm]: /home/'group'/'user'/.conda/envs/simnibs_env/lib/python3.9/site-packages/simnibs/mesh_tools/cgal/../../external/lib/linux
+  ld_library_path: '' # Prefixed to LD_LIBRARY_PATH for SimNIBS tools; '' = the libraries of the install in startup.simnibs_bin_path (<simnibs package>/external/lib/linux). Set only to override, e.g. [qsub] /opt/gcc/7.2.0/lib64
   job_prefix: 'PS' # Prefix for HPC job names (keep short; total name capped at 20 chars)
   max_wait_checks: 540  # Maximum number of status checks when waiting for a job (1 check/20s ≈ 3 hours)
 
@@ -385,11 +385,12 @@ placement:
                          # Converted with the NONLINEAR (nonl) transform, like the heuristic target.
 
   plantus:
-    # --- Paths (required) ---
-    script_path: ''           # Path to PlanTUS installation directory (must contain code/PlanTUS.py).
+    # --- Paths ---
+    script_path: ''           # Required. Path to PlanTUS installation directory (must contain code/PlanTUS.py).
                               # Install from: https://github.com/mlueckel/PlanTUS
-    env_path: ''      # Path to SimNIBS installation (must contain simnibs_env/bin/python).
-                              # Typically the top-level SimNIBS directory, e.g. /opt/SimNIBS-4.1
+    env_path: ''      # Python environment PlanTUS runs in; '' = the Python of the SimNIBS install in
+                              # startup.simnibs_bin_path. Otherwise a SimNIBS installation (simnibs_env/bin/python,
+                              # e.g. /opt/SimNIBS-4.1) or a conda env bin/ folder
     # --- Target (one of the two must be set) ---
     target_name: ''           # Label string for the target; used in output filenames (required)
     mni_target_mm: []         # [x y z] MNI coordinate of the sonication target [mm].
@@ -527,6 +528,8 @@ grid:
 segmentation:
   use_qform: 0      # Force qform reorientation before charm segmentation? Set to 1 if charm reports qform/sform mismatch.
   debug: 0          # Pass --debug flag to charm segmentation for verbose output?
+  noneck: 0         # Pass --noneck to charm: the scan contains no neck
+  settings_file: '' # charm settings (.ini, passed as --usesettings); '' = charm.ini of the SimNIBS install. Keep it outside the m2m folder.
 
 #------------ Head model processing
 

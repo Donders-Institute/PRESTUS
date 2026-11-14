@@ -24,10 +24,10 @@ PRESTUS keeps two kinds of intermediate results apart:
 ??? note "Stage outputs and compared settings"
     | Stage output | Sidecar | Picked up by | Compared settings |
     |---|---|---|---|
-    | SimNIBS segmentation, `path.seg/m2m_sub-XXX/` | none (standard SimNIBS output) | every layered run, when `final_tissues.nii.gz` exists (`io.overwrite_simnibs`) | none |
     | Pseudo-CT, `<pct folder>/pseudoCT.nii.gz` | `pseudoCT.json` | every run with `pct.enabled: 1`, when it exists | `pct.skull_mapping` (with `custom_slope` / `custom_intercept`) |
     | Placement run, `<path.placement>/sub-XXX/<mode>/<target_name>/` | `placement_run.json` | heuristic, PlanTUS and TUS_entry placement, per `placement.reuse` | `placement.<mode>` (without tool install paths) and the transducer without its positions |
     | Pressure map, `nii/sub-XXX_<medium>_T1w<affix>_pressure.nii.gz` | `…_pressure.json` | a run with `path.acoustic_input` set to the NIfTI | `simulation.medium`, `grid` (without `thermal_*`), `layers`, `headmodel`, `pct`, `medium_properties`, the transducer (geometry and grid positions) and the subject |
+    | SimNIBS segmentation, `path.seg/m2m_sub-XXX/` | none (standard SimNIBS output) | every layered run, when `final_tissues.nii.gz` exists (`io.overwrite_simnibs`) | SimNIBS version (`charm_log.html`) and charm settings (`settings.ini`): a warning, see [Segmentation](doc_preproc.md#simnibs-version-and-charm-settings) |
 
 `io.cache_signature_check` handles a mismatch (`error` by default, `warn`, `off`). An output without a sidecar (e.g. a pressure map from another tool) is used with the warning `prestus:cache:unverified`.
 

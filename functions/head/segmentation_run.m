@@ -60,6 +60,27 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
     if isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'debug') && parameters.segmentation.debug == 1
         charm_args = [charm_args, {'--debug'}];
     end
+    if isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'noneck') && parameters.segmentation.noneck == 1
+        charm_args = [charm_args, {'--noneck'}];
+    end
+    if isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'settings_file') ...
+            && ~isempty(parameters.segmentation.settings_file)
+        settings_file = char(parameters.segmentation.settings_file);
+        if ~isfile(settings_file)
+            error('segmentation_run:settingsMissing', 'segmentation.settings_file not found: %s', settings_file);
+        end
+        % charm --forcerun deletes the m2m folder, and refuses a settings file inside it
+        % (absolute: charm runs in path.seg, where a relative path would point elsewhere)
+        d = dir(settings_file);
+        settings_file = fullfile(d(1).folder, d(1).name);
+        m2m_folder = fullfile(parameters.path.seg, ['m2m_' subj_id_string]);
+        dm = dir(m2m_folder);                   % entries carry the folder's absolute path
+        if ~isempty(dm) && isfolder(m2m_folder) && strcmp(d(1).folder, dm(1).folder)
+            error('segmentation_run:settingsInM2m', ...
+                'Keep segmentation.settings_file outside %s: charm deletes that folder when it re-runs.', m2m_folder);
+        end
+        charm_args = [charm_args, {'--usesettings', settings_file}];
+    end
 
     % Platform selection
     if strcmp(parameters.platform, 'auto')
@@ -74,6 +95,18 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
     if ~isfield(parameters, 'startup') || ~isfield(parameters.startup, 'simnibs_bin_path') ...
             || isempty(parameters.startup.simnibs_bin_path)
         error('simnibs_bin_path required for segmentation');
+    end
+    % Segmentation labels (charm_seg_labels.m) are those of charm, SimNIBS 4 and later
+    info = simnibs_install_info(char(parameters.startup.simnibs_bin_path));
+    if ~isnan(info.major) && info.major < 4
+        error('segmentation_run:simnibsVersion', ...
+            'SimNIBS %s in %s: PRESTUS segments with charm from SimNIBS 4 or later.', ...
+            info.version, parameters.startup.simnibs_bin_path);
+    elseif isempty(info.version)
+        warn('SimNIBS version of %s not found; PRESTUS needs SimNIBS 4 or later.', ...
+            parameters.startup.simnibs_bin_path);
+    else
+        fprintf('➤ SimNIBS %s (%s)\n', info.version, parameters.startup.simnibs_bin_path);
     end
     charm_path = fullfile(parameters.startup.simnibs_bin_path, 'charm');
     % Shell-safe text form of the charm call, for the two branches below
@@ -130,7 +163,11 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         % Add environment setup
         fprintf(fid, 'source /etc/profile\n'); % load system-wide environment variable setups and shell initialization commands
         fprintf(fid, 'export PATH=%s:$PATH\n', parameters.startup.simnibs_bin_path);
-        fprintf(fid, 'export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH\n', parameters.hpc.ld_library_path);
+        % hpc.ld_library_path, else the selected install's libraries (SIMNIBS_LD_LIBRARY_PATH)
+        ld = simnibs_ld_library_path(parameters);
+        if ~isempty(ld)
+            fprintf(fid, 'export LD_LIBRARY_PATH=%s:$LD_LIBRARY_PATH\n', shell_quote_arg(ld));
+        end
 
         % Add segmentation call
         fprintf(fid, 'cd %s\n', shell_quote_arg(parameters.path.seg));

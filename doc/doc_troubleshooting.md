@@ -31,7 +31,7 @@ Most entries link to the page that explains the behaviour. If you solve an issue
 | Symptom | Cause and fix |
 |---|---|
 | `ValueError: The qform and sform of do not match. Please run charm with the --forceqform option` | Set `segmentation.use_qform: 1`. |
-| `undefined symbol` errors from `charm` | Set `hpc.ld_library_path` to the shared libraries [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html) needs (e.g. `/opt/gcc/7.2.0/lib64`; [Installation](doc_installation.md#point-prestus-to-simnibs)). |
+| `undefined symbol` errors from `charm` | Empty, `hpc.ld_library_path` already gives SimNIBS tools the install's own libraries. Otherwise set it to the shared libraries [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html) needs (e.g. `/opt/gcc/7.2.0/lib64`; [Installation](doc_installation.md#point-prestus-to-simnibs)). |
 | Two runs of the same subject (e.g. left and right transducer) both start a segmentation | Neither finds a finished `m2m_sub-XXX` folder. Segment first (`modules.segmentation_only: 1`), then start the simulations. |
 | A segmentation is not redone after changing the input images | Existing segmentations are reused unless `io.overwrite_simnibs: 1` (independent of `io.overwrite_files`). |
 

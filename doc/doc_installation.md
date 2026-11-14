@@ -76,7 +76,7 @@ Optional flags:
 - `--no-plantus`: skip the PlanTUS Python packages (`nilearn`, `vtk`, `h5py`)
 - `--no-workbench`: skip Connectome Workbench (e.g. when `wb_command` is available as an HPC module)
 
-When it finishes, the script prints the `simnibs_bin_path` and `env_path` values to put in your config. Alternatively, follow the [official conda guide](https://simnibs.github.io/simnibs/build/html/installation/conda.html).
+When it finishes, the script prints the `simnibs_bin_path` value to put in your config; `hpc.ld_library_path` and the PlanTUS `env_path` follow it while they are empty. Alternatively, follow the [official conda guide](https://simnibs.github.io/simnibs/build/html/installation/conda.html).
 
 ### Point PRESTUS to SimNIBS
 

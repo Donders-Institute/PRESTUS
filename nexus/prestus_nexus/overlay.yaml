@@ -234,6 +234,8 @@ fields:
 
   segmentation.use_qform: {kind: flag}
   segmentation.debug: {kind: flag}
+  segmentation.noneck: {kind: flag}
+  segmentation.settings_file: {kind: file}
 
   headmodel.head_pad_mm: {unit: mm}
   headmodel.csf_expansion: {unit: mm}
@@ -924,6 +926,8 @@ display:
   babelbrain: {label: BabelBrain solver}
   elastic: {label: Elastic (shear-wave) skull model}
   time_reversal: {label: Time reversal (refocusing, aberration report, pose search)}
+  segmentation.noneck: {label: Scan without neck (charm --noneck), advanced: true}
+  segmentation.settings_file: {label: Custom charm settings file, advanced: true}
 
   # Timing
   timing: {label: Sonication protocol}

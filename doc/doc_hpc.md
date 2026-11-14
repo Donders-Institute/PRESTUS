@@ -51,7 +51,7 @@ To submit, PRESTUS saves the parameters to a temporary file, writes a small laun
 | `hpc.posthoc_water_timelimit`, `hpc.posthoc_water_memorylimit` | `'05:00:00'`, `40` | Resources of the post-hoc free-water jobs |
 | `hpc.job_prefix` | `'PS'` | Prefix of job names |
 | `hpc.wait_for_job`, `hpc.max_wait_checks` | `false`, `540` | Block MATLAB until the job ends (one check every 20 s) |
-| `hpc.ld_library_path` | `''` | Extra shared-library path for [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html), if `charm` reports `undefined symbol` errors |
+| `hpc.ld_library_path` | `''` | Shared-library path prefixed for [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html) tools. Empty: the libraries of the install in `startup.simnibs_bin_path`, so it follows the selected environment. Set it only to override, e.g. if `charm` reports `undefined symbol` errors |
 | `hpc.name` | `'default'` | `'snellius'` selects the [Snellius](https://www.surf.nl/en/services/compute/snellius-the-national-supercomputer) partition presets (`snellius.*`) |
 
 All keys are listed in [Parameters](doc_parameters.md#high-performance-computing-hpc). Which simulations need a GPU and which settings are fastest is described in [k-Wave](doc_kwave.md). The time and memory earlier runs needed are summarised under [Resource estimates](#resource-estimates-from-earlier-runs).

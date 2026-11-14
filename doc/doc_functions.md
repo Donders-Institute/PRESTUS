@@ -233,6 +233,7 @@ On this page:
 | `preproc_segmentation`                  | Setup SimNIBS segmentation |
 | `preproc_transducer_placement`          | Resolve transducer and focus positions |
 | `read_placement_record`                 | Read the run record of a placement run folder |
+| `segmentation_check_existing`           | How an existing segmentation differs from the selected SimNIBS |
 | `segmentation_run`                      | Submit SimNIBS segmentation |
 | `skull_fill_holes`                      | Fill holes in skull segmentation and between skull and skin |
 | `skull_rubber_wrap`                     | Inflate the skull layer to locally fill potential holes |
@@ -311,6 +312,9 @@ On this page:
 | `sanitize_output_affix`                 | Normalise `io.output_affix` to the BIDS `_desc-<label>` form. |
 | `shell_quote_arg`                       | Quote a string as a single literal argument for system(). |
 | `should_save_output`                    | Decide whether an output is saved: per-step `io` flag, else `io.save_matrices` (matrix outputs), else the built-in default. |
+| `simnibs_env_overrides`                 | Environment for a SimNIBS tool run with RUN_COMMAND |
+| `simnibs_install_info`                  | Version and default charm settings of a SimNIBS install |
+| `simnibs_ld_library_path`               | LD_LIBRARY_PATH prefix for SimNIBS tools (charm, mni2subject, ...) |
 | `simnibs_version`                       | Get SimNIBS version of segmentation from HTML, print, allocate to `parameters`. |
 | `subset_fields`                         | Copy designated structure field to new structure. |
 | `tissuemask_binary`                     | Extract binary tissue segmentation masks (for indexing) |

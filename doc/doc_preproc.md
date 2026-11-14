@@ -17,6 +17,16 @@ For a `layered` medium, the first run segments the T1 (and the T2, when `path.t2
 
 - `modules.segmentation_only: 1` segments and stops, e.g. to segment all subjects before simulating them.
 - `segmentation.use_qform: 1` when `charm` reports a qform/sform mismatch; `segmentation.debug: 1` passes `--debug` to `charm`.
+- `segmentation.noneck: 1` passes `--noneck` for a scan without a neck.
+
+### SimNIBS Version and charm Settings
+
+`startup.simnibs_bin_path` selects the SimNIBS install, and with it the version; PRESTUS needs SimNIBS 4 or later. While they are empty, `hpc.ld_library_path` (the install's libraries for SimNIBS tools) and `placement.plantus.env_path` (the Python PlanTUS runs in) follow it; a value set there overrides it. To change charm's settings, copy the install's `charm.ini` (in its `simnibs` package folder), edit the copy and set `segmentation.settings_file` to it; keep it outside the m2m folder. Report the settings you changed.
+
+An existing segmentation is reused even when another version or other settings are selected. PRESTUS then warns, comparing the version in `charm_log.html` and the settings in `settings.ini` of the m2m folder with the selection. Set `io.overwrite_simnibs: 1` to segment again, which deletes the m2m folder first, or point `path.seg` to a separate folder per version to keep both. What was built from the old segmentation is detected on reuse: grid, medium, acoustic and head-model caches, placement runs and pseudo-CTs record the segmentation's checksum ([Cache reuse checks](doc_outputs_reuse.md#cache-reuse-checks)), and a defaced copy is made again.
+
+In the Nexus, the Segmentation card (Medium tab) lists the SimNIBS installs on this computer, shows the version and the existing segmentation, opens `charm_report.html`, and has the re-run switch. When runs are submitted to a cluster over SSH (Run tab), *Scan cluster* lists the installs there: conda environments, `~/SimNIBS*`, `/opt/simnibs*` and the bin folders of the `simnibs` environment modules. The Nexus keeps the result per host, so it can check a cluster path that does not exist on this computer.
+
 
 Installing SimNIBS: [Installation](doc_installation.md#install-simnibs). Errors: [Troubleshooting](doc_troubleshooting.md#segmentation-simnibs-charm).
 

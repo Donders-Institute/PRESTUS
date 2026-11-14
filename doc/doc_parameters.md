@@ -177,7 +177,7 @@ Segmentation and MNI conversion need `startup.simnibs_bin_path`. The other paths
 
     | **Parameter** | **Description** | **Comments** |
     |---|---|---|
-    | `simnibs_bin_path` | Absolute path to SimNIBS binaries. | Mandatory for segmentation and MNI conversion |
+    | `simnibs_bin_path` | Absolute path to the bin folder of a SimNIBS 4 install (holds `charm`). | Mandatory for segmentation and MNI conversion. Selects the SimNIBS version. |
     | `matlab_bin_path` | Absolute path to MATLAB binary. | Required for pseudoCT generation on HPC (e.g. `/opt/matlab/R2024a/bin/matlab`). Local execution falls back to `matlabroot`. |
     | `fsl_bin_path` | Absolute path to [FSL](https://fsl.fmrib.ox.ac.uk/fsl/) bin directory. | Required for pseudoCT generation (e.g. `/opt/fsl/bin`). Prepended to PATH at runtime. |
     | `ants_bin_path` | Absolute path to [ANTs](https://github.com/ANTsX/ANTs) bin directory. | Required for pseudoCT generation (e.g. `/opt/ants/bin`). Prepended to PATH at runtime. |
@@ -195,7 +195,7 @@ Segmentation and MNI conversion need `startup.simnibs_bin_path`. The other paths
 | `output_affix` | Optional affix for output file names. | `''` | Differentiates outputs for the same subject/transducer (e.g. different intensities or targets) |
 | `overwrite_files` | File overwrite behaviour. | `'always'` | `never` / `always` / `force` / `ask`. Does NOT apply to SimNIBS segmentations. In chained pipelines (async, multi-ISPPA, uncertainty), `always` re-runs only the output stages (CSV, NIfTI, HTML report) and reuses cached intermediates; `force` re-runs every stage. See [Overwrite behaviour](doc_outputs_reuse.md#overwrite-behaviour). |
 | `cache_signature_check` | Response when a reused grid, medium or acoustic cache, or a stage output a run starts from (placement run, pseudo-CT, pressure map), was built from different settings. | `'error'` | `error` / `warn` (reuse anyway) / `off`. Caches: applies when one is reused because of `overwrite_files: never` (or a declined overwrite). See [Cache reuse checks](doc_outputs_reuse.md#cache-reuse-checks) and [Starting from earlier stage outputs](doc_outputs_reuse.md#starting-from-earlier-stage-outputs). |
-| `overwrite_simnibs` | Overwrite SimNIBS segmentation results? | `0` | `1 = yes`, `0 = no` |
+| `overwrite_simnibs` | Overwrite SimNIBS segmentation results? | `0` | `1 = yes`, `0 = no`. Re-runs charm (`--forcerun`), which deletes the m2m folder first. Without it, an existing segmentation is reused even when another SimNIBS version or other charm settings are selected (with a warning). |
 | `save_matrices` | Save all intermediate matrices (`.mat` / cache files)? | `[]` | `1` = save all, `0` = save none, `[]` = use the per-step defaults. Applies to every per-step matrix flag left empty; a per-step flag set to `0`/`1` always wins. `0` also triggers cleanup of uncertainty intermediates. |
 | `save_source_matrices` | Save `kwave_source.mat` (transducer source array)? | `[]` → `1` | `[]` inherits `save_matrices`, else default. Needed by multi-stage pipelines (e.g. uncertainty). |
 | `save_acoustic_matrices` | Save acoustic results (`sensor_data`, `kgrid`, medium; can be very large)? | `[]` → `0` | `[]` inherits `save_matrices`, else default. Needed to reload acoustics (e.g. separate thermal runs, calibration debugging). |
@@ -480,7 +480,7 @@ See [doc_placement_plantus.md](doc_placement_plantus.md).
     | **Parameter** | **Description** | **Default** | **Comments** |
     |---|---|---|---|
     | `script_path` | PlanTUS installation directory (contains `code/PlanTUS.py`). | `''` | Required. |
-    | `env_path` | SimNIBS installation or conda env whose Python runs PlanTUS. | `''` | Required. |
+    | `env_path` | SimNIBS installation or conda env whose Python runs PlanTUS. | `''` | `''` = the Python of the SimNIBS install in `startup.simnibs_bin_path`. |
     | `target_name` | Target label, used in output folder and file names. | `''` | Required. Outputs go to `<path.placement>/sub-XXX/plantus/<target_name>/`. |
     | `mni_target_mm` | Target [MNI mm]. | `[]` | Empty = use `transducer.focus_pos` (voxels). |
     | `focal_distance_list` | Focal distances from the calibration [mm]. | `[]` | Required. Set the eligible and optimal skin–target distance. |
@@ -569,6 +569,8 @@ See [TUS_entry placement](doc_placement_tus_entry.md).
 | `use_qform` | Force qform reorientation before charm segmentation? | `0` | Set to `1` if charm reports a qform/sform mismatch error. |
 | `debug` | Pass `--debug` to charm for verbose segmentation output? | `0` | `1 = yes`, `0 = no` |
 | `deface` | Create a defaced copy of the SimNIBS m2m folder (`m2m_sub-NNN_defaced/`) for safe sharing? | `0` | `1 = yes`, `0 = no`. Runs [`pydeface`](https://github.com/poldracklab/pydeface) (must be installed in `startup.simnibs_bin_path`) on T1, UTE, bias-corrected, and MNI-space anatomical images. The original m2m folder is never modified. Only affects saved files; see `io.deface_plots` for figure defacing. |
+| `noneck` | Pass `--noneck` to charm: the scan contains no neck. | `0` | `1 = yes`, `0 = no` |
+| `settings_file` | charm settings file (`.ini`), passed as `--usesettings`. | `''` | `''` = the `charm.ini` of the SimNIBS install. Start from a copy of that file. Keep it outside the m2m folder, which charm deletes when it re-runs. |
 
 ---
 
@@ -756,7 +758,7 @@ See [k-Wave](doc_kwave.md) and [HPC](doc_hpc.md).
 | `memorylimit` | Memory limit [GB]. | `20` | |
 | `posthoc_water_timelimit` | Time limit of the post-hoc free-water jobs (`modules.run_posthoc_water_sims`). | `'05:00:00'` | |
 | `posthoc_water_memorylimit` | Memory limit of the post-hoc free-water jobs [GB]. | `40` | |
-| `ld_library_path` | LD_LIBRARY path for SimNIBS installation. | `''` | Set if you see `undefined symbol` errors. e.g. `/opt/gcc/7.2.0/lib64` |
+| `ld_library_path` | Prefixed to `LD_LIBRARY_PATH` for SimNIBS tools (charm, MNI conversion). | `''` | `''` = the libraries of the install in `startup.simnibs_bin_path` (`<simnibs package>/external/lib/linux`), so it follows the selected environment. Set only to override, e.g. `/opt/gcc/7.2.0/lib64` for `undefined symbol` errors. The pseudo-CT job uses only a set value. |
 | `job_prefix` | Prefix string for HPC job names. | `'PS'` | Keep short; the job name is capped at 20 characters. Overridden to `'TP'` for transducer positioning jobs. |
 | `max_wait_checks` | Maximum number of job status checks when `wait_for_job = true`. | `540` | At 1 check/20 s, `540` ≈ 3 hours. |
 | `depend_type` | Scheduler dependency type for `depend_job_id(s)`. | `'afterok'` | `'afterok'` or `'afterany'`. Internal (not in `config_default.yaml`); `prestus_study_start` uses `'afterany'` for the study-report job. |
