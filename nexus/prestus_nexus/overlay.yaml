@@ -72,7 +72,8 @@ fields:
 
   # ── Simulation ───────────────────────────────────────────────────────
   simulation.medium: {choices: [water, layered, phantom]}
-  simulation.code_type: {choices: [matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu]}
+  simulation.code_type:          # k-Wave runs: acoustic, thermal (with heating) or time reversal
+    choices: [matlab_cpu, matlab_gpu, cpp_cpu, cpp_gpu, cpp_mlx]
   simulation.precision: {choices: [single, double]}
   simulation.interactive: {kind: flag}
   simulation.debug: {kind: flag}
@@ -184,13 +185,14 @@ fields:
   # ── Placement ────────────────────────────────────────────────────────
   placement.mode: {choices: [manual, localite, heuristic, mni, plantus, tus_entry]}
   placement.reuse: {choices: [auto, always, never]}
+  placement.skin_gap_mm: {unit: mm}
   placement.manual: {visible_if: {key: placement.mode, in: [manual]}}
   placement.manual.coordinate_space: {choices: [voxel, ras, mni]}
   placement.localite: {visible_if: {key: placement.mode, in: [localite]}}
   placement.localite.enabled: {kind: flag}
   placement.localite.file: {kind: file}
   placement.localite.session: {kind: yaml}
-  placement.localite.target: {kind: yaml, help: "Pick the series by target name (the ingested name, or the XML description in file mode); '' = use the series index. With several transducers, one name per transducer, e.g. [L_MD, R_MD]: transducer i uses entry i."}
+  placement.localite.target: {kind: yaml, help: "Pick the series by target name (the ingested name, or the XML description in file mode); '' = use the series index. With several transducers, one name per transducer, e.g. [L_M1, R_M1]: transducer i uses entry i."}
   placement.localite.position: {kind: yaml, help: "Otherwise: index of the detected series (1-based, after the pulse-count filter); with several transducers one index per transducer, e.g. [1, 2]."}
   placement.localite.markertype: {choices: [TriggerMarkers, GUMMarkers]}
   placement.localite.reference_distance_mm: {unit: mm}
@@ -207,7 +209,6 @@ fields:
   placement.mni: {visible_if: {key: placement.mode, in: [mni]}}
   placement.mni.trans_pos_mm: {kind: vec3, unit: MNI mm}
   placement.mni.focus_pos_mm: {kind: vec3, unit: MNI mm}
-  placement.mni.skin_gap_mm: {unit: mm}
   placement.plantus: {visible_if: {key: placement.mode, in: [plantus]}}
   placement.plantus.*_mm: {unit: mm}
   placement.plantus.script_path: {kind: dir}
@@ -260,7 +261,6 @@ fields:
 
   # ── Backends ─────────────────────────────────────────────────────────
   jwave: {visible_if: {key: acoustic_backend, in: [jwave]}}
-  time_reversal.placement_search.standoff_mm: {kind: yaml, unit: mm}
   time_reversal.placement_search.jitter_mm: {kind: yaml, unit: mm}
   time_reversal.placement_search.jitter_mode: {kind: str, choices: [grid, scalp]}
   grid.water_baseline_grid: {kind: str, choices: [beam, full]}
@@ -389,6 +389,7 @@ deprecated:
   calibration.optmethod: {use: calibration.opt_method, kind: rename, since: v0.6.0}
   calibration.seed: {use: calibration.opt_seed, kind: rename, since: v0.6.0}
   calibration.addEPdistance: {use: calibration.add_FDO, kind: rename, since: v0.6.0}
+  placement.plantus.additional_offset_mm: {use: placement.skin_gap_mm, kind: rename, since: v0.7-pre}
   calibration.weights: {use: calibration.opt_weights, kind: convert, convert: calibration_weights, since: v0.6.0, note: "the meaning is inverted (now 0 = uniform, w >= 1 = Gaussian with SD = centre/w); set calibration.opt_weights"}
   calibration.path_input_phase: {use: [], kind: removed, since: v0.7-pre, note: "no longer read"}
   calibration.submit_medium: {use: [], kind: removed, since: v0.6.0, note: "calibration runs use platform"}
@@ -798,6 +799,7 @@ display:
   placement.mode: {label: Placement method, help: "How transducer and focus positions are obtained: 'manual' coordinates; 'localite' a recorded neuronavigation pose (ingested with neuronav_gui); 'heuristic' a search from an MNI target; 'mni' MNI coordinates snapped to the scalp; 'plantus' PlanTUS optimisation; 'tus_entry' the TUS_entry R tool."}
   placement.report: {label: Write placement report}
   placement.reuse: {label: Reuse recorded placement run}
+  placement.skin_gap_mm: {label: Gap to the scalp, help: "Gap between scalp and transducer exit plane along the beam axis (e.g. a gel pad); heuristic, MNI, PlanTUS and TUS_entry placement."}
   placement.manual: {label: Manual coordinates}
   placement.manual.coordinate_space: {label: Coordinate space of the positions}
   placement.localite: {label: Localite neuronavigation}
@@ -831,7 +833,6 @@ display:
   placement.mni: {label: MNI coordinates}
   placement.mni.trans_pos_mm: {label: Transducer entry (MNI)}
   placement.mni.focus_pos_mm: {label: Focus (MNI)}
-  placement.mni.skin_gap_mm: {label: Gap to the scalp}
   placement.plantus: {label: PlanTUS optimisation}
   placement.plantus.script_path: {label: PlanTUS folder}
   placement.plantus.env_path: {label: SimNIBS installation}
@@ -839,7 +840,6 @@ display:
   placement.plantus.mni_target_mm: {label: Target (MNI)}
   placement.plantus.focal_distance_list: {label: Candidate focal depths}
   placement.plantus.flhm_list: {label: Focal lengths (FLHM) per depth}
-  placement.plantus.additional_offset_mm: {label: Extra stand-off, advanced: true}
   placement.plantus.max_angle_deg: {label: Max. tilt angle, advanced: true}
   placement.plantus.mask_radius_mm: {label: Target mask radius, advanced: true}
   placement.plantus.weight_*: {advanced: true}

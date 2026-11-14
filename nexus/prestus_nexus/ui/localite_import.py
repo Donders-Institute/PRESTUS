@@ -75,7 +75,7 @@ class LocaliteImportDialog(QDialog):
         self.order.currentIndexChanged.connect(lambda _i: self._preview())
         opts.addWidget(self.order)
         self.custom = QLineEdit()
-        self.custom.setPlaceholderText("e.g. L_MD, R_MD")
+        self.custom.setPlaceholderText("e.g. L_M1, R_M1")
         self.custom.textChanged.connect(lambda _t: self._preview())
         opts.addWidget(self.custom)
         self.check_n = QCheckBox(f"Require {n_tx} target(s) per session (the configured transducers)")

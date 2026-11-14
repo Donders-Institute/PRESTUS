@@ -27,7 +27,7 @@ HOW_TO = (
     "<li><b>Add the runs.</b> <i>Add subjects…</i> takes IDs such as <tt>1-12, 15</tt>. "
     "<i>Import from Localite…</i> makes one run per recorded target.</li>"
     "<li><b>Name each condition</b> if a subject has more than one run (e.g. the target "
-    "<tt>L_MD</tt> and <tt>R_MD</tt>). The condition names the outputs and groups the group report. "
+    "<tt>L_M1</tt> and <tt>R_M1</tt>). The condition names the outputs and groups the group report. "
     "Two included rows with the same subject and condition would overwrite each other.</li>"
     "<li><b>Optional: vary a setting per run.</b> <i>Add setting column…</i> adds any config key, "
     "e.g. <tt>transducer.target_isppa_wcm2</tt>. An empty cell keeps the study value.</li>"
@@ -36,9 +36,9 @@ HOW_TO = (
     "Example:"
     "<table cellspacing='0' cellpadding='3' border='1' style='margin-top:4px'>"
     "<tr><th>subject_id</th><th>condition</th><th>transducer.target_isppa_wcm2</th></tr>"
-    "<tr><td>1</td><td>L_MD</td><td></td></tr>"
-    "<tr><td>1</td><td>R_MD</td><td></td></tr>"
-    "<tr><td>2</td><td>L_MD</td><td>20</td></tr></table>")
+    "<tr><td>1</td><td>L_M1</td><td></td></tr>"
+    "<tr><td>1</td><td>R_M1</td><td></td></tr>"
+    "<tr><td>2</td><td>L_M1</td><td>20</td></tr></table>")
 
 # Hover help for the reserved columns; config-key columns show their config_default.yaml help
 RESERVED_HELP = {
