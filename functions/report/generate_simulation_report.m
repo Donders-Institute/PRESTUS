@@ -746,9 +746,9 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
         if isfield(bb, 'ppw') && ~isempty(bb.ppw)
             bb_ppw = fmt(bb.ppw, '%d', '');
         end
-        if isfield(bb, 'tx_system') && ~isempty(bb.tx_system)
+        if isfield(bb, 'tx_system') && ~isempty(bb.tx_system) && ~strcmp(bb.tx_system, 'PRESTUS')
             bb_preset = html_utils.escape(bb.tx_system);
-        end
+        end   % empty: the PRESTUS transducer geometry, no preset to name
         if isfield(bb, 'computing_backend')
             cb = bb.computing_backend;
             if ischar(cb) || isstring(cb); cb = lower(char(cb)); end
@@ -1727,7 +1727,7 @@ function html = build_medium_properties_babelbrain(parameters)
         return
     end
 
-    % BabelBrain material row labels (fixed ordering from BabelIntegrationBASE.py)
+    % BabelBrain material row labels (fixed ordering from babel_integration_base.py)
     bb_row_labels  = {'Water', 'Skin', 'Skull (cortical)', 'Skull (trabecular)', 'Brain', ...
                       'White matter', 'Gray matter', 'CSF'};
     n_rows = min(size(mat, 1), numel(bb_row_labels));

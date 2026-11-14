@@ -1,5 +1,5 @@
 function out_files = export_babelbrain_inputs( ...
-        parameters, medium_masks, focus_pos, planimg, equip_param)
+        parameters, medium_masks, focus_pos, planimg)
 % EXPORT_BABELBRAIN_INPUTS  Write all BabelBrain input files from a PRESTUS run
 %
 % Prepares every file needed to run BabelBrain on the current subject and
@@ -28,14 +28,12 @@ function out_files = export_babelbrain_inputs( ...
 %
 % Use as:
 %   out_files = export_babelbrain_inputs(parameters, medium_masks, focus_pos, planimg)
-%   out_files = export_babelbrain_inputs(..., equip_param)
 %
 % Input:
 %   parameters    - PRESTUS config with .babelbrain sub-struct and .io.dir_babelbrain
 %   medium_masks  - [Nx x Ny x Nz] medium label volume from preproc_medium_mask
 %   focus_pos     - [1x3] focus voxel in grid coordinates
 %   planimg       - planimg struct from grid_tissue_setup
-%   equip_param   - (optional) equipment config for transducer lookup
 %
 % Output:
 %   out_files - struct with fields:
@@ -52,7 +50,6 @@ arguments
     medium_masks  (:,:,:) {mustBeNumeric}
     focus_pos     (1,3)   {mustBeNumeric}
     planimg       (1,1)   struct
-    equip_param         struct = struct()
 end
 
 %% Output directory
@@ -105,10 +102,6 @@ else
     z_beyond_focus_mm = bb.z_beyond_focus_mm;
 end
 bb = apply_default(bb, 'tx_mech_adjust_z_m',  0.0);
-
-if isempty(bb.tx_system)
-    [bb.tx_system, ~] = babelbrain_transducer_map(parameters, equip_param, out_dir);
-end
 
 % 'auto' / named backends -> BabelBrain integer (RunCases and the YAML need a number)
 [bb.computing_backend, bb.device_name] = resolve_bb_backend(bb.computing_backend, bb.device_name);
@@ -213,17 +206,33 @@ for k = 1:numel(bb_root_candidates)
     end
 end
 
-% Preset geometry (default.yaml) — FocalLength also drives the placement correction
-cfg = struct();
-yaml_path = fullfile(bb_root_py, 'BabelBrain', ...
-    ['Babel_' get_babel_folder(bb.tx_system)], 'default.yaml');
-yaml_path = strrep(yaml_path, '/', filesep);
-if isfile(yaml_path)
-    cfg = yaml.loadFile(yaml_path, 'ConvertToArray', true);
+% Simulated geometry (PRESTUS transducer, or a named BabelBrain preset);
+% its focal length also drives the placement correction.
+if isempty(bb_root_py)
+    error('export_babelbrain_inputs: BabelBrain source root not found (external/BabelBrain).');
 end
-preset_focal_length_m = [];
-if isfield(cfg, 'FocalLength')
-    preset_focal_length_m = cfg.FocalLength;
+bb_geom = babelbrain_tx_geometry(parameters.transducer(1), bb.tx_system, strrep(bb_root_py, '/', filesep));
+bb.tx_system = bb_geom.tx_system;
+preset_focal_length_m = bb_geom.focal_length_m;
+
+% Geometry keyword arguments for RunCases: preset default.yaml, overridden by
+% the PRESTUS values (PRESTUS geometry, or Single/BSonix aperture and focal length).
+cfg = bb_geom.cfg;
+geom_py = struct();
+if isfield(cfg, 'TxDiam'),       geom_py.Aperture     = cfg.TxDiam;       end
+if isfield(cfg, 'FocalLength'),  geom_py.FocalLength  = cfg.FocalLength;  end
+if isfield(cfg, 'InDiameters'),  geom_py.InDiameters  = cfg.InDiameters;  end
+if isfield(cfg, 'OutDiameters'), geom_py.OutDiameters = cfg.OutDiameters; end
+flag_keys = struct('aperture', 'Aperture', 'focal_length', 'FocalLength', ...
+                   'in_diameters', 'InDiameters', 'out_diameters', 'OutDiameters');
+for k = 1:2:numel(bb_geom.flags)
+    geom_py.(flag_keys.(erase(bb_geom.flags{k}, '--'))) = str2double(strsplit(bb_geom.flags{k+1}, ','));
+end
+if strcmp(bb_geom.tx_system, 'PRESTUS')
+    run_sim_module = 'TranscranialModeling.babel_integration.integration_templates.babel_integration_focused_annular_array';
+else
+    run_sim_module = sprintf('TranscranialModeling.babel_integration.%s.babel_integration_%s', ...
+        bb_geom.type, bb_geom.tx_system);
 end
 
 % Mechanical placement correction so BabelBrain's apex lands on trans_pos
@@ -233,7 +242,7 @@ end
 tx_mech_adjust_total_m = bb.tx_mech_adjust_z_m + geom_corr_m;
 if ~strcmp(placement_src, 'none')
     fprintf(['[export_babelbrain_inputs] Tx placement correction: %+.1f mm ' ...
-        '(preset FL %.1f mm - apex-to-target %.2f mm from %s)\n'], ...
+        '(FL %.1f mm - apex-to-target %.2f mm from %s)\n'], ...
         geom_corr_m*1e3, preset_focal_length_m*1e3, apex_to_target_mm, placement_src);
 else
     warning('export_babelbrain_inputs:noPlacementCorr', ...
@@ -258,10 +267,20 @@ fprintf(fid, 'import sys, os\n\n');
 fprintf(fid, '# ── Configuration ─────────────────────────────────────────────\n');
 fprintf(fid, 'BabelBrain_ROOT = ''%s''\n', py_escape(bb_root_py));
 fprintf(fid, 'if BabelBrain_ROOT and BabelBrain_ROOT not in sys.path:\n');
-fprintf(fid, '    sys.path.insert(0, BabelBrain_ROOT)\n\n');
-fprintf(fid, 'from TranscranialModeling.BabelIntegrationANNULAR_ARRAY import RUN_SIM\n\n');
+fprintf(fid, '    sys.path.insert(0, BabelBrain_ROOT)\n');
+fprintf(fid, '    sys.path.append(os.path.join(BabelBrain_ROOT, ''BabelBrain''))\n\n');
+fprintf(fid, 'import numpy as np\n');
+fprintf(fid, 'from %s import RUN_SIM\n\n', run_sim_module);
+phased = any(strcmp(bb_geom.type, {'focused_array', 'flat_array_2D'}));
+if phased
+    % Element tables are long; the script reads them from the preset yaml.
+    fprintf(fid, 'import yaml\n');
+    fprintf(fid, 'with open(''%s'') as _f:\n', py_escape(strrep(bb_geom.yaml, '\', '/')));
+    fprintf(fid, '    PRESET = yaml.safe_load(_f)\n\n');
+end
 fprintf(fid, 'R = RUN_SIM()\n');
 fprintf(fid, 'output_files = R.RunCases(\n');
+fprintf(fid, '    TxSystem       = ''%s'',\n', py_escape(bb_geom.tx_system));
 fprintf(fid, '    targets        = [''%s''],\n', py_escape(target));
 fprintf(fid, '    ID             = ''%s'',\n', py_escape(subj_id));
 fprintf(fid, '    basedir        = ''%s'',\n', py_escape(strrep(out_dir, '\', '/')));
@@ -283,22 +302,24 @@ fprintf(fid, '    bDoRefocusing               = %s,\n', mat2pyb(bb.do_refocusing
 fprintf(fid, '    bDisplay                    = False,\n');
 fprintf(fid, '%s', weights_arg);
 
-% Geometry kwargs (from preset default.yaml if available)
-if ~isempty(fieldnames(cfg))
-    if isfield(cfg, 'TxDiam')
-        fprintf(fid, '    Aperture       = %.6f,  # m\n', cfg.TxDiam);
+% Geometry kwargs [m]
+if isfield(geom_py, 'Aperture')
+    fprintf(fid, '    Aperture       = %.7f,\n', geom_py.Aperture);
+end
+if isfield(geom_py, 'FocalLength')
+    fprintf(fid, '    FocalLength    = %.7f,\n', geom_py.FocalLength);
+end
+for f = {'InDiameters', 'OutDiameters'}
+    if isfield(geom_py, f{1})
+        fprintf(fid, '    %-14s = np.array([%s]),\n', f{1}, ...
+            strjoin(arrayfun(@(x) sprintf('%.7f', x), geom_py.(f{1})(:)', 'UniformOutput', false), ', '));
     end
-    if isfield(cfg, 'FocalLength')
-        fprintf(fid, '    FocalLength    = %.6f,  # m\n', cfg.FocalLength);
-    end
-    if isfield(cfg, 'InDiameters')
-        fprintf(fid, '    InDiameters    = [%s],\n', ...
-            strjoin(arrayfun(@(x) sprintf('%.6f', x), cfg.InDiameters(:)', 'UniformOutput', false), ', '));
-    end
-    if isfield(cfg, 'OutDiameters')
-        fprintf(fid, '    OutDiameters   = [%s],\n', ...
-            strjoin(arrayfun(@(x) sprintf('%.6f', x), cfg.OutDiameters(:)', 'UniformOutput', false), ', '));
-    end
+end
+if phased
+    fprintf(fid, '    elements          = PRESET[''Elements''],\n');
+    fprintf(fid, '    num_elements      = PRESET[''NumElements''],\n');
+    fprintf(fid, '    element_size      = PRESET[''ElementSize''],\n');
+    fprintf(fid, '    coordinate_system = PRESET.get(''CoordinateSystem'', ''cartesian''),\n');
 end
 
 fprintf(fid, ')\n\n');
@@ -363,23 +384,6 @@ end
 
 function py_bool = mat2pyb(val)
     if val; py_bool = 'True'; else; py_bool = 'False'; end
-end
-
-function folder = get_babel_folder(tx_system)
-    MAP = struct( ...
-        'CTX_500',   'CTX500',   'CTX_250',   'CTX250',   'CTX_250_2ch', 'CTX250_2ch', ...
-        'R15287',    'R15287',   'R15473',    'R15473',   'R15646',       'R15646', ...
-        'DPX_500',   'DPX500',   'DPXPC_300', 'DPXPC300', 'R15148',       'R15148', ...
-        'DomeTx',    'DomeTx',   'H317',      'H317',     'H246',         'H246', ...
-        'H301',      'H301',     'Single',    'SingleTx', 'BSonix',       'SingleTx', ...
-        'REMOPD',    'REMOPD',   'I12378',    'I12378',   'IGT64_500',    'IGT64_500', ...
-        'ATAC',      'ATAC' ...
-    );
-    if isfield(MAP, tx_system)
-        folder = MAP.(tx_system);
-    else
-        folder = tx_system;
-    end
 end
 
 function s = py_escape(s)

@@ -1,5 +1,5 @@
 function sensor_data = babelbrain_wrapper( ...
-        parameters, medium_masks, kwave_medium, focus_pos, trans_pos, planimg, equip_param, pseudoCT)
+        parameters, medium_masks, kwave_medium, focus_pos, trans_pos, planimg, pseudoCT)
 % BABELBRAIN_WRAPPER  Run BabelBrain acoustic simulation as PRESTUS backend
 %
 % Drop-in replacement for ACOUSTIC_WRAPPER that uses BabelBrain's
@@ -9,17 +9,17 @@ function sensor_data = babelbrain_wrapper( ...
 % downstream stages (acoustic_analysis, thermal_simulation) remain unchanged.
 %
 % Pipeline:
-%   1. Map PRESTUS transducer → BabelBrain preset (babelbrain_transducer_map)
+%   1. Transducer geometry: PRESTUS rings or a BabelBrain preset (babelbrain_tx_geometry)
 %   2. Write BabelViscoInput NIfTI mask (write_babelbrain_input)
 %   3. Write OptimizedWeightsFile HDF5 (export_babelbrain_weights)
 %   4. Invoke BabelBrain Python bridge via run_command()
 %   5. Read *DataForSim.h5 output (read_babelbrain_output)
 %
 % Required config fields (parameters.babelbrain):
-%   .tx_system          - BabelBrain preset name, e.g. 'CTX_500'.
-%                         If empty, babelbrain_transducer_map is called to
-%                         auto-detect. Set explicitly when using a custom
-%                         RUN_SIM subclass.
+%   .tx_system          - '' (default): BabelBrain simulates the PRESTUS transducer's
+%                         ring geometry, on which its calibration was fitted.
+%                         A BabelBrain preset name (e.g. 'CTX_500', 'H317') uses
+%                         BabelBrain's own device definition instead.
 %   .computing_backend  - 1=CUDA, 2=OpenCL, 3=Metal (Apple Silicon), 4=CPU
 %                         'auto' (default): detect Metal on macOS, CUDA on Linux
 %                         with nvidia-smi, else CPU.
@@ -104,7 +104,7 @@ function sensor_data = babelbrain_wrapper( ...
 % Use as:
 %   sensor_data = babelbrain_wrapper(parameters, medium_masks, kwave_medium, ...
 %                     focus_pos, trans_pos, planimg)
-%   sensor_data = babelbrain_wrapper(..., equip_param)
+%   sensor_data = babelbrain_wrapper(..., pseudoCT)
 %
 % Input:
 %   parameters   - PRESTUS config struct with .babelbrain sub-struct
@@ -115,7 +115,6 @@ function sensor_data = babelbrain_wrapper( ...
 %   trans_pos    - [1x3] transducer (bowl rear-centre / apex) voxel in grid coordinates;
 %                  sets BabelBrain's Tx placement and the beam direction
 %   planimg      - planimg struct from grid_tissue_setup (affine info)
-%   equip_param  - (optional) equipment config struct for transducer lookup
 %   pseudoCT     - (optional) [Nx x Ny x Nz] Hounsfield-unit pseudo-CT in
 %                  grid space (from grid_tissue_setup). Required when
 %                  parameters.babelbrain.ct_mapping is non-empty.
@@ -124,7 +123,7 @@ function sensor_data = babelbrain_wrapper( ...
 %   sensor_data  - struct with p_max_all [Nx x Ny x Nz] [Pa], matching the
 %                  format returned by acoustic_wrapper.
 %
-% See also: ACOUSTIC_WRAPPER, WRITE_BABELBRAIN_INPUT, BABELBRAIN_TRANSDUCER_MAP,
+% See also: ACOUSTIC_WRAPPER, WRITE_BABELBRAIN_INPUT, BABELBRAIN_TX_GEOMETRY,
 %           READ_BABELBRAIN_OUTPUT, EXPORT_BABELBRAIN_WEIGHTS
 
 arguments
@@ -134,7 +133,6 @@ arguments
     focus_pos    (1,3) {mustBeNumeric}
     trans_pos    (1,3) {mustBeNumeric}
     planimg      (1,1) struct
-    equip_param        struct  = struct()
     pseudoCT           {mustBeNumeric} = []
 end
 
@@ -344,23 +342,14 @@ if abs(res_mm - dx_bb_est_mm) > 0.01
         res_mm, dx_bb_est_mm, ppw_use, freq_hz, smallest_sos_ms, dx_bb_est_mm, ppw_use);
 end
 
-%% Step 1 — Transducer preset
-if isempty(bb.tx_system)
-    [bb.tx_system, csv_path] = babelbrain_transducer_map(parameters, equip_param, out_dir);
-    if isempty(bb.tx_system)
-        error(['babelbrain_wrapper: No BabelBrain preset matched and auto-detection ' ...
-            'returned empty preset.\n' ...
-            'Set parameters.babelbrain.tx_system explicitly or register the ' ...
-            'transducer as described in babelbrain_transducer_map.']);
-    end
-    if ~isempty(csv_path)
-        fprintf(['[babelbrain_wrapper] Custom element CSV generated.\n' ...
-            '  You must register the preset in BabelBrain before proceeding.\n' ...
-            '  CSV: %s\n'], csv_path);
-        error('babelbrain_wrapper: Custom preset registration required. See above.');
-    end
-end
-fprintf('[babelbrain_wrapper] Using preset: %s\n', bb.tx_system);
+%% Step 1 — Transducer geometry
+% Empty tx_system: BabelBrain simulates the PRESTUS transducer itself (its ring
+% geometry on BabelBrain's generic focused annular template), so the shipped
+% calibration, fitted on that geometry, applies ring for ring. A named preset
+% uses BabelBrain's own device definition instead.
+bb_geom = babelbrain_tx_geometry(tr, bb.tx_system, bb_root);
+bb.tx_system = bb_geom.tx_system;
+fprintf('[babelbrain_wrapper] Transducer: %s\n', bb.tx_system);
 
 %% Focal calibration — locate or re-steer the geometric aim
 % PRESTUS's focal_distance_ep is the intended FWHM-centre of the achieved field,
@@ -433,67 +422,10 @@ end
 %     focal_distance_bowl (uncalibrated).
 % See doc_babelbrain.md (Transducer placement, ZSteering, and the drive phases).
 
-% Read FocalLength from the preset default.yaml. BabelBrain's folder name can
-% differ from the preset string (e.g. 'CTX_500' lives in Babel_CTX500/), so try
-% the canonical folder name first, then the preset string as-is.
-preset_focal_length_m = [];   % also used by focal_length_mm_for_resample
-preset_folder_name = bb_preset_folder(bb.tx_system);
-preset_yaml_candidates = {
-    fullfile(bb_root, 'BabelBrain', sprintf('Babel_%s', preset_folder_name), 'default.yaml'), ...
-    fullfile(bb_root, 'BabelBrain', sprintf('Babel_%s', bb.tx_system),        'default.yaml'), ...
-};
-for k = 1:numel(preset_yaml_candidates)
-    preset_yaml = preset_yaml_candidates{k};
-    if isfile(preset_yaml)
-        try
-            preset_cfg = yaml.loadFile(preset_yaml, 'ConvertToArray', true);
-            if isfield(preset_cfg, 'FocalLength')
-                preset_focal_length_m = preset_cfg.FocalLength;
-                fprintf('[babelbrain_wrapper] Preset yaml: %s\n', preset_yaml);
-            end
-        catch ME
-            warning('babelbrain_wrapper: failed to read preset yaml %s: %s', preset_yaml, ME.message);
-        end
-        break
-    end
-end
-preset_fl_src = 'from yaml';
-
-% Single-element presets (Single, BSonix) carry no geometry in default.yaml:
-% BabelBrain's GUI asks the user for aperture and focal length, and
-% BabelIntegrationSingle.RUN_SIM.RunCases reads both from its kwargs
-% (KeyError: 'Aperture' without them). Take them from the PRESTUS transducer,
-% so RunCases gets them and the placement correction, ZSteering and resample
-% anchor below use the real focal length instead of the no-FL fallback.
-bb_single_geom_flag = {};
-if any(strcmp(bb.tx_system, {'Single', 'BSonix'}))
-    if ~(isfield(tr, 'annular') && all(isfield(tr.annular, {'curv_radius_mm', 'elem_od_mm'})) && ...
-            ~isempty(tr.annular.curv_radius_mm) && ~isempty(tr.annular.elem_od_mm))
-        error('PRESTUS:babelbrain:singleGeometry', ...
-            ['BabelBrain preset ''%s'' needs the aperture and focal length from PRESTUS: ' ...
-             'set transducer.annular.curv_radius_mm and transducer.annular.elem_od_mm.'], bb.tx_system);
-    end
-    if isfield(tr.annular, 'elem_n') && tr.annular.elem_n > 1
-        warning('PRESTUS:babelbrain:singleMultiElem', ...
-            ['BabelBrain preset ''%s'' models one solid bowl; the %d-element transducer is ' ...
-             'simulated as a single element of outer diameter %.1f mm.'], ...
-            bb.tx_system, tr.annular.elem_n, max(tr.annular.elem_od_mm));
-    end
-    if isfield(tr.annular, 'elem_id_mm') && any(tr.annular.elem_id_mm > 0)
-        warning('PRESTUS:babelbrain:singleHole', ...
-            'BabelBrain preset ''%s'' has no central opening; elem_id_mm %.1f mm is ignored.', ...
-            bb.tx_system, min(tr.annular.elem_id_mm));
-    end
-    single_aperture_m = max(tr.annular.elem_od_mm) / 1000;
-    if isempty(preset_focal_length_m)
-        preset_focal_length_m = tr.annular.curv_radius_mm / 1000;
-        preset_fl_src = 'from transducer.annular.curv_radius_mm';
-    end
-    bb_single_geom_flag = {'--aperture', sprintf('%.6f', single_aperture_m), ...
-                           '--focal_length', sprintf('%.6f', preset_focal_length_m)};
-    fprintf('[babelbrain_wrapper] %s geometry from PRESTUS transducer: Aperture=%.1f mm  FocalLength=%.1f mm\n', ...
-        bb.tx_system, single_aperture_m*1e3, preset_focal_length_m*1e3);
-end
+% Focal length of the simulated transducer: the PRESTUS radius of curvature
+% (PRESTUS geometry) or the preset FocalLength.
+preset_focal_length_m = bb_geom.focal_length_m;   % also used by focal_length_mm_for_resample
+preset_fl_src = bb_geom.fl_src;
 
 % Focal distance from the bowl apex [mm]
 focal_distance_bowl_mm = [];
@@ -569,7 +501,7 @@ fprintf('[babelbrain_wrapper] ---- BabelBrain simulation summary ----\n');
 
 % --- Transducer & frequency ---
 fprintf('[babelbrain_wrapper]  backend   : %s\n', backend_str);
-fprintf('[babelbrain_wrapper]  Preset:           %s\n', bb.tx_system);
+fprintf('[babelbrain_wrapper]  Transducer:       %s\n', bb.tx_system);
 fprintf('[babelbrain_wrapper]  Frequency:        %.0f Hz (%.0f kHz)\n', freq_hz, freq_hz/1e3);
 fprintf('[babelbrain_wrapper]  PRESTUS grid:     %.4f mm\n', res_mm);
 fprintf('[babelbrain_wrapper]  BabelBrain est.:  %.4f mm  (%d PPW)\n', dx_bb_est_mm, ppw_use);
@@ -579,9 +511,9 @@ if isfield(tr, 'focal_distance_ep')
     fprintf('[babelbrain_wrapper]  focal_distance_ep:  %.1f mm\n', tr.focal_distance_ep);
 end
 if ~isempty(preset_focal_length_m)
-    fprintf('[babelbrain_wrapper]  Preset FocalLength: %.1f mm (%s)\n', preset_focal_length_m*1e3, preset_fl_src);
+    fprintf('[babelbrain_wrapper]  Focal length:     %.1f mm (%s)\n', preset_focal_length_m*1e3, preset_fl_src);
 else
-    fprintf('[babelbrain_wrapper]  Preset FocalLength: NOT FOUND  ← fallback path active\n');
+    fprintf('[babelbrain_wrapper]  Focal length:     NOT FOUND  ← fallback path active\n');
 end
 fprintf('[babelbrain_wrapper]  ZSteering:        %.4f m (%.1f mm)\n', z_steering_m, z_steering_m*1e3);
 fprintf('[babelbrain_wrapper]  TxMechAdjustZ:    %.4f m (%.1f mm = %.1f mm placement corr + %.1f mm user)\n', ...
@@ -899,7 +831,7 @@ babelbrain_argv = [{python_bin, bb_runner, ...
     '--z_steering', sprintf('%.6f', z_steering_m), ...
     '--z_beyond_focus_mm', sprintf('%.1f', z_beyond_focus_mm), ...
     '--log_file', log_file}, ...
-    bb_single_geom_flag, ...
+    bb_geom.flags, ...
     bb_root_flag(bb_root), ...
     bb_weights_flag(weights_path), ...
     source_amp_pa_flag, ...
@@ -1029,11 +961,15 @@ sensor_data.trans_pos            = trans_pos;   % beam-axis direction for the th
 % In water medium mode, the primary simulation IS the water simulation, so
 % freefield_isppa_wcm2 is derived directly from sensor_data without a separate run.
 % In layered/phantom mode, a dedicated water-only BabelBrain run provides the baseline.
+% Intensity uses the water BabelBrain simulates (1000 kg/m³, 1500 m/s; its water
+% material is not patched, see run_babelbrain_case.py), not medium_properties.water.
+BB_WATER_DENSITY     = 1000;   % [kg/m³]
+BB_WATER_SOUND_SPEED = 1500;   % [m/s]
 p_bb_water_peak_pa = [];   % BabelBrain free-water focal peak, for amplitude calibration below
 if is_water_medium
     p_max_pa = max(sensor_data.p_max_all(:));
     p_bb_water_peak_pa = p_max_pa;
-    sensor_data.freefield_isppa_wcm2 = p_max_pa^2 / (2 * 1000 * 1500) / 1e4;
+    sensor_data.freefield_isppa_wcm2 = p_max_pa^2 / (2 * BB_WATER_DENSITY * BB_WATER_SOUND_SPEED) / 1e4;
     fprintf('[babelbrain_wrapper] Water medium — freefield ISPPA: %.4f W/cm²\n', ...
         sensor_data.freefield_isppa_wcm2);
 else
@@ -1074,7 +1010,7 @@ else
             '--z_beyond_focus_mm', sprintf('%.1f', z_beyond_focus_mm), ...
             '--log_file', water_log, ...
             '--water_only'}, ...
-            bb_single_geom_flag, ...            % Single/BSonix: aperture and focal length
+            bb_geom.flags, ...                 % PRESTUS geometry or Single/BSonix: aperture, focal length, rings
             bb_root_flag(bb_root), ...
             bb_weights_flag(weights_path), ...  % needed for z-steering geometry match
             source_amp_pa_flag, ...             % same drive as the transcranial run, else BabelBrain's ~50 kPa default
@@ -1113,8 +1049,8 @@ else
         try
             p_water = double(h5read(water_h5, '/p_amp'));
             p_bb_water_peak_pa = max(p_water(:));
-            % ISPPA = p_peak^2 / (2 * rho_water * c_water), converted Pa→W/cm²
-            sensor_data.freefield_isppa_wcm2 = p_bb_water_peak_pa^2 / (2 * 1000 * 1500) / 1e4;
+            % ISPPA = p_peak^2 / (2 * rho_water * c_water) in BabelBrain's water, Pa→W/cm²
+            sensor_data.freefield_isppa_wcm2 = p_bb_water_peak_pa^2 / (2 * BB_WATER_DENSITY * BB_WATER_SOUND_SPEED) / 1e4;
             fprintf('[babelbrain_wrapper] Free-water ISPPA: %.4f W/cm²\n', ...
                 sensor_data.freefield_isppa_wcm2);
         catch ME
@@ -1388,25 +1324,6 @@ function ver = query_babelbrain_version(python_bin, bb_runner, bb_root)
                 case 'BABELBRAIN_ROOT';          ver.bb_root      = strtrim(parts{2});
             end
         end
-    end
-end
-
-function folder = bb_preset_folder(preset_name)
-% Map a BabelBrain preset string to the on-disk Babel_<folder> directory name.
-% Mirrors PRESET_MODULE_MAP in run_babelbrain_case.py.
-    folder_map = struct( ...
-        'CTX_500',    'CTX500', ...
-        'CTX_250',    'CTX250', ...
-        'CTX_250_2ch','CTX250_2ch', ...
-        'DPX_500',    'DPX500', ...
-        'DPXPC_300',  'DPXPC300', ...
-        'Single',     'SingleTx', ...
-        'BSonix',     'SingleTx' ...
-    );
-    if isfield(folder_map, preset_name)
-        folder = folder_map.(preset_name);
-    else
-        folder = preset_name;   % most presets use the preset name directly
     end
 end
 

@@ -10,7 +10,7 @@ function mask = bb_tissuemask_binary(material_map)
 % it attributes boundary voxels (e.g. the skull-brain reflection hotspot) the
 % way the solver treated them.
 %
-% BabelBrain label convention (BabelIntegrationBASE.py / material map):
+% BabelBrain label convention (babel_integration_base.py / material map):
 %   0 = water, 1 = skin, 2 = cortical bone, 3 = trabecular bone, 4 = brain
 %
 % Use as:

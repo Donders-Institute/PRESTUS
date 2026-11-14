@@ -296,9 +296,11 @@ fields:
   babelbrain.focal_calibration_target: {choices: [flhm_center, peak]}
   babelbrain.z_beyond_focus_mm: {unit: mm}
   babelbrain.python_env: {kind: path}
-  babelbrain.air_regions: {kind: bool, visible_if: {key: babelbrain.ct_mapping, not_in: ['']}}
-  babelbrain.air_hu_window: {kind: numbers, unit: HU}
-  babelbrain.air_keep_boundary: {kind: bool}
+  # BabelBrain's CT path needs the pseudo-CT, which grid_tissue_setup.m loads only with pct.enabled
+  babelbrain.ct_mapping: {choices: [Webb-Marsac, Aubry, Pichardo, McDannold, Marsac-Aubry, Pichardo-Marsac, McDannold-Marsac], visible_if: {key: pct.enabled, in: [1, true]}}
+  babelbrain.air_regions: {kind: bool, visible_if: [{key: pct.enabled, in: [1, true]}, {key: babelbrain.ct_mapping, not_in: ['', null]}]}
+  babelbrain.air_hu_window: {kind: numbers, unit: HU, visible_if: [{key: pct.enabled, in: [1, true]}, {key: babelbrain.ct_mapping, not_in: ['', null]}, {key: babelbrain.air_regions, in: [1, true]}]}
+  babelbrain.air_keep_boundary: {kind: bool, visible_if: [{key: pct.enabled, in: [1, true]}, {key: babelbrain.ct_mapping, not_in: ['', null]}, {key: babelbrain.air_regions, in: [1, true]}]}
 
   medium_properties.*.sound_speed: {unit: m/s}
   medium_properties.*.density: {unit: kg/m³}
@@ -417,6 +419,10 @@ deprecated:
   io.external_acoustic_nifti: {use: path.acoustic_input, source: load_parameters.m}
 
 extra:
+  babelbrain.tight_narrow_beam:
+    kind: bool
+    default: []
+    help: BabelBrain narrow-beam domain (saves compute; the pre-focal field is not emitted). Ignored when grid.acoustic_fov_length_mm is set.
   simulation.async_grid_mode:
     kind: str
     default: shared

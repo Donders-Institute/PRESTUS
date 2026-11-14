@@ -432,7 +432,7 @@ function [parameters] = prestus_pipeline(parameters, options)
         if ~isfield(parameters.io, 'dir_babelbrain') || isempty(parameters.io.dir_babelbrain)
             parameters.io.dir_babelbrain = fullfile(parameters.io.dir_output, 'babelbrain');
         end
-        export_babelbrain_inputs(parameters, medium_masks, focus_pos, planimg, struct());
+        export_babelbrain_inputs(parameters, medium_masks, focus_pos, planimg);
     end
 
     clear source_labels

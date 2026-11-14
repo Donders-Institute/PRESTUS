@@ -9,7 +9,7 @@ function export_babelbrain_weights(phases_rad, velocity, parameters, out_path, g
 %   u0 *= OptimizedWeights          (in AdjustWeightAmplitudes)
 %
 % where u0 already carries geometric (Rayleigh-steered) phases AND a uniform
-% SourceAmpPa amplitude per element (BabelIntegrationANNULAR_ARRAY.py:
+% SourceAmpPa amplitude per element (babel_integration_focused_annular_array.py:
 % u0[ring] = SourceAmpPa*exp(1i*AllPhi[ring])). The weights must
 % therefore be:
 %   - a delta PHASE correction relative to those geometric phases:
@@ -45,7 +45,7 @@ function export_babelbrain_weights(phases_rad, velocity, parameters, out_path, g
 %
 % Output:
 %   HDF5 file at out_path in the layout BabelViscoFDTD's SaveToH5py writes
-%   and ReadFromH5py (BabelIntegrationBASE.py) reads: every root item carries
+%   and ReadFromH5py (babel_integration_base.py) reads: every root item carries
 %   a string attribute 'type', and complex arrays are an h5py-style compound
 %   {r, i}.
 %     /CALIBRATION       - [N_elem] complex64 (compound r/i float32) phasors
@@ -64,7 +64,7 @@ function export_babelbrain_weights(phases_rad, velocity, parameters, out_path, g
 %   run_babelbrain_case.py.
 %
 % See also: IMPORT_BABELBRAIN_WEIGHTS, PERFORM_GLOBAL_SEARCH,
-%           BabelBrain/TranscranialModeling/BabelIntegrationBASE.py
+%           BabelBrain/TranscranialModeling/babel_integration/integration_templates/babel_integration_base.py
 
 arguments
     phases_rad      (1,:) {mustBeNumeric}

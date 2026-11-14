@@ -7,8 +7,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'standalone'}) test_
 %                          BabelBrain submodule present.
 %   Stage 2 (write)      — write_babelbrain_input produces a valid NIfTI with
 %                          correct label counts and focal voxel.
-%   Stage 3 (transducer) — babelbrain_transducer_map resolves a known preset
-%                          and generates a custom CSV for a novel transducer.
+%   Stage 3 (transducer) — babelbrain_tx_geometry passes the PRESTUS ring
+%                          geometry by default and resolves a named preset.
 %   Stage 4 (dry_run)    — Python bridge executes with dry_run=true; verifies
 %                          BabelBrain imports and writes the input NIfTI.
 %   Stage 5 (full)       — Full GPU simulation; checks p_max_all is present
@@ -107,7 +107,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'standalone'}) test_
     methods (Test, TestTags = {'paths', 'quick', 'nogpu'})
 
         function test_prestus_functions_on_path(tc)
-            required = {'write_babelbrain_input', 'babelbrain_transducer_map', ...
+            required = {'write_babelbrain_input', 'babelbrain_tx_geometry', ...
                         'read_babelbrain_output', 'babelbrain_wrapper', ...
                         'load_parameters'};
             for k = 1:numel(required)
@@ -198,26 +198,26 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'standalone'}) test_
     end
 
     % ================================================================== %
-    %% STAGE 3 — babelbrain_transducer_map
+    %% STAGE 3 — babelbrain_tx_geometry
     % ================================================================== %
     methods (Test, TestTags = {'transducer', 'quick', 'nogpu'})
 
-        function test_known_preset_resolved(tc)
-            p = tc.make_r15473_params();
-            [preset, csv_path] = babelbrain_transducer_map(p, struct(), tc.SimPath);
-            tc.verifyEqual(preset, 'R15473', ...
-                sprintf('Expected preset R15473, got ''%s''.', preset));
-            tc.verifyEmpty(csv_path, ...
-                'No custom CSV expected for a known preset.');
+        function test_default_uses_prestus_geometry(tc)
+            p = tc.make_novel_transducer_params();
+            g = babelbrain_tx_geometry(p.transducer(1), '', tc.BbRoot);
+            tc.verifyEqual(g.tx_system, 'PRESTUS');
+            tc.verifyEqual(g.focal_length_m, 0.055, 'AbsTol', 1e-9);
+            out = str2double(strsplit(g.flags{find(strcmp(g.flags, '--out_diameters')) + 1}, ','));
+            tc.verifyEqual(out, [10 20 30] / 1000, 'AbsTol', 1e-9);
         end
 
-        function test_novel_transducer_generates_csv(tc)
-            p = tc.make_novel_transducer_params();
-            [preset, csv_path] = babelbrain_transducer_map(p, struct(), tc.SimPath);
-            tc.verifyEmpty(preset, ...
-                'Novel transducer should not match any preset.');
-            tc.verifyTrue(~isempty(csv_path) && isfile(csv_path), ...
-                'Custom element CSV should have been generated for novel transducer.');
+        function test_named_preset_resolved(tc)
+            tc.assumeTrue(~isempty(tc.BbRoot) && isfolder(tc.BbRoot), 'BabelBrain submodule not present.');
+            p = tc.make_r15473_params();
+            g = babelbrain_tx_geometry(p.transducer(1), 'R15473', tc.BbRoot);
+            tc.verifyEqual(g.type, 'focused_annular_array');
+            tc.verifyEqual(g.focal_length_m, 0.1, 'AbsTol', 1e-9);
+            tc.verifyEmpty(g.flags, 'Ring presets keep their yaml geometry.');
         end
 
     end

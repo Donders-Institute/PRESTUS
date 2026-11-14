@@ -158,7 +158,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelb
         function uncertaintyWithCtMapping(tc)
             % With ct_mapping, BabelBrain maps bone from HU; the JSON is still
             % passed (its Skin/Brain entries remain BabelBrain's soft-tissue
-            % materials on the CT path, BabelIntegrationBASE.py).
+            % materials on the CT path, babel_integration_base.py).
             p = bb_parameters(tc.TmpDir, 'matlab');
             p.babelbrain.ct_mapping = 'Webb-Marsac';
             [masks, fp, tp] = phantom_masks(p, {'skin', 'skull', 'brain'});
@@ -207,7 +207,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelb
         %% single-element preset geometry
 
         function singlePresetPassesGeometry(tc)
-            % BabelIntegrationSingle.RUN_SIM.RunCases reads Aperture and
+            % the simple_focused RUN_SIM.RunCases reads Aperture and
             % FocalLength from its kwargs, and Babel_SingleTx/default.yaml has
             % neither: the wrapper passes both from transducer.annular.
             p = bb_parameters(tc.TmpDir, 'matlab');
@@ -225,6 +225,22 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelb
             [~, argv] = run_wrapper(tc, p, masks, fp, tp, []);
             tc.verifyFalse(has_flag(argv, '--aperture'));
             tc.verifyFalse(has_flag(argv, '--focal_length'));
+        end
+
+        function defaultPassesPrestusGeometry(tc)
+            % empty tx_system: BabelBrain simulates the PRESTUS rings, so the
+            % calibrated per-ring drive maps ring for ring.
+            p = bb_parameters(tc.TmpDir, 'matlab');
+            p.babelbrain.tx_system = '';
+            p.grid.dims = [40 40 60];
+            [masks, fp, tp] = phantom_masks(p, {'skin', 'skull_cortical', 'brain'});
+            [~, argv] = run_wrapper(tc, p, masks, fp, tp, []);
+            a = p.transducer(1).annular;
+            arg = @(f) argv{find(strcmp(argv, f)) + 1};
+            tc.verifyEqual(arg('--tx_system'), 'PRESTUS');
+            tc.verifyEqual(str2double(arg('--focal_length')), a.curv_radius_mm / 1000, 'AbsTol', 1e-6);
+            tc.verifyEqual(str2double(strsplit(arg('--in_diameters'), ',')), a.elem_id_mm(:)' / 1000, 'AbsTol', 1e-6);
+            tc.verifyEqual(str2double(strsplit(arg('--out_diameters'), ',')), a.elem_od_mm(:)' / 1000, 'AbsTol', 1e-6);
         end
 
         %% water / phantom label maps
@@ -334,7 +350,7 @@ function [js, argv, nii] = run_wrapper(tc, p, masks, fp, tp, pct)
 % JSON it wrote and the argv of the BabelBrain call.
     setappdata(0, 'prestus_test_cmds', {});
     planimg = struct('t1_header', [], 'transf', [], 'inv_transf', [], 'origin_ras_mm', [0 0 0]);
-    sd = babelbrain_wrapper(p, masks, struct(), fp, tp, planimg, struct(), pct);
+    sd = babelbrain_wrapper(p, masks, struct(), fp, tp, planimg, pct);
     tc.verifyEqual(sd.babelbrain_source, 'dry_run');
     cmds = getappdata(0, 'prestus_test_cmds');
     is_case = cellfun(@(c) any(contains(c, 'run_babelbrain_case.py')) && ~any(strcmp(c, '--get_version')), cmds);

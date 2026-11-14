@@ -51,9 +51,10 @@ On this page:
 | `babelbrain_check_geometry`             | Error for geometries the BabelBrain backend cannot simulate (several transducers, beam off the grid z axis) |
 | `babelbrain_insitu_isppa`               | In-brain peak ISPPA of the scaled acoustic field: the `Isppa` BabelBrain's thermal solver normalises to. |
 | `babelbrain_placement_correction`       | Mechanical Tx offset that puts BabelBrain's apex at trans_pos |
+| `babelbrain_preset`                     | Resolve a BabelBrain preset from BabelBrain's transducer registry |
 | `babelbrain_thermal_timing`             | Convert PRESTUS timing to BabelBrain thermal parameters |
 | `babelbrain_thermal_wrapper`            | Run BabelBrain thermal simulation and read results |
-| `babelbrain_transducer_map`             | Map a PRESTUS transducer to a BabelBrain preset |
+| `babelbrain_tx_geometry`                | Transducer geometry BabelBrain simulates for a PRESTUS transducer |
 | `babelbrain_wrapper`                    | Run BabelBrain acoustic simulation as PRESTUS backend |
 | `export_babelbrain_inputs`              | Write all BabelBrain input files from a PRESTUS run |
 | `export_babelbrain_weights`             | Pack PRESTUS per-element phases and particle velocity into a BabelBrain OptimizedWeightsFile (HDF5 complex64 phasors). |

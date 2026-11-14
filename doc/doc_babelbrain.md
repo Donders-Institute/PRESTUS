@@ -225,23 +225,9 @@ PRESTUS writes `<target>_<f>kHz_<ppw>PPW_AirRegions.nii.gz` next to the CT input
 
 ## Transducer Mapping
 
-BabelBrain only accepts named presets. Set `babelbrain.tx_system` to choose one. If it is empty, PRESTUS resolves the preset by:
+By default (`babelbrain.tx_system` empty) BabelBrain simulates the PRESTUS transducer itself: the rings of `transducer.annular` (`elem_id_mm`, `elem_od_mm`, `curv_radius_mm`) on BabelBrain's generic focused annular template. This is the geometry the shipped calibrations were fitted on, so their per-ring phases and amplitudes apply ring for ring, and BabelBrain, k-Wave and jwave simulate the same source. Single-element bowls are one ring. The outer ring diameter sets BabelBrain's aperture.
 
-1. **Serial number**: `tran.serial` from the equipment YAML.
-2. **Geometry**: element count, radius of curvature, maximum outer diameter and frequency (tolerances: ±2 mm radius, ±3 mm OD, ±5% frequency).
-3. **Custom CSV**: if nothing matches, it writes an element CSV in BabelBrain annular-array format and prints instructions for adding a new preset.
-
-| PRESTUS serial / geometry | BabelBrain preset | Rings | R_curv [mm] | OD [mm] | Freq |
-|---|---|---|---|---|---|
-| IS_PCD15473_01001 | `R15473` | 10 | 100.0 | 65.0 | 300 kHz |
-| IS_PCD15287_01001 | `R15287` | 4 | 62.9 | 64.0 | 500 kHz |
-| IS_PCD15646_01001 | `R15646` | 10 | 72.0 | 72.0 | 500 kHz |
-| CTX500 geometry | `CTX_500` | 7 | 62.9 | 64.0 | 500 kHz |
-| CTX250 geometry | `CTX_250` | 7 | 62.9 | 64.0 | 250 kHz |
-| Single-element bowl (any `elem_n: 1` annular) | `Single` | 1 | from `curv_radius_mm` | from `elem_od_mm` | any |
-| IGT 64-channel phased array | `IGT64_500` | 64 | – | – | 500 kHz |
-
-The `Single` and `BSonix` presets (`BSonix` only when set as `tx_system`) need `transducer.annular.curv_radius_mm` and `transducer.annular.elem_od_mm`.
+Set `babelbrain.tx_system` to a BabelBrain preset to use BabelBrain's own device definition instead, for example to compare against it, or for a phased array PRESTUS does not describe as rings (`H317`, `IGT64_500`, ...). Presets are listed in BabelBrain's registry, `BabelBrain/SelFiles/transducer_list.yaml`; `REMOPD` is accepted for `TheraPhas`. The `Single` and `BSonix` presets take their aperture and focal length from `transducer.annular`.
 
 ## Calibration Weights
 
@@ -335,8 +321,8 @@ For multi-transducer runs use `acoustic_backend: kwave` or `jwave` with `thermal
     PRESTUS records the BabelBrain version with the results:
 
     ```matlab
-    sensor_data.babelbrain_version.version_txt   % e.g. '0.8.1'
-    sensor_data.babelbrain_version.git_describe  % e.g. '0.8.0-19-g5237cd2'
+    sensor_data.babelbrain_version.version_txt   % e.g. '0.8.8'
+    sensor_data.babelbrain_version.git_describe  % e.g. 'v0.8.8'
     sensor_data.babelbrain_version.git_commit    % full SHA
     sensor_data.babelbrain_version.bb_root       % path used at runtime
     ```

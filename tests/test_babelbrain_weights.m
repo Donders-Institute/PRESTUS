@@ -3,7 +3,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelb
 % against BabelBrain's OptimizedWeightsFile layout.
 %
 % BabelBrain writes and reads /CALIBRATION with BabelViscoFDTD's SaveToH5py /
-% ReadFromH5py (TxCalibration.py, BabelIntegrationBASE.py): a 1-D h5py complex
+% ReadFromH5py (TxCalibration.py, babel_integration_base.py): a 1-D h5py complex
 % dataset (compound {r, i}) at the root, with a string attribute 'type' on every
 % root item. The fixtures bb_calibration_ring.h5 (one weight per ring) and
 % bb_calibration_subelem.h5 (one weight per sub-element, as TxCalibration fits)

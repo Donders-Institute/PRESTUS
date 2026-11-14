@@ -14,7 +14,7 @@ function sensor_data = read_babelbrain_output(h5_path, use_refocus, parameters, 
 % parameters / planimg are not supplied, no resampling is performed (legacy
 % behaviour).
 %
-% BabelBrain HDF5 output keys (BabelIntegrationBASE.py Step 9/10):
+% BabelBrain HDF5 output keys (babel_integration_base.py Step 9/10):
 %   /p_amp          - [Nx x Ny x Nz] float32, peak positive pressure [Pa]
 %   /p_amp_refocus  - same, after refocusing back-propagation (optional)
 %   /p_complex      - [Nx x Ny x Nz] complex64, steady-state Fourier pressure [Pa]
@@ -310,7 +310,7 @@ if needs_resample
     if debug_on
         % MaterialMap ground truth (when present): BabelBrain's own tissue-index
         % volume, on the SAME grid/indexing as p_amp (both flipped identically
-        % before saving; see BabelIntegrationBASE.py Step10_GetResults). Resample
+        % before saving; see babel_integration_base.py Step10_GetResults). Resample
         % with MODE (majority vote) — this is integer label data, and the
         % BabelBrain-native grid is typically FINER than the PRESTUS grid, so
         % point-sampled 'nearest' would drop thin structures (e.g. sub-voxel

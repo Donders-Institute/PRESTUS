@@ -30,6 +30,7 @@ Exit codes:
 """
 
 import argparse
+import importlib
 import sys
 import os
 import yaml
@@ -198,12 +199,17 @@ def parse_args():
     p.add_argument('--tx_mech_adjust_z',    default=0.0, type=float,
                    help='Transducer z offset into skin [m] (default 0: geometry already in NIfTI)')
     p.add_argument('--aperture',            default=0.0, type=float,
-                   help='Transducer aperture (outer diameter) [m]. Required by the single-element '
-                        'presets (Single, BSonix), whose default.yaml has no geometry; overrides '
-                        'the preset TxDiam when > 0.')
+                   help='Transducer aperture (outer diameter) [m]. Required with --tx_system PRESTUS '
+                        'and by the single-element presets (Single, BSonix), whose default.yaml has '
+                        'no geometry; overrides the preset TxDiam when > 0.')
     p.add_argument('--focal_length',        default=0.0, type=float,
-                   help='Transducer focal length (radius of curvature) [m]. Required by the '
-                        'single-element presets; overrides the preset FocalLength when > 0.')
+                   help='Transducer focal length (radius of curvature) [m]. Required with --tx_system '
+                        'PRESTUS and by the single-element presets; overrides the preset FocalLength '
+                        'when > 0.')
+    p.add_argument('--in_diameters',        default='',
+                   help='--tx_system PRESTUS: comma-separated inner ring diameters [m].')
+    p.add_argument('--out_diameters',       default='',
+                   help='--tx_system PRESTUS: comma-separated outer ring diameters [m].')
     p.add_argument('--z_steering',          default=0.0, type=float,
                    help='ZSteering: axial offset of electronic focus from preset FocalLength [m]. '
                         'Derived automatically from focal_distance_mm vs FocalLength when no '
@@ -297,30 +303,57 @@ def parse_args():
     return p.parse_args()
 
 
-# Map tx_system string → (module_path, preset_folder_name)
-# module_path is relative to BabelBrain root (TranscranialModeling package)
-# preset_folder is under BabelBrain/BabelBrain/Babel_<name>/default.yaml
-PRESET_MODULE_MAP = {
-    'CTX_500':      ('TranscranialModeling.BabelIntegrationANNULAR_ARRAY',       'CTX500'),
-    'CTX_250':      ('TranscranialModeling.BabelIntegrationANNULAR_ARRAY',       'CTX250'),
-    'CTX_250_2ch':  ('TranscranialModeling.BabelIntegrationANNULAR_ARRAY',       'CTX250_2ch'),
-    'R15287':       ('TranscranialModeling.BabelIntegrationANNULAR_ARRAY',       'R15287'),
-    'R15473':       ('TranscranialModeling.BabelIntegrationANNULAR_ARRAY',       'R15473'),
-    'R15646':       ('TranscranialModeling.BabelIntegrationANNULAR_ARRAY',       'R15646'),
-    'DPX_500':      ('TranscranialModeling.BabelIntegrationANNULAR_ARRAY',       'DPX500'),
-    'DPXPC_300':    ('TranscranialModeling.BabelIntegrationANNULAR_ARRAY',       'DPXPC300'),
-    'R15148':       ('TranscranialModeling.BabelIntegrationANNULAR_ARRAY',       'R15148'),
-    'DomeTx':       ('TranscranialModeling.BabelIntegrationDomeTx',              'DomeTx'),
-    'H317':         ('TranscranialModeling.BabelIntegrationH317',                'H317'),
-    'H246':         ('TranscranialModeling.BabelIntegrationH246',                'H246'),
-    'H301':         ('TranscranialModeling.BabelIntegrationH301',                'H301'),
-    'Single':       ('TranscranialModeling.BabelIntegrationSingle',              'SingleTx'),
-    'BSonix':       ('TranscranialModeling.BabelIntegrationSingle',              'SingleTx'),
-    'REMOPD':       ('TranscranialModeling.BabelIntegrationREMOPD',              'REMOPD'),
-    'I12378':       ('TranscranialModeling.BabelIntegrationI12378',              'I12378'),
-    'IGT64_500':    ('TranscranialModeling.BabelIntegrationIGT64_500',           'IGT64_500'),
-    'ATAC':         ('TranscranialModeling.BabelIntegrationATAC',                'ATAC'),
-}
+# Preset names BabelBrain has renamed; old configs keep working.
+TX_ALIASES = {'REMOPD': 'TheraPhas'}
+
+# Reserved tx_system: the PRESTUS transducer's own ring geometry (--aperture,
+# --focal_length, --in_diameters, --out_diameters) on BabelBrain's generic
+# focused annular template, which BabelBrain also uses for custom transducers.
+PRESTUS_GEOMETRY = 'PRESTUS'
+
+# BabelBrain package modules, relative to its source root.
+BB_BASE    = 'TranscranialModeling.babel_integration.integration_templates.babel_integration_base'
+BB_HELPERS = 'TranscranialModeling.babel_integration.babel_integration_helpers'
+BB_ANNULAR = 'TranscranialModeling.babel_integration.integration_templates.babel_integration_focused_annular_array'
+BB_TXGEOM  = 'TranscranialModeling.tx_geometries'
+
+
+def add_babelbrain_paths(bb_root):
+    """Put the BabelBrain source root first on sys.path and its BabelBrain/ app
+    folder last (for Utils, ArtifactIO), as BabelBrain's own offline examples do.
+    The root must come first so `import BabelBrain` finds the package."""
+    if bb_root not in sys.path:
+        sys.path.insert(0, bb_root)
+    app_dir = os.path.join(bb_root, 'BabelBrain')
+    if app_dir not in sys.path:
+        sys.path.append(app_dir)
+
+
+def resolve_preset(bb_root, tx_system):
+    """Look a preset up in BabelBrain's transducer registry.
+
+    Returns a dict with the BabelBrain preset name, the RUN_SIM module path, the
+    preset default.yaml path and the transducer_type (geometry family), derived
+    the same way BabelBrain's CalculateFieldProcess does.
+    """
+    if tx_system == PRESTUS_GEOMETRY:
+        return {'name': PRESTUS_GEOMETRY, 'type': 'focused_annular_array',
+                'module': BB_ANNULAR, 'yaml': ''}
+    name = TX_ALIASES.get(tx_system, tx_system)
+    reg_path = os.path.join(bb_root, 'BabelBrain', 'SelFiles', 'transducer_list.yaml')
+    with open(reg_path) as f:
+        registry = {e['name']: e for e in yaml.safe_load(f) if not e.get('custom', False)}
+    if name not in registry:
+        raise ImportError(f"Unknown tx_system '{tx_system}'. Known presets: {sorted(registry)}")
+    entry = registry[name]
+    ttype = entry['transducer_type']
+    return {
+        'name':   name,
+        'type':   ttype,
+        'module': f'TranscranialModeling.babel_integration.{ttype}.babel_integration_{name}',
+        'yaml':   os.path.join(bb_root, 'BabelBrain', 'babel_transducers', ttype,
+                               entry['module_name'], 'default.yaml'),
+    }
 
 
 def find_babelbrain_root(hint=''):
@@ -346,12 +379,12 @@ def find_babelbrain_root(hint=''):
     )
 
 
-def load_preset_config(babelbrain_root, tx_system):
-    """Load default.yaml for the given preset; return dict or {}."""
-    _, folder = PRESET_MODULE_MAP.get(tx_system, (None, None))
-    if not folder:
-        return {}
-    yaml_path = os.path.join(babelbrain_root, 'BabelBrain', f'Babel_{folder}', 'default.yaml')
+def load_preset_config(preset):
+    """Load default.yaml for the given preset (resolve_preset dict); return dict or {}."""
+    yaml_path = preset['yaml']
+    tx_system = preset['name']
+    if not yaml_path:
+        return {}   # PRESTUS geometry: everything comes from the command line
     if not os.path.isfile(yaml_path):
         print(f'[run_babelbrain_case] WARNING: preset config not found: {yaml_path}', file=sys.stderr)
         print(f'[run_babelbrain_case] WARNING: BabelBrain will use hardcoded geometry defaults '
@@ -364,23 +397,13 @@ def load_preset_config(babelbrain_root, tx_system):
     return cfg
 
 
-def load_run_sim(babelbrain_root, tx_system):
-    """Import the correct RUN_SIM class for the given preset name."""
-    if tx_system not in PRESET_MODULE_MAP:
-        raise ImportError(
-            f"Unknown tx_system '{tx_system}'. "
-            f"Known presets: {sorted(PRESET_MODULE_MAP.keys())}"
-        )
-    module_path, _ = PRESET_MODULE_MAP[tx_system]
-
-    if babelbrain_root not in sys.path:
-        sys.path.insert(0, babelbrain_root)
-
+def load_run_sim(preset):
+    """Import the RUN_SIM class for the given preset (resolve_preset dict)."""
     import importlib
-    mod = importlib.import_module(module_path)
+    mod = importlib.import_module(preset['module'])
     cls = getattr(mod, 'RUN_SIM', None)
     if cls is None:
-        raise ImportError(f"Module '{module_path}' has no RUN_SIM class.")
+        raise ImportError(f"Module '{preset['module']}' has no RUN_SIM class.")
     return cls
 
 
@@ -510,19 +533,17 @@ def _patch_annular_array_weights(RunSimClass, dump_path=None, anchor_path=None,
     first time AdjustWeightAmplitudes runs, for offline comparison against the
     ideal (analytical) source geometry."""
     import numpy as np
-    import inspect
     import importlib
 
-    # Only patch for ANNULAR_ARRAY modules
-    if 'ANNULAR_ARRAY' not in inspect.getfile(RunSimClass):
-        return
-
-    # Resolve the SimulationConditions class from the same module
-    mod = inspect.getmodule(RunSimClass)
-    SimCond = getattr(mod, 'SimulationConditions', None)
+    # Resolve the preset's SimulationConditions class (RUN_SIM → BabelFTD_Simulations
+    # → SimulationConditions) and patch only focused annular arrays.
+    sim_cls = getattr(RunSimClass, '_BabelFTDSimClass', None)
+    SimCond = getattr(sim_cls, '_SimConditionsClass', None)
     if SimCond is None:
         print('[run_babelbrain_case] Warning: could not find SimulationConditions — '
               'per-ring weight expansion patch not applied.')
+        return
+    if not issubclass(SimCond, importlib.import_module(BB_ANNULAR).SimulationConditions):
         return
 
     def _dump_source(self, ret):
@@ -535,11 +556,11 @@ def _patch_annular_array_weights(RunSimClass, dump_path=None, anchor_path=None,
             allphi = np.angle(np.asarray(bpp).ravel()) if bpp is not None else np.array([])
             with h5py.File(dump_path, 'w') as f:
                 # Sub-element source geometry BabelBrain actually integrates over.
-                f['center']   = np.asarray(self._TxRC['center'], dtype=np.float64)   # [N_sub x 3] positions [m]
-                f['ds']       = np.asarray(self._TxRC['ds'], dtype=np.float64).ravel()  # [N_sub] surface-area weights [m^2]
-                f['elemdims'] = np.asarray([int(e[0]) for e in self._TxRC['elemdims']], dtype=np.int64)  # subelems/ring
-                if 'elemcenter' in self._TxRC:
-                    f['elemcenter'] = np.asarray(self._TxRC['elemcenter'], dtype=np.float64)  # [N_rings x 3]
+                f['center']   = np.asarray(self._Tx['center'], dtype=np.float64)   # [N_sub x 3] positions [m]
+                f['ds']       = np.asarray(self._Tx['ds'], dtype=np.float64).ravel()  # [N_sub] surface-area weights [m^2]
+                f['elemdims'] = np.asarray([int(e[0]) for e in self._Tx['elemdims']], dtype=np.int64)  # subelems/ring
+                if 'elemcenter' in self._Tx:
+                    f['elemcenter'] = np.asarray(self._Tx['elemcenter'], dtype=np.float64)  # [N_rings x 3]
                 f['AllPhi_rad']  = allphi.astype(np.float64)                          # per-ring geometric steer
                 f['weights_ret'] = np.asarray(ret, dtype=np.complex64).ravel()        # applied per-subelem weight
                 for attr, key in [('_SourceAmpPa', 'SourceAmpPa'), ('_SpatialStep', 'SpatialStep'),
@@ -555,7 +576,7 @@ def _patch_annular_array_weights(RunSimClass, dump_path=None, anchor_path=None,
                         f[key] = np.asarray(v, dtype=np.float64).ravel()
             self._prestus_source_dumped = True
             print(f'[run_babelbrain_case] Source dump written: {dump_path} '
-                  f'(N_sub={np.asarray(self._TxRC["center"]).shape[0]}, N_rings={self._TxRC["NumberElems"]})')
+                  f'(N_sub={np.asarray(self._Tx["center"]).shape[0]}, N_rings={self._Tx["NumberElems"]})')
         except Exception as e:
             print(f'[run_babelbrain_case] Source dump failed (non-fatal): {e}')
 
@@ -577,7 +598,7 @@ def _patch_annular_array_weights(RunSimClass, dump_path=None, anchor_path=None,
             return
         try:
             import json, os
-            C = np.asarray(self._TxRC['center'], dtype=np.float64)   # sub-elem positions [m], domain frame
+            C = np.asarray(self._Tx['center'], dtype=np.float64)   # sub-elem positions [m], domain frame
             Rc = float(self._FocalLength)                            # bowl radius = focal length [m]
             fsl = getattr(self, '_FocalSpotLocation', None)
             zdim = getattr(self, '_ZDim', None)
@@ -619,10 +640,10 @@ def _patch_annular_array_weights(RunSimClass, dump_path=None, anchor_path=None,
 
     def _compute_weights(self):
         if self._OptimizedWeights is None:
-            return np.ones((self._TxRC['center'].shape[0], 1), np.complex64)
+            return np.ones((self._Tx['center'].shape[0], 1), np.complex64)
 
-        n_sub = self._TxRC['center'].shape[0]
-        n_rings = self._TxRC['NumberElems']
+        n_sub = self._Tx['center'].shape[0]
+        n_rings = self._Tx['NumberElems']
 
         # AllPhi-referenced correction: if the weights file carries the raw
         # intended per-ring drive (/DRIVE/phases_rad, /DRIVE/amp_ratio), rebuild
@@ -669,7 +690,7 @@ def _patch_annular_array_weights(RunSimClass, dump_path=None, anchor_path=None,
             w_expanded = np.empty(n_sub, dtype=np.complex64)
             base = 0
             for n in range(n_rings):
-                count = self._TxRC['elemdims'][n][0]
+                count = self._Tx['elemdims'][n][0]
                 w_expanded[base:base + count] = w_ring[n]
                 base += count
             return w_expanded.reshape((n_sub, 1))
@@ -685,7 +706,7 @@ def _patch_annular_array_weights(RunSimClass, dump_path=None, anchor_path=None,
             w_expanded = np.empty(n_sub, dtype=np.complex64)
             base = 0
             for n in range(n_rings):
-                count = self._TxRC['elemdims'][n][0]
+                count = self._Tx['elemdims'][n][0]
                 w_expanded[base:base + count] = self._OptimizedWeights[n]
                 base += count
             return w_expanded.reshape((n_sub, 1))
@@ -707,7 +728,7 @@ def _patch_noncat_skull_attenuation(bb_root, bone_q=1.0):
 
     THE BUG
     -------
-    On the non-CT path, BabelIntegrationBASE.Step1_InitializeConditions builds the
+    On the non-CT path, babel_integration_base.Step1_InitializeConditions builds the
     per-material Q-correction array as ``QCorrArr = np.ones(5)`` (or ``np.ones(8)``
     with brain segmentation) — i.e. it applies *no* Q correction to cortical or
     trabecular bone. Historically the
@@ -749,10 +770,9 @@ def _patch_noncat_skull_attenuation(bb_root, bone_q=1.0):
     """
     import inspect  # noqa: F401  (kept for parity with sibling patch helper)
 
-    if bb_root not in sys.path:
-        sys.path.insert(0, bb_root)
+    add_babelbrain_paths(bb_root)
     try:
-        from TranscranialModeling.BabelIntegrationBASE import BabelFTD_Simulations_BASE
+        BabelFTD_Simulations_BASE = importlib.import_module(BB_BASE).BabelFTD_Simulations_BASE
     except Exception as e:
         print(f'[run_babelbrain_case] Warning: could not import BabelFTD_Simulations_BASE; '
               f'non-CT skull-attenuation fix NOT applied ({e}).', file=sys.stderr)
@@ -810,7 +830,7 @@ def _patch_zdomain_reference(bb_root):
 
     THE PROBLEM
     -----------
-    CalculateRayleighFieldsForward (ANNULAR_ARRAY / CONCAVE_PHASEDARRAY / Single)
+    CalculateRayleighFieldsForward (every geometry template)
     positions the transducer at
         Tx_z += TxMechanicalAdjustmentZ + ZDomainStart
     where ZDomainStart = CalculateDomainZReference() = GlobalStartSkin -
@@ -837,10 +857,9 @@ def _patch_zdomain_reference(bb_root):
     printed, so the magnitude of the neutralized correction stays visible in the
     log. Disable with --no_zdomain_fix to reproduce the un-patched behaviour.
     """
-    if bb_root not in sys.path:
-        sys.path.insert(0, bb_root)
+    add_babelbrain_paths(bb_root)
     try:
-        from TranscranialModeling.BabelIntegrationBASE import SimulationConditionsBASE
+        SimulationConditionsBASE = importlib.import_module(BB_BASE).SimulationConditionsBASE
     except Exception as e:
         print(f'[run_babelbrain_case] Warning: could not import SimulationConditionsBASE; '
               f'ZDomainStart neutralization NOT applied ({e}).', file=sys.stderr)
@@ -887,14 +906,15 @@ def _patch_resave_normalized(bb_root, write_output=False):
     outside the mask volume (affine rounding) produce negative indices, which
     numpy fancy-indexing wraps around to the end of the array rather than
     clamping to zero. The upper-bounds clamp was already in BabelBrain; this
-    adds the matching lower-bounds clamp — restoring the three-line fix that
-    previously lived in
-    external/BabelBrain/TranscranialModeling/BabelIntegrationBASE.py.
+    adds the matching lower-bounds clamp.
+
+    The function lives in babel_integration_helpers; the base module takes it
+    with `import *`, so it is rebound in the base module, where Step10 looks it
+    up. bApplyOnlyMask (phase maps) masks without normalising, as upstream.
     """
-    if bb_root not in sys.path:
-        sys.path.insert(0, bb_root)
+    add_babelbrain_paths(bb_root)
     try:
-        import TranscranialModeling.BabelIntegrationBASE as BASE
+        BASE = importlib.import_module(BB_BASE)
     except Exception as e:
         print(f'[run_babelbrain_case] Warning: could not patch ResaveNormalized: {e}',
               file=sys.stderr)
@@ -906,7 +926,7 @@ def _patch_resave_normalized(bb_root, write_output=False):
     import numpy as _np
     import nibabel as _nib
 
-    def _patched_resave_normalized(rpath, mask):
+    def _patched_resave_normalized(rpath, mask, bApplyOnlyMask=False):
         assert '_Sub.nii.gz' in rpath
         if not write_output:
             return
@@ -931,7 +951,8 @@ def _patch_resave_normalized(bb_root, write_output=False):
                            IndexesMask[1, :],
                            IndexesMask[2, :]].reshape(ResultsData.shape)
         ResultsData[SubMask < 4] = 0
-        ResultsData /= ResultsData.max()
+        if not bApplyOnlyMask:
+            ResultsData /= ResultsData.max()
         NormalizedNifti = _nib.Nifti1Image(ResultsData, Results.affine, header=Results.header)
         NormalizedNifti.to_filename(NRPath)
 
@@ -963,8 +984,7 @@ def _patch_calculate_temperature_effects(bb_root):
     import inspect
     import textwrap
 
-    if bb_root not in sys.path:
-        sys.path.insert(0, bb_root)
+    add_babelbrain_paths(bb_root)
     try:
         import ThermalModeling.CalculateTemperatureEffects as CTE_mod
     except Exception as e:
@@ -1026,74 +1046,61 @@ def _patch_calculate_temperature_effects(bb_root):
 
 
 def _patch_annular_surface(bb_root):
-    """Monkeypatch GenerateSurface: make its ring-band tessellation deterministic.
+    """Monkeypatch generate_annular_curved_surface: deterministic ring-band tessellation.
 
-    BabelIntegrationANNULAR_ARRAY.GenerateSurface lays out each annular ring's
-    surface elements with two `np.arange(step/2, step*(0.5+n), step)` calls — one
-    radial (BetaC, the polar-angle bands) and one azimuthal (AlphaC). Because the
-    stop is a floating-point multiple of the step, np.arange intermittently emits
-    n+1 samples instead of n (the classic arange endpoint bug), appending a
-    spurious extra band beyond the ring's intended outer radius.
+    tx_geometries.generate_annular_curved_surface lays out each ring's surface
+    elements with two `np.arange(step/2, step*(0.5+n), step)` calls, one over the
+    polar-angle bands (betas) and one azimuthal (alphas). Because the stop is a
+    floating-point multiple of the step, np.arange intermittently emits n+1
+    samples instead of n, appending a band beyond the ring's outer radius.
 
-    Observed on the 10-ring R15473 at 300 kHz: ring 9 got 4 BetaC bands instead
-    of 3, extending its outer radius from the configured 30.75 mm to 31.215 mm
-    (into ring 10's inner edge, erasing the kerf). That inflated ring 9's emitting
-    area ~41% and the on-axis focal intensity ~7% — enough to push the water
-    free-field ~13% above k-Wave / jwave / the analytical Rayleigh, even though
-    PRESTUS hands BabelBrain the correct OutDiameters. The defect is purely in
-    BabelBrain's tessellation of correct input.
+    Observed on the 10-ring R15473 at 300 kHz: ring 9 got 4 bands instead of 3,
+    extending its outer radius from 30.75 mm to 31.215 mm (into ring 10, erasing
+    the kerf). That inflated ring 9's area ~41% and the free-water focal
+    intensity ~13% above k-Wave / jwave / analytical Rayleigh.
 
-    Fix: replace both aranges with the count-based form
-        BetaC  = Beta1 + BetaStep*(np.arange(int(nrstep)) + 0.5)
-        AlphaC =         sAlpha  *(np.arange(int(nAlpha)) + 0.5)
-    which yields exactly nrstep / nAlpha samples with identical values, no FP
-    endpoint risk. Applies to every annular transducer and frequency, not just
-    the borderline ring that happened to tip over here.
-
-    Implementation mirrors _patch_calculate_temperature_effects: inspect.getsource
-    + targeted string replacement + exec into the module namespace, so the ~100
-    line GenerateSurface body is NOT copied into PRESTUS. GeneratedRingArrayTx
-    resolves GenerateSurface from module globals at call time, so rebinding it in
-    the module dict is sufficient. Safe no-op (with a warning) if the source does
-    not match a known BabelBrain version or is already patched.
+    Fix: count-based sampling, `start + step*(np.arange(int(n)) + 0.5)`, which
+    gives exactly n samples with the same values. The function is shared by the
+    focused annular, single-element and flat annular templates, which resolve it
+    from tx_geometries' globals at call time, so rebinding it there covers all of
+    them. Implementation: inspect.getsource + targeted replacement + exec into
+    the module namespace. Safe no-op (with a warning) if the source does not match.
     """
     import inspect
     import textwrap
 
-    if bb_root not in sys.path:
-        sys.path.insert(0, bb_root)
+    add_babelbrain_paths(bb_root)
     try:
-        import TranscranialModeling.BabelIntegrationANNULAR_ARRAY as ANN
+        TXG = importlib.import_module(BB_TXGEOM)
     except Exception as e:
-        print(f'[run_babelbrain_case] Warning: could not patch GenerateSurface: {e}',
+        print(f'[run_babelbrain_case] Warning: could not patch ring tessellation: {e}',
               file=sys.stderr)
         return
 
-    if getattr(ANN, '_prestus_surface_fix', False):
+    if getattr(TXG, '_prestus_surface_fix', False):
         return
 
-    orig_fn = getattr(ANN, 'GenerateSurface', None)
+    orig_fn = getattr(TXG, 'generate_annular_curved_surface', None)
     if orig_fn is None:
-        print('[run_babelbrain_case] Warning: GenerateSurface not found in '
-              'BabelIntegrationANNULAR_ARRAY; ring-tessellation fix NOT applied.',
-              file=sys.stderr)
+        print('[run_babelbrain_case] Warning: generate_annular_curved_surface not found in '
+              'tx_geometries; ring-tessellation fix NOT applied.', file=sys.stderr)
         return
     try:
         src = textwrap.dedent(inspect.getsource(orig_fn))
     except (OSError, TypeError) as e:
         print(f'[run_babelbrain_case] Warning: could not get source of '
-              f'GenerateSurface: {e}', file=sys.stderr)
+              f'generate_annular_curved_surface: {e}', file=sys.stderr)
         return
 
     _REPLACEMENTS = [
-        ('np.arange(Beta1+BetaStep/2,Beta1+BetaStep*(1/2 + nrstep),BetaStep)',
-         '(Beta1 + BetaStep*(np.arange(int(nrstep)) + 0.5))'),
-        ('np.arange(sAlpha/2,sAlpha*(1/2 + nAlpha ),sAlpha)',
-         '(sAlpha*(np.arange(int(nAlpha)) + 0.5))'),
+        ('np.arange(inner_beta + beta_step / 2, inner_beta + beta_step * (1 / 2 + num_steps), beta_step)',
+         '(inner_beta + beta_step * (np.arange(int(num_steps)) + 0.5))'),
+        ('np.arange(alpha_step / 2, alpha_step * (1 / 2 + num_alphas), alpha_step)',
+         '(alpha_step * (np.arange(int(num_alphas)) + 0.5))'),
     ]
     if not all(old in src for old, _ in _REPLACEMENTS):
-        print('[run_babelbrain_case] Warning: GenerateSurface source does not match '
-              'expected pattern; ring-tessellation fix NOT applied (BabelBrain '
+        print('[run_babelbrain_case] Warning: generate_annular_curved_surface source does not '
+              'match expected pattern; ring-tessellation fix NOT applied (BabelBrain '
               'version mismatch?).', file=sys.stderr)
         return
 
@@ -1103,15 +1110,15 @@ def _patch_annular_surface(bb_root):
 
     try:
         code = compile(src_patched, inspect.getfile(orig_fn), 'exec')
-        exec(code, ANN.__dict__)  # noqa: S102 — intentional monkeypatch
+        exec(code, TXG.__dict__)  # noqa: S102 — intentional monkeypatch
     except Exception as e:
-        print(f'[run_babelbrain_case] Warning: failed to apply GenerateSurface '
+        print(f'[run_babelbrain_case] Warning: failed to apply ring-tessellation '
               f'patch: {e}', file=sys.stderr)
         return
 
-    ANN._prestus_surface_fix = True
-    print('[run_babelbrain_case] Patched GenerateSurface: deterministic ring-band '
-          'tessellation (fixes np.arange endpoint overshoot inflating outer-ring area).')
+    TXG._prestus_surface_fix = True
+    print('[run_babelbrain_case] Patched generate_annular_curved_surface: deterministic '
+          'ring-band tessellation (fixes np.arange endpoint overshoot inflating ring area).')
 
 
 # dB/cm → Np/m : 1 Np = 8.685889638 dB, and 100 cm per m.
@@ -1150,7 +1157,7 @@ def _write_air_regions(basedir, subject_id, target, freq, ppw, hu_window=(-1200.
     simulation -- can be split into several pieces.
 
     Must run before _quantize_ct_for_babelbrain, which overwrites CT.nii.gz
-    with the index map. BabelBrain (BabelIntegrationBASE.RunCases) loads the
+    with the index map. BabelBrain (babel_integration_base.RunCases) loads the
     file from basedir/ID/<target>_<f>kHz_<ppw>PPW_AirRegions.nii.gz with the
     same axis-2 flip as the CT, so writing it on the CT grid keeps them aligned.
     In the solver, stress and particle velocity are never updated inside the
@@ -1211,7 +1218,7 @@ def _quantize_ct_for_babelbrain(basedir, subject_id, target, freq, ppw):
     directly. It expects CTFNAME to already be a quantized index map (small
     integers indexing into a sorted table of unique HU levels), with that
     table saved separately as `<CT.nii.gz prefix>CT-cal.npz` (key
-    'UniqueHU') -- BabelIntegrationBASE.py loads both:
+    'UniqueHU') -- babel_integration_base.py loads both:
         DensityCTMap = flip(nibabel.load(CTFNAME).get_fdata(), axis=2).astype(uint32)
         AllBoneHU = np.load(CTFNAME.split('CT.nii.gz')[0]+'CT-cal.npz')['UniqueHU']
     and uses DensityCTMap values directly as indices into AllBoneHU / the
@@ -1300,12 +1307,11 @@ def _inject_prestus_materials(bb_root, freq, props_json_path):
     """
     import json
 
-    if bb_root not in sys.path:
-        sys.path.insert(0, bb_root)
+    add_babelbrain_paths(bb_root)
     try:
-        import TranscranialModeling.BabelIntegrationBASE as bbase
+        bbase = importlib.import_module(BB_HELPERS)
     except Exception as e:
-        print(f'[run_babelbrain_case] Warning: could not import BabelIntegrationBASE; '
+        print(f'[run_babelbrain_case] Warning: could not import babel_integration_helpers; '
               f'PRESTUS material injection skipped ({e}).', file=sys.stderr)
         return
 
@@ -1319,7 +1325,7 @@ def _inject_prestus_materials(bb_root, freq, props_json_path):
 
     MatFreq = getattr(bbase, 'MatFreq', None)
     if not MatFreq:
-        print('[run_babelbrain_case] Warning: MatFreq not found in BabelIntegrationBASE; '
+        print('[run_babelbrain_case] Warning: MatFreq not found in babel_integration_helpers; '
               'PRESTUS material injection skipped.', file=sys.stderr)
         return
 
@@ -1386,9 +1392,13 @@ def main():
             print(f'{k}={v}')
         sys.exit(0)
 
+    add_babelbrain_paths(bb_root)
     try:
-        RunSimClass = load_run_sim(bb_root, args.tx_system)
-    except ImportError as e:
+        preset = resolve_preset(bb_root, args.tx_system)
+        if preset['name'] != args.tx_system:
+            print(f"[run_babelbrain_case] Preset '{args.tx_system}' is now '{preset['name']}' in BabelBrain.")
+        RunSimClass = load_run_sim(preset)
+    except (ImportError, OSError) as e:
         print(f'[run_babelbrain_case] Import error: {e}', file=sys.stderr)
         sys.exit(1)
 
@@ -1418,7 +1428,7 @@ def main():
     # fix above to be active (otherwise the injected bone attenuation is not
     # realised). Water-only runs do not read it (BabelBrain's own water). On the
     # CT path bone comes from the HU mapping, but Skin and Brain still come from
-    # MatFreq (BabelIntegrationBASE.py), so their injected values apply there.
+    # MatFreq (babel_integration_helpers.py), so their injected values apply there.
     if args.medium_properties_json:
         if args.no_skull_atten_fix:
             print('[run_babelbrain_case] Warning: --medium_properties_json given together with '
@@ -1431,44 +1441,59 @@ def main():
     _patch_calculate_temperature_effects(bb_root)
 
     # Correctness patch: deterministic annular ring-band tessellation. Fixes a
-    # np.arange endpoint overshoot in GenerateSurface that intermittently adds a
+    # np.arange endpoint overshoot in generate_annular_curved_surface that intermittently adds a
     # spurious outer sub-ring (inflating that ring's area / the focal intensity).
     _patch_annular_surface(bb_root)
 
     # Load preset geometry from default.yaml
-    preset_cfg = load_preset_config(bb_root, args.tx_system)
+    preset_cfg = load_preset_config(preset)
 
-    # Build geometry kwargs for RunCases (passed through to BabelFTD_Simulations)
+    # Build geometry kwargs for RunCases (passed through to BabelFTD_Simulations).
+    # The YAML → kwarg names follow BabelBrain's own Step 2 caller; phased arrays
+    # take their element table from here (the device classes hold no geometry).
     geom_kw = {}
-    if preset_cfg:
-        if 'TxDiam' in preset_cfg:
-            geom_kw['Aperture']     = float(preset_cfg['TxDiam'])
-        if 'FocalLength' in preset_cfg:
-            geom_kw['FocalLength']  = float(preset_cfg['FocalLength'])
-        if 'InDiameters' in preset_cfg:
-            geom_kw['InDiameters']  = np.array([float(x) for x in preset_cfg['InDiameters']])
-        if 'OutDiameters' in preset_cfg:
-            geom_kw['OutDiameters'] = np.array([float(x) for x in preset_cfg['OutDiameters']])
+    for yaml_key, kw_key, conv in (
+            ('TxDiam',                     'Aperture',                       float),
+            ('FocalLength',                'FocalLength',                    float),
+            ('InDiameters',                'InDiameters',                    lambda v: np.array([float(x) for x in v])),
+            ('OutDiameters',               'OutDiameters',                   lambda v: np.array([float(x) for x in v])),
+            ('Elements',                   'elements',                       lambda v: v),
+            ('NumElements',                'num_elements',                   int),
+            ('ElementSize',                'element_size',                   float),
+            ('CoordinateSystem',           'coordinate_system',              str),
+            ('DistanceTxBottomToOutplane', 'distance_tx_bottom_to_outplane', float)):
+        if yaml_key in preset_cfg:
+            geom_kw[kw_key] = conv(preset_cfg[yaml_key])
 
-    # Geometry passed by PRESTUS (single-element presets have none in default.yaml).
+    # Geometry passed by PRESTUS (the PRESTUS-geometry preset and single-element
+    # presets have none in default.yaml).
     for key, val in (('Aperture', args.aperture), ('FocalLength', args.focal_length)):
         if val > 0:
             if key in geom_kw and abs(geom_kw[key] - val) > 1e-6:
                 print(f'[run_babelbrain_case] {key}: command line {val} m overrides preset {geom_kw[key]} m')
             geom_kw[key] = val
+    for key, val in (('InDiameters', args.in_diameters), ('OutDiameters', args.out_diameters)):
+        if val:
+            geom_kw[key] = np.array([float(x) for x in val.split(',')])
 
-    # BabelIntegrationSingle.RUN_SIM.RunCases reads kargs['Aperture'] and
-    # kargs['FocalLength'] with no default; fail here with the fix, not a KeyError.
-    if PRESET_MODULE_MAP[args.tx_system][0].endswith('BabelIntegrationSingle'):
-        missing = [k for k in ('Aperture', 'FocalLength') if k not in geom_kw]
+    # Fail here with the fix, not a KeyError/ValueError deep in BabelBrain: the
+    # simple_focused RUN_SIM.RunCases reads Aperture/FocalLength with no default,
+    # and the PRESTUS-geometry preset has no other source for its rings.
+    needed = {'simple_focused': ('Aperture', 'FocalLength'),
+              PRESTUS_GEOMETRY: ('Aperture', 'FocalLength', 'InDiameters', 'OutDiameters')}
+    key = PRESTUS_GEOMETRY if preset['name'] == PRESTUS_GEOMETRY else preset['type']
+    if key in needed:
+        missing = [k for k in needed[key] if k not in geom_kw]
         if missing:
-            raise ValueError(f'{args.tx_system} preset needs {" and ".join(missing)}: '
-                             f'pass --aperture and --focal_length [m].')
+            raise ValueError(f'{args.tx_system} needs {", ".join(missing)}: pass --aperture, '
+                             f'--focal_length [m] (and --in_diameters/--out_diameters for PRESTUS).')
+        if key == PRESTUS_GEOMETRY and len(geom_kw['InDiameters']) != len(geom_kw['OutDiameters']):
+            raise ValueError('--in_diameters and --out_diameters need one value per ring.')
 
-    # Only forward geometry the preset's sim class accepts by name. Phased arrays
-    # (H317, H246, ...) hardcode their geometry in CreateSimConditions and pass
-    # **kargs on to BabelFTD_Simulations_BASE, which rejects Aperture et al.
-    sim_cls = getattr(sys.modules.get(RunSimClass.__module__), 'BabelFTD_Simulations', None)
+    # Only forward geometry the preset's sim class accepts by name: each geometry
+    # family takes a different subset (e.g. flat annular H246 has no FocalLength),
+    # and BabelFTD_Simulations_BASE rejects the rest.
+    sim_cls = getattr(RunSimClass, '_BabelFTDSimClass', None)
     if geom_kw and sim_cls is not None:
         import inspect
         accepted = set()
@@ -1488,13 +1513,11 @@ def main():
               f"FocalLength={geom_kw.get('FocalLength','?')} m  "
               f"n_rings={len(geom_kw.get('InDiameters',[]))}")
 
-    try:
-        R = RunSimClass()
-    except TypeError:
-        R = RunSimClass(TxSystem=args.tx_system)
+    R = RunSimClass()
 
     # Build RunCases kwargs
     kw = dict(
+        TxSystem       = preset['name'],   # stored in DataForSim; read by the thermal step
         targets        = [args.target],
         ID             = args.subject_id,
         basedir        = args.basedir,
@@ -1519,7 +1542,7 @@ def main():
         kw['MappingMethod'] = args.ct_mapping
         kw['bPETRA'] = args.use_petra
         # BabelBrain only reads an air mask when bExtractAirRegions=True
-        # (BabelIntegrationBASE.py RunCases sets AIRMASK to
+        # (babel_integration_base.py RunCases sets AIRMASK to
         # <target>_<f>kHz_<ppw>PPW_AirRegions.nii.gz, else None). With
         # --air_regions PRESTUS writes that file from the raw-HU CT first
         # (before quantization overwrites CT.nii.gz). Never for water-only runs,

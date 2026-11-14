@@ -17,7 +17,7 @@ On this page:
 - [Built-In Material Table](#built-in-material-table): BabelBrain's own tissue values, used only if material injection fails.
 
 !!! note "At a glance"
-    - **Tested with:** BabelBrain 0.8.1, the `external/BabelBrain` submodule pinned at upstream `main` commit `36d6a3e` (after the v0.8.1 tag). Other versions may break the runtime patches below; each run records the version it used ([version tracking](doc_babelbrain.md)).
+    - **Tested with:** BabelBrain 0.8.8, the `external/BabelBrain` submodule pinned at the v0.8.8 tag (`7aeccd3`). Other versions may break the runtime patches below; each run records the version it used ([version tracking](doc_babelbrain.md)).
 
 ## Call Chain
 
@@ -25,7 +25,7 @@ On this page:
 prestus_pipeline.m
   └─ acoustic_stage.m            ← dispatches on parameters.acoustic_backend (run_acoustic_backend)
        └─ babelbrain_wrapper.m   ← MATLAB orchestrator
-            ├─ babelbrain_transducer_map.m   (preset resolution)
+            ├─ babelbrain_tx_geometry.m      (PRESTUS rings or BabelBrain preset)
             ├─ write_babelbrain_input.m       (NIfTI label mask)
             ├─ export_babelbrain_weights.m    (calibration HDF5)
             └─ system() → run_babelbrain_case.py   ← Python bridge
@@ -40,6 +40,9 @@ The bridge runs in `babelbrain.python_env`, writes `*DataForSim.h5` to `<dir_cac
     | `_inject_prestus_materials` | Overwrites `MatFreq` from `--medium_properties_json` (attenuation converted from dB/(cm·MHz^y) to Np/m) | runs only without `--no_skull_atten_fix` |
     | `_patch_noncat_skull_attenuation` | Bone shear = 0 (fluid bone), so the specified skull attenuation is realised | `--no_skull_atten_fix` |
     | `_patch_zdomain_reference` | `CalculateDomainZReference` returns 0 (see [Output alignment](#output-alignment)) | `--no_zdomain_fix` |
+    | `_patch_annular_surface` | Ring tessellation samples exactly the configured bands (`np.arange` endpoint overshoot added a band to some rings) | always on |
+    | `_patch_annular_array_weights` | Expands per-ring calibration weights to sub-elements (focused annular arrays) | with a weights file |
+    | `_patch_resave_normalized`, `_patch_calculate_temperature_effects` | Crash guards (negative mask index; tissue class absent from the domain) | always on |
 
 ## GPU Backend Selection and Platform Support
 
@@ -102,7 +105,7 @@ w[n] = exp(i × (elem_phase[n] − geometric_phase_at_aim[n]))
 `water_amp_calibration` removes the few-% pressure bias of BabelBrain's source correction by comparing the free-water field with `rayleigh_axial_intensity.m`, and applies the same factor to the head simulation. The thermal input is not rescaled, because BabelBrain renormalises it to `Isppa`.
 
 ??? note "Why the factor transfers, and water baseline checks"
-    BabelBrain's `Correction = 100/(100 − ExpectedError(CFL))`, ×√2 (`BabelIntegrationBASE`) leaves a few % pressure bias at CFL ~0.5. The factor transfers to tissue because the simulation is linear and the bias sits in the shared source chain. The transcranial timestep differs (sub-602 pFOV, R15473 300 kHz 6 PPW: CFL/water 0.300 → Correction 0.290 vs 0.471 → 0.465). The correction tracks it within ~2% in pressure (0.290/0.465 = 0.624 vs CFL ratio 0.637), ~4% in intensity.
+    BabelBrain's `Correction = 100/(100 − ExpectedError(CFL))`, ×√2 (`babel_integration_base`) leaves a few % pressure bias at CFL ~0.5. The factor transfers to tissue because the simulation is linear and the bias sits in the shared source chain. The transcranial timestep differs (sub-602 pFOV, R15473 300 kHz 6 PPW: CFL/water 0.300 → Correction 0.290 vs 0.471 → 0.465). The correction tracks it within ~2% in pressure (0.290/0.465 = 0.624 vs CFL ratio 0.637), ~4% in intensity.
 
     The thermal renormalisation is `PressureRatio = sqrt(Isppa·2ρc)/max(p_amp[brain])`.
 
@@ -170,7 +173,7 @@ Inspect `/MaterialMap`, `/p_amp`, `/TargetLocation` and `/z_vec` in `*DataForSim
 <a id="built-in-material-table"></a>
 ## Built-In Material Table
 
-Literature fits tabulated every 5 kHz from 100 to 1125 kHz (`TranscranialModeling/BabelIntegrationBASE.py`). They apply only if material injection fails.
+Literature fits tabulated every 5 kHz from 100 to 1125 kHz (`MatFreq` in `TranscranialModeling/babel_integration/babel_integration_helpers.py`). They apply only if material injection fails.
 
 ??? note "Built-in values and references"
     | Tissue | Density [kg/m³] | Long. SoS [m/s] 300 / 500 / 650 kHz | Long. att. [Np/m] 300 / 500 / 650 kHz |

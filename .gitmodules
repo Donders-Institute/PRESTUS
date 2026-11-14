@@ -20,4 +20,4 @@
 [submodule "external/BabelBrain"]
 	path = external/BabelBrain
 	url = https://github.com/ProteusMRIgHIFU/BabelBrain
-	# 5237cd2	v0.8.1
+	# 7aeccd3	v0.8.8

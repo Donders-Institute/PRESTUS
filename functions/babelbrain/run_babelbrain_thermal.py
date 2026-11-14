@@ -129,16 +129,17 @@ def main():
     if bb_root not in sys.path:
         sys.path.insert(0, bb_root)
 
-    # Apply the same empty-tissue-mask guard as the acoustic bridge
-    # (run_babelbrain_case.py). This is a SEPARATE process from that script, so
-    # the patch has to be (re-)applied here too -- CalculateThermalProcess
+    # Apply the same import paths and empty-tissue-mask guard as the acoustic
+    # bridge (run_babelbrain_case.py). This is a SEPARATE process from that
+    # script, so both have to be (re-)applied here -- CalculateThermalProcess
     # forks a child process to run CalculateTemperatureEffects, so this must
     # happen before that call for the fork to inherit the patched function.
     script_dir = os.path.dirname(os.path.abspath(__file__))
     if script_dir not in sys.path:
         sys.path.insert(0, script_dir)
     try:
-        from run_babelbrain_case import _patch_calculate_temperature_effects
+        from run_babelbrain_case import add_babelbrain_paths, _patch_calculate_temperature_effects
+        add_babelbrain_paths(bb_root)
         _patch_calculate_temperature_effects(bb_root)
     except Exception as e:
         print(f'[run_babelbrain_thermal] Warning: could not apply empty-mask guard patch: {e}',
@@ -187,6 +188,8 @@ def main():
             TxSystem                    = args.tx_system,
             LimitBHTEIterationsPerProcess = args.limit_bhte_iter,
             bConcatenateSimulations     = False,
+            bMergedSimulation           = False,   # BabelBrain >= 0.8.8: combined-trajectory input
+            MergedPressureRatio         = [],
         )
     except Exception as e:
         print(f'[run_babelbrain_thermal] CalculateThermalProcess error: {e}',

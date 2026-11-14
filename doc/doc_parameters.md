@@ -78,7 +78,7 @@ Used when `acoustic_backend` or `thermal_backend` is `babelbrain`, or when `io.e
     | `root` | BabelBrain source tree. | `''` | Empty = `external/BabelBrain` submodule. |
     | `computing_backend` | GPU/CPU backend. | `'auto'` | `auto` / `cuda` / `opencl` / `metal` / `cpu` (or `1`–`4`). `auto`: Metal on macOS, else CUDA if `nvidia-smi` finds a GPU, else CPU. The thermal engine has no CPU backend. |
     | `device_name` | Device name. | `'auto'` | Set explicitly when several GPUs are present. |
-    | `tx_system` | BabelBrain transducer preset. | `''` | Empty = auto-detect from serial/geometry. See [Transducer mapping](doc_babelbrain.md#transducer-mapping). |
+    | `tx_system` | BabelBrain transducer preset. | `''` | Empty = the PRESTUS transducer's ring geometry (as calibrated). A preset name uses BabelBrain's device definition. See [Transducer mapping](doc_babelbrain.md#transducer-mapping). |
     | `ppw` | Points-per-wavelength floor for BabelBrain's own FDTD grid. | `12` | Lower = faster, more numerical dispersion. |
     | `do_refocusing` | Apply BabelBrain's refocusing step. | `false` | Thermal then uses `/p_amp_refocus`. |
     | `z_beyond_focus_mm` | Domain extent past the focus [mm]. | `40` | |

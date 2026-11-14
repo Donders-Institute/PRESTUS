@@ -114,7 +114,7 @@ end
 %   SpatialStep = SmallestSOS / freq / PPW
 % SmallestSOS is the smallest positive sound speed in its material table,
 % floored by the Pichardo shear speed at 1000 kg/m3 (1000*0.422 + 680.515 =
-% 1102.515 m/s; GetSmallestSOS/DensityToSSoSPichardo in BabelIntegrationBASE.py).
+% 1102.515 m/s; GetSmallestSOS/DensityToSSoSPichardo in babel_integration_helpers.py).
 % With the fluid-bone model (_patch_noncat_skull_attenuation in
 % run_babelbrain_case.py) that floor is the binding term. A mask written at any
 % other step would be read as a smaller or larger physical domain, so the mask
