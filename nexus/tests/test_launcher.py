@@ -162,3 +162,14 @@ def test_plantus_script_loads_in_matlab(schema, prestus_root, tmp_path):
     assert proc.returncode == 0 and launcher.OK_SENTINEL in out, out[-2000:]
     assert "ON=run_transducer_placement PT=1 SIM=0 REUSE=never" in out, out[-2000:]
 
+
+
+def test_plantus_submit_script_keeps_platform(tmp_path, prestus_root):
+    study = tmp_path / "config_pilot.yaml"
+    study.write_text("subject_id: 1\n")
+    local = launcher.plantus_script(study, prestus_root, False)
+    job = launcher.plantus_script(study, prestus_root, False, local=False)
+    assert "parameters.platform = 'matlab'" in local and "parameters.platform" not in job
+    assert launcher.PLACEMENT_ONLY in job
+    assert launcher.matlab_value(0) == "0" and launcher.matlab_value("never") == "'never'"
+    assert launcher.matlab_value([]) == "[]" and launcher.matlab_value(True) == "true"

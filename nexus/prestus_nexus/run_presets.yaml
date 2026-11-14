@@ -13,14 +13,15 @@
 #     table (acoustic ~14-145 min, thermal ~45-115 min depending on GPU; A16/P100 noted
 #     "Out of RAM" on thermal at a near-default memory footprint).
 #
-# Applying a preset only sets hpc.* keys on the open study (via ConfigModel.set, so the
+# Applying a preset only sets hpc.* keys (and platform) on the open study (via ConfigModel.set, so the
 # usual 'changed' marker and Issues panel apply); it never submits a job -- see
 # doc_hpc.md for the manual srun/sbatch workflow.
 
 presets:
   - name: Local
-    description: No scheduler. Runs in this MATLAB session (Run tab's "Run locally"), as today.
-    overrides: {}
+    description: No scheduler (platform matlab). Runs in this MATLAB session (Run tab's "Run locally").
+    overrides:
+      platform: matlab
 
   - name: Donders HPC — default
     description: >-

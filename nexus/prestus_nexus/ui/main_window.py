@@ -608,6 +608,14 @@ class MainWindow(QMainWindow):
         for spec in self._tab_specs():
             tab = TabPage(self, spec)
             key = spec["key"]
+            if key == "run":
+                # sub-tabs in workflow order: Stages, Where to run, Plan, Review YAML, Launch, Jobs
+                where, where_col = tab.new_column()
+                tab.add_subtab(where, "Where to run")
+                tab.subtabs.setTabText(0, "Stages")
+                tab.columns.append(where_col)
+                for sec in ("hpc", "snellius"):
+                    tab.section_columns[sec] = where_col
             if key == "study":
                 from .study_page import StudyPage
                 study = StudyPage(self)
@@ -643,6 +651,9 @@ class MainWindow(QMainWindow):
                     self.run_profile_panel.changed.connect(self._changed)
                     self.run_profile_panel.changed.connect(page.refresh)
                     page.add_extra(self.run_profile_panel)
+                    from .pipeline_options import PipelineOptionsPanel
+                    self.pipeline_options_panel = PipelineOptionsPanel(self)
+                    page.add_extra(self.pipeline_options_panel)
                 tab.add_section(page)
                 if section == "study":
                     tab.add_card(self.pages[STUDY])
@@ -703,17 +714,15 @@ class MainWindow(QMainWindow):
                 tab.add_card(self.uncertainty_card)
             elif key == "run":
                 from .run_page import RunPage
-                side = QTabWidget()
                 run = RunPage(self)
                 review = ReviewPage(self)
                 self.pages[RUN], self.pages[REVIEW] = run, review
                 self._section_tab[RUN] = self._section_tab[REVIEW] = key
-                side.addTab(run, "Run log")
-                side.addTab(review, "Review YAML")
-                side.addTab(run.jobs_view, "Jobs")
-                side.currentChanged.connect(lambda _i, s=side: s.currentWidget().refresh())
-                self.run_side = side
-                tab.set_side(side, (2, 3))
+                tab.add_subtab(run.plan_card, "Plan")
+                tab.add_subtab(review, "Review YAML")
+                tab.add_subtab(run, "Launch")
+                tab.add_subtab(run.jobs_view, "Jobs")
+                self.run_side = tab.subtabs         # RunPage.show_jobs_tab and show_special select in it
             elif key == "results":
                 from .results_page import ResultsPage
                 results = ResultsPage(self)
@@ -853,7 +862,9 @@ class MainWindow(QMainWindow):
                     finally:
                         QApplication.restoreOverrideCursor()
                     self._refresh_issues()
-                self.run_side.currentWidget().refresh()
+                current = self.run_side.currentWidget()
+                if hasattr(current, "refresh"):
+                    current.refresh()
             if tab.key == "results" and RESULTS in self.pages:
                 self.pages[RESULTS].refresh()
             if tab.subtabs is not None and tab.subtabs.currentWidget() in (
@@ -978,7 +989,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "io_preview"):
             self.io_preview.refresh()
         run = self.pages.get(RUN)
-        if run is not None:
+        if run is not None and run.plan_card.isVisible():   # the Plan sub-tab refreshes it when shown
             run.update_deployment_summary()
         self._update_title()
         self._update_tab_counts()

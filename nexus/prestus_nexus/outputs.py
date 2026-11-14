@@ -107,6 +107,27 @@ def measured_ct_file(model: ConfigModel) -> Path | None:
     return hits[0] if hits else None
 
 
+_EXISTING: dict = {}
+
+
+def existing_outputs(model: ConfigModel) -> dict[str, bool] | None:
+    """Which optional output categories (predict_outputs.save_items) already have files in this
+    subject's output folder, for this medium and output affix: {label: exists}. None when
+    path.sim or subject_id is unset. Cached until a folder it reads changes (mtime)."""
+    from .predict_outputs import save_items
+    out = dir_output(model)
+    if out is None:
+        return None
+    items = save_items(model)
+    folders = (out, out / "cache", out / "nii", out / "nii" / "properties", out / "debug")
+    stamp = tuple(p.stat().st_mtime_ns if p.is_dir() else None for p in folders)
+    key = (str(out), tuple(i.pattern for i in items), stamp)
+    if key not in _EXISTING:
+        _EXISTING.clear()
+        _EXISTING[key] = {i.label: bool(i.pattern) and out.is_dir() and any(out.glob(i.pattern))
+                          for i in items}
+    return dict(_EXISTING[key])
+
 
     from .study import sanitize_affix
     base, sid = dir_output(model), _subject_id(model)

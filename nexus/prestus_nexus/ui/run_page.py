@@ -12,7 +12,7 @@ from pathlib import Path
 from PyQt6.QtCore import QObject, QProcess, QProcessEnvironment, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                             QMenu, QMessageBox, QPlainTextEdit, QPushButton, QTextEdit, QToolButton,
+                             QMenu, QMessageBox, QPushButton, QTextEdit, QToolButton,
                              QVBoxLayout, QWidget)
 
 from .. import jobs as hpc_jobs
@@ -20,10 +20,9 @@ from .. import launcher
 from .. import proctree
 from .. import remote as rmt
 from ..model import ConfigModel
-from ..estimate import estimate
-from ..predict_outputs import predict, save_summary
 from . import icons, style
 from .jobs_view import JobsView, JobsWindow
+from .run_plan_card import RunPlanCard
 
 
 # Scheduler queries, cancels and log reads run here: over SSH they take seconds, and the
@@ -62,6 +61,9 @@ class RunPage(QWidget):
         self._remote_host: rmt.RemoteHost | None = None
 
         v = QVBoxLayout(self)
+        # 'What this run does' (run_plan_card): its own Run sub-tab, 'Plan' (main_window)
+        self.plan_card = RunPlanCard()
+        self.plan_card.refresh = lambda: self.plan_card.update_plan(self.model)   # TabPage._sub_tab_changed
         title = QLabel("Run in MATLAB")
         title.setObjectName("CardTitle")
         v.addWidget(title)
@@ -70,21 +72,6 @@ class RunPage(QWidget):
                        "Validate first: it only loads the config with <tt>load_parameters</tt>.")
         intro.setWordWrap(True)
         v.addWidget(intro)
-
-        self.deploy_toggle = QCheckBox("Show deployment, save && resource details")
-        self.deploy_toggle.setToolTip(
-            "What prestus_pipeline_start would submit (single job, or one job per transducer/"
-            "target/uncertainty variant) and what io.save_* keeps besides the CSV/report.")
-        self.deploy_toggle.setChecked(bool(window.session.get("run_show_deployment", False)))
-        self.deploy_toggle.toggled.connect(self._toggle_deployment)
-        v.addWidget(self.deploy_toggle)
-        self.deploy_text = QPlainTextEdit(readOnly=True)
-        self.deploy_text.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        deploy_mono = style.mono_font()
-        self.deploy_text.setFont(deploy_mono)
-        self.deploy_text.setFixedHeight(180)
-        self.deploy_text.setVisible(self.deploy_toggle.isChecked())
-        v.addWidget(self.deploy_text)
 
         row = QHBoxLayout()
         row.addWidget(QLabel("MATLAB"))
@@ -261,32 +248,20 @@ class RunPage(QWidget):
         self.act_alt.setToolTip(other.toolTip())
 
     def update_deployment_summary(self) -> None:
-        """Cheap — safe to call on every model edit, unlike refresh(). The only disk
-        access is a stat of run_stats.jsonl (re-read only when it changed)."""
-        if not self.deploy_toggle.isChecked():
-            return
-        plan = predict(self.model)
-        lines = [f"DEPLOYMENT  ({plan.mode.replace('_', '-')} mode)"]
-        lines += [f"  {j}" for j in plan.jobs]
-        for w in plan.warnings:
-            lines.append(f"  ! {w}")
-        lines += ["", "SAVE CHOICES"]
-        lines += [f"  {s}" for s in save_summary(self.model)]
-        lines += ["", "RESOURCES  (from earlier runs of this project)"]
-        lines += [f"  {s}" for s in estimate(self.model).lines()]
-        self.deploy_text.setPlainText("\n".join(lines))
-
-    def _toggle_deployment(self, on: bool) -> None:
-        self.window.session.set("run_show_deployment", on)
-        self.deploy_text.setVisible(on)
-        if on:
-            self.update_deployment_summary()
+        """Cheap — safe to call on every model edit, unlike refresh(). Disk access: a stat of
+        run_stats.jsonl (re-read only when it changed) and the existence checks of
+        run_plan (segmentation, pseudo-CT, measured CT)."""
+        self.plan_card.update_plan(self.model)
 
     # ── SSH submission ─────────────────────────────────────────────────
     def _toggle_remote(self, on: bool) -> None:
         self.window.session.set("remote_enabled", on)
         self.remote_box.setVisible(on)
+        self.window.update_context()          # scheduler settings show while submitting over SSH
         self.refresh()
+        tab = self.window.tabs.currentWidget()
+        if hasattr(tab, "refresh"):
+            tab.refresh()
 
     def _remote_on(self) -> bool:
         return self.remote_toggle.isChecked() and bool(self.r_host.text().strip())
@@ -371,6 +346,17 @@ class RunPage(QWidget):
         if r is None or not self._ready(need_matlab=False):
             return
         mapped, unmapped = rmt.path_overrides(self.model, r)
+        options = self._pipeline_options()
+        seq_over: dict = {}
+        for cfg in options.sequential_configs:
+            p = Path(cfg).resolve()
+            try:
+                child = ConfigModel.from_file(self.model.schema, p, self.model.library)
+            except Exception as e:          # noqa: BLE001 — reported, the user decides
+                QMessageBox.warning(self, "Submit over SSH", f"Cannot read the sequential config {p}:\n{e}")
+                return
+            seq_over[str(p)], child_unmapped = rmt.path_overrides(child, r)
+            unmapped += [f"{p.name}: {k}" for k in child_unmapped]
         if unmapped and QMessageBox.question(
                 self, "Submit over SSH",
                 "These config values are paths on this computer outside the mapped folder, so "
@@ -379,7 +365,8 @@ class RunPage(QWidget):
                 "\n\nSubmit anyway?") != QMessageBox.StandardButton.Yes:
             return
         try:
-            argv = rmt.submit_command(r, self.model.path, self.window.prestus_root, mapped)
+            argv = rmt.submit_command(r, self.model.path, self.window.prestus_root, mapped,
+                                      options=options, sequential_overrides=seq_over)
         except rmt.PathMapError as e:
             QMessageBox.warning(self, "SSH", f"{e}.\nThe study folder (and PRESTUS, unless a remote "
                                 "PRESTUS folder is set) must be under the local folder.")
@@ -390,6 +377,10 @@ class RunPage(QWidget):
             self._append(f"  {key} → {value}  (on the cluster)", "#777")
 
     # ── helpers ─────────────────────────────────────────────────────────
+    def _pipeline_options(self):
+        """Pipeline options stored for this study (Run tab ▸ Pipeline options)."""
+        return launcher.load_options(self.window.session, self.model.path)
+
     def _browse(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "MATLAB binary", self.matlab.text())
         if path:
@@ -488,7 +479,8 @@ class RunPage(QWidget):
     def write_launcher(self) -> Path | None:
         if not self._ready(need_matlab=False):
             return None
-        path = launcher.write_launcher(self.model.path, self.window.prestus_root)
+        path = launcher.write_launcher(self.model.path, self.window.prestus_root,
+                                       options=self._pipeline_options())
         self.status.setText(f"Launcher written: <tt>{path}</tt> — run it in MATLAB with "
                             f"<tt>run('{path}')</tt>")
         return path
@@ -546,8 +538,58 @@ class RunPage(QWidget):
         if not self._ready():
             return
         self.job_remote = None
-        path = launcher.write_submit_launcher(self.model.path, self.window.prestus_root)
+        path = launcher.write_submit_launcher(self.model.path, self.window.prestus_root,
+                                              options=self._pipeline_options())
         self._start("Submit", launcher.run_command(self.matlab.text(), path), path.parent)
+
+    def submits_to_cluster(self) -> bool:
+        """Whether a run from this page goes to a scheduler (here or over SSH)."""
+        return self._cluster_first()
+
+    def submit_placement(self, mode: str = "plantus") -> bool:
+        """Submit only the placement stage of the config (PlanTUS, TUS_entry, heuristic) as a
+        job, no simulation. Returns whether it started."""
+        return self.submit_partial(mode, f"the {mode} placement", launcher.placement_overrides(mode),
+                                   launcher.PLACEMENT_ONLY)
+
+    def submit_partial(self, name: str, what: str, overrides: list, extra: str = "") -> bool:
+        """Submit part of the pipeline (launcher.partial_script: ``overrides`` on the config,
+        ``extra`` statements) as a job, the way Submit does: to this computer's scheduler, or
+        over SSH. Returns whether it started."""
+        if self.proc is not None:
+            QMessageBox.warning(self, "Submit", f"“{self.task}” is still running on the Run tab.")
+            return False
+        if self.model.get("platform") == "matlab":
+            QMessageBox.warning(self, "Submit", "platform is 'matlab' in this config, which runs "
+                                "locally. Set it to 'auto', 'slurm' or 'qsub' (Setup tab) to submit.")
+            return False
+        if self._remote_on():
+            r = self._remote()
+            if r is None or not self._ready(need_matlab=False):
+                return False
+            mapped, unmapped = rmt.path_overrides(self.model, r)
+            if unmapped and QMessageBox.question(
+                    self, "Submit over SSH",
+                    "These config values are paths on this computer outside the mapped folder:\n\n"
+                    + "\n".join(unmapped[:8]) + "\n\nSubmit anyway?") != QMessageBox.StandardButton.Yes:
+                return False
+            try:
+                argv = rmt.submit_command(r, self.model.path, self.window.prestus_root,
+                                          mapped + list(overrides), extra=extra)
+            except rmt.PathMapError as e:
+                QMessageBox.warning(self, "SSH", f"{e}.")
+                return False
+            self.job_remote = r
+        else:
+            if self.scheduler is None or not self._ready():
+                return False
+            self.job_remote = None
+            path = launcher.write_partial_script(self.model.path, self.window.prestus_root, name, what,
+                                                 list(overrides), extra, local=False)
+            argv = launcher.run_command(self.matlab.text(), path)
+        self._start("Submit", argv, self.model.path.parent)
+        self._append(f"Only {what} (no simulation).", "#777")
+        return True
 
     def _collect_jobs(self) -> None:
         known = {j.job_id for j in self.jobs}

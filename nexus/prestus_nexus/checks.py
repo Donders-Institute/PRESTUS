@@ -7,6 +7,8 @@ MATLAB's load_parameters stays the final authority.
 
 from __future__ import annotations
 
+import math
+
 import os
 import time
 from dataclasses import dataclass
@@ -572,6 +574,51 @@ def defaults_issues(model: ConfigModel) -> list[Issue]:
                   "Tools ▸ Update project defaults… refreshes the copy")]
 
 
+STAIRCASE_MM = 0.75     # coarser grids: staircased skull and tissue boundaries in head media
+
+
+def grid_issues(model: ConfigModel) -> list[Issue]:
+    """Grid resolution against the wavelength and the head geometry.
+
+    PPW as source_sensor_setup.m checks it: the slowest sound speed of the modelled tissues
+    over the fundamental frequency, at least grid.min_ppw (default 6) points per wavelength;
+    below that PRESTUS warns, and errors for jwave (its absorption diverges). For head and
+    phantom media, a grid coarser than STAIRCASE_MM staircases the tissue transitions."""
+    issues: list[Issue] = []
+    g = model.get
+    dx = g("grid.resolution_mm")
+    if not _is_num(dx) or dx <= 0:
+        return issues
+    freqs = [t.get("freq_hz") for t in model.effective_transducers()]
+    freqs = [float(f[0] if isinstance(f, (list, tuple)) and f else f) for f in freqs
+             if _is_num(f) or (isinstance(f, (list, tuple)) and f and _is_num(f[0]))]
+    medium = g("simulation.medium") or "layered"
+    props = g("medium_properties") or {}
+    tissues = ["water"] if medium == "water" else list(props)
+    speeds = [(props.get(t, {}) or {}).get("sound_speed") for t in tissues if isinstance(props.get(t), dict)]
+    speeds = [(float(c), t) for c, t in zip(speeds, tissues) if _is_num(c) and c > 0]
+    min_ppw = g("grid.min_ppw")
+    min_ppw = float(min_ppw) if _is_num(min_ppw) and min_ppw > 0 else 6.0
+    if freqs and speeds:
+        f = max(freqs)
+        c, tissue = min(speeds)
+        ppw = c / (f * dx / 1e3)
+        if ppw < min_ppw:
+            need = c / (f * min_ppw) * 1e3
+            jwave = str(g("acoustic_backend") or "").startswith("jwave")
+            issues.append(Issue(
+                "error" if jwave else "warning", "grid.resolution_mm",
+                f"{ppw:.1f} points per wavelength at {f / 1e3:.0f} kHz in {tissue} ({c:.0f} m/s), "
+                f"below the minimum of {min_ppw:g}: set {need:.2f} mm or finer"
+                + (" (jwave diverges below the minimum)" if jwave else "")))
+    if medium in ("layered", "phantom") and dx > STAIRCASE_MM:
+        issues.append(Issue(
+            "warning", "grid.resolution_mm",
+            f"Above {STAIRCASE_MM} mm, staircasing at the head tissue transitions (skull, scalp) "
+            "may affect the results; use 0.75 mm or finer for results you report"))
+    return issues
+
+
 def uncertainty_issues(model: ConfigModel) -> list[Issue]:
     """uncertainty_pipeline.m errors when a variant's medium file is missing (configNotFound)."""
     if model.get("simulation.uncertainty") is not True:
@@ -580,6 +627,137 @@ def uncertainty_issues(model: ConfigModel) -> list[Issue]:
     sets = property_sets(model, model.schema.toolbox_path.parent.parent)
     return [Issue("error", f"simulation.uncertainty_{variant}", f"{VARIANT_SHORT[variant]} variant: {why}")
             for variant, why in sets.errors.items()]
+
+
+def drive_issues(model: ConfigModel) -> list[Issue]:
+    """A custom annular transducer (no library serial) is driven by its focal depth setting
+    and target ISPPA (fill_annular_drive.m): without phases it needs focal_distance_ep (or
+    _bowl), without an amplitude a target ISPPA. Flat rings keep needing phases."""
+    issues: list[Issue] = []
+    for ti, t in enumerate(model.effective_transducers()):
+        if t.get("type") != "annular" or not is_empty(t.get("serial")):
+            continue
+        ann = t.get("annular") or {}
+        if not isinstance(ann, dict):
+            continue
+        no_phase = is_empty(ann.get("elem_phase_deg")) and is_empty(ann.get("elem_phase_rad"))
+        depth = not is_empty(t.get("focal_distance_ep")) or not is_empty(t.get("focal_distance_bowl"))
+        flat = _is_num(ann.get("curv_radius_mm")) and not math.isfinite(ann["curv_radius_mm"])
+        if no_phase and (flat or not depth):
+            issues.append(Issue("error", f"{TX}.focal_distance_ep",
+                                "No steering: set the focal depth setting"
+                                + (" (flat rings need element phases)" if flat else "")
+                                + ", or element phases from calibration (advanced)", ti))
+        if is_empty(ann.get("elem_p_amp")) and is_empty(t.get("target_isppa_wcm2")):
+            issues.append(Issue("error", f"{TX}.target_isppa_wcm2",
+                                "No drive level: set the target free-water ISPPA, or element "
+                                "pressure amplitudes from calibration (advanced)", ti))
+    return issues
+
+
+def _on(v: Any) -> bool:
+    """A 0/1 flag or bool config value that is set."""
+    return v is True or (_is_num(v) and v != 0)
+
+
+def heating_issues(model: ConfigModel) -> list[Issue]:
+    """Timing and thermal grid checks load_parameters.m runs when run_heating_sims is on
+    (it calls thermal_parameters.m), and the thermal FOV against the acoustic FOV."""
+    issues: list[Issue] = []
+    g = model.get
+    if _on(g("modules.run_heating_sims")):
+        # thermal_parameters.m:76 / :81: ptd/pri and ptrd/ptri must be integers; with pri
+        # or ptri 0 (the defaults) both are 0/0 = NaN and round_if_integer.m stops the run
+        for key, msg in (("timing.pri", "Pulses per PT must be integer"),
+                         ("timing.ptri", "PTRI reps in PTRD must be integer")):
+            v = g(key)
+            if not _is_num(v) or v <= 0:
+                issues.append(Issue("error", key,
+                                    f"Heating is on but {key} is not set (> 0): PRESTUS stops "
+                                    f"with '{msg}'. Set the timing protocol (Timing tab)"))
+        # thermal_parameters.m:64/:76/:81: pd, ptd or ptrd 0 leaves no sonication time
+        zero = [k for k in ("timing.pd", "timing.ptd", "timing.ptrd") if _is_num(g(k)) and g(k) == 0]
+        if zero:
+            issues.append(Issue("warning", zero[0],
+                                f"Heating is on but {', '.join(zero)} = 0: the thermal model has "
+                                "no sonication time, so no heating"))
+        # thermal_grid_setup.m:75-78: one thermal FOV extent per grid dimension
+        fov = g("grid.thermal_fov_mm")
+        if not is_empty(fov) and not _on(g("grid.axisymmetric")):
+            if not (isinstance(fov, list) and len(fov) == 3 and all(_is_num(x) for x in fov)):
+                issues.append(Issue("error", "grid.thermal_fov_mm",
+                                    "Needs three extents [x, y, z] in mm (one per grid dimension)"))
+    # resolve_acoustic_fov_params.m: the acoustic FOV is on only with both diameter and
+    # length set; thermal_stage.m:89-91: thermal_use_acoustic_fov needs it
+    diam, length = g("grid.acoustic_fov_diameter_mm"), g("grid.acoustic_fov_length_mm")
+    fov_on = not is_empty(diam) and not is_empty(length)
+    if _on(g("grid.thermal_use_acoustic_fov")) and not fov_on:
+        issues.append(Issue("info", "grid.thermal_use_acoustic_fov",
+                            "Has no effect without an acoustic FOV (set both "
+                            "grid.acoustic_fov_diameter_mm and acoustic_fov_length_mm)"))
+    # thermal_grid_setup.m:79-80: thermal_fov_mm is clamped to the grid the thermal stage
+    # starts from, which is the acoustic FOV box when thermal_use_acoustic_fov is on
+    fov = g("grid.thermal_fov_mm")
+    if fov_on and _on(g("grid.thermal_use_acoustic_fov")) and len(model.effective_transducers()) == 1 \
+            and isinstance(fov, list) and len(fov) == 3 and all(_is_num(x) for x in fov) \
+            and _is_num(diam) and _is_num(length) and g("grid.mode") != "ras_plus":
+        if max(fov[0], fov[1]) > diam or fov[2] > length:
+            issues.append(Issue("info", "grid.thermal_fov_mm",
+                                f"Larger than the acoustic FOV ({diam:g} mm across, {length:g} mm "
+                                "long) that the thermal model runs in here; PRESTUS clamps it to "
+                                "that box"))
+    return issues
+
+
+def _pichardo_shear_fit(f0: float) -> tuple[float, float]:
+    """medium_elastic_properties.m pichardo_shear_fit: cS = a*rho + b, linear in frequency
+    through the 270 and 836 kHz fits (extrapolated outside)."""
+    t = (f0 - 270e3) / (836e3 - 270e3)
+    return 0.458 + t * (0.386 - 0.458), 545.52 + t * (815.51 - 545.52)
+
+
+def elastic_issues(model: ConfigModel) -> list[Issue]:
+    """medium_elastic_properties.m:155-165: warning when the slowest shear wave has fewer
+    than elastic.min_ppw_shear (default 6) points per wavelength. Predicted from the layered
+    skull densities; pseudo-CT densities are only known at run time."""
+    g = model.get
+    if g("acoustic_backend") != "kwave_elastic" or (g("elastic.shear_mapping") or "pichardo") != "pichardo":
+        return []
+    if (g("simulation.medium") or "layered") != "layered" or _on(g("pct.enabled")):
+        return []
+    dx = g("grid.resolution_mm")
+    txs = model.effective_transducers()
+    f = txs[0].get("freq_hz") if txs else None
+    f = f[0] if isinstance(f, list) and f else f
+    if not _is_num(dx) or dx <= 0 or not _is_num(f) or f <= 0:
+        return []
+    rho_min = g("elastic.shear_density_min")
+    rho_min = float(rho_min) if _is_num(rho_min) else 1200.0
+    nu = g("elastic.poisson_min")
+    nu = float(nu) if _is_num(nu) else 0.1
+    a, b = _pichardo_shear_fit(float(f))
+    props = g("medium_properties") or {}
+    speeds = []
+    for tissue in ("skull", "skull_cortical", "skull_trabecular"):    # tissuemask_binary skull
+        p = props.get(tissue)
+        if not isinstance(p, dict) or not _is_num(p.get("density")) or p["density"] <= rho_min:
+            continue
+        cs = a * p["density"] + b
+        if _is_num(p.get("sound_speed")):                               # Poisson-ratio cap
+            cs = min(cs, p["sound_speed"] * math.sqrt((1 - 2 * nu) / (2 * (1 - nu))))
+        speeds.append((cs, tissue))
+    if not speeds:
+        return []
+    cs, tissue = min(speeds)
+    need = g("elastic.min_ppw_shear")
+    need = float(need) if _is_num(need) else 6.0
+    ppw = cs / (f * dx * 1e-3)
+    if ppw >= need:
+        return []
+    return [Issue("warning", "grid.resolution_mm",
+                  f"Shear waves in {tissue} (about {cs:.0f} m/s at {f / 1e3:.0f} kHz) get {ppw:.1f} "
+                  f"points per wavelength, below elastic.min_ppw_shear = {need:g}: set "
+                  f"{cs / (f * need) * 1e3:.2f} mm or finer")]
 
 
 def all_issues(model: ConfigModel) -> list[Issue]:

@@ -214,6 +214,19 @@ def test_plantus_actions_run_placement_only(window, monkeypatch):
     monkeypatch.setattr(type(window), "show_special", lambda self, key: shown.append(key))
     window.pages[RUN].finished.emit(PlantusActions.TASK, True)
     assert shown == [VIEWER] and not acts._waiting
+def test_run_tab_subtabs(window):
+    from prestus_nexus.ui.main_window import REVIEW, RUN
+    tab = window.tab_pages["run"]
+    assert [tab.subtabs.tabText(i) for i in range(tab.subtabs.count())] == \
+        ["Stages", "Where to run", "Plan", "Review YAML", "Launch", "Jobs"]
+    assert tab.subtab_of(window.pages["modules"]) is tab.subtabs.widget(0)
+    assert tab.subtab_of(window.pages["hpc"]) is tab.subtabs.widget(1)
+    assert window.show_special(RUN) is tab.subtabs.currentWidget()
+    assert window.show_special(REVIEW) is tab.subtabs.currentWidget()
+    window.goto("hpc.timelimit")
+    assert tab.subtabs.currentWidget() is tab.subtabs.widget(1)
+
+
 def test_choice_notes_never_become_windows(window, app):
     """A choice's plain-text note (overlay choice_math '> …') stays inside its field: replacing it
     on refresh used to leave each old note as a top-level window (the pop-up seen in advanced mode)."""

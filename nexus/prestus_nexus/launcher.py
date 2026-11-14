@@ -6,6 +6,7 @@ import datetime as _dt
 import glob
 import os
 import shutil
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .fsio import write_text_atomic
@@ -36,11 +37,121 @@ def launcher_path(study: Path) -> Path:
     return study.with_name(f"run_{stem}.m")
 
 
-def launcher_script(study: Path, prestus_root: Path, local: bool = True) -> str:
+# ── pipeline options (prestus_pipeline_start's second argument) ─────────────────────
+# Nexus-side settings, not config keys: stored per study in the session (load_options).
+# Stage limits of the multi-ISPPA pipeline (multi_isppa_pipeline.m:110-118) and of the
+# uncertainty pipeline (uncertainty_pipeline.m:122-131); a memory limit is in GB like
+# hpc.memorylimit, [] keeps hpc.memorylimit.
+MULTI_ISPPA_OPTIONS = ("acoustic_timelimit", "thermal_timelimit", "summary_timelimit",
+                       "acoustic_memorylimit", "thermal_memorylimit", "summary_memorylimit",
+                       "acoustic_partition", "summary_partition")
+UNCERTAINTY_OPTIONS = ("stage1_timelimit", "sim_timelimit", "report_timelimit",
+                       "stage1_memorylimit", "sim_memorylimit", "report_memorylimit",
+                       "stage1_partition", "report_partition")
+STAGE_OPTIONS = MULTI_ISPPA_OPTIONS + UNCERTAINTY_OPTIONS
+SESSION_KEY = "pipeline_options"
+
+
+@dataclass
+class PipelineOptions:
+    """What the run script passes as ``options`` to prestus_pipeline_start.
+
+    sequential_configs: follow-up configs run after this one with heat carry-over, in order
+    (options.sequential_configs.config_<N>, N = 2, 3, ...; sequential_pipeline.m picks the
+    lowest N first). stages: STAGE_OPTIONS name -> value. generate_summary_report: the
+    multi-ISPPA summary report (multi_isppa_pipeline.m:110; None = PRESTUS' default, on)."""
+    sequential_configs: list[str] = field(default_factory=list)
+    stages: dict[str, object] = field(default_factory=dict)
+    generate_summary_report: bool | None = None
+
+    def is_empty(self) -> bool:
+        return not self.sequential_configs and not self.stages and self.generate_summary_report is None
+
+    def to_dict(self) -> dict:
+        out: dict = {}
+        if self.sequential_configs:
+            out["sequential_configs"] = list(self.sequential_configs)
+        if self.stages:
+            out["stages"] = dict(self.stages)
+        if self.generate_summary_report is not None:
+            out["generate_summary_report"] = bool(self.generate_summary_report)
+        return out
+
+    @classmethod
+    def from_dict(cls, d) -> "PipelineOptions":
+        d = d if isinstance(d, dict) else {}
+        seq = [str(x) for x in d.get("sequential_configs") or [] if x]
+        stages = {k: v for k, v in (d.get("stages") or {}).items()
+                  if k in STAGE_OPTIONS and v not in (None, "", [])}
+        gsr = d.get("generate_summary_report")
+        return cls(seq, stages, gsr if isinstance(gsr, bool) else None)
+
+
+def _study_key(study: Path) -> str:
+    return str(Path(study).resolve())
+
+
+def load_options(session, study: Path | None) -> PipelineOptions:
+    """The study's pipeline options from the session (empty when none are stored)."""
+    if session is None or study is None:
+        return PipelineOptions()
+    store = session.get(SESSION_KEY) or {}
+    return PipelineOptions.from_dict(store.get(_study_key(study)) if isinstance(store, dict) else None)
+
+
+def save_options(session, study: Path, options: PipelineOptions) -> None:
+    """Store (or, when empty, forget) the study's pipeline options; the caller saves the session."""
+    store = dict(session.get(SESSION_KEY) or {})
+    if options.is_empty():
+        store.pop(_study_key(study), None)
+    else:
+        store[_study_key(study)] = options.to_dict()
+    session.set(SESSION_KEY, store)
+
+
+def add_to_chain(session, study: Path, child: Path) -> PipelineOptions:
+    """Append a follow-up config to the study's sequential chain (no duplicates)."""
+    opts = load_options(session, study)
+    child_s = str(Path(child).resolve())
+    if child_s not in opts.sequential_configs:
+        opts.sequential_configs.append(child_s)
+    save_options(session, study, opts)
+    return opts
+
+
+def options_lines(options: PipelineOptions | None, local: bool, load_expr=None) -> list[str]:
+    """MATLAB lines that build ``options`` (none when there are no options).
+
+    load_expr(path) -> MATLAB expression that loads a sequential config; the default loads
+    it from its local folder (remote.submit_command maps it to the cluster instead)."""
+    if options is None or options.is_empty():
+        return []
+    lines = ["options = struct();"]
+    for key in STAGE_OPTIONS:
+        if key in options.stages:
+            lines.append(f"options.{key} = {matlab_value(options.stages[key])};")
+    if options.generate_summary_report is not None:
+        lines.append(f"options.generate_summary_report = {matlab_value(bool(options.generate_summary_report))};")
+    if options.sequential_configs:
+        lines += ["% sequential follow-ups with heat carry-over (doc_sequential.md)",
+                  "options.sequential_configs = struct();"]
+        for n, cfg in enumerate(options.sequential_configs, start=2):
+            p = Path(cfg).resolve()
+            field_ = f"options.sequential_configs.config_{n}"
+            expr = load_expr(p) if load_expr else f"load_parameters({_q(p.name)}, {_q(p.parent)})"
+            lines.append(f"{field_} = {expr};")
+            if local:
+                lines.append(f"{field_}.platform = 'matlab';")
+    return lines
+
+
+def launcher_script(study: Path, prestus_root: Path, local: bool = True,
+                    options: PipelineOptions | None = None) -> str:
     """Script that loads the study config and starts the pipeline.
 
     local=True sets platform 'matlab' for this run only (PRESTUS' 'auto'
-    requires sbatch or qsub); the study config is left unchanged.
+    requires sbatch or qsub); the study config is left unchanged. ``options``
+    (PipelineOptions) are passed to prestus_pipeline_start when there are any.
     """
     study = Path(study).resolve()
     lines = [
@@ -54,13 +165,18 @@ def launcher_script(study: Path, prestus_root: Path, local: bool = True) -> str:
     ]
     if local:
         lines += ["parameters.platform = 'matlab';   % run in this MATLAB session"]
-    lines += ["prestus_pipeline_start(parameters);", ""]
+    opt = options_lines(options, local)
+    if opt:
+        lines += opt + ["prestus_pipeline_start(parameters, options);", ""]
+    else:
+        lines += ["prestus_pipeline_start(parameters);", ""]
     return "\n".join(lines)
 
 
-def write_launcher(study: Path, prestus_root: Path, local: bool = True) -> Path:
+def write_launcher(study: Path, prestus_root: Path, local: bool = True,
+                   options: PipelineOptions | None = None) -> Path:
     path = launcher_path(study)
-    path.write_text(launcher_script(study, prestus_root, local), encoding="utf-8")
+    write_text_atomic(path, launcher_script(study, prestus_root, local, options))
     return path
 
 
@@ -69,11 +185,12 @@ def submit_launcher_path(study: Path) -> Path:
     return study.with_name(f"submit_{stem}.m")
 
 
-def write_submit_launcher(study: Path, prestus_root: Path) -> Path:
+def write_submit_launcher(study: Path, prestus_root: Path,
+                          options: PipelineOptions | None = None) -> Path:
     """Launcher that keeps the config's platform, so PRESTUS submits to SLURM/qsub
     (prestus_pipeline_start -> hpc_submit_job) and returns after submission."""
     path = submit_launcher_path(study)
-    path.write_text(launcher_script(study, prestus_root, local=False), encoding="utf-8")
+    write_text_atomic(path, launcher_script(study, prestus_root, local=False, options=options))
     return path
 
 
@@ -176,47 +293,116 @@ def _stem(study: Path) -> str:
     return study.stem[len("config_"):] if study.stem.startswith("config_") else study.stem
 
 
-def plantus_script(study: Path, prestus_root: Path, interactive: bool) -> str:
-    """Script that runs only the PlanTUS placement of the study config.
+PLACEMENT_ONLY = ("for f = fieldnames(parameters.modules)', if startsWith(f{1}, {'run_', 'generate_'}), "
+                  "parameters.modules.(f{1}) = 0; end, end; parameters.modules.run_transducer_placement = 1;")
 
-    interactive=True opens Connectome Workbench to pick the vertex and confirm it in a
-    review dialog (no MATLAB desktop needed); False takes the composite-score optimum.
-    The placement always runs again (placement.reuse: never) and writes the placement
-    report and the positions the placement viewer shows; no simulation runs.
-    """
+
+def matlab_value(v) -> str:
+    """A Python value as a MATLAB literal (str, bool, number, flat list)."""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return repr(v)
+    if isinstance(v, (list, tuple)):
+        return "[" + " ".join(matlab_value(x) for x in v) + "]"
+    return _q(v)
+
+
+def placement_overrides(mode: str = "plantus", interactive: bool = False) -> list[tuple[str, object]]:
+    """Config values a placement-only run sets on top of the study config: the placement
+    always runs again, without interaction unless PlanTUS is to open Workbench."""
+    out: list[tuple[str, object]] = [("simulation.interactive", 0)]
+    if mode == "plantus":
+        out.append(("placement.plantus.interactive", int(interactive)))
+    return out + [("placement.reuse", "never")]
+
+
+def plantus_overrides(interactive: bool) -> list[tuple[str, object]]:
+    return placement_overrides("plantus", interactive)
+
+
+def partial_script(study: Path, prestus_root: Path, what: str, overrides: list[tuple[str, object]],
+                   extra: str = "", local: bool = True) -> str:
+    """Script that runs part of the pipeline for the study config: ``overrides`` replace config
+    values (load_parameters), ``extra`` MATLAB statements then adjust ``parameters`` (e.g.
+    PLACEMENT_ONLY). local=False keeps the config's platform, so PRESTUS submits it as a job."""
     study = Path(study).resolve()
+    cell = "; ...\n".join(f"    {_q(k)}, {matlab_value(v)}" for k, v in overrides)
     return "\n".join([
         f"% Generated by the PRESTUS Nexus on {_dt.date.today().isoformat()}.",
-        f"% Runs only the PlanTUS placement of {study.name}. Edit the study config, not this script.",
+        f"% Runs only {what} of {study.name}. Edit the study config, not this script.",
         "",
         f"prestus_root = {_q(prestus_root)};",
         "addpath(genpath(fullfile(prestus_root, 'functions')));",
         "",
         f"parameters = load_parameters({_q(study.name)}, {_q(study.parent)}, {{ ...",
-        "    'simulation.interactive', 0; ...",
-        f"    'placement.plantus.interactive', {int(interactive)}; ...",
-        "    'placement.reuse', 'never'});",
-        "parameters.platform = 'matlab';   % run in this MATLAB session",
-        "% placement only: every other stage off",
-        "for f = fieldnames(parameters.modules)'",
-        "    if startsWith(f{1}, {'run_', 'generate_'})",
-        "        parameters.modules.(f{1}) = 0;",
-        "    end",
-        "end",
-        "parameters.modules.run_transducer_placement = 1;",
+        cell + "});",
+        *(["parameters.platform = 'matlab';   % run in this MATLAB session"] if local else []),
+        *([f"% {what} only", extra] if extra else []),
         "prestus_pipeline_start(parameters);",
         "",
     ])
 
 
-def plantus_script_path(study: Path) -> Path:
-    return Path(study).with_name(f"plantus_{_stem(Path(study))}.m")
-
-
-def write_plantus_script(study: Path, prestus_root: Path, interactive: bool) -> Path:
-    path = plantus_script_path(study)
-    path.write_text(plantus_script(study, prestus_root, interactive), encoding="utf-8")
+def write_partial_script(study: Path, prestus_root: Path, name: str, what: str,
+                         overrides: list[tuple[str, object]], extra: str = "", local: bool = True) -> Path:
+    path = Path(study).with_name(f"{name}_{_stem(Path(study))}.m")
+    write_text_atomic(path, partial_script(study, prestus_root, what, overrides, extra, local))
     return path
+
+
+def segmentation_overrides(rerun: bool = False) -> list[tuple[str, object]]:
+    """A segmentation-only run (SimNIBS charm, modules.segmentation_only): the segmentation
+    stage runs for a layered medium only; rerun=True segments again over an existing m2m
+    folder (io.overwrite_simnibs), which charm deletes first."""
+    return [("simulation.interactive", 0), ("simulation.medium", "layered"),
+            ("modules.segmentation_only", 1), ("io.overwrite_simnibs", int(rerun))]
+
+
+def write_segmentation_script(study: Path, prestus_root: Path, rerun: bool = False,
+                              local: bool = True) -> Path:
+    return write_partial_script(study, prestus_root, "segmentation", "the SimNIBS segmentation",
+                                segmentation_overrides(rerun), local=local)
+
+
+def placement_script(study: Path, prestus_root: Path, mode: str, interactive: bool = False,
+                     local: bool = True) -> str:
+    """Script that runs only the placement stage of the study config (placement_overrides,
+    every other stage off). local=False keeps the config's platform, so PRESTUS submits it
+    as a job (HPC)."""
+    return partial_script(study, prestus_root, f"the {mode} placement",
+                          placement_overrides(mode, interactive), PLACEMENT_ONLY, local)
+
+
+def placement_script_path(study: Path, mode: str) -> Path:
+    return Path(study).with_name(f"{mode}_{_stem(Path(study))}.m")
+
+
+def write_placement_script(study: Path, prestus_root: Path, mode: str, interactive: bool = False,
+                           local: bool = True) -> Path:
+    return write_partial_script(study, prestus_root, mode, f"the {mode} placement",
+                                placement_overrides(mode, interactive), PLACEMENT_ONLY, local)
+
+
+def plantus_script(study: Path, prestus_root: Path, interactive: bool, local: bool = True) -> str:
+    """Script that runs only the PlanTUS placement of the study config.
+
+    interactive=True opens Connectome Workbench to pick the vertex and confirm it in a
+    review dialog (no MATLAB desktop needed); False takes the composite-score optimum, or
+    placement.plantus.vertex when the config sets one. The placement always runs again
+    (placement.reuse: never) and writes the placement report and the positions the
+    placement viewer shows; no simulation runs. local=False keeps the config's platform,
+    so PRESTUS submits it as a job (HPC).
+    """
+    return placement_script(study, prestus_root, "plantus", interactive, local)
+
+
+def plantus_script_path(study: Path) -> Path:
+    return placement_script_path(study, "plantus")
+
+
+def write_plantus_script(study: Path, prestus_root: Path, interactive: bool, local: bool = True) -> Path:
+    return write_placement_script(study, prestus_root, "plantus", interactive, local)
 
 
 def ingest_script(study: Path, prestus_root: Path, selection: list[tuple[str, str]]) -> str:

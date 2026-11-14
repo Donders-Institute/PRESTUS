@@ -324,3 +324,12 @@ def test_run_page_shows_selected_job_log(schema, prestus_root, tmp_path, monkeyp
     page.jobs_window.close()
 
 
+def test_submit_command_placement_only(tmp_path, prestus_root):
+    r = rmt.RemoteHost("h", path_map=[(str(tmp_path), "/project/x")], prestus_root="/project/x/PRESTUS")
+    argv = rmt.submit_command(r, tmp_path / "config_t.yaml", prestus_root,
+                              [("path.sim", "/project/x/sim")] + launcher.plantus_overrides(False),
+                              extra=launcher.PLACEMENT_ONLY)
+    cmd = argv[-1]
+    assert "placement.plantus.interactive" in cmd and "placement.reuse" in cmd
+    assert "parameters.modules.run_transducer_placement = 1;" in cmd
+    assert cmd.index("run_transducer_placement = 1") < cmd.index("prestus_pipeline_start(parameters)")

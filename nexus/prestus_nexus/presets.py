@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import yamlio
-from .model import ConfigModel
+from .model import ConfigModel, values_equal
 
 _PRESETS_FILE = Path(__file__).parent / "run_presets.yaml"
 
@@ -36,7 +36,24 @@ def apply(model: ConfigModel, preset: Preset) -> None:
     'changed' marker and Issues panel pick it up for free). Keys outside hpc.* are
     rejected -- a preset only ever touches hpc.*, and this guards against a typo in
     run_presets.yaml silently writing somewhere else."""
+    for key in preset.overrides:
+        if not _allowed(key):
+            raise ValueError(f"run preset {preset.name!r}: override key {key!r} is not under hpc.* "
+                             "or platform")
     for key, value in preset.overrides.items():
-        if not (key == "hpc" or key.startswith("hpc.")):
-            raise ValueError(f"run preset {preset.name!r}: override key {key!r} is not under hpc.*")
         model.set(key, value)
+
+
+def _allowed(key: str) -> bool:
+    return key in ("hpc", "platform") or key.startswith("hpc.")
+
+
+def matches(model: ConfigModel, preset: Preset) -> bool:
+    """The study already has every value the preset sets (and the preset sets some)."""
+    return bool(preset.overrides) and all(
+        values_equal(model.get(k), v) for k, v in preset.overrides.items())
+
+
+def current(model: ConfigModel, all_presets: list[Preset]) -> Preset | None:
+    """The first preset whose values the study has, if any."""
+    return next((p for p in all_presets if matches(model, p)), None)

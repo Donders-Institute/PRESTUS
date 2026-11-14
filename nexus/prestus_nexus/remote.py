@@ -232,25 +232,39 @@ def path_overrides(model, remote: RemoteHost) -> tuple[list[tuple[str, str]], li
     return mapped, unmapped
 
 
-def _overrides_cell(overrides: list[tuple[str, str]]) -> str:
-    return "{" + "; ".join(f"{launcher._q(k)}, {launcher._q(v)}" for k, v in overrides) + "}"
+def _overrides_cell(overrides: list[tuple[str, object]]) -> str:
+    return "{" + "; ".join(f"{launcher._q(k)}, {launcher.matlab_value(v)}" for k, v in overrides) + "}"
 
 
 def submit_command(remote: RemoteHost, study: Path, prestus_root: Path,
-                   overrides: list[tuple[str, str]] | None = None) -> list[str]:
+                   overrides: list[tuple[str, object]] | None = None, extra: str = "",
+                   options=None, sequential_overrides: dict | None = None) -> list[str]:
     """ssh argv that loads the study config on the host and submits it with PRESTUS.
 
     Keeps the config's platform and hpc.* settings ('auto' detects the host's scheduler);
     overrides (from path_overrides) replace config values after merging, before
-    load_parameters checks the paths.
+    load_parameters checks the paths. extra: MATLAB statements run on ``parameters``
+    before submitting (e.g. launcher.PLACEMENT_ONLY). options (launcher.PipelineOptions)
+    are passed to prestus_pipeline_start; each sequential config is loaded from its folder on
+    the host with its own path overrides (sequential_overrides: resolved path -> overrides).
     """
     study = Path(study).resolve()
     rdir = PurePosixPath(remote.to_remote(study.parent))
     rroot = remote.remote_root(prestus_root)
-    extra = f", {_overrides_cell(overrides)}" if overrides else ""
+    cell = f", {_overrides_cell(overrides)}" if overrides else ""
+    seq_over = sequential_overrides or {}
+
+    def load_remote(p: Path) -> str:
+        ov = seq_over.get(str(p))
+        c = f", {_overrides_cell(ov)}" if ov else ""
+        return (f"load_parameters({launcher._q(p.name)}, "
+                f"{launcher._q(str(PurePosixPath(remote.to_remote(p.parent))))}{c})")
+
+    opts = launcher.options_lines(options, local=False, load_expr=load_remote)
+    start = "prestus_pipeline_start(parameters, options)" if opts else "prestus_pipeline_start(parameters)"
     body = (f"addpath(genpath(fullfile({launcher._q(rroot)}, 'functions'))); "
-            f"parameters = load_parameters({launcher._q(study.name)}, {launcher._q(str(rdir))}{extra}); "
-            "prestus_pipeline_start(parameters)")
+            f"parameters = load_parameters({launcher._q(study.name)}, {launcher._q(str(rdir))}{cell}); "
+            f"{extra + ' ' if extra else ''}{' '.join(opts) + ' ' if opts else ''}{start}")
     matlab = f"{remote.matlab} -batch {shlex.quote(launcher._wrapped(body))}"
     return remote.ssh(f"cd {shlex.quote(str(rdir))} && {matlab}")
 

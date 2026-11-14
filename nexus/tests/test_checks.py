@@ -161,6 +161,30 @@ def test_placement_issues(schema, tmp_path):
     m.set("placement.tus_entry.script_path", str(tmp_path / "missing.R"))
     found = _msgs(checks.placement_issues(m), "error")
     assert found[("placement.tus_entry.script_path", "error")] == "File not found"
+
+
+def test_grid_resolution_issues(schema):
+    from prestus_nexus.checks import STAIRCASE_MM, grid_issues
+    from prestus_nexus.model import ConfigModel
+    m = ConfigModel(schema)
+    m.set("transducer.freq_hz", 500e3)
+    m.set("simulation.medium", "layered")
+    m.set("grid.resolution_mm", 0.5)                      # 6 PPW in water at 500 kHz: fine
+    assert not grid_issues(m)
+    m.set("grid.resolution_mm", 1.0)                      # 3 PPW, and staircasing
+    msgs = [(i.level, i.message) for i in grid_issues(m)]
+    assert any(lvl == "warning" and "points per wavelength" in t and "0.50 mm" in t for lvl, t in msgs)
+    assert any("staircasing" in t for _lvl, t in msgs)
+    m.set("acoustic_backend", "jwave")
+    assert any(i.level == "error" for i in grid_issues(m))   # jwave diverges below min PPW
+    m.reset("acoustic_backend")
+    m.set("grid.resolution_mm", 0.6)
+    m.set("simulation.medium", "water")                    # no head: no staircasing warning
+    assert not any("staircasing" in i.message for i in grid_issues(m))
+    m.set("simulation.medium", "phantom")
+    assert 0.6 <= STAIRCASE_MM and not any("staircasing" in i.message for i in grid_issues(m))
+
+
 def test_measured_ct_pattern(schema, tmp_path):
     from prestus_nexus.outputs import measured_ct_file
     anat = tmp_path / "anat"

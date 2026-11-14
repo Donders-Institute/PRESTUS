@@ -12,9 +12,9 @@ def test_shipped_presets_load():
     assert names == ["Local", "Donders HPC — default", "Donders HPC — GPU, high-fidelity",
                      "Snellius — A100", "Snellius — H100"]
     assert all(p.description for p in ps)
-    # every override is under hpc.* (the apply() guard assumes this)
+    # every override is under hpc.* or platform (the apply() guard assumes this)
     for p in ps:
-        assert all(k == "hpc" or k.startswith("hpc.") for k in p.overrides)
+        assert p.overrides and all(k in ("hpc", "platform") or k.startswith("hpc.") for k in p.overrides)
 
 
 def test_snellius_presets_use_the_exact_partition_selectors():
@@ -49,3 +49,18 @@ def test_donders_default_resets_what_the_gpu_preset_sets(schema):
     presets.apply(m, by_name["Donders HPC — default"])
     assert m.get("hpc.partition") == "" and m.get("hpc.gpu") == ""
     assert m.get("hpc.timelimit") == "04:00:00" and m.get("hpc.memorylimit") == 20
+
+
+def test_current_profile_follows_the_settings(schema):
+    by_name = {p.name: p for p in presets.load_presets()}
+    m = ConfigModel(schema)
+    # the shipped hpc defaults are the Donders default profile
+    assert presets.current(m, list(by_name.values())).name == "Donders HPC — default"
+    presets.apply(m, by_name["Local"])
+    assert m.get("platform") == "matlab"
+    assert presets.current(m, list(by_name.values())).name == "Local"
+    m.set("platform", "slurm")
+    assert not presets.matches(m, by_name["Local"])
+    m.set("hpc.memorylimit", 33)
+    m.set("hpc.gpu", "gpu:1")
+    assert presets.current(m, list(by_name.values())) is None        # matches no profile

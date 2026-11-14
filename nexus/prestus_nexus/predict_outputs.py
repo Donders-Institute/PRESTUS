@@ -250,10 +250,105 @@ def predict(model: ConfigModel) -> Plan:
                 artifacts=artifacts, common_dirs=common_dirs, warnings=warnings, jobs=jobs)
 
 
+@dataclass
+class SaveItem:
+    label: str                 # 'source matrices'
+    kind: str                  # 'file' | 'folder'
+    where: str                 # path relative to the output folder, e.g. cache/sub-003_layered_results.mat
+    saved: bool                # what the flags decide
+    reason: str                # why: the flag that decides, or the default
+    applies: bool = True       # False when the stage that writes it does not run
+    note: str = ""             # what it holds
+    pattern: str = ""          # glob, relative to the output folder, of this run's files (outputs.existing_outputs)
+
+
+def save_items(model: ConfigModel) -> list[SaveItem]:
+    """The optional outputs (io.save_*, simulation.debug) with where they go and why they are
+    or are not saved, as should_save_output.m and the writers decide. The metrics CSV, the
+    report, log/, img/ and the T1w NIfTI maps are always written (see predict)."""
+    g = model.get
+    sid_raw = g("subject_id")
+    tag = f"sub-{int(sid_raw):03d}" if _is_num(sid_raw) and sid_raw == int(sid_raw) and 0 <= sid_raw <= 999 \
+        else "sub-XXX"
+    medium = g("simulation.medium") or "layered"
+    layered = medium == "layered"
+    affix = sanitize_affix(g("io.output_affix") or "")
+    stem = f"{tag}_{medium}"
+
+    def on(key, default=True) -> bool:
+        v = g(key)
+        return default if v is None or (isinstance(v, list) and not v) else bool(v)
+
+    heating = on("modules.run_heating_sims", False)
+    nifti = on("modules.run_nifti_creation")
+    babelbrain = str(g("acoustic_backend") or "kwave").lower() == "babelbrain"
+    timing_pd = not is_empty(g("timing.pd"))
+    timing_pri = not is_empty(g("timing.pri"))
+
+    items = []
+    for key, label, where, note, applies, why_not in [
+        ("save_source_matrices", "source matrices", f"cache/{stem}_kwave_source{affix}.mat",
+         "transducer source array, shared across variants", not babelbrain, "BabelBrain sets up its own source"),
+        ("save_acoustic_matrices", "acoustic matrices", f"cache/{stem}_results{affix}.mat",
+         "sensor data, grid, medium and source; can be very large", True, ""),
+        ("save_thermal_matrices", "thermal matrices", f"cache/{stem}_heating_res{affix}.mat",
+         "temperature time series and field maps", heating, "no thermal simulation"),
+        ("save_grid_cache", "grid cache", f"cache/{stem}_grid_cache{affix}.mat",
+         "preprocessed grid, reused by a re-run", True, ""),
+        ("save_medium_cache", "medium cache", f"cache/{stem}_medium_cache{affix}.mat",
+         "mapped medium, reused by a re-run", True, ""),
+    ]:
+        value = g(f"io.{key}")
+        saved = _effective_save(g, key)
+        if not is_empty(value):
+            reason = f"io.{key}: {_flag(value)}"
+        elif not is_empty(g("io.save_matrices")):
+            reason = f"io.{key} empty: follows io.save_matrices: {_flag(g('io.save_matrices'))}"
+        else:
+            reason = f"io.{key} and io.save_matrices empty: default {'on' if saved else 'off'}"
+        if not applies:
+            reason = why_not
+        items.append(SaveItem(label, "file", where, saved, reason, applies, note, where))
+
+    items.append(SaveItem("complex pressure field", "file", f"cache/{stem}_p_complex{affix}.mat",
+                          on("io.save_p_complex", False), f"io.save_p_complex: {_flag(g('io.save_p_complex'))}",
+                          True, "magnitude and phase of the steady-state field (large)",
+                          f"cache/{stem}_p_complex{affix}*.mat"))
+    v = g("io.save_heatingvideo")
+    video = f"{stem}_heating_animation{affix}.avi"
+    items.append(SaveItem("heating video", "file", video,
+                          v is None or v == 1, f"io.save_heatingvideo: {_flag(v)}" if heating else "no thermal simulation",
+                          heating, "incremental heating, uncompressed AVI", video))
+    for key, label, kind, where, pattern, note, applies, why_not in [
+        ("save_property_maps", "property maps", "folder", "nii/properties/", "nii/properties/*.nii*",
+         "one NIfTI per acoustic and thermal property", layered and nifti, "layered medium with NIfTI maps only"),
+        ("save_MNI", "MNI-space maps", "file", f"nii/{stem}_MNI{affix}_*.nii.gz", f"nii/{stem}_MNI{affix}_*.nii*",
+         "the NIfTI maps also in MNI space (needs the SimNIBS m2m folder)",
+         layered and nifti, "layered medium with NIfTI maps only"),
+        ("save_Ipa", "pulse-average intensity (Ipa) map", "file", f"nii/{stem}_T1w{affix}_Ipa.nii.gz",
+         f"nii/{stem}_T1w{affix}_Ipa.nii*", "", nifti and timing_pd, "needs timing.pd" if nifti else "no NIfTI maps"),
+        ("save_Ita", "time-average intensity (Ita) map", "file", f"nii/{stem}_T1w{affix}_Ita.nii.gz",
+         f"nii/{stem}_T1w{affix}_Ita.nii*", "", nifti and timing_pd and timing_pri,
+         "needs timing.pd and timing.pri" if nifti else "no NIfTI maps"),
+    ]:
+        value = g(f"io.{key}")
+        saved = _effective_save(g, key)
+        reason = f"io.{key}: {_flag(value)}" if not is_empty(value) else f"io.{key} empty: default {'on' if saved else 'off'}"
+        items.append(SaveItem(label, kind, where, saved, reason if applies else why_not, applies, note, pattern))
+    debug = bool(g("simulation.debug"))
+    items.append(SaveItem("debug diagnostics", "folder", "debug/", debug, f"simulation.debug: {_flag(g('simulation.debug'))}",
+                          True, "preproc/, medium/ and source/ figures and data", "debug/*"))
+    return items
+
+
+def _flag(v) -> str:
+    if is_empty(v):
+        return "empty"
+    return "1" if bool(v) else "0"
+
+
 def save_summary(model: ConfigModel) -> list[str]:
-    """Human-readable read of io.save_* / simulation.debug: what gets kept besides
-    the always-written CSV/report. Mirrors config_default.yaml's io section
-    comments — a direct readout, not a prediction, so it needs no mode branching."""
+    """Plain-text read of save_items, for the command line and the tests."""
     g = model.get
     global_flag = g("io.save_matrices")
     if is_empty(global_flag):
@@ -263,22 +358,13 @@ def save_summary(model: ConfigModel) -> list[str]:
     else:
         global_text = "OFF — saves no matrix below whose flag is left empty"
     lines = ["Global default (io.save_matrices): " + global_text]
-    flags = [
-        ("save_source_matrices", "source matrices", "kwave_source.mat — shared across variants"),
-        ("save_acoustic_matrices", "acoustic matrices", "sensor_data + kgrid + medium + source (can be large)"),
-        ("save_thermal_matrices", "thermal matrices", "heating_res.mat — temperature timeseries + field maps"),
-        ("save_heatingvideo", "heating video", "incremental heating video"),
-        ("save_property_maps", "property maps", "nii/properties/*.nii.gz (layered medium only)"),
-        ("save_MNI", "MNI-space NIfTIs", "in addition to native T1w space"),
-        ("save_Ipa", "Ipa intensity map", "pulse-average intensity NIfTI"),
-        ("save_Ita", "Ita intensity map", "temporal-average intensity NIfTI"),
-        ("save_p_complex", "complex pressure field", "p_complex alongside p_max_all (large)"),
-    ]
-    width = max(len(label) for _, label, _ in flags) + 2
-    for key, label, note in flags:
-        on = _effective_save(g, key)
-        mark = "✓" if on else "✗"
-        lines.append(f"  {mark} {label:<{width}}{note}")
+    items = save_items(model)
+    width = max(len(i.label) for i in items) + 2
+    for i in items:
+        if i.label == "debug diagnostics":
+            continue
+        mark = "✓" if i.saved and i.applies else "✗"
+        lines.append(f"  {mark} {i.label:<{width}}{i.where}  ({i.reason})")
     debug_on = bool(g("simulation.debug"))
     lines.append(("✓" if debug_on else "✗") +
                  " Debug diagnostics (simulation.debug): " +
@@ -289,12 +375,14 @@ def save_summary(model: ConfigModel) -> list[str]:
 # Built-in defaults of should_save_output.m. Matrix flags inherit
 # io.save_matrices when empty; the other io.save_* flags do not.
 _MATRIX_SAVE_DEFAULTS = {"save_source_matrices": True, "save_acoustic_matrices": False,
-                         "save_thermal_matrices": True}
+                         "save_thermal_matrices": True, "save_grid_cache": False,
+                         "save_medium_cache": False}
+_OTHER_SAVE_DEFAULTS = {"save_MNI": True, "save_property_maps": False, "save_kwave_medium": False}
 
 
 def _effective_save(g, key: str) -> bool:
     """Mirror should_save_output.m: per-step flag, else io.save_matrices (matrix
-    flags only), else the built-in default."""
+    flags only), else the built-in default (any flag not listed there: on)."""
     value = g(f"io.{key}")
     if not is_empty(value):
         return bool(value)
@@ -303,4 +391,4 @@ def _effective_save(g, key: str) -> bool:
         if not is_empty(global_flag):
             return bool(global_flag)
         return _MATRIX_SAVE_DEFAULTS[key]
-    return bool(value)
+    return _OTHER_SAVE_DEFAULTS.get(key, True)
