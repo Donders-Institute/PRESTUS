@@ -281,6 +281,123 @@ def probe_command(remote: RemoteHost, prestus_root: Path) -> list[str]:
     return remote.ssh(script)
 
 
+# Lists the SimNIBS installs on the host, as simnibs.find_installs does locally: charm on
+# PATH, conda environments, ~/SimNIBS*, /opt/simnibs*, and the bin folders of the
+# 'simnibs' environment modules (module show). Per install one 'simnibs' line
+# (bin, version, package, pydeface 0/1, module, python, library folder) and its charm.ini as 'ini' lines,
+# normalised like simnibs.normalised_settings. Runs nothing from SimNIBS.
+SIMNIBS_SCAN = r'''
+cands=""; mods=""
+add() { cands="$cands
+$1"; }
+c=$(command -v charm 2>/dev/null) && add "$(dirname "$c")"
+for d in "$HOME"/.conda/envs/*/bin "$HOME"/miniconda3/envs/*/bin "$HOME"/anaconda3/envs/*/bin \
+         "$HOME"/miniforge3/envs/*/bin "$HOME"/mambaforge/envs/*/bin "$HOME"/SimNIBS*/bin \
+         /opt/SimNIBS*/bin /opt/simnibs*/bin /opt/simnibs/*/bin /opt/simnibs/*/*/bin /usr/local/SimNIBS*/bin; do
+  add "$d"
+done
+if [ -f "$HOME/.conda/environments.txt" ]; then
+  while IFS= read -r e; do [ -n "$e" ] && add "$e/bin"; done < "$HOME/.conda/environments.txt"
+fi
+if type module >/dev/null 2>&1; then
+  for m in $(module -t avail simnibs 2>&1 | grep -i '^simnibs' | sed 's/(default)//'); do
+    for p in $(module show "$m" 2>&1 | grep -E '(^|[^A-Z_])PATH([^A-Z_]|$)' | grep -oE '/[^ "),:;]+'); do
+      add "$p"; mods="$mods
+$p	$m"
+    done
+  done
+fi
+seen="|"
+echo "$cands" | while IFS= read -r b; do
+  [ -n "$b" ] && [ -f "$b/charm" ] || continue
+  r=$(cd "$b" 2>/dev/null && pwd -P) || continue
+  case "$seen" in *"|$r|"*) continue;; esac
+  seen="$seen$r|"
+  pkg=$(grep -o "[^\"' ]*site-packages/simnibs/cli/charm.py" "$b/charm" 2>/dev/null | head -n 1)
+  pkg=${pkg%/cli/charm.py}
+  if [ -z "$pkg" ] || [ ! -d "$pkg" ]; then
+    pkg=""
+    for p in "$b"/../lib/python3*/site-packages/simnibs "$b"/../simnibs_env/lib/python3*/site-packages/simnibs \
+             "$r"/../lib/python3*/site-packages/simnibs; do
+      if [ -d "$p" ]; then pkg=$(cd "$p" && pwd -P); break; fi
+    done
+  fi
+  ver=""
+  if [ -n "$pkg" ]; then
+    di=$(ls -d "$pkg"/../simnibs-*.dist-info 2>/dev/null | head -n 1)
+    [ -n "$di" ] && ver=$(basename "$di" | sed -e 's/^simnibs-//' -e 's/\.dist-info$//')
+    if [ -z "$ver" ] && [ -f "$pkg/_version.py" ]; then
+      ver=$(sed -n "s/^__version__ *= *['\"]\([^'\"]*\)['\"].*/\1/p" "$pkg/_version.py" | head -n 1)
+    fi
+  fi
+  pyd=0; [ -f "$b/pydeface" ] && pyd=1
+  mod=$(echo "$mods" | awk -F'\t' -v p="$b" '$1==p {print $2; exit}')
+  py=""; l1=$(head -n 1 "$b/charm" 2>/dev/null)
+  case "$l1" in *'/env '*) ;; '#!'*python*) py=${l1#??}; py=${py# }; py=${py%% *};; esac
+  [ -n "$py" ] && [ ! -f "$py" ] && py=""
+  if [ -z "$py" ]; then
+    py=$(grep -o '"[^"]*python[^"]*" -E' "$b/charm" 2>/dev/null | head -n 1 | sed -e 's/^"//' -e 's/" -E$//')
+    [ -n "$py" ] && [ ! -f "$py" ] && py=""
+  fi
+  [ -z "$py" ] && [ -f "$b/python" ] && py="$b/python"
+  ld=""; [ -n "$pkg" ] && [ -d "$pkg/external/lib/linux" ] && ld="$pkg/external/lib/linux"
+  printf 'simnibs\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$b" "$ver" "$pkg" "$pyd" "$mod" "$py" "$ld"
+  if [ -n "$pkg" ] && [ -f "$pkg/charm.ini" ]; then
+    sed 's/#.*//' "$pkg/charm.ini" | tr -s ' \t' '  ' | sed -e 's/^ //' -e 's/ $//' -e 's/ *= */=/g' \
+      | grep -v '^$' | while IFS= read -r l; do printf 'ini\t%s\t%s\n' "$b" "$l"; done
+  fi
+done
+echo simnibs-scan-done
+'''
+
+
+def simnibs_scan_command(remote: RemoteHost) -> list[str]:
+    """ssh argv that lists the SimNIBS installs on the host (parse_simnibs_scan)."""
+    return remote.ssh(SIMNIBS_SCAN)
+
+
+def parse_simnibs_scan(text: str, host: str):
+    """Output of simnibs_scan_command -> [simnibs.Install] on host, or None when the scan
+    did not finish (no connection, failed setup commands)."""
+    from pathlib import PurePosixPath
+    from .simnibs import Install
+    if "simnibs-scan-done" not in text:
+        return None
+    rows: dict[str, dict] = {}
+    ini: dict[str, list[str]] = {}
+    for line in text.splitlines():
+        parts = line.split("\t")
+        if parts[0] == "simnibs" and len(parts) >= 5:
+            rows[parts[1]] = {"version": parts[2] or None, "package": parts[3],
+                              "pydeface": parts[4] == "1", "module": parts[5] if len(parts) > 5 else "",
+                              "python": parts[6] if len(parts) > 6 else "",
+                              "ld": parts[7] if len(parts) > 7 else ""}
+        elif parts[0] == "ini" and len(parts) >= 3:
+            ini.setdefault(parts[1], []).append("\t".join(parts[2:]))
+    return [Install(PurePosixPath(b), r["version"], PurePosixPath(r["package"]) if r["package"] else None,
+                    host=host, module=r["module"], pydeface=r["pydeface"],
+                    settings_lines=tuple(ini[b]) if b in ini else None,
+                    python=r["python"], ld_library_path=r["ld"])
+            for b, r in rows.items()]
+
+
+def cat_command(remote: RemoteHost, path: str) -> list[str]:
+    """ssh argv that prints a file on the host (e.g. a cluster install's charm.ini)."""
+    return remote.ssh(f"cat {shlex.quote(path)}")
+
+
+def host_from_session(session) -> RemoteHost | None:
+    """The SSH host runs are submitted to (Run tab, saved in the session), or None."""
+    if not session.get("remote_enabled", False) or not str(session.get("remote_host", "") or "").strip():
+        return None
+    local, rem = session.get("remote_local_prefix", ""), session.get("remote_remote_prefix", "")
+    return RemoteHost(host=str(session.get("remote_host")).strip(),
+                      path_map=[(local, rem)] if local and rem else [],
+                      setup=str(session.get("remote_setup", "") or ""),
+                      matlab=str(session.get("remote_matlab", "") or "matlab"),
+                      prestus_root=str(session.get("remote_prestus_root", "") or ""))
+
+
 def parse_probe(text: str) -> dict[str, str]:
     """'key: value' lines from probe_command -> {key: value}; '-' means not found."""
     out: dict[str, str] = {}

@@ -65,3 +65,98 @@ def test_import_rejects_unrelated_file(tmp_path):
     f.write_text(json.dumps({"foo": 1}))
     r = tm.from_tus_calculator(tm.read_settings(f))
     assert not r.timing and r.notes
+
+
+# ── Editing from the diagram ────────────────────────────────────────────
+
+def test_snap_limits_and_dragged_values():
+    p = tm.Protocol(pd=0.02, pri=0.2, ptd=1, ptri=3, ptrd=12, ramp=0.002)
+    assert tm.snap(0.023456) == pytest.approx(0.023) and tm.snap(0) == 0
+    assert tm.limits(p, "pd") == (0.004, 0.2)
+    assert tm.limits(p, "ptri") == (1, 12)
+    assert tm.dragged(p, "pd", 0.5) == pytest.approx(0.2)        # cannot outgrow the PRI
+    assert tm.dragged(p, "ramp", 0.5) == pytest.approx(0.01)     # rise + fall fit in the pulse
+    assert tm.dragged(p, "ptrd", 40.4) == pytest.approx(40)
+    assert not tm.Protocol(**{**p.__dict__, "pd": tm.dragged(p, "pd", 9)}).problems()
+
+
+def test_parse_duration_units_and_frequency():
+    assert tm.parse_duration("20 ms") == pytest.approx(0.02)
+    assert tm.parse_duration("500 µs") == pytest.approx(5e-4)
+    assert tm.parse_duration("0,5") == pytest.approx(0.5)
+    assert tm.parse_duration("2 min") == pytest.approx(120)
+    assert tm.parse_duration("5 Hz", hz=True) == pytest.approx(0.2)
+    assert tm.parse_duration("5 Hz") is None and tm.parse_duration("fast") is None
+
+
+def test_diagram_drag_and_type(schema):
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PyQt6")
+    from PyQt6.QtCore import QPoint, Qt
+    from PyQt6.QtTest import QTest
+    from PyQt6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from prestus_nexus.model import ConfigModel
+    from prestus_nexus.ui.timing_view import TimingPanel
+    model = ConfigModel(schema)
+    for k, v in {"timing.pd": 0.02, "timing.pri": 0.2, "timing.ptd": 1, "timing.ptri": 3, "timing.ptrd": 12,
+                 "timing.pulse_ramp_dur": 0}.items():
+        model.set(k, v)
+    panel = TimingPanel(model)
+    panel.resize(800, 500)
+    panel.show()
+    app.processEvents()
+    d = panel.diagram
+    d.repaint()
+    edge = next(h for h in d._handles if h.edge and h.name == "pd")
+    y = int(edge.rect.center().y())
+    x = int(edge.rect.center().x())
+    QTest.mousePress(d, Qt.MouseButton.LeftButton, pos=QPoint(x, y))
+    QTest.mouseMove(d, QPoint(x + int(0.03 * edge.sx), y))       # +30 ms
+    QTest.mouseRelease(d, Qt.MouseButton.LeftButton, pos=QPoint(x + int(0.03 * edge.sx), y))
+    assert model.get("timing.pd") == pytest.approx(0.05, abs=0.002)
+
+    label = next(h for h in d._handles if not h.edge and h.name == "pri")
+    QTest.mouseClick(d, Qt.MouseButton.LeftButton, pos=label.rect.center().toPoint())
+    assert d._editor is not None
+    d._editor.setText("4 Hz")
+    QTest.keyClick(d._editor, Qt.Key.Key_Return)
+    assert model.get("timing.pri") == pytest.approx(0.25)
+    panel.close()
+
+
+def test_timing_fields_fold_under_the_diagram(schema, tmp_path):
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PyQt6")
+    from pathlib import Path
+    from PyQt6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from prestus_nexus.model import ConfigModel
+    from prestus_nexus.session import Session
+    from prestus_nexus.ui.main_window import MainWindow
+    model = ConfigModel(schema)
+    for k, v in {"timing.pd": 0.02, "timing.pri": 0.2, "timing.ptd": 1, "timing.ptri": 3, "timing.ptrd": 12}.items():
+        model.set(k, v)
+    w = MainWindow(model, Session(tmp_path / "s.yaml"), Path(__file__).resolve().parents[2])
+    page = w.pages["timing"]
+    rows = {r.node.path: r for r in page.rows}
+    page.refresh()
+    assert all(rows[k].block.isHidden() for k in ("timing.pd", "timing.pri", "timing.ptrd"))
+    assert not rows["timing.pulse_ramp_shape"].block.isHidden()          # not set in the diagram
+    w.timing_panel.fold_button.setChecked(True)
+    assert not rows["timing.pd"].block.isHidden()
+    w.timing_panel.fold_button.setChecked(False)
+    model.set("timing.pd", "abc")                                        # an invalid value stays in view
+    page.refresh()
+    assert not rows["timing.pd"].block.isHidden()
+    w.close()
+
+
+def test_values_equal_on_screen_are_not_flagged():
+    # 700 ms typed with a unit used to be 0.7000000000000001 s, so 'PD > PRI' stayed on screen
+    assert tm.parse_duration("700 ms") == 0.7
+    p = tm.Protocol(pd=0.7000000000000001, pri=0.7, ptd=1.4, ptri=2.8, ptrd=5.6, ramp=0.35000000000000003)
+    assert p.problems() == []
+    assert tm.Protocol(pd=0.71, pri=0.7, ptd=1.4).problems()      # a real excess is still reported

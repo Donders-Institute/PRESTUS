@@ -18,6 +18,9 @@ from typing import Any
 from .merge import is_empty, mergestruct
 from .yamlio import load_file
 
+# ITRUSST tissue-property overview: the reference values and bounds the variants take
+ITRUSST_PROPERTIES_URL = "https://itrusst.github.io/itrusst_properties/"
+
 VARIANTS = ("temp_high", "temp_low", "trans_high", "trans_low")
 VARIANT_LABEL = {"default": "Default", "temp_high": "Temp-H (max. heating)",
                  "temp_low": "Temp-L (min. heating)", "trans_high": "Trans-H (max. intensity)",
@@ -37,12 +40,12 @@ PROPERTIES = [
     ("attenuation", "Attenuation", "dB/cm"),
     ("alpha_coeff", "Attenuation coefficient", "dB/(cm·MHz^y)"),
     ("alpha_power", "Attenuation power law y", ""),
-    ("thermal_conductivity", "Thermal conductivity", "W/m/°C"),
-    ("specific_heat_capacity", "Specific heat", "J/kg/°C"),
-    ("perfusion", "Perfusion", "mL/min/kg"),
     ("absorption", "Absorption", "dB/cm"),
     ("absorption_fraction", "Absorption fraction", ""),
     ("absorption_coeff", "Absorption coefficient", "dB/(cm·MHz^y)"),
+    ("thermal_conductivity", "Thermal conductivity", "W/m/°C"),
+    ("specific_heat_capacity", "Specific heat", "J/kg/°C"),
+    ("perfusion", "Perfusion", "mL/min/kg"),
 ]
 THERMAL = ("thermal_conductivity", "specific_heat_capacity", "perfusion", "absorption",
            "absorption_fraction", "absorption_coeff")

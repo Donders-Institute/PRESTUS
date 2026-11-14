@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import simnibs as sn
 from .model import TX, ConfigModel, Issue, is_empty
 from .paths import m2m_dir, resolve_pattern
 from .schema import Node
@@ -102,8 +103,48 @@ def value_issues(model: ConfigModel) -> list[Issue]:
     return issues
 
 
+class _KeyRecorder:
+    """The model, recording which keys get() reads (subject_issues' cache key)."""
+
+    def __init__(self, model: ConfigModel):
+        self._model = model
+        self.read: dict[tuple, str] = {}
+
+    def get(self, path: str, ti: int = 0):
+        value = self._model.get(path, ti)
+        self.read[(path, ti)] = repr(value)
+        return value
+
+    def __getattr__(self, name):
+        return getattr(self._model, name)
+
+
+# subject_issues looks for folders and files (~1 s on a network drive) and runs after every
+# edit. Its answer is reused for _STATUS_TTL_S while every setting it read is unchanged, so
+# typing in an unrelated field does no file I/O.
+_subject_cache: list[tuple[float, dict[tuple, str], tuple, list[Issue]]] = []
+
+
+def _simnibs_context() -> tuple:
+    """What the SimNIBS checks read besides the config: the SSH host and its scanned installs."""
+    return sn.remote_host(), sn.remote_generation()
+
+
 def subject_issues(model: ConfigModel) -> list[Issue]:
     """Subject, path and environment checks (Setup tab inputs)."""
+    now = time.monotonic()
+    ctx = _simnibs_context()
+    for stamp, read, c, issues in _subject_cache:
+        if now - stamp < _STATUS_TTL_S and c == ctx and \
+                all(repr(model.get(k, ti)) == v for (k, ti), v in read.items()):
+            return list(issues)
+    rec = _KeyRecorder(model)
+    issues = _subject_issues(rec)
+    _subject_cache[:] = [(time.monotonic(), rec.read, ctx, issues)]
+    return list(issues)
+
+
+def _subject_issues(model: ConfigModel) -> list[Issue]:
     issues: list[Issue] = []
     g = model.get
     sid = g("subject_id")
@@ -172,9 +213,60 @@ def subject_issues(model: ConfigModel) -> list[Issue]:
                                 f"{m2m.name} not found and no SimNIBS path set to run charm"))
         else:
             issues.append(Issue("info", "path.seg", f"{m2m.name} not found; charm will run"))
-        if not is_empty(simnibs) and not Path(simnibs).is_dir():
-            issues.append(Issue("error", "startup.simnibs_bin_path", "Folder not found"))
+        issues += _simnibs_issues(model, m2m)
     return issues
+
+
+def _simnibs_issues(model: ConfigModel, m2m: Path) -> list[Issue]:
+    """The SimNIBS environment (SimNIBS 4: charm), the charm settings, and an existing
+    segmentation that another version or other settings made (segmentation_check_existing.m)."""
+    g = model.get
+    out: list[Issue] = []
+    bin_path, settings = g("startup.simnibs_bin_path"), g("segmentation.settings_file")
+    inst = None
+    host = sn.remote_host()             # runs submitted over SSH: the install may be on the cluster
+    if not is_empty(bin_path):
+        if Path(bin_path).is_dir():
+            inst = sn.install_info(bin_path)
+            if inst is None:
+                out.append(Issue("error", "startup.simnibs_bin_path", "No charm in this folder (SimNIBS bin folder)"))
+        else:
+            inst = sn.lookup(bin_path)
+            if inst is None and host:
+                out.append(Issue("warning", "startup.simnibs_bin_path",
+                                 f"Not on this computer, nor among the SimNIBS installs found on {host}: "
+                                 "scan the cluster on Medium › Segmentation"))
+            elif inst is None:
+                out.append(Issue("error", "startup.simnibs_bin_path", "Folder not found"))
+        if inst is not None and inst.supported is False:
+            out.append(Issue("error", "startup.simnibs_bin_path",
+                             f"SimNIBS {inst.version}: PRESTUS segments with charm from SimNIBS 4 or later"))
+        for key, value in sn.linked_mismatches(g, inst):
+            out.append(Issue("warning", key,
+                             f"Belongs to another SimNIBS install than startup.simnibs_bin_path ({inst.bin}); "
+                             "leave it empty to follow the selected environment"))
+        if g("segmentation.deface") in (1, True) and inst is not None and inst.pydeface is False:
+            out.append(Issue("warning", "segmentation.deface",
+                             f"pydeface not found in {inst.bin}: no defaced copy is made "
+                             "(install it in the SimNIBS environment)"))
+    if not is_empty(settings):
+        sp = Path(settings)
+        if not sp.is_file():
+            out.append(Issue("warning" if host else "error", "segmentation.settings_file",
+                             "Not found on this computer" + (f"; charm on {host} needs it there" if host else "")))
+        elif sp.resolve().parent == m2m.resolve():
+            out.append(Issue("error", "segmentation.settings_file",
+                             "charm deletes the m2m folder when it re-runs: keep the settings file outside it"))
+    state = sn.segmentation_state(m2m)
+    rerun = g("io.overwrite_simnibs") in (1, True)
+    if state.exists and rerun:
+        out.append(Issue("warning", "io.overwrite_simnibs",
+                         f"charm deletes {m2m.name} (incl. toMNI/T1_to_MNI_post-hoc) and segments again"))
+    elif state.exists:
+        for d in sn.differences(state, inst, None if is_empty(settings) else str(settings)):
+            out.append(Issue("warning", "path.seg",
+                             f"{m2m.name} {d}; it is reused as is (Re-run SimNIBS segmentation to replace it)"))
+    return out
 
 
 # ── Placement modes: availability for the configured subject ─────────────
@@ -295,6 +387,7 @@ _status_cache: dict[tuple, tuple[float, dict]] = {}
 
 def clear_status_cache() -> None:
     _status_cache.clear()
+    _subject_cache.clear()
 
 
 def placement_mode_status(model: ConfigModel) -> dict[str, ModeStatus]:
@@ -343,9 +436,15 @@ def placement_issues(model: ConfigModel) -> list[Issue]:
         elif not (Path(script) / "code" / "PlanTUS.py").is_file():
             issues.append(Issue("error", "placement.plantus.script_path", "code/PlanTUS.py not found here"))
         if is_empty(env):
-            issues.append(Issue("error", "placement.plantus.env_path",
-                                "Required: the SimNIBS (or PRESTUS) Python environment"))
-        elif not Path(env).is_dir():
+            # empty: the Python of the SimNIBS install in startup.simnibs_bin_path
+            inst = sn.lookup(g("startup.simnibs_bin_path"))
+            if is_empty(g("startup.simnibs_bin_path")):
+                issues.append(Issue("error", "placement.plantus.env_path",
+                                    "Required without startup.simnibs_bin_path: the SimNIBS Python environment"))
+            elif inst is not None and not inst.python:
+                issues.append(Issue("warning", "placement.plantus.env_path",
+                                    f"No Python found for the SimNIBS install {inst.bin}: set the environment here"))
+        elif not Path(env).is_dir() and sn.remote_host() is None:
             issues.append(Issue("error", "placement.plantus.env_path", "Folder not found"))
         wb = g("placement.plantus.connectome_wb_path")
         if not is_empty(wb) and not Path(wb).is_dir():

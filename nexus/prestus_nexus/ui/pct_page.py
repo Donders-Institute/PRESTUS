@@ -1,8 +1,9 @@
-"""Pseudo-CT tab: shows the generated pseudoCT.nii.gz (if any) over the subject's T1, and the
-in-skull property distributions the default (pseudo-CT) run models against the range the
-uncertainty bound variants model.
+"""Skull CT tab: shows the CT the skull mapping reads over the subject's T1 (the measured CT in
+path.ct_pattern, else the generated pseudoCT.nii.gz, if any), and the in-skull property
+distributions the default (CT-mapped) run models against the range the uncertainty bound
+variants model.
 
-With pct.enabled, only the default variant maps the skull from the pseudo-CT; the four bound
+With pct.enabled, only the default variant maps the skull from the CT; the four bound
 variants keep its head geometry but give the skull layer the homogeneous values of their medium
 file (simulation.uncertainty_<variant>, else the files shipped in config/uncertainty/). The
 histograms come from, in order of preference:
@@ -25,7 +26,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidg
 from .. import placement as pl
 from ..bridge import BridgeError, as_list
 from ..model import is_empty
-from ..outputs import dir_output, dir_pct, pseudoct_file
+from ..outputs import dir_output, dir_pct, measured_ct_file, pseudoct_file
 from ..study import sanitize_affix
 from ..uncertainty import VARIANTS, variant_file
 from ..yamlio import load_file
@@ -43,8 +44,8 @@ except ImportError:          # pragma: no cover
     HAVE_MPL = False
 
 PROPERTIES = [
-    ("pseudoCT_HU", "pseudo-HU", None),
-    ("density", "Density [kg/m3]", "density"),
+    ("pseudoCT_HU", "(pseudo-)HU", None),
+    ("density", "Density [kg/m³]", "density"),
     ("sound_speed", "Sound speed [m/s]", "sound_speed"),
     ("alpha_coeff", "Attenuation [dB/(cm.MHz)]", "alpha_coeff"),
 ]
@@ -52,7 +53,7 @@ PROPERTIES = [
 RUN_STYLE = ("Skull layer value (unused when mapped)", "ink", "--")      # colour: palette role
 BAND_STYLE = ("Bound variants (homogeneous skull)", "#d98a1f", 0.22)
 SOURCE_TEXT = {"grid": "grid voxels: the exact preprocessed grid",
-               "native": "native voxels: the pCT image before cropping/resampling/smoothing"}
+               "native": "native voxels: the CT image before cropping/resampling/smoothing"}
 
 
 def skull_band(bounds: dict[str, dict], key: str) -> tuple[float, float] | None:
@@ -137,14 +138,14 @@ def stats_title(stats: dict, path: Path) -> str:
     n = stats.get("n_voxels", "?")
     if stats.get("predicted"):
         source = stats.get("source", "")
-        what = f"predicted from the pseudo-CT ({SOURCE_TEXT.get(source, f'{source} voxels')})"
+        what = f"predicted from the CT ({SOURCE_TEXT.get(source, f'{source} voxels')})"
     else:
         what = "mapped skull of the default run"
     return f"In-skull properties, {what} · {path.name} (n={n} skull voxels)"
 
 
 class PctPage(QWidget):
-    """T1 + pseudoCT overlay, plus the in-skull property histograms of the default run or a
+    """T1 + CT overlay, plus the in-skull property histograms of the default run or a
     prediction (if any) against the bound variants' homogeneous skull values."""
 
     def __init__(self, window, parent: QWidget | None = None):
@@ -153,7 +154,7 @@ class PctPage(QWidget):
         self._loaded_for: tuple | None = None
 
         outer = QVBoxLayout(self)
-        title = QLabel("Pseudo-CT")
+        title = QLabel("Skull CT")
         title.setObjectName("CardTitle")
         outer.addWidget(title)
         content = QWidget()
@@ -181,7 +182,7 @@ class PctPage(QWidget):
         self.stats_title.setWordWrap(True)
         head.addWidget(self.stats_title, 1)
         self.predict_btn = QPushButton("Predict skull properties")
-        self.predict_btn.setToolTip("Apply the pct.mapping_* settings to the pseudo-CT skull voxels, "
+        self.predict_btn.setToolTip("Apply the pct.mapping_* settings to the CT's skull voxels, "
                                     "without simulating (pct_predict_skull_properties in MATLAB)")
         self.predict_btn.clicked.connect(self.predict)
         head.addWidget(self.predict_btn)
@@ -222,7 +223,7 @@ class PctPage(QWidget):
         sid, anat = m.get("subject_id"), m.get("path.anat")
         pattern, pct = m.get("path.t1_pattern"), m.get("path.pct")
         seg = m.get("path.seg")
-        key = (sid, anat, pattern, pct, seg, m.get("path.sim"), m.get("simulation.medium"),
+        key = (sid, anat, pattern, pct, seg, m.get("path.ct_pattern"), m.get("path.sim"), m.get("simulation.medium"),
                m.get("io.output_affix"))
         if key == self._loaded_for:
             return
@@ -246,21 +247,30 @@ class PctPage(QWidget):
         enabled = bool(self.model.get("pct.enabled"))
         t1 = self._t1()
         pct_dir = dir_pct(self.model)
-        pct_file, legacy = pseudoct_file(self.model)
+        measured = not is_empty(self.model.get("path.ct_pattern"))
+        if measured:
+            pct_file, legacy = measured_ct_file(self.model), False
+        else:
+            pct_file, legacy = pseudoct_file(self.model)
         sid = self.model.get("subject_id")
         sub = f"sub-{int(sid):03d}" if isinstance(sid, (int, float)) and not isinstance(sid, bool) else "this subject"
         # One panel for what is missing, most basic first; the page shows content otherwise.
         if not enabled and pct_file is None:
-            self.stack.show_empty("Pseudo-CT is off for this study",
+            self.stack.show_empty("CT-based skull mapping is off for this study",
                                   "Skull properties come from the tissue segmentation. Turn on "
-                                  "pct.enabled to derive them from a UTE/PETRA image instead.",
-                                  "Turn on pseudo-CT…", lambda: self.window.goto("pct.enabled"))
+                                  "pct.enabled to map them from a measured CT, or from a pseudo-CT "
+                                  "generated from a UTE/PETRA image.",
+                                  "Turn on CT mapping…", lambda: self.window.goto("pct.enabled"))
         elif t1 is None:
             anat = self.model.get("path.anat")
             self.stack.show_empty("No T1 image yet" if is_empty(anat) else f"No T1 image found for {sub}",
-                                  "The pseudo-CT is shown over the subject's T1 image. Set the "
+                                  "The CT is shown over the subject's T1 image. Set the "
                                   "anatomy folder (path.anat) and path.t1_pattern on Setup ▸ Paths.",
                                   "Set T1 image…", lambda: self.window.goto("path.anat"))
+        elif pct_file is None and measured:
+            self.stack.show_empty(f"No measured CT found for {sub}",
+                                  "path.ct_pattern matches no file in the anatomy folder (path.anat).",
+                                  "Set CT file…", lambda: self.window.goto("path.ct_pattern"))
         elif pct_file is None:
             self.stack.show_empty(f"No pseudo-CT for {sub} yet",
                                   "Running the pipeline with pct.enabled on writes pseudoCT.nii.gz"
@@ -270,10 +280,10 @@ class PctPage(QWidget):
             self.stack.show_content()
         self.viewer.set_anatomy(t1)
         if not enabled:
-            msgs.append("pct.enabled is off: this study does not use the pseudo-CT shown here.")
+            msgs.append("pct.enabled is off: this study does not use the CT shown here.")
         if pct_file is not None:
             self.viewer.set_overlay(pct_file)
-            msgs.append(f"pseudo-CT: {pct_file}")
+            msgs.append(f"{'measured CT (shown at its own resolution; the run resamples it to the segmentation grid)' if measured else 'pseudo-CT'}: {pct_file}")
             if legacy:
                 msgs.append(f"<span style='color:{style.active()['red']}'>This pseudo-CT is in the SimNIBS folder, "
                             "where PRESTUS no longer writes. Move it (with tissues_mask.nii.gz) to "
@@ -296,11 +306,12 @@ class PctPage(QWidget):
         has_matlab = self.window.matlab_path() is not None
         self.predict_btn.setEnabled(self._has_pct and has_matlab and not self._predicting)
         if not self._has_pct:
-            self.predict_btn.setToolTip("Needs a pseudoCT.nii.gz for this subject.")
+            self.predict_btn.setToolTip("Needs a CT for this subject: a measured CT (path.ct_pattern) "
+                                        "or a pseudoCT.nii.gz.")
         elif not has_matlab:
             self.predict_btn.setToolTip("MATLAB not found; set its path on the Run tab.")
         else:
-            self.predict_btn.setToolTip("Apply the pct.mapping_* settings to the pseudo-CT skull voxels, "
+            self.predict_btn.setToolTip("Apply the pct.mapping_* settings to the CT's skull voxels, "
                                         "without simulating (pct_predict_skull_properties in MATLAB)")
 
     def _saved_config(self) -> str | None:
@@ -315,7 +326,7 @@ class PctPage(QWidget):
             return
         self._predicting = True
         self._update_predict_btn()
-        self._note("⟳ Predicting skull properties from the pseudo-CT…", "accent")
+        self._note("⟳ Predicting skull properties from the CT…", "accent")
         self.window.bridge().call("nexus_pct", {"action": "predict", "config": cfg},
                                   on_done=self._predicted, on_error=self._predict_failed)
 
@@ -372,7 +383,7 @@ class PctPage(QWidget):
         self.stats_title.setText("In-skull property distributions")
         if stats_file is None:
             self.canvas.hide()
-            self.stats_note.setText("None for this subject yet: predict them from the pseudo-CT, or "
+            self.stats_note.setText("None for this subject yet: predict them from the CT, or "
                                     "run with pct.enabled on (the default run writes "
                                     "sub-XXX_&lt;medium&gt;_medium_stats.json to the output's cache folder).")
             self.stats_note.show()

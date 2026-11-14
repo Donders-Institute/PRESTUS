@@ -286,13 +286,15 @@ fields:
   segmentation.settings_file: {kind: file}
   segmentation.deface: {kind: flag}
 
-  headmodel.head_pad_mm: {unit: mm}
-  headmodel.csf_expansion: {unit: mm}
-  headmodel.smooth_method: {choices: [gaussian, box]}
-  headmodel.smooth_fwhm_mm: {unit: mm}
+  headmodel.csf_expansion: {unit: mm, group: grid_refinement, group_first: true}
+  headmodel.head_pad_mm: {unit: mm, group: grid_refinement}
+  headmodel.smooth_method: {choices: [gaussian, box, 'off'], group: head_smoothing, group_first: true}
+  headmodel.smooth_threshold_*: {visible_if: {key: headmodel.smooth_method, not_in: ['off']}, group: head_smoothing}
+  headmodel.smooth_fwhm_mm: {unit: mm, visible_if: {key: headmodel.smooth_method, not_in: ['off']}, group: head_smoothing}
+  headmodel.smooth_properties: {visible_if: {key: headmodel.smooth_method, not_in: ['off']}, group: head_smoothing}
   headmodel.skull_fill_method: {choices: [rubberwrap, imclose]}
-  headmodel.skull_wrap_radius: {unit: voxels}
-  headmodel.skull_wrap_visualize: {kind: flag}
+  headmodel.skull_wrap_radius: {unit: voxels, visible_if: {key: headmodel.skull_fill_method, in: [rubberwrap]}}
+  headmodel.skull_wrap_visualize: {kind: flag, visible_if: {key: headmodel.skull_fill_method, in: [rubberwrap]}}
 
   pct.enabled: {kind: flag}
   # The mapping settings apply only with pct.enabled
@@ -726,12 +728,24 @@ tabs:
     label: Placement
     intro: Where the transducer sits and where it focuses, from coordinates, neuronavigation or planning tools.
     sections: [placement, neuronav]
-  - key: simulation
-    label: Simulation
-    intro: Medium and solver, the simulation grid, the sonication protocol and the thermal model.
-    sections: [simulation, grid, timing, thermal, segmentation, headmodel, pct, layers, medium_properties, jwave, babelbrain, elastic, time_reversal]
     doc: doc_nexus_tabs.md#placement-viewer
     subtab_docs: {Settings: doc_placement.md#choosing-a-placement-mode, Viewer: doc_nexus_tabs.md#placement-viewer, Beam axis: doc_nexus_tabs.md#placement-viewer, 3D: doc_nexus_tabs.md#placement-viewer, Localite: doc_nexus_calibration-localite.md#localite-page, PlanTUS: doc_placement_plantus.md#running-plantus, TUS entry: doc_placement_tus_entry.md}
+  - key: medium
+    label: Medium
+    intro: What the beam travels through. Choose the medium, then how the head model is built from the segmentation, the tissue properties against their ITRUSST bounds, and the CT-based skull mapping (measured CT or UTE pseudo-CT).
+    sections: [segmentation, headmodel, head_smoothing, grid_refinement, layers, medium_properties, uncertainty, pct]
+    doc: doc_medium.md
+    subtab_docs: {Head model: doc_preproc.md, Skull CT: doc_pseudoCT.md}
+  - key: sonication
+    label: Sonication
+    intro: The pulse protocol and, when the thermal simulation runs, the thermal model.
+    sections: [timing, coupling, thermal]
+    doc: doc_nexus_tabs.md#timing-diagram-and-tus-calculator
+  - key: solver
+    label: Solver
+    intro: The acoustic and thermal solvers, the simulation grid and the solver-specific options.
+    sections: [simulation, compute, grid, jwave, babelbrain, elastic, time_reversal]
+    doc: doc_backend.md
   - key: study
     label: Study
     intro: Many subjects with per-run settings, targeting accuracy and the group report.
@@ -785,18 +799,21 @@ display:
   thermal_backend: {label: Thermal solver, group: simulation, group_first: true}
 
   # Simulation
-  simulation.medium: {label: Medium, help: "'layered': head model from the SimNIBS segmentation (skin, skull, brain, …); 'water': free-field simulation in water; 'phantom': a user-defined phantom."}
-  simulation.code_type: {label: k-Wave code}
+  simulation.medium: {label: Medium, group: __medium__, help: "'layered': head model from the SimNIBS segmentation (skin, skull, brain, …); 'water': free-field simulation in water; 'phantom': a user-defined phantom."}
+  simulation.code_type: {label: k-Wave backend, group: compute, help: "Where k-Wave computes (acoustic and thermal k-Wave stages, time reversal): 'matlab_gpu' / 'matlab_cpu' (MATLAB), 'cpp_gpu' / 'cpp_cpu' (k-Wave's C++ binaries, fastest), 'cpp_mlx' (Apple Silicon GPU). A GPU choice also requests a GPU for cluster jobs."}
+  jwave.use_gpu: {label: jwave GPU, group: compute}
+  babelbrain.computing_backend: {label: BabelBrain backend, group: compute}
+  babelbrain.device_name: {label: BabelBrain device, group: compute}
   simulation.precision: {label: Numerical precision, advanced: true}
   simulation.interactive: {label: Interactive mode, advanced: true}
-  simulation.debug: {label: Debug outputs, advanced: false}
-  simulation.transducer_coupling: {label: Multi-transducer coupling}
-  simulation.async_grid_mode: {label: Async grid mode, advanced: true}
-  simulation.uncertainty: {label: Uncertainty analysis, advanced: true}
-  simulation.uncertainty_temp_high: {label: Temp-H medium file (max. heating), help: "Medium properties of the Temp-H variant, the ITRUSST bounds that maximise brain heating: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_temp_high.yaml. Tissues and properties the file does not list keep the default medium properties."}
-  simulation.uncertainty_temp_low: {label: Temp-L medium file (min. heating), help: "Medium properties of the Temp-L variant, the ITRUSST bounds that minimise brain heating: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_temp_low.yaml. Tissues and properties the file does not list keep the default medium properties."}
-  simulation.uncertainty_trans_high: {label: Trans-H medium file (max. intensity), help: "Medium properties of the Trans-H variant, the ITRUSST bounds that maximise brain intensity: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_trans_high.yaml. Tissues and properties the file does not list keep the default medium properties. Acoustic only: the pipeline runs no heating for this variant, so thermal properties are not used."}
-  simulation.uncertainty_trans_low: {label: Trans-L medium file (min. intensity), help: "Medium properties of the Trans-L variant, the ITRUSST bounds that minimise brain intensity: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_trans_low.yaml. Tissues and properties the file does not list keep the default medium properties. Acoustic only: the pipeline runs no heating for this variant, so thermal properties are not used."}
+  simulation.debug: {label: Debug outputs, advanced: false, group: modules}
+  simulation.transducer_coupling: {label: Coupling, group: coupling, choice_labels: {coherent: "coherent: fire together, fields interfere", async: "async: fire in separate windows, intensities add"}}
+  simulation.async_grid_mode: {label: "Grid for async runs", advanced: true, group: coupling}
+  simulation.uncertainty: {label: Uncertainty analysis, group: uncertainty, group_first: true}
+  simulation.uncertainty_temp_high: {group: uncertainty, label: Temp-H medium file (max. heating), help: "Medium properties of the Temp-H variant, the ITRUSST bounds that maximise brain heating: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_temp_high.yaml. Tissues and properties the file does not list keep the default medium properties."}
+  simulation.uncertainty_temp_low: {group: uncertainty, label: Temp-L medium file (min. heating), help: "Medium properties of the Temp-L variant, the ITRUSST bounds that minimise brain heating: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_temp_low.yaml. Tissues and properties the file does not list keep the default medium properties."}
+  simulation.uncertainty_trans_high: {group: uncertainty, label: Trans-H medium file (max. intensity), help: "Medium properties of the Trans-H variant, the ITRUSST bounds that maximise brain intensity: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_trans_high.yaml. Tissues and properties the file does not list keep the default medium properties. Acoustic only: the pipeline runs no heating for this variant, so thermal properties are not used."}
+  simulation.uncertainty_trans_low: {group: uncertainty, label: Trans-L medium file (min. intensity), help: "Medium properties of the Trans-L variant, the ITRUSST bounds that minimise brain intensity: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_trans_low.yaml. Tissues and properties the file does not list keep the default medium properties. Acoustic only: the pipeline runs no heating for this variant, so thermal properties are not used."}
 
   # Paths
   path.anat: {label: Anatomical images folder}
@@ -810,7 +827,7 @@ display:
   path.localite_t1_pattern: {label: Localite planning T1 pattern, group: placement, advanced: true}
   path.localite_export: {label: Localite export folder, group: placement, advanced: true}
   path.localite: {label: Localite folder (deprecated), group: placement, advanced: true}
-  path.pct: {label: Pseudo-CT output folder, advanced: true}
+  path.pct: {label: Pseudo-CT output folder, advanced: true, group: pct}
   path.ct_pattern: {label: Measured CT file pattern (empty = pseudo-CT from UTE), group: pct, group_first: true}
   path.acoustic_input: {label: Start from pressure map (NIfTI), advanced: true}
   path.placement: {label: Placement output folder, group: placement, advanced: true}
@@ -1175,6 +1192,11 @@ display:
   babelbrain.cleanup_cache: {label: "Delete the cache after the run", advanced: true}
   babelbrain.dry_run: {label: "Prepare inputs only (dry run)", advanced: true}
   babelbrain.tight_narrow_beam: {label: "Narrow-beam domain", advanced: true}
+  # BabelBrain's own HU mapping lives with the other CT settings (Medium › CT-based skull mapping)
+  babelbrain.ct_mapping: {label: "BabelBrain HU mapping", group: pct}
+  babelbrain.air_regions: {label: "BabelBrain internal air regions", group: pct}
+  babelbrain.air_hu_window: {label: "BabelBrain air HU window", group: pct, advanced: true}
+  babelbrain.air_keep_boundary: {label: "BabelBrain: keep air at the domain boundary", group: pct, advanced: true}
   transducer.tx_calibration: {label: "Drive calibration record"}
   transducer.combo: {label: "Device combination"}
   grid.water_margin_mm: {label: "Lateral water margin"}

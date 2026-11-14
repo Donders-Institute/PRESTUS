@@ -284,7 +284,7 @@ def test_pct_page_predicts_and_prefers_the_default_run(window, tmp_path, monkeyp
     page.predict()
     fn, args = window.fake.calls[-1]
     assert fn == "nexus_pct" and args == {"action": "predict", "config": str(m.path)}
-    assert page.stats_kind == "predicted" and "predicted from the pseudo-CT (native voxels" in page.stats_title.text()
+    assert page.stats_kind == "predicted" and "predicted from the CT (native voxels" in page.stats_title.text()
     att = page.axes[3]
     assert len(att.patches) >= 1 and any("constant 4.7" in t.get_text() for t in att.texts)
     assert page.fig.legends and "Bound variants (homogeneous skull)" in \
@@ -300,3 +300,36 @@ def test_pct_page_predicts_and_prefers_the_default_run(window, tmp_path, monkeyp
     page.predict()
     assert "Prediction failed: No pseudoCT.nii.gz found" in page.stats_note.text()
     assert page.predict_btn.isEnabled()
+
+
+def test_pct_flow_steps_and_curves(window, tmp_path, monkeypatch):
+    m = window.model
+    m.set("simulation.medium", "layered")
+    m.set("pct.enabled", 1)
+    m.set("pct.skull_mapping", "wiesinger")
+    monkeypatch.setattr(MainWindow, "matlab_path", lambda self: "/fake/matlab")
+    hu = [-200, 1000, 3000]
+    window.fake.handlers["nexus_pct"] = lambda args: {
+        "hu": hu, "density": [1000, 1600, 2700], "sound_speed": [1500, 2300, 3600],
+        "alpha_coeff": [0.5, 8, 20], "alpha_power": [1, 1, 1],
+        "mapping": {"density": "k-plan", "sound_speed": "k-plan", "attenuation": "k-plan",
+                    "density_calibration": "kplan_default"},
+        "reference": {"skull": {"density": 1850, "sound_speed": 2800, "alpha_coeff": 13}}}
+    flow = window.pct_flow
+    flow.refresh()
+    texts = [s.text.text() for s in flow.steps]
+    assert [s.glyph for s in flow.steps] == ["mri", "histogram", "line_map", "ct", "table"]
+    assert "UTE / PETRA image" in texts[0] and "HU = -2000 × UTE + 2042" in texts[2]
+    assert flow.ute_canvas.isVisibleTo(flow) and flow.ute_fig.axes[0].lines
+    flow.request_curves(force=True)
+    fn, args = window.fake.calls[-1]
+    assert fn == "nexus_pct" and args["action"] == "curves" and args["pct"]["skull_mapping"] == "wiesinger"
+    assert len(flow.prop_fig.axes) == 3 and "Density (k-plan)" in flow.prop_fig.axes[0].get_title(loc="left")
+    n = len(window.fake.calls)
+    flow.refresh()                                     # same settings: drawn from the cache
+    flow.request_curves(force=True)
+    assert len(window.fake.calls) == n
+
+    m.set("path.ct_pattern", "sub-%1$03d_CT.nii.gz")
+    flow.refresh()
+    assert "Measured CT" in flow.steps[0].text.text() and not flow.steps[2].isVisibleTo(flow)

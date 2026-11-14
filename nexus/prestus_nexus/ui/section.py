@@ -63,6 +63,7 @@ class SectionPage(QFrame):
         self.ti = 0
         self.show_advanced = False
         self.folded: set[str] = set()       # set_fold: rows another control on the card edits
+        self.moved: dict = {}               # move_rows: path -> reveal() of the widget now holding the row
         self.fold_open = False
         self.goal: str | None = None        # 'Tune for' goal: its keys are shown even when advanced
         self.locked = locked                # read-only until unlocked (overlay 'locked')
@@ -249,6 +250,16 @@ class SectionPage(QFrame):
         """A widget shown above the fields (diagram, panel, …), or below them."""
         (self.extras_below if below else self.extras).addWidget(widget)
 
+    def move_rows(self, paths, grid: QGridLayout, reveal=None) -> None:
+        """Show the rows of `paths` in `grid` on another widget (e.g. an advanced fold on a
+        companion card); this page still fills, checks and resets them. `reveal()` opens that
+        widget before focus_key scrolls to one of them."""
+        for row in self.rows:
+            if row.node.path in paths:
+                r = grid.rowCount()
+                grid.addWidget(row.block, r, 0, Qt.AlignmentFlag.AlignTop)
+                grid.addWidget(row.container, r, 1, Qt.AlignmentFlag.AlignTop)
+                self.moved[row.node.path] = reveal
         self.refresh()
 
     def set_table(self, widget: QWidget) -> None:
@@ -282,6 +293,7 @@ class SectionPage(QFrame):
         """Start collapsed while predicate() holds (e.g. geometry from the equipment library),
         until the card is opened or closed by hand; `note` follows the title meanwhile."""
         self.collapse_if, self.collapse_note = predicate, note
+        self.refresh()
 
     def _toggle_body(self) -> None:
         self._user_toggled = True
@@ -397,6 +409,7 @@ class SectionPage(QFrame):
         """Redraw the card icon in the active palette (after a theme change)."""
         if self.icon_name:
             self.icon.setPixmap(icons.icon(self.icon_name, style.active()["accent"], 20).pixmap(20, 20))
+
     def _row_shown(self, row: _Row) -> bool:
         if self._tabulated(row.node):
             return False
@@ -566,6 +579,8 @@ class SectionPage(QFrame):
                 continue
             if not row.container.isVisible() and row.node.advanced and not self.show_advanced:
                 self.set_show_advanced(True)
+            if self.moved.get(path) is not None:
+                self.moved[path]()
             if self.body.isHidden():
                 self._set_body(True)
             w = self.parentWidget()

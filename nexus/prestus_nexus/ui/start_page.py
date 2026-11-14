@@ -189,12 +189,23 @@ class StartPage(QWidget):
         self.simnibs_btn = QPushButton("Choose SimNIBS folder…")
         self.simnibs_btn.setToolTip("The SimNIBS 'bin' folder, which holds charm (startup.simnibs_bin_path)")
         self.simnibs_btn.clicked.connect(self.choose_simnibs)
+        self.seg_run_btn = QPushButton("Run segmentation now")
+        self.seg_run_btn.setToolTip("Run only SimNIBS charm for this participant now (an hour or more; as a "
+                                    "cluster job where the Run tab submits there), so the placement tools and "
+                                    "the 3D head can use it before the first simulation")
+        self.seg_run_btn.clicked.connect(self._run_segmentation)
+        self.seg_run_btn.setVisible(False)
+        seg_btns = QWidget()
+        sb = QHBoxLayout(seg_btns)
+        sb.setContentsMargins(0, 0, 0, 0)
+        sb.addWidget(self.seg_run_btn)
+        sb.addWidget(self.simnibs_btn)
         self.out_lbl = _value_label()
         out_btn = QPushButton("Change…")
         out_btn.setToolTip("Where PRESTUS writes the results (path.sim)")
         out_btn.clicked.connect(self.choose_output)
         rows = [("Subject number", self.sid, None), ("T2 image", self.t2_lbl, None),
-                ("Segmentation", self.seg_lbl, self.simnibs_btn), ("Results folder", self.out_lbl, out_btn)]
+                ("Segmentation", self.seg_lbl, seg_btns), ("Results folder", self.out_lbl, out_btn)]
         for r, (name, w, btn) in enumerate(rows):
             lab = QLabel(name)
             lab.setObjectName("CardSub")
@@ -205,6 +216,10 @@ class StartPage(QWidget):
                 g.addWidget(btn, r, 2, Qt.AlignmentFlag.AlignTop)
         s.body.addWidget(self.image_details)
         return s
+
+    def _run_segmentation(self) -> None:
+        from .segmentation_panel import run_segmentation
+        run_segmentation(self.window)
 
     def dragEnterEvent(self, event) -> None:      # noqa: N802 (Qt API)
         if self._dropped_nifti(event) is not None:
@@ -294,12 +309,14 @@ class StartPage(QWidget):
         m2m = m2m_dir(root, sid) if isinstance(root, str) and root else None
         simnibs = m.get("startup.simnibs_bin_path")
         has_simnibs = not is_empty(simnibs) and qs.is_simnibs_bin(simnibs)
+        self.seg_run_btn.setVisible(bool(has_simnibs and m2m is not None and not m2m.is_dir()))
         if m2m is not None and m2m.is_dir():
             self.seg_lbl.setText(f"Found: {m2m}")
             self.simnibs_btn.setVisible(False)
         elif has_simnibs:
             self.seg_lbl.setText(f"Not found yet. SimNIBS ({simnibs}) creates <i>{m2m.name if m2m else 'it'}</i> "
-                                 "on the first run, which adds a few hours once per participant.")
+                                 "on the first run, which adds a few hours once per participant; or run it "
+                                 "now, on its own.")
             self.simnibs_btn.setText("Change SimNIBS…")
             self.simnibs_btn.setVisible(True)
         else:

@@ -1,23 +1,24 @@
-"""Simulation tab card, shown while simulation.uncertainty is on: the default medium properties
-and the four variants (Temp-H/L bound heating, Trans-H/L bound intensity) side by side, and the
-range of each pair for brain and skull (one column per property with its own scale, as in the
-ITRUSST tissue-property overview). The Trans pair runs acoustic only, so thermal properties show
-the Temp pair alone."""
+"""Medium › Uncertainty card, shown while simulation.uncertainty is on: the ITRUSST bounds plot,
+then a collapsed advanced fold with the default medium properties next to the four variants
+(Temp-H/L bound heating, Trans-H/L bound intensity) and the variant medium files (rows of the
+Uncertainty analysis card, moved here with attach_files). draw_ranges plots the range of each pair for brain and skull
+(one column per property with its own scale, as in the ITRUSST tissue-property overview), with a
+line at the value this config uses. The Trans pair runs acoustic only, so thermal properties
+show the Temp pair alone."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import (QAbstractItemView, QFrame, QHeaderView, QLabel, QTableWidget,
-                             QTableWidgetItem, QVBoxLayout)
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QColor, QDesktopServices
+from PyQt6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout, QHeaderView, QLabel, QPushButton,
+                             QTableWidget, QTableWidgetItem, QToolButton, QVBoxLayout, QWidget)
 
 from .. import uncertainty as unc
 from . import style
 
 try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
     from matplotlib.figure import Figure
     from matplotlib.lines import Line2D
     HAVE_MPL = True
@@ -122,8 +123,21 @@ def draw_ranges(fig, sets: unc.PropertySets, tissues: tuple[str, ...], c: dict) 
     fig.subplots_adjust(left=0.05, right=0.96, top=0.68, bottom=0.12, wspace=0.9)
 
 
+def itrusst_button() -> QPushButton:
+    """Opens the ITRUSST tissue-property overview (reference values and bounds) in the browser."""
+    b = QPushButton("Open ITRUSST tissue properties ↗")
+    b.setProperty("compact", True)
+    b.setToolTip(f"Reference acoustic and thermal properties and their bounds: {unc.ITRUSST_PROPERTIES_URL}")
+    b.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(unc.ITRUSST_PROPERTIES_URL)))
+    return b
+
+
+FILE_KEYS = tuple(f"simulation.uncertainty_{v}" for v in ("temp_high", "temp_low", "trans_high", "trans_low"))
+
+
 class UncertaintyCard(QFrame):
-    """Default and Temp-H/L, Trans-H/L medium properties; hidden unless simulation.uncertainty."""
+    """Bounds plot of the Temp-H/L, Trans-H/L medium properties; values and variant files in an
+    advanced fold below. Hidden unless simulation.uncertainty."""
 
     def __init__(self, model, prestus_root: str | Path, parent=None):
         super().__init__(parent)
@@ -138,24 +152,45 @@ class UncertaintyCard(QFrame):
         title = QLabel("Uncertainty variants: medium properties")
         title.setObjectName("CardTitle")
         v.addWidget(title)
-        self.note = QLabel()
-        self.note.setObjectName("CardSub")
-        self.note.setWordWrap(True)
-        self.note.setTextFormat(Qt.TextFormat.RichText)
-        v.addWidget(self.note)
+        self.errors = QLabel()                  # unreadable variant files: shown with the fold closed
+        self.errors.setObjectName("CardSub")
+        self.errors.setWordWrap(True)
+        self.errors.setTextFormat(Qt.TextFormat.RichText)
+        v.addWidget(self.errors)
 
         self.canvases: dict[str, object] = {}
         if HAVE_MPL:
-            for name, heading in (("brain", "Brain"), ("skull", "Skull: S single layer · T trabecular · C cortical")):
+            from .mpl_theme import ThemedCanvas      # drawn in the Nexus theme
+            self.caption = QLabel()
+            self.caption.setObjectName("CardSub")
+            self.caption.setWordWrap(True)
+            v.addWidget(self.caption)
+            for name, heading in (("brain", "Brain"),
+                                  ("skull", "Skull: S single layer · T trabecular · C cortical")):
                 h = QLabel(heading)
                 h.setObjectName("SubGroupTitle")
                 v.addWidget(h)
-                fig = Figure(figsize=(9, 2.6))
-                canvas = FigureCanvasQTAgg(fig)
+                canvas = ThemedCanvas(Figure(figsize=(9, 2.6)), export_name=f"property_bounds_{name}")
                 canvas.setMinimumHeight(230)
                 v.addWidget(canvas)
                 self.canvases[name] = canvas
+        # advanced: the values behind the plot and the variant medium files
+        self.b_adv = QToolButton(text="Advanced: values per variant and variant medium files")
+        self.b_adv.setCheckable(True)
+        self.b_adv.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.b_adv.setArrowType(Qt.ArrowType.RightArrow)
+        self.b_adv.setAutoRaise(True)
+        self.b_adv.toggled.connect(self._toggle_advanced)
+        v.addWidget(self.b_adv)
+        self.advanced = QWidget()
+        av = QVBoxLayout(self.advanced)
+        av.setContentsMargins(0, 4, 0, 0)
+        self.advanced.hide()
+        v.addWidget(self.advanced)
 
+        values = QLabel("Values per variant")
+        values.setObjectName("SubGroupTitle")
+        av.addWidget(values)
         self.table = QTableWidget(0, 4 + len(unc.VARIANTS))
         self.table.setHorizontalHeaderLabels(["Tissue", "Property", "Unit", "Default",
                                               *(unc.VARIANT_SHORT[v] for v in unc.VARIANTS)])
@@ -165,8 +200,28 @@ class UncertaintyCard(QFrame):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setMinimumHeight(320)
-        v.addWidget(self.table)
+        av.addWidget(self.table)
+
+        files = QLabel("Variant medium files")
+        files.setObjectName("SubGroupTitle")
+        av.addWidget(files)
+        self.note = QLabel()
+        self.note.setObjectName("CardSub")
+        self.note.setWordWrap(True)
+        self.note.setTextFormat(Qt.TextFormat.RichText)
+        av.addWidget(self.note)
+        from .section import SectionPage
+        self.files_grid = SectionPage._new_grid()
+        av.addLayout(self.files_grid)
         self.refresh()
+
+    def attach_files(self, page) -> None:
+        """Show the variant-file rows of the Uncertainty analysis card (`page`) in the fold."""
+        page.move_rows(FILE_KEYS, self.files_grid, reveal=lambda: self.b_adv.setChecked(True))
+
+    def _toggle_advanced(self, on: bool) -> None:
+        self.advanced.setVisible(on)
+        self.b_adv.setArrowType(Qt.ArrowType.DownArrow if on else Qt.ArrowType.RightArrow)
 
     def _signature(self) -> tuple:
         files = []
@@ -191,28 +246,35 @@ class UncertaintyCard(QFrame):
         self.sets = sets = unc.property_sets(self.model, self.prestus_root)
         c = style.active()
         self._fill_note(sets, c)
-        for name, tissues in (("brain", unc.BRAIN), ("skull", unc.SKULL)):
-            canvas = self.canvases.get(name)
-            if canvas is not None:
-                draw_ranges(canvas.figure, sets, tissues, c)
-                canvas.draw_idle()
         self._fill_table(sets, c)
+        for name, tissues in (("brain", unc.BRAIN), ("skull", unc.SKULL)):
+            if name in self.canvases:
+                draw_ranges(self.canvases[name].figure, sets, tissues, c)
+                self.canvases[name].draw_idle()
 
     def _fill_note(self, sets: unc.PropertySets, c: dict) -> None:
-        lines = []
+        lines, errors = [], []
         for variant in unc.VARIANTS:
             label = unc.VARIANT_LABEL[variant]
             if variant in sets.errors:
-                lines.append(f"<b>{label}</b>: <span style='color:{c['red']}'>{sets.errors[variant]}</span>")
+                msg = f"<b>{label}</b>: <span style='color:{c['red']}'>{sets.errors[variant]}</span>"
+                lines.append(msg)
+                errors.append(msg)
             else:
                 lines.append(f"<b>{label}</b>: {sets.files[variant]}")
         freq = (f"Attenuation is compared at the transducer frequency ({sets.freq_mhz:g} MHz)."
                 if sets.freq_from_transducer else
                 f"No transducer frequency set: attenuation is compared at {sets.freq_mhz:g} MHz.")
         lines.append("Each variant file is merged onto the default medium properties; tissues and "
-                     "properties a file does not list (greyed below) keep the default. Trans-H/L run "
-                     "acoustic only, so their thermal properties are not used. " + freq)
+                     "properties a file does not list (greyed in the table) keep the default. Trans-H/L "
+                     "run acoustic only, so their thermal properties are not used.")
         self.note.setText("<br>".join(lines))
+        self.errors.setText("<br>".join(errors))
+        self.errors.setVisible(bool(errors))
+        if hasattr(self, "caption"):
+            self.caption.setText("ITRUSST bounds per property and the value this config uses (line). "
+                                 "Temp-H/L bound brain heating, Trans-H/L brain intensity (acoustic "
+                                 "properties only). " + freq)
 
     def _fill_table(self, sets: unc.PropertySets, c: dict) -> None:
         present = list(sets.sets.get("default", {}))

@@ -8,14 +8,12 @@ proposes all of these keys, and the QuickStart tab writes them into the model.
 
 from __future__ import annotations
 
-import glob
-import os
 import re
 import shutil
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import simnibs
 from .paths import m2m_dir, matlab_sprintf, resolve_pattern
 
 NIFTI_FILTER = "NIfTI images (*.nii *.nii.gz)"
@@ -114,33 +112,18 @@ def default_output(anat: str, config_path: Path | None) -> Path:
     return Path(anat).parent / "prestus_sim"
 
 
-def _charm_names() -> tuple[str, ...]:
-    return ("charm.cmd", "charm.exe", "charm.bat", "charm") if os.name == "nt" else ("charm",)
-
-
 def is_simnibs_bin(folder: str | Path) -> bool:
-    return any((Path(folder) / n).is_file() for n in _charm_names())
+    return simnibs.is_simnibs_bin(folder)
 
 
 def find_simnibs_bin() -> Path | None:
-    """A SimNIBS bin folder (one that holds charm) on this computer, or None: on PATH first,
-    then the installers' default locations on macOS, Windows and Linux."""
+    """A SimNIBS 4 bin folder (one that holds charm) on this computer, or None: on PATH first,
+    then the newest install found (simnibs.find_installs)."""
+    installs = [i for i in simnibs.find_installs() if i.supported is not False]
     exe = shutil.which("charm")
     if exe:
-        return Path(exe).resolve().parent
-    home = Path.home()
-    pats = [str(home / "SimNIBS*" / "bin"), str(home / "Applications" / "SimNIBS*" / "bin")]
-    if sys.platform == "darwin":
-        pats += ["/Applications/SimNIBS*/bin", str(home / "Applications" / "SimNIBS*" / "simnibs_env" / "bin")]
-    elif os.name == "nt":
-        for env in ("LOCALAPPDATA", "PROGRAMFILES"):
-            root = os.environ.get(env)
-            if root:
-                pats += [str(Path(root) / "SimNIBS*" / "bin")]
-    else:
-        pats += ["/opt/SimNIBS*/bin", "/usr/local/SimNIBS*/bin"]
-    for pat in pats:
-        for hit in sorted(glob.glob(pat), reverse=True):      # newest version first
-            if is_simnibs_bin(hit):
-                return Path(hit)
-    return None
+        on_path = Path(exe).resolve().parent
+        for inst in installs:
+            if inst.bin.resolve() == on_path:
+                return inst.bin
+    return installs[0].bin if installs else None

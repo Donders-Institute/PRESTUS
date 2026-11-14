@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -130,19 +131,24 @@ class Protocol:
         return self.pd * self.pulses_per_train * self.trains
 
     def problems(self) -> list[str]:
+        """Inconsistent settings. Comparisons allow a relative 1e-9, so values that are equal
+        on screen (e.g. 700 ms typed with a unit = 0.7000000000000001 s) are not flagged."""
+        def gt(a: float, b: float) -> bool:
+            return a > b * (1 + 1e-9) + 1e-15
+
         out = []
         if not self.has_pulse:
             out.append("No pulse duration: thermal simulations need timing.pd (and the train settings).")
             return out
-        if self.pri and self.pd > self.pri:
+        if self.pri and gt(self.pd, self.pri):
             out.append("Pulse duration exceeds the pulse repetition interval.")
-        if self.ptd and self.pri and self.ptd < self.pri:
+        if self.ptd and self.pri and gt(self.pri, self.ptd):
             out.append("Pulse train is shorter than one pulse repetition interval.")
-        if self.ptri and self.ptd > self.ptri:
+        if self.ptri and gt(self.ptd, self.ptri):
             out.append("Pulse train duration exceeds the train repetition interval.")
-        if self.ptrd and self.ptri and self.ptrd < self.ptri:
+        if self.ptrd and self.ptri and gt(self.ptri, self.ptrd):
             out.append("Repetition duration is shorter than one train repetition interval.")
-        if 2 * self.ramp > self.pd:
+        if gt(2 * self.ramp, self.pd):
             out.append("Rise + fall ramp is longer than the pulse.")
         if self.ramp_shape not in ("linear", "tukey"):
             out.append("Pulse ramp shape must be 'linear' or 'tukey'.")
@@ -248,3 +254,61 @@ def write_settings(path: str | Path, settings: dict) -> Path:
     path = Path(path)
     write_text_atomic(path, json.dumps(settings, indent=2) + "\n")
     return path
+
+
+# ── Editing from the diagram ────────────────────────────────────────────
+
+# Protocol field -> config key
+FIELD_KEYS = {"pd": "timing.pd", "ramp": "timing.pulse_ramp_dur", "pri": "timing.pri",
+              "ptd": "timing.ptd", "ptri": "timing.ptri", "ptrd": "timing.ptrd"}
+FIELD_NAMES = {"pd": "pulse duration", "ramp": "ramp duration", "pri": "pulse repetition interval",
+               "ptd": "pulse train duration", "ptri": "pulse train repetition interval",
+               "ptrd": "pulse train repetition duration"}
+_UNITS = {"s": 1.0, "ms": 1e-3, "us": 1e-6, "µs": 1e-6, "μs": 1e-6, "min": 60.0}
+
+
+def snap(v: float, digits: int = 2) -> float:
+    """`v` rounded to `digits` significant digits (drag resolution)."""
+    if v <= 0 or not math.isfinite(v):
+        return 0.0
+    return round(v, digits - 1 - int(math.floor(math.log10(v))))
+
+
+def limits(p: Protocol, name: str) -> tuple[float, float]:
+    """Range a dragged value may take so the protocol stays valid (see Protocol.problems)."""
+    inf = math.inf
+    if name == "pd":
+        return 2 * p.ramp, (p.pri if p.has_train else inf)
+    if name == "ramp":
+        return 0.0, p.pd / 2
+    if name == "pri":
+        return p.pd, p.ptd
+    if name == "ptd":
+        return p.pri, (p.ptri if p.has_repetition else inf)
+    if name == "ptri":
+        return p.ptd, p.ptrd
+    if name == "ptrd":
+        return p.ptri, inf
+    raise KeyError(name)
+
+
+def dragged(p: Protocol, name: str, value: float) -> float:
+    """A dragged value: snapped, then kept inside `limits`."""
+    lo, hi = limits(p, name)
+    v = snap(value)
+    return min(max(v, lo), hi)
+
+
+def parse_duration(text: str, hz: bool = False) -> float | None:
+    """Seconds from '20 ms', '0.5', '500 us', '2 min' (no unit = seconds); with hz=True also
+    '5 Hz' / '1 kHz' (a repetition frequency, returned as its interval). None if unreadable."""
+    t = text.strip().replace(",", ".").lower()
+    m = re.fullmatch(r"([0-9]*\.?[0-9]+(?:e[-+]?[0-9]+)?)\s*([a-zµμ]*)", t)
+    if not m:
+        return None
+    v, unit = float(m.group(1)), m.group(2)
+    if hz and unit in ("hz", "khz"):
+        f = v * (1e3 if unit == "khz" else 1.0)
+        return 1.0 / f if f > 0 else None
+    scale = _UNITS.get(unit or "s")
+    return None if scale is None else float(f"{v * scale:.12g}")     # 700 ms -> 0.7, not 0.7000000000000001

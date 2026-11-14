@@ -142,7 +142,7 @@ def test_pct_stats_title_says_which_it_is(tmp_path):
     assert "mapped skull of the default run" in stats_title({"n_voxels": 5}, real)
     assert "n=5 skull voxels" in stats_title({"n_voxels": 5}, real)
     native = stats_title({"predicted": True, "source": "native", "n_voxels": 3}, real)
-    assert "predicted from the pseudo-CT (native voxels: the pCT image before cropping" in native
+    assert "predicted from the CT (native voxels: the CT image before cropping" in native
     grid = stats_title({"predicted": True, "source": "grid"}, real)
     assert "grid voxels: the exact preprocessed grid" in grid and "—" not in grid + native
 

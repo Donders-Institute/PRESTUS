@@ -35,17 +35,25 @@ RESULTS = "__results__"
 PCT = "__pct__"
 CALIBRATION = "__calibration__"
 LOCALITE = "__localite__"
+PLANTUS = "__plantus__"
 START = "__start__"
-SPECIAL = (REVIEW, VIEWER, RUN, STUDY, RESULTS, PCT, CALIBRATION, LOCALITE, START)
-SUBTAB_PAGES = (VIEWER, PCT, RESULTS, CALIBRATION, LOCALITE)
 TUNE_FOR = False                     # 'Tune for' control: off until it suggests values (overlay 'tuning' kept)
+MEDIUM_SELECT = "__medium__"         # overlay group of simulation.medium: the Medium tab header row
+PLACEMENT_SELECT = "__placement_method__"   # overlay group of placement.mode: the Placement tab header row
+TUS_ENTRY = "__tus_entry__"
+HEURISTIC = "__heuristic__"
+SPECIAL = (REVIEW, VIEWER, RUN, STUDY, RESULTS, PCT, CALIBRATION, LOCALITE, PLANTUS, TUS_ENTRY, HEURISTIC, START,
+           MEDIUM_SELECT, PLACEMENT_SELECT)
+SELECTORS = (MEDIUM_SELECT, PLACEMENT_SELECT)   # header rows that own their key (goto)
 # Sub-tab label -> icon (ui/icons.py)
 SUBTAB_ICONS = {
     "Settings": "advanced", "Calibration": "chart", "Viewer": "mri", "Beam axis": "wave", "3D": "cube",
     "Transducers": "tx_annular", "Localite": "place_localite", "Heuristic": "place_heuristic",
     "PlanTUS": "place_plantus", "TUS entry": "place_tus_entry", "Head model": "segmentation",
+    "Acoustic properties": "table", "Uncertainty": "range", "Skull CT": "ct", "Stages": "stages", "Where to run": "server",
     "Plan": "report", "Review YAML": "file", "Launch": "play", "Jobs": "jobs", "Results": "chart",
 }
+SUBTAB_PAGES = (VIEWER, PCT, RESULTS, CALIBRATION, LOCALITE, PLANTUS, TUS_ENTRY, HEURISTIC)
 LEVEL_ICON = {"error": "✗", "warning": "⚠", "info": "ℹ"}
 LEVEL_COLOR_KEY = {"error": "red", "warning": "amber", "info": "info"}
 _OPEN_WINDOWS: list = []          # keeps windows opened from File > New / Open alive
@@ -608,6 +616,8 @@ class MainWindow(QMainWindow):
         for spec in self._tab_specs():
             tab = TabPage(self, spec)
             key = spec["key"]
+            if key == "medium":
+                self._build_medium_tab(tab)
             if key == "run":
                 # sub-tabs in workflow order: Stages, Where to run, Plan, Review YAML, Launch, Jobs
                 where, where_col = tab.new_column()
@@ -637,14 +647,54 @@ class MainWindow(QMainWindow):
                 page.changed.connect(self._changed)
                 self.pages[section] = page
                 self._section_tab[section] = key
+                if section == "babelbrain":
+                    # BabelBrain's HU mapping and internal air sit with the other CT settings
+                    bb_ct_link = QLabel(
+                        "CT-based skull properties (BabelBrain HU mapping, internal air) are set under "
+                        "<a href='#pct'>Medium › CT-based skull mapping</a>, once a CT or pseudo-CT is used.")
+                    bb_ct_link.setObjectName("CardSub")
+                    bb_ct_link.setWordWrap(True)
+                    bb_ct_link.linkActivated.connect(lambda _l: self.goto("pct.enabled"))
+                    page.add_extra(bb_ct_link)
+                if section == "segmentation":
+                    from .segmentation_panel import SegmentationPanel
+                    self.segmentation_panel = SegmentationPanel(self)
+                    page.add_extra(self.segmentation_panel)
                 if section == "placement":
                     page.add_extra(LocaliteActions(self))
                     page.add_extra(PlantusActions(self))
+                if section == "segmentation":
+                    from .section import LABEL_WIDTH
+                    from .simnibs_panel import SimnibsPanel
+                    from .. import remote as rmt
+                    from .. import simnibs as sn
+
+                    def _ssh_host(session=self.session):
+                        h = rmt.host_from_session(session)
+                        return h.host if h else None
+                    sn.remote_host = _ssh_host          # checks: an install may be on the cluster
+                    self.simnibs_panel = SimnibsPanel(self.model, LABEL_WIDTH, session=self.session)
+                    self.simnibs_panel.page = page
+                    self.simnibs_panel.changed.connect(self._changed)
+                    page.add_extra(self.simnibs_panel)
+                if section == "medium_properties":
+                    from .medium_table import MediumPanel
+                    self.medium_panel = MediumPanel(self.model, self.prestus_root)
+                    self.medium_panel.goto.connect(self.goto)
+                    page.set_table(self.medium_panel)
+                if section == "coupling":
+                    from .coupling_view import CouplingPrediction
+                    self.coupling_view = CouplingPrediction(self.model, lambda: self.pages.get(VIEWER))
+                    self.coupling_view.open_placement_requested.connect(lambda: self.show_special(VIEWER))
+                    page.add_extra(self.coupling_view, below=True)
                 if section == "timing":
                     from .timing_view import TimingPanel
                     self.timing_panel = TimingPanel(self.model)
                     self.timing_panel.changed.connect(self._changed)
                     page.add_extra(self.timing_panel)
+                    page.set_fold(TimingPanel.FOLDED, open_=False)      # edited in the diagram
+                    self.timing_panel.fold_toggled.connect(
+                        lambda shown, pg=page: (setattr(pg, "fold_open", shown), pg.refresh()))
                 if section == "hpc":
                     from .run_profile import RunProfilePanel
                     self.run_profile_panel = RunProfilePanel(self)
@@ -703,15 +753,13 @@ class MainWindow(QMainWindow):
                 self.pages[LOCALITE] = loc
                 self._section_tab[LOCALITE] = key
                 tab.add_subtab(loc, "Localite")
-            elif key == "simulation":
-                from .pct_page import PctPage
-                pct_page = PctPage(self)
-                self.pages[PCT] = pct_page
-                self._section_tab[PCT] = key
-                tab.set_full_tab(pct_page, "Pseudo-CT")
-                from .uncertainty_view import UncertaintyCard
-                self.uncertainty_card = UncertaintyCard(self.model, self.prestus_root)
-                tab.add_card(self.uncertainty_card)
+            elif key == "medium":
+                # cards that follow the sections of their sub-tab
+                tab.section_columns["uncertainty"].addWidget(self.uncertainty_card)
+                if "uncertainty" in self.pages:          # variant files: in the card's advanced fold
+                    self.uncertainty_card.attach_files(self.pages["uncertainty"])
+                tab.section_columns["pct"].addWidget(self.pct_flow)
+                tab.section_columns["pct"].addWidget(self.pct_formulas)
             elif key == "run":
                 from .run_page import RunPage
                 run = RunPage(self)
@@ -852,7 +900,7 @@ class MainWindow(QMainWindow):
             if tab.key == "placement" and VIEWER in self.pages:
                 self.pages[VIEWER].refresh()
                 self._issue_timer.start()           # the viewer's checks, now its images are loaded
-            if tab.key == "simulation" and PCT in self.pages:
+            if tab.key == "medium" and PCT in self.pages:
                 self.pages[PCT].refresh()
             if tab.key == "run":
                 if VIEWER in self.pages and self.model.get("placement.mode") in ("manual", None, ""):
@@ -905,9 +953,83 @@ class MainWindow(QMainWindow):
         for tab in self.tab_pages.values():
             tab.set_goal(goal)
 
+    def _build_medium_tab(self, tab: TabPage) -> None:
+        """Medium tab: the medium selector as a header row, then sub-tabs 'Head model'
+        (segmentation, head model, tissue layers), 'Acoustic properties' (the property table),
+        'Uncertainty' (the analysis switch and ITRUSST bounds plot; variant table and files in an advanced fold) and
+        'Skull CT' (CT-based skull mapping settings, equations and the CT page). Sub-tabs the medium does not use are hidden (_refresh_medium_tab)."""
+        from .medium_selector import MediumSelector
+        from .pct_flow import PctFlow
+        from .pct_formulas import PctFormulas
+        from .pct_page import PctPage
+        from .uncertainty_view import UncertaintyCard
+        self.medium_selector = MediumSelector(self.model)
+        self.medium_selector.changed.connect(self._changed)
+        self.pages[MEDIUM_SELECT] = self.medium_selector
+        self._section_tab[MEDIUM_SELECT] = tab.key
+        tab.add_header(self.medium_selector)
+
+        scroll, column = tab.new_column()
+        tab.add_subtab(scroll, "Acoustic properties")
+        tab.subtabs.setTabText(0, "Head model")
+        tab.columns.append(column)
+        tab.section_columns["medium_properties"] = column
+
+        # its own sub-tab: switching the analysis on does not reflow the property table
+        unc_scroll, unc_column = tab.new_column()
+        tab.add_subtab(unc_scroll, "Uncertainty")
+        tab.columns.append(unc_column)
+        tab.section_columns["uncertainty"] = unc_column
+        self.uncertainty_card = UncertaintyCard(self.model, self.prestus_root)
+        tab.cards.append(self.uncertainty_card)
+
+        pct_scroll, pct_column = tab.new_column()
+        tab.columns.append(pct_column)
+        tab.section_columns["pct"] = pct_column
+        self.pct_flow = PctFlow(self)
+        tab.cards.append(self.pct_flow)
+        self.pct_formulas = PctFormulas(self.model, self.prestus_root)
+        tab.cards.append(self.pct_formulas)
+        pct_page = PctPage(self)
+        self.pages[PCT] = pct_page
+        self._section_tab[PCT] = tab.key
+        split = QSplitter()
+        split.addWidget(pct_scroll)
+        split.addWidget(pct_page)
+        pct_scroll.setMinimumWidth(520)           # the settings and equations keep their width
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 1)
+        split.setChildrenCollapsible(False)
+        split.setSizes([1000, 1000])
+        split.refresh = pct_page.refresh          # TabPage._sub_tab_changed
+        tab.add_subtab(split, "Skull CT")
+        self.medium_subtabs = {"head": tab.settings_page, "acoustic": scroll, "uncertainty": unc_scroll,
+                               "pct": split}
+        tab.on_refresh = self._refresh_medium_tab
+
+    def _refresh_medium_tab(self, tab: TabPage) -> None:
+        """Water uses no head model and no skull CT; a phantom uses tissue layers but no skull CT."""
+        medium = str(self.model.get("simulation.medium") or "layered")
+        # the variant files bound brain and skull: nothing to vary in water
+        shown = {"head": medium != "water", "acoustic": True, "uncertainty": medium != "water" or self.model.get("simulation.uncertainty") is True,
+                 "pct": medium == "layered"}
+        for name, widget in self.medium_subtabs.items():
+            tab.subtabs.setTabVisible(tab.subtabs.indexOf(widget), shown[name])
+        layers = self.pages.get("layers")
+        if layers is not None and medium == "phantom":
+            # a phantom is defined by its layers: shown (still locked) though the card is advanced
+            layers.setVisible(True)
+        current = next((n for n, w in self.medium_subtabs.items() if w is tab.subtabs.currentWidget()), None)
+        if current is not None and not shown[current]:
+            tab.subtabs.setCurrentWidget(self.medium_subtabs["acoustic"])
+
     def goto(self, path: str, ti: int | None = None) -> None:
         section = self.display_section(path)
         page = self.pages.get(section)
+        if section in SELECTORS and page is not None:
+            self._select_tab(self._section_tab.get(section, ""))
+            page.focus_key(path, ti)
+            return
         if not isinstance(page, SectionPage):
             return
         tab = self._select_tab(self._section_tab.get(section, ""))
