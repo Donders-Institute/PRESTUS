@@ -22,7 +22,8 @@ function [job_id, jobs] = prestus_pipeline_start(parameters, options)
 %   parameters - PRESTUS config; must contain subject_id; platform field
 %                controls dispatch ('matlab','slurm','qsub','auto')
 %   options    - pipeline options (optional, default: struct());
-%                .sequential_configs — cell array of config paths for sequential runs
+%                .sequential_configs — struct of loaded follow-up configs, fields
+%                  config_2, config_3, … (load_parameters output; run in field-number order)
 %
 % Output:
 %   job_id     - HPC scheduler job ID; [] when platform is 'matlab' and for

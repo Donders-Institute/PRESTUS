@@ -19,8 +19,9 @@ function combine_async_intensity(files_in, file_out, targets_wcm2)
 % Rationale: in async mode the instantaneous peak intensity at any voxel
 % equals the maximum over individual transducer fields, not their sum.
 % Summing is correct only for the time-averaged heat deposition used in
-% thermal modelling (assuming equal, non-overlapping duty cycles that
-% together fill the total protocol duty cycle).  Acoustic safety metrics
+% thermal modelling, assuming each transducer fires with the timing block's
+% duty cycle in its own non-overlapping window; if the transducers share that
+% on-time, the sum overestimates heating by up to N.  Acoustic safety metrics
 % (ISPPA, MI, peak pressure) must therefore be derived from p_max_async,
 % not from p_max_all.
 %
