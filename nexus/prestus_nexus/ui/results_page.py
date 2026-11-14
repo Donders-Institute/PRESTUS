@@ -1,5 +1,7 @@
-"""Results tab: acoustic/thermal NIfTI viewer, the self-contained HTML report, the
-output CSV, and a side-by-side comparison of every run in the subject's output folder.
+"""Results tab: a reporting overview of the run (ITRUSST items and non-significant-risk
+check, itrusst_report.py), the acoustic/thermal NIfTI maps (Spatial), the thermal time
+courses, the self-contained HTML report, the output CSV, and a side-by-side comparison of
+every run in the subject's output folder. The Overview opens first.
 
 One output folder holds several runs, told apart by their output affix (study
 conditions, uncertainty variants, async per-transducer sub-runs and joint result,
@@ -13,21 +15,30 @@ they are opened, so the T1, the maps and the HTML report are read on request."""
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
-from PyQt6.QtCore import QUrl
-from PyQt6.QtGui import QDesktopServices
-from PyQt6.QtWidgets import (QComboBox, QHBoxLayout, QLabel, QPushButton, QTableWidget,
-                             QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget)
+from html import escape
 
+from PyQt6.QtCore import QUrl, pyqtSignal
+from PyQt6.QtGui import QDesktopServices, QGuiApplication
+from PyQt6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton,
+                             QTableWidget,
+                             QTableWidgetItem, QTabWidget, QTextBrowser, QVBoxLayout, QWidget)
+
+from .. import focal_widths as fwm
+from .. import followup as fu
+from .. import itrusst_report as ir
 from .. import placement as pl
 from .. import results as rs
 from ..model import is_empty
 from ..outputs import dir_output
+from . import style
 from .empty_state import EmptyStack
 from .heat_view import HeatPanel
 from .ortho_view import OrthoViewer, cached_volume
+from .pose_table import PoseTable
 
 # Marker colours per transducer (1, 2, ...), drawn on the result maps.
 TX_COLOURS = ("#ffffff", "#5ad1ff", "#9dff8a", "#ffd35a")
@@ -104,8 +115,144 @@ class _OverlayPanel(QWidget):
             self.viewer.when_loaded(lambda: self.viewer.centre_on(self.viewer.overlay_peak()))
 
 
+class OverviewPanel(QWidget):
+    """The run's parameters as ITRUSST asks TUS studies to report them, with the
+    non-significant-risk check; each row names its source (itrusst_report.py).
+
+    Focal widths of runs whose CSV has no focal_fwhm_* columns are measured on their T1w
+    intensity map (focal_widths.py) on a worker thread; the rows read 'measuring…' until
+    the result arrives, and the overview is then rebuilt."""
+
+    STATUS = {"within": ("ok", "within"), "near": ("warn", "near limit"), "above": ("bad", "above")}
+    _widths_done = pyqtSignal(object, object)          # (token, {stem: FocalWidths | None})
+    _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="nexus-focal-widths")
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.report: ir.Report | None = None
+        self._args = None                                # (model, run, runs) last shown
+        self._widths: dict = {}
+        self._token = 0
+        self._widths_done.connect(self._on_widths)
+        v = QVBoxLayout(self)
+        v.setContentsMargins(0, 0, 0, 0)
+        bar = QHBoxLayout()
+        self.summary = QLabel()
+        self.summary.setWordWrap(True)
+        bar.addWidget(self.summary, 1)
+        self.copy = QPushButton("Copy as Markdown")
+        self.copy.setToolTip("Copy the overview as Markdown tables, e.g. for a methods section or a lab notebook")
+        self.copy.clicked.connect(self._copy)
+        bar.addWidget(self.copy)
+        v.addLayout(bar)
+        self.view = QTextBrowser()
+        self.view.setOpenLinks(False)
+        v.addWidget(self.view, 1)
+
+    def load(self, model, run: rs.Run | None, runs: list[rs.Run]) -> None:
+        self._token += 1
+        self._args = (model, run, runs)
+        self._widths = {}
+        todo = []
+        if run is not None:
+            for r in ir.width_runs(run, runs):
+                inputs = fwm.inputs_for(r)
+                axis = tuple(float(a) for a in (*inputs[2], *inputs[3]))
+                hit = fwm.cached(inputs[0], inputs[1], axis)
+                self._widths[r.stem] = hit if hit is not None else ir.PENDING
+                if hit is None:
+                    todo.append((r.stem, inputs))
+        if todo:
+            token = self._token
+            fut = self._executor.submit(_measure_widths, todo)
+            fut.add_done_callback(lambda f: self._widths_done.emit(token, f))
+        self._show()
+
+    def _on_widths(self, token, fut) -> None:
+        if token != self._token or self._args is None:
+            return                                       # another run is shown by now
+        try:
+            found = fut.result()
+        except Exception:                                # noqa: BLE001 — shown as not available
+            found = {}
+        for stem, value in list(self._widths.items()):
+            if value == ir.PENDING:
+                self._widths[stem] = found.get(stem)
+        self._show()
+
+    def _show(self) -> None:
+        model, run, runs = self._args
+        self.report = ir.build(model, run, runs, self._widths) if run is not None else None
+        self.copy.setEnabled(self.report is not None)
+        if self.report is None:
+            self.summary.setText("No run selected.")
+            self.view.clear()
+            return
+        from .readout import status
+        r = self.report
+        if r.verdict == "within":
+            head = status("Within ITRUSST non-significant-risk limits", "ok")
+        elif r.verdict == "review":
+            head = status(f"{len(r.above)} metric(s) above their ITRUSST NSR reference level: "
+                          f"{escape(', '.join(r.above))}. Inspect NSR adherence.", "bad")
+        else:
+            head = status("No ITRUSST-limited metric in this run's outputs", "muted")
+        self.summary.setText(f"<b>{escape(r.run_label)}</b> ({escape(r.medium)}) · {head}")
+        self.view.setHtml(self.html(r))
+
+    def html(self, r: ir.Report) -> str:
+        from .readout import status
+        c = style.active()
+        out = [f"<style>td {{ padding: 2px 10px 2px 0; }} th {{ text-align: left; color: {c['ink3']}; "
+               f"font-weight: normal; padding: 2px 10px 2px 0; }} h3 {{ margin: 12px 0 4px 0; }}</style>"]
+        for sec in r.sections:
+            out.append(f"<h3>{escape(sec.title)}</h3>")
+            if sec.note:
+                out.append(f"<p style='color:{c['ink3']}'>{escape(sec.note)}</p>")
+            if not sec.rows:
+                continue
+            limits = any(row.limit for row in sec.rows)
+            head = "<tr><th>Item</th><th>Value</th>" + ("<th>Limit</th><th>Status</th>" if limits else "") \
+                + "<th>Source</th></tr>"
+            out.append(f"<table cellspacing='0' width='100%'>{head}")
+            for row in sec.rows:
+                value = escape(row.value)
+                if row.value == ir.NA:
+                    value = f"<span style='color:{c['ink4']}'>{value}</span>"
+                cells = f"<td>{escape(row.label)}</td><td><b>{value}</b></td>"
+                if limits:
+                    st = self.STATUS.get(row.status)
+                    cells += f"<td>{escape(row.limit)}</td><td>{status(st[1], st[0]) if st else ''}</td>"
+                cells += f"<td style='color:{c['ink3']}'>{escape(row.source)}</td>"
+                out.append(f"<tr>{cells}</tr>")
+            out.append("</table>")
+        return "".join(out)
+
+    def _copy(self) -> None:
+        if self.report is not None:
+            QGuiApplication.clipboard().setText(ir.to_markdown(self.report))
+
+
+def _measure_widths(todo) -> dict:
+    """{stem: FocalWidths or None} for (stem, focal_widths.inputs_for) pairs (worker thread)."""
+    out = {}
+    for stem, (path, mask, trans, focus) in todo:
+        try:
+            out[stem] = fwm.measure(path, mask, trans, focus)
+        except Exception:                                # noqa: BLE001 — unreadable map
+            out[stem] = None
+    return out
+
+
 class ResultsPage(QWidget):
-    """Run selector over Acoustic / Thermal / Heating / Report / Data Table / Compare sub-tabs."""
+    """Run selector over Overview / Spatial (Acoustic, Thermal) / Heating / Report /
+    Data table / Poses (time-reversal pose search only) / Compare sub-tabs.
+
+    "Follow-up…" starts a new config from the selected run (followup_dialog); the run header
+    shows its lineage (follow-up configs in the study folder, results.lineage_links).
+    ``followup_created(path)`` is emitted with the saved follow-up config."""
+
+    followup_created = pyqtSignal(object)
 
     def __init__(self, window, parent: QWidget | None = None):
         super().__init__(parent)
@@ -147,29 +294,53 @@ class ResultsPage(QWidget):
         open_folder.setToolTip("Show this subject's output folder in the file manager")
         open_folder.clicked.connect(self._open_folder)
         tb.addWidget(open_folder)
+        self.followup_btn = QPushButton("Follow-up…")
+        self.followup_btn.setToolTip("Create a new config that starts from this run's results: "
+                                     "another intensity, timing or placement, a time-reversal pose, "
+                                     "or a sequential run with heat carry-over")
+        self.followup_btn.clicked.connect(lambda: self.open_followup())
+        tb.addWidget(self.followup_btn)
         # run selector and open buttons do nothing until there are runs: hidden till then
-        self._run_controls = (self.run_label, self.run_combo, open_html, open_folder)
+        self._run_controls = (self.run_label, self.run_combo, open_html, open_folder, self.followup_btn)
         tb.addStretch(1)
         self.status = QLabel("No output loaded.")
         self.status.setObjectName("CardSub")
         tb.addWidget(self.status)
         v.addLayout(tb)
+        self.lineage = QLabel()
+        self.lineage.setObjectName("CardSub")
+        self.lineage.setWordWrap(True)
+        self.lineage.hide()
+        v.addWidget(self.lineage)
 
         self.subtabs = QTabWidget()
         self.stack = EmptyStack(self.subtabs)
         v.addWidget(self.stack, 1)
+        self.overview = OverviewPanel()
+        self.subtabs.addTab(self.overview, "Overview")
         acoustic = tuple(k for k in rs.MAPS if k not in rs.THERMAL_MAPS)
         set_t1 = (lambda: window.goto("path.anat")) if hasattr(window, "goto") else None
+        self.spatial = QTabWidget()                 # the maps on the T1
+        self.spatial.setDocumentMode(True)
         self.acoustic = _OverlayPanel(acoustic, "acoustic", set_t1)
-        self.subtabs.addTab(self.acoustic, "Acoustic")
+        self.spatial.addTab(self.acoustic, "Acoustic")
         self.thermal = _OverlayPanel(rs.THERMAL_MAPS, "thermal", set_t1)
-        self.subtabs.addTab(self.thermal, "Thermal")
-        self.heat = HeatPanel()
+        self.spatial.addTab(self.thermal, "Thermal")
+        self.spatial.currentChanged.connect(lambda _i: self._load_visible())
+        self.subtabs.addTab(self.spatial, "Spatial")
+        self.heat = HeatPanel(filename_hint=lambda: (f"{self._run.stem}_heating" if getattr(self, "_run", None)
+                                                    is not None else "heating"))
         self.subtabs.addTab(self.heat, "Heating")
         self.report_tab, self.web, self.report_combo = self._build_report_tab()
         self.subtabs.addTab(self.report_tab, "Report")
         self.table = QTableWidget()
-        self.subtabs.addTab(self.table, "Data Table")
+        self.subtabs.addTab(self.table, "Data table")
+        self.poses = PoseTable()
+        self.poses.use_pose.connect(lambda row: self.open_followup("pose_from_time_reversal", row))
+        self.subtabs.addTab(self.poses, "Poses")
+        self.subtabs.setTabVisible(self.subtabs.indexOf(self.poses), False)
+        self.subtabs.setTabToolTip(self.subtabs.indexOf(self.poses),
+                                   "Poses scored by the time-reversal pose search")
         self.compare = QTableWidget()
         self.compare.setToolTip("One row per run; double-click a row to show that run")
         self.compare.cellDoubleClicked.connect(lambda row, _c: self.run_combo.setCurrentIndex(row))
@@ -187,18 +358,64 @@ class ResultsPage(QWidget):
                          "(e.g. the sequential or multi-ISPPA summary)")
         combo.currentIndexChanged.connect(self._load_report)
         row.addWidget(combo, 1)
+        self.pdf_btn = QPushButton("Export report as PDF…")
+        self.pdf_btn.setToolTip("Save the shown report as a PDF")
+        self.pdf_btn.clicked.connect(self._export_pdf)
+        self.pdf_btn.setEnabled(False)
+        row.addWidget(self.pdf_btn)
         vl.addLayout(row)
-        try:
-            from PyQt6.QtWebEngineWidgets import QWebEngineView
-            web = QWebEngineView()
-            vl.addWidget(web, 1)
-            return w, web, combo
-        except ImportError:
-            note = QLabel("PyQt6-WebEngine not installed — use 'Open HTML report' to view it "
-                          "in a browser instead.")
-            note.setWordWrap(True)
-            vl.addWidget(note)
-            return w, None, combo
+        self._report_layout = vl
+        return w, None, combo
+
+    def _web(self):
+        """The report view, created when the Report tab first shows a report (QtWebEngine is
+        imported before the QApplication in app.py, as Qt requires; the view itself is only
+        built on demand). None without PyQt6-WebEngine."""
+        if self.web is None and not getattr(self, "_no_web", False):
+            try:
+                from PyQt6.QtWebEngineWidgets import QWebEngineView
+            except ImportError:
+                self._no_web = True
+                note = QLabel("PyQt6-WebEngine not installed — use 'Open HTML report' to view it "
+                              "in a browser instead.")
+                note.setWordWrap(True)
+                self._report_layout.addWidget(note)
+                return None
+            self.web = QWebEngineView()
+            self._report_layout.addWidget(self.web, 1)
+        return self.web
+
+    def _export_pdf(self) -> None:
+        web = self.web
+        src = self.report_combo.currentData()
+        if web is None or not src:
+            return
+        start = str(Path(src).with_suffix(".pdf"))
+        chosen, _ = QFileDialog.getSaveFileName(self, "Export report as PDF", start, "PDF (*.pdf)")
+        if not chosen:
+            return
+        target = Path(chosen)
+
+        def done(data) -> None:
+            from ..fsio import write_bytes_atomic
+            try:
+                if not data:
+                    raise OSError("the report could not be printed")
+                write_bytes_atomic(target, bytes(data))
+            except OSError as exc:
+                QMessageBox.warning(self, "PDF not saved", f"Could not save {target}:\n{exc}")
+                return
+            self.status.setText(f"Saved {target.name}")
+        web.page().printToPdf(done)
+
+    def show_view(self, widget: QWidget) -> None:
+        """Bring a sub-tab forward, also one inside Spatial (Acoustic, Thermal)."""
+        if self.spatial.indexOf(widget) >= 0:
+            self.spatial.setCurrentWidget(widget)
+            self.subtabs.setCurrentWidget(self.spatial)
+        else:
+            self.subtabs.setCurrentWidget(widget)
+        self._load_visible()
 
     # ── model-derived paths ─────────────────────────────────────────────
     def _base(self) -> Path | None:
@@ -300,10 +517,55 @@ class ResultsPage(QWidget):
 
     def _show_part(self, index: int) -> None:
         self._part = self._parts[index] if 0 <= index < len(self._parts) else self._current()
-        self._stale = {self.acoustic, self.thermal, self.heat, self.report_tab}
+        self._stale = {self.overview, self.acoustic, self.thermal, self.heat, self.report_tab,
+                       self.poses}
         self._fill_reports(self._part)
         self._load_table(self._part)
+        self._show_lineage(self._current())
+        tables = fu.pose_tables(self._part) if self._part is not None else []
+        self.subtabs.setTabVisible(self.subtabs.indexOf(self.poses), bool(tables))
+        self._pose_tables = tables
+        self.followup_btn.setEnabled(self._part is not None and self.window.model.path is not None)
         self._load_visible()
+
+    # ── follow-ups and lineage ──────────────────────────────────────────
+    def _show_lineage(self, run: rs.Run | None) -> None:
+        """'Follow-up of …' / 'Follow-ups: …' for the selected run, from the lineage headers of
+        the configs in the study folder."""
+        path = self.window.model.path
+        if run is None or path is None:
+            self.lineage.hide()
+            return
+        links = rs.lineage_links(path.parent)
+        up, down = rs.lineage_for(run, links, path)
+        parts = []
+        if up is not None:
+            kind = fu.TYPES[up.type].label if up.type in fu.TYPES else up.type
+            parent = Path(up.parent_config).name if up.parent_config else "?"
+            label = rs.describe_affix(up.parent_affix)[0]
+            parts.append(f"Follow-up ({escape(kind)}) of run <b>{escape(label)}</b> in {escape(parent)}, "
+                         f"config {escape(up.child_config.name)}")
+        if down:
+            items = ", ".join(f"{escape(rs.describe_affix(d.child_affix)[0])} ({escape(d.child_config.name)})"
+                              for d in down)
+            parts.append(f"Follow-ups of this run: {items}")
+        self.lineage.setText(" · ".join(parts))
+        self.lineage.setVisible(bool(parts))
+
+    def open_followup(self, ftype: str | None = None, pose: dict | None = None):
+        """The follow-up dialog for the selected run (or async part)."""
+        run = self._part or self._current()
+        if run is None:
+            return None
+        if self.window.model.path is None:
+            QMessageBox.information(self, "Save first", "Save this config first: a follow-up refers to it.")
+            return None
+        from .followup_dialog import FollowupDialog
+        dlg = FollowupDialog(self.window, run, ftype=ftype, pose=pose, parent=self)
+        dlg.created.connect(self.followup_created.emit)
+        dlg.created.connect(lambda _p: self._show_lineage(self._current()))
+        dlg.open()
+        return dlg
 
     def _thermal_run(self) -> rs.Run | None:
         """Async per-transducer fields have no thermal stage: show the joint run's."""
@@ -313,10 +575,14 @@ class ResultsPage(QWidget):
     def _load_visible(self) -> None:
         """Load the shown sub-tab's files if it has not shown the current run yet."""
         w = self.subtabs.currentWidget()
+        if w is self.spatial:
+            w = self.spatial.currentWidget()
         if w not in self._stale:
             return
         self._stale.discard(w)
-        if w is self.acoustic or w is self.thermal:
+        if w is self.overview:
+            self.overview.load(self.window.model, self._part, self._all_runs)
+        elif w is self.acoustic or w is self.thermal:
             anat = self._anat()
             markers = self._markers(self._part, anat)
             if w is self.acoustic:
@@ -327,6 +593,8 @@ class ResultsPage(QWidget):
             self.heat.load(self._thermal_run())
         elif w is self.report_tab:
             self._load_report()
+        elif w is self.poses:
+            self.poses.load(getattr(self, "_pose_tables", []))
 
     def _markers(self, run: rs.Run | None, anat: Path | None):
         """Transducer (square) and focus (x) of every transducer of the run, as its
@@ -351,9 +619,13 @@ class ResultsPage(QWidget):
         markers = []
         for i, (trans, focus) in enumerate(positions):
             colour = TX_COLOURS[(i + offset) % len(TX_COLOURS)]
+            ti = i + offset                     # hover text: the device the open config names
+            tip = (self.window.model.transducer_tooltip(ti) if ti < self.window.model.n_transducers
+                   else f"Transducer {ti + 1}")
             for pos, marker in ((trans, "s"), (focus, "x")):
                 if isinstance(pos, list) and len(pos) == 3 and all(isinstance(c, (int, float)) for c in pos):
-                    markers.append((pl.prestus_voxel_to_ras(t1, pos), marker, colour))
+                    markers.append((pl.prestus_voxel_to_ras(t1, pos), marker, colour,
+                                    tip if marker == "s" else f"{tip} · focus"))
         self._marker_cache = (key, markers)
         return markers
 
@@ -374,8 +646,10 @@ class ResultsPage(QWidget):
             self._stale.add(self.report_tab)       # load when the Report tab is opened
             return
         path = self.report_combo.currentData()
-        if path and self.web is not None:
-            self.web.setUrl(QUrl.fromLocalFile(path))
+        web = self._web() if path else self.web
+        if path and web is not None:
+            web.setUrl(QUrl.fromLocalFile(path))
+        self.pdf_btn.setEnabled(bool(path) and web is not None)
 
     def _load_table(self, run: rs.Run | None) -> None:
         metrics = rs.read_metrics(run.csv if run is not None else None)

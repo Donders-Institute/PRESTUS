@@ -144,6 +144,13 @@ class StartPage(QWidget):
         intro.setObjectName("TabIntro")
         intro.setWordWrap(True)
         self.col.addWidget(intro)
+        # the one entry to follow-ups (Results ▸ Follow-up…), off the four-step main path
+        followup = QLabel("<a href='results'>Already have results? Start a follow-up run "
+                          "(another intensity, timing or pose) from the Results tab ›</a>")
+        followup.setObjectName("CardSub")
+        followup.setToolTip("Opens Results; pick a run and press Follow-up…")
+        followup.linkActivated.connect(self.goto_tab.emit)
+        self.col.addWidget(followup)
 
         self.step_image = self._build_image_step()
         self.step_tx = self._build_transducer_step()

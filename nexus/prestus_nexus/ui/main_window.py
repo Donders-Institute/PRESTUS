@@ -830,6 +830,7 @@ class MainWindow(QMainWindow):
             elif key == "results":
                 from .results_page import ResultsPage
                 results = ResultsPage(self)
+                results.followup_created.connect(lambda path: self.open_study(path))
                 self.pages[RESULTS] = results
                 self._section_tab[RESULTS] = key
                 tab.set_full_tab(results, "Results")
@@ -1402,6 +1403,7 @@ class MainWindow(QMainWindow):
         if g.failed:
             return
         self.model.load_dict(fresh.override_dict())
+        self.model.lineage = fresh.lineage
         self.history.clear()
         self.dirty = False
         for page in self.pages.values():

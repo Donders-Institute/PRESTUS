@@ -117,6 +117,10 @@ def test_results_page_lists_runs(schema, tmp_path):
     m.set("path.anat", str(anat))
     page = ResultsPage(SimpleNamespace(model=m))
     page.refresh()
+    assert page.subtabs.currentWidget() is page.overview      # the reporting overview opens first
+    assert page.overview.report is not None and page.acoustic.viewer.anat is None
+    page.show_view(page.acoustic)                             # maps: under Spatial
+    assert page.subtabs.currentWidget() is page.spatial
     page.acoustic.viewer.wait()                               # volumes load in the background
 
     labels = [page.run_combo.itemText(i) for i in range(page.run_combo.count())]
@@ -141,7 +145,7 @@ def test_results_page_lists_runs(schema, tmp_path):
 
     # Sub-tabs other than the shown one load when opened.
     assert page.thermal.viewer.overlay is None and page.thermal.viewer.anat is None
-    page.subtabs.setCurrentWidget(page.thermal)
+    page.show_view(page.thermal)
     page.thermal.viewer.wait()
     assert page.thermal.viewer.overlay is not None
 
@@ -211,3 +215,82 @@ def test_heating_tab(schema, tmp_path):
     assert page.heat.data is not None
     page.run_combo.setCurrentText("coherent")
     assert page.heat.data is None and "not found" in page.heat.note.text()
+
+
+LAYERED_CSV = {"subject_id": 3, "freq_Hz": 500000, "Isppa": 40.0, "Ispta": 4.0, "Isppa_brain": 12.5,
+               "Isppa_skull": 30.0, "Isppa_skin": 5.0, "Psptp_brain": 0.6e6, "Psptp_skull": 1.1e6,
+               "Psptp_skin": 0.3e6, "Psptp": 2.4e6, "MI_brain": 0.85, "MI_skull": 1.5, "MI_skin": 0.4,
+               "MI_tc": 0.9, "real_focal_distance_ep_mm": 41.2, "focal_flhm_center_ep_mm": 43.0,
+               "focal_vol_3dB_mm3": 120.0, "focal_vol_6dB_mm3": 260.0, "freefield_isppa_wcm2": 30.0,
+               "TIC": 0.4, "riseT_brain": 0.3, "riseT_skull": 2.6, "riseT_skin": 0.1, "maxT_brain": 37.3,
+               "maxT_skull": 39.6, "maxT_skin": 37.1, "CEM43_brain": 0.01, "CEM43_skull": 0.5,
+               "CEM43_skin": 0.001, "CEM43iso_brain": 0.02, "CEM43iso_skull": 9.0, "CEM43iso_skin": 0.002}
+
+
+def _write_csv(path, cols):
+    path.write_text(",".join(cols) + "\n" + ",".join(str(v) for v in cols.values()) + "\n")
+
+
+def test_itrusst_overview(schema, tmp_path):
+    from prestus_nexus import itrusst_report as ir
+    base = tmp_path / "sims" / TAG
+    base.mkdir(parents=True)
+    _write_csv(base / f"{TAG}_layered.csv", LAYERED_CSV)
+    _write_csv(base / f"{TAG}_water.csv", {"subject_id": 3, "freq_Hz": 500000, "Isppa": 30.0, "Ispta": 3.0,
+                                         "Psptp": 1.0e6, "MI": 1.4, "focal_vol_6dB_mm3": 300.0})
+    _write_csv(base / f"{TAG}_layered_targeting.csv", {"placement_mode": "plantus", "focus_error_mm": 3.5,
+                                                       "focus_error_axial_mm": 3.0, "focus_error_lateral_mm": 1.8})
+    (base / f"{TAG}_placement.json").write_text(json.dumps(
+        {"mode": "plantus", "transducers": {"trans_pos": [1, 2, 3], "focus_pos": [4, 5, 6]}}))
+    m = ConfigModel(schema)
+    for k, v in {"subject_id": 3, "path.sim": str(tmp_path / "sims"), "simulation.medium": "layered",
+                 "timing.pd": 0.02, "timing.pri": 0.2, "timing.ptd": 80, "timing.ptri": 80, "timing.ptrd": 80,
+                 "transducer.freq_hz": 250000}.items():
+        m.set(k, v)
+    runs = rs.runs_for(m)
+    run = next(r for r in runs if r.medium == "layered")
+    rep_ = ir.build(m, run, runs)
+    rows = {(sec.title, r.label): r for sec in rep_.sections for r in sec.rows}
+    safety = {r.label: r for sec in rep_.sections if sec.title.startswith("ITRUSST") for r in sec.rows}
+    # limits and colour rule of the HTML report: above > limit, near >= 50 %, within below
+    assert safety["Max pressure"].status == "above" and safety["Max pressure"].value == "2.4 MPa"
+    assert safety["MI (transcranial)"].status == "within" and safety["MI (skull)"].status == "near"
+    assert safety["Temp rise (skull)"].status == "above" and safety["Max temp (skull)"].status == "above"
+    assert safety["MI (free water, from the free-water run)"].value == "1.4"
+    assert rep_.verdict == "review" and set(rep_.above) == {"Max pressure", "Temp rise (skull)", "Max temp (skull)"}
+    # the frequency the run used (CSV), not the config's
+    assert rows[("Transducer", "Fundamental frequency")].value == "500 kHz"
+    assert rows[("Transducer", "Fundamental frequency")].source == "run CSV"
+    # pulse timing derived from the config
+    assert rows[("Pulse timing", "Pulse repetition frequency (PRF = 1/PRI)")].value == "5 Hz"
+    assert rows[("Pulse timing", "Pulse duty cycle (PD/PRI)")].value == "10 %"
+    assert rows[("Pulse timing", "Total sonication duration")].value == "80 s"
+    # free water from the water run, in situ and targeting from their files
+    fw = "Free-water acoustic parameters (simulated)"
+    assert rows[(fw, "ISPPA")].value == "30 W/cm²"
+    assert rows[(fw, "Focal width, axial (−3 dB FWHM)")].value == ir.NA      # no CSV column, no map
+    assert rows[("Placement and targeting", "Placement method")].value == "plantus"
+    assert rows[("Placement and targeting", "Planned focus (target)")].value == "[4, 5, 6] T1 voxel"
+    assert rows[("Placement and targeting", "Focus error (focal centroid to planned focus)")].value == "3.5 mm"
+    th = "Thermal (simulated)"
+    assert rows[(th, "CEM43 (skull, k-Wave form)")].value == "0.5 min"
+    m.set("thermal.cem43_iso", 1)                         # the ISO columns, as the report reads them
+    rows = {(sec.title, r.label): r for sec in ir.build(m, run, runs).sections for r in sec.rows}
+    assert rows[(th, "CEM43 (skull, ISO form)")].value == "9 min"
+    assert rows[(th, "CEM43 (skull, ISO form)")].status == "near"
+    md = ir.to_markdown(rep_)
+    assert "| Max pressure | 2.4 MPa | ≤ 2 MPa | above | run CSV |" in md
+
+
+def test_itrusst_overview_missing_outputs(schema, tmp_path):
+    from prestus_nexus import itrusst_report as ir
+    _folder(tmp_path)                                         # CSVs: Isppa_brain and riseT_brain only
+    m = _model(schema, tmp_path)
+    runs = rs.runs_for(m)
+    rep_ = ir.build(m, runs[0], runs)
+    safety = [r for r in rep_.sections[0].rows]
+    assert [r.label for r in safety] == ["Temp rise (brain)"] and rep_.verdict == "within"
+    rows = {r.label: r for sec in rep_.sections for r in sec.rows}
+    assert rows["MI, transcranial (MItc)"].value == ir.NA and rows["MI, transcranial (MItc)"].status == ""
+    assert rows["Manufacturer"].value == ir.NA
+    assert any("free-water run" in sec.note for sec in rep_.sections)

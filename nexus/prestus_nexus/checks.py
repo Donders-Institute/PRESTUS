@@ -387,6 +387,7 @@ _status_cache: dict[tuple, tuple[float, dict]] = {}
 
 def clear_status_cache() -> None:
     _status_cache.clear()
+    _followup_cache.clear()
     _subject_cache.clear()
 
 
@@ -766,6 +767,39 @@ def drive_issues(model: ConfigModel) -> list[Issue]:
     return issues
 
 
+# followup_issues reads files (the pressure map's sidecar); its answer is reused for
+# _STATUS_TTL_S while the overrides and the lineage are unchanged.
+_followup_cache: list[tuple[float, str, list[Issue]]] = []
+
+
+def followup_issues(model: ConfigModel) -> list[Issue]:
+    """Starting from earlier outputs: path.acoustic_input (load_acoustic_input.m: file,
+    sidecar, medium, grid, transducers; the sidecar signature, check_sidecar_signature.m),
+    io.adopted_* (thermal_simulation.m:163,292,306 skip a missing file silently) and a
+    follow-up's parent config (followup.py lineage)."""
+    from . import followup as fu
+    key = repr((model.override_dict(), getattr(model, "lineage", None), str(model.path)))
+    now = time.monotonic()
+    for stamp, k, issues in _followup_cache:
+        if k == key and now - stamp < _STATUS_TTL_S:
+            return list(issues)
+    issues: list[Issue] = []
+    value = model.get("path.acoustic_input")
+    if isinstance(value, str) and value.strip():
+        p = fu.resolve(model, value.strip())
+        if not Path(value).expanduser().is_absolute():
+            issues.append(Issue("info", "path.acoustic_input",
+                                f"Relative path: MATLAB resolves it against its working folder "
+                                f"(the Nexus launcher uses the config's folder: {p.parent})"))
+        if not str(p).lower().endswith((".nii", ".nii.gz")):
+            issues.append(Issue("warning", "path.acoustic_input",
+                                "Expected a NIfTI pressure map (*_T1w*_pressure.nii.gz)"))
+        issues += fu.pressure_issues(model, p, need_level=False)
+    issues += fu.adopted_issues(model) + fu.lineage_issues(model)
+    _followup_cache[:] = [(time.monotonic(), key, issues)]
+    return list(issues)
+
+
 def _on(v: Any) -> bool:
     """A 0/1 flag or bool config value that is set."""
     return v is True or (_is_num(v) and v != 0)
@@ -909,5 +943,7 @@ def all_issues(model: ConfigModel) -> list[Issue]:
     issues = (value_issues(model) + model.unknown_keys()
               + subject_issues(model) + rule_issues(model) + placement_issues(model)
               + library_issues(model) + isppa_issues(model) + defaults_issues(model)
-              + uncertainty_issues(model))
+              + uncertainty_issues(model) + grid_issues(model) + drive_issues(model)
+              + followup_issues(model)
+              + multitransducer_issues(model) + heating_issues(model) + elastic_issues(model))
     return sorted(issues, key=lambda i: order.get(i.level, 3))

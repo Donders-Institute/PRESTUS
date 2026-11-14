@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -57,13 +58,16 @@ COMPARE_COLUMNS = (
     ("Isppa_brain", "ISPPA brain [W/cm²]"),
     ("Isppa", "ISPPA peak [W/cm²]"),
     ("MI_brain", "MI brain"),
-    ("real_focal_distance_mm", "Focal distance [mm]"),
+    ("real_focal_distance_ep_mm", "Focal distance, exit plane [mm]"),
     ("halfmax_ISPPA_volume_brain_mm3", "Half-max volume [mm³]"),
     ("maxT_brain", "Max T brain [°C]"),
     ("riseT_brain", "ΔT brain [°C]"),
     ("riseT_skull", "ΔT skull [°C]"),
     ("CEM43_brain", "CEM43 brain [min]"),
 )
+
+# Columns of earlier versions -> current names (*_bowl_mm: from the bowl apex)
+_RENAMED_COLUMNS = {"real_focal_distance_mm": "real_focal_distance_bowl_mm"}
 
 _TRANS = re.compile(r"_trans-(\d+)$")
 _JOINT = re.compile(r"_desc-asyncJoint(?:S(\d+))?$")
@@ -115,53 +119,69 @@ def describe_affix(affix: str) -> tuple[str, str, int | None]:
     return label, kind, ti
 
 
-def _maps_for(base: Path, tag: str, medium: str, affix: str) -> dict[str, Path]:
+def _files_in(folder: Path) -> set[str]:
+    """Names of the regular files in folder (one directory listing; empty if it is missing)."""
+    try:
+        with os.scandir(folder) as it:
+            return {e.name for e in it if e.is_file()}
+    except OSError:
+        return set()
+
+
+def _maps_for(base: Path, tag: str, medium: str, affix: str,
+              nii_files: set[str] | None = None) -> dict[str, Path]:
     nii = base / "nii"
+    names_here = _files_in(nii) if nii_files is None else nii_files
     found: dict[str, Path] = {}
     for label, names in MAPS.items():
         for name in names:
-            p = nii / f"{tag}_{medium}_T1w{affix}_{name}.nii.gz"
-            if p.is_file():
-                found[label] = p
+            fname = f"{tag}_{medium}_T1w{affix}_{name}.nii.gz"
+            if fname in names_here:
+                found[label] = nii / fname
                 break
     return found
 
 
 def discover_runs(base: Path, tag: str, media: tuple[str, ...] = ("layered", "water", "phantom")) -> list[Run]:
     """Every run with a results CSV or a result NIfTI in ``base``, sorted by affix."""
+    base_files = _files_in(base)              # one listing per folder (slow network shares)
+    nii_files = _files_in(base / "nii")
     affixes: dict[tuple[str, str], None] = {}
     for medium in media:
         prefix = f"{tag}_{medium}"
-        for p in base.glob(f"{prefix}*.csv"):
-            affix = p.stem[len(prefix):]
+        for name in sorted(base_files):
+            if not (name.startswith(prefix) and name.endswith(".csv")):
+                continue
+            affix = name[len(prefix):-len(".csv")]
             if affix and not affix.startswith("_"):
                 continue
             if affix.endswith("_targeting"):
                 continue
             affixes[(medium, affix)] = None
-        nii = base / "nii"
-        if nii.is_dir():
-            t1w = f"{prefix}_T1w"
-            for p in nii.glob(f"{t1w}*.nii.gz"):
-                rest = p.name[len(t1w):-len(".nii.gz")]
-                for names in MAPS.values():
-                    hit = next((n for n in names if rest.endswith("_" + n)), None)
-                    if hit:
-                        affixes[(medium, rest[:-len(hit) - 1])] = None
-                        break
+        t1w = f"{prefix}_T1w"
+        for name in sorted(nii_files):
+            if not (name.startswith(t1w) and name.endswith(".nii.gz")):
+                continue
+            rest = name[len(t1w):-len(".nii.gz")]
+            for names in MAPS.values():
+                hit = next((n for n in names if rest.endswith("_" + n)), None)
+                if hit:
+                    affixes[(medium, rest[:-len(hit) - 1])] = None
+                    break
     runs = []
     for medium, affix in sorted(affixes, key=lambda k: (k[0] != "layered", k[1])):
         label, kind, ti = describe_affix(affix)
-        csv_path = base / f"{tag}_{medium}{affix}.csv"
-        report = base / f"{tag}_{medium}_report{affix}.html"
-        maps = _maps_for(base, tag, medium, affix)
-        if not csv_path.is_file() and not maps:
+        csv_name = f"{tag}_{medium}{affix}.csv"
+        report_name = f"{tag}_{medium}_report{affix}.html"
+        maps = _maps_for(base, tag, medium, affix, nii_files)
+        has_csv = csv_name in base_files
+        if not has_csv and not maps:
             continue
         if medium != "layered":
             label = f"{medium} · {label}"
         runs.append(Run(affix=affix, medium=medium, base=base, tag=tag, label=label, kind=kind,
-                        transducer=ti, csv=csv_path if csv_path.is_file() else None,
-                        report=report if report.is_file() else None, maps=maps))
+                        transducer=ti, csv=base / csv_name if has_csv else None,
+                        report=base / report_name if report_name in base_files else None, maps=maps))
     return runs
 
 
@@ -205,7 +225,11 @@ def read_metrics(path: Path | None) -> dict[str, str]:
         rows = list(csv.reader(fh))
     if len(rows) < 2:
         return {}
-    return dict(zip(rows[0], rows[-1]))
+    metrics = dict(zip(rows[0], rows[-1]))
+    for old, new in _RENAMED_COLUMNS.items():
+        if old in metrics and new not in metrics:
+            metrics[new] = metrics.pop(old)
+    return metrics
 
 
 def placement_positions(run: Run) -> list[tuple[list[float] | None, list[float] | None]]:
@@ -372,3 +396,75 @@ def _from_h5(node):
         return {k: _from_h5(node[k]) for k in node}
     data = node[()]
     return np.ravel(data) if np.issubdtype(np.asarray(data).dtype, np.number) else None
+
+
+# ── Follow-up lineage (followup.py; model.LINEAGE_TAG header line of a child config) ──
+
+@dataclass
+class LineageLink:
+    """A follow-up config in the study folder and the run it was made from."""
+    child_config: Path
+    child_affix: str            # sanitised io.output_affix of the child
+    parent_config: str
+    parent_affix: str
+    type: str
+    created: str = ""
+
+
+_LINEAGE_CACHE: dict[str, tuple[int, int, "LineageLink | None"]] = {}
+
+
+def _lineage_of(path: Path, size: int, mtime: int) -> "LineageLink | None":
+    hit = _LINEAGE_CACHE.get(str(path))
+    if hit is not None and hit[:2] == (size, mtime):
+        return hit[2]
+    from . import yamlio
+    from .model import LINEAGE_TAG, parse_lineage
+    link = None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    if LINEAGE_TAG in text:
+        rec = parse_lineage(text)
+        if rec:
+            try:
+                data = yamlio.load(text) or {}
+            except Exception:              # noqa: BLE001 — a broken YAML has no lineage to show
+                data = {}
+            raw = (data.get("io") or {}).get("output_affix") if isinstance(data, dict) else ""
+            link = LineageLink(path, sanitize_affix(raw if isinstance(raw, str) else ""),
+                               str(rec.get("parent_config", "")), str(rec.get("parent_affix", "")),
+                               str(rec.get("type", "")), str(rec.get("created", "")))
+    _LINEAGE_CACHE[str(path)] = (size, mtime, link)
+    return link
+
+
+def lineage_links(folder: Path | None) -> list[LineageLink]:
+    """Every follow-up config (*.yaml with a lineage header) in a study folder: one listing,
+    and each YAML read again only when its size or modification time changed."""
+    if folder is None:
+        return []
+    out = []
+    try:
+        with os.scandir(folder) as it:
+            entries = [(e.path, e.stat()) for e in it
+                       if e.is_file() and e.name.lower().endswith((".yaml", ".yml"))]
+    except OSError:
+        return []
+    for p, st in sorted(entries):
+        link = _lineage_of(Path(p), st.st_size, st.st_mtime_ns)
+        if link is not None:
+            out.append(link)
+    return out
+
+
+def lineage_for(run: Run, links: list[LineageLink],
+                config: Path | None = None) -> tuple["LineageLink | None", list[LineageLink]]:
+    """(the link that made ``run``, the follow-ups made from it). A child is matched by its
+    output affix; parents by their affix and, when ``config`` is given, the parent config."""
+    parent = next((ln for ln in links if ln.child_affix == run.affix), None)
+    cfg = str(Path(config).resolve()) if config is not None else None
+    children = [ln for ln in links if ln.parent_affix == run.affix
+                and (cfg is None or not ln.parent_config or ln.parent_config == cfg)]
+    return parent, children

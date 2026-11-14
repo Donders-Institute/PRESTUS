@@ -27,6 +27,39 @@ if TYPE_CHECKING:
 
 TX = "transducer"
 
+# Follow-up lineage (followup.py): one comment line in the study YAML header, e.g.
+# '# nexus-followup: {"parent_config": ..., "parent_affix": ..., "type": ..., "created": ...}'.
+# MATLAB ignores comments, so no config key is involved; it is re-emitted on every save.
+LINEAGE_TAG = "nexus-followup:"
+
+
+def parse_lineage(text: str) -> dict | None:
+    """The lineage record in the leading comment lines of a study YAML, or None."""
+    import json
+    for line in text.splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        if not s.startswith("#"):
+            break
+        s = s.lstrip("#").strip()
+        if s.startswith(LINEAGE_TAG):
+            try:
+                rec = json.loads(s[len(LINEAGE_TAG):].strip())
+            except ValueError:
+                return None
+            return rec if isinstance(rec, dict) else None
+    return None
+
+
+def lineage_header(header: str, lineage: dict | None) -> str:
+    """header with the lineage line appended (yamlio.dump prefixes '# ')."""
+    if not lineage:
+        return header
+    import json
+    line = f"{LINEAGE_TAG} {json.dumps(lineage, ensure_ascii=False)}"
+    return f"{header}\n{line}" if header else line
+
 
 # Merge semantics (functions/helper/mergestruct.m): see merge.py
 
@@ -150,6 +183,7 @@ class ConfigModel:
         self.tx: list[dict] = [{}]        # sparse override per transducer
         self.tx_as_list = False           # write transducer as a YAML list even if N == 1
         self.path: Path | None = None     # study YAML file
+        self.lineage: dict | None = None  # follow-up record (LINEAGE_TAG header line)
         # facts about this computer for visibility rules ('__<name>' keys), set by the main
         # window: '__scheduler' = a scheduler (sbatch/qsub) or an SSH submission host is available
         self.context: dict = {}
@@ -159,11 +193,13 @@ class ConfigModel:
     def from_file(cls, schema: Schema, path: str | Path,
                   library: "EquipmentLibrary | None" = None) -> "ConfigModel":
         model = cls(schema, library)
-        data = yamlio.load_file(path) or {}
+        text = Path(path).read_text(encoding="utf-8")
+        data = yamlio.load(text) or {}
         if not isinstance(data, dict):
             raise ValueError(f"{path}: top level must be a mapping")
         model.load_dict(data)
         model.path = Path(path)
+        model.lineage = parse_lineage(text)
         return model
 
     def load_dict(self, data: dict) -> None:
@@ -227,13 +263,13 @@ class ConfigModel:
         return out
 
     def to_yaml(self, header: str = "") -> str:
-        return yamlio.dump(self.override_dict(), header)
+        return yamlio.dump(self.override_dict(), lineage_header(header, self.lineage))
 
     def save(self, path: str | Path | None = None, header: str = "") -> Path:
         target = Path(path) if path else self.path
         if target is None:
             raise ValueError("No file name given")
-        yamlio.dump_file(target, self.override_dict(), header)
+        yamlio.dump_file(target, self.override_dict(), lineage_header(header, self.lineage))
         self.path = target
         return target
 

@@ -2,7 +2,7 @@
 
 A standalone desktop app for putting a PRESTUS study config together before running it in MATLAB. It writes a normal override YAML for `load_parameters`, containing only the values that differ from `config_default.yaml`. MATLAB still does all loading, validation and simulation.
 
-Status: *experimental*. In place: config builder, transducer library panel, placement viewer, MATLAB validate/run, deprecation of the old tools, and the Localite and Calibration pages (MATLAB GUIs integrated through a persistent MATLAB session). User documentation is in [doc/doc_nexus.md](../doc/doc_nexus.md).
+In place: config builder, transducer library panel, placement viewer with 3D view, MATLAB validate/run, results browser with follow-up runs, deprecation of the old tools, and the Localite and Calibration pages (MATLAB GUIs integrated through a persistent MATLAB session). User documentation is in [doc/doc_nexus.md](../doc/doc_nexus.md).
 
 ## Running
 
@@ -44,6 +44,7 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
    - Closed by default: the header shows the error and warning counts; clicking them (or *View ▸ Issues…*, Ctrl+Shift+I) opens the list as a popup.
    - Clicking an issue jumps to the field.
 5. **Review & save.** Shows the exact YAML that will be written and which `config_default.yaml` it is merged onto. Saves are atomic (`fsio.py`); *Edit ▸ Undo / Redo* step through changes (`undo.py`).
+6. **Results and follow-ups.** The Results tab browses the runs in the output folder; *Follow-up…* writes a new study config that starts from the selected run (`followup.py`), and the Run tab's *Pipeline options* pass sequential follow-ups and per-stage limits to `prestus_pipeline_start` (`launcher.PipelineOptions`).
 
 ## How it is built
 
@@ -76,10 +77,12 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 | `telemetry.py` | *Tools ▸ Usage statistics…*: reads and writes the consent record `~/.prestus/telemetry.json` that MATLAB uses; sends nothing. |
 | `docs.py` | Links into the documentation (published pages or local `doc/*.md`) and the Help menu. |
 | `multitransducer.py` | Grid orientation of a multi-transducer run under `grid.mode` and each beam's tilt (ports of `mean_beam_axis.m` and `preproc_head.m`). |
+| `followup.py` | Follow-up runs without Qt: the five types, their config keys, validation and the `# nexus-followup:` lineage line. |
 | `proctree.py` | Stopping a started program with everything it started (MATLAB's launcher and binary). |
 | `ui/export.py` | The download button on every figure: SVG, PDF, PNG and copy. |
 | `ui/errors.py` | Unexpected errors as a dialog instead of a crash, logged to `nexus_errors.log` in the cache folder. |
 | `ui/transducers_page.py` | *Placement ▸ Transducers* (2+ transducers): per-transducer table, grid orientation, coupling and timing notes. |
+| `ui/followup_dialog.py`, `ui/pose_table.py` | The *Follow-up…* dialog; the *Poses* sub-tab of a time-reversal pose search with *Use this pose…*. |
 | `ui/pipeline_options.py` | *Run ▸ Where to run ▸ Pipeline options*: sequential chain, per-stage limits, summary report switch (stored in the session, not the config). |
 | `ui/isppa_sweep.py` | The target ISPPA editor with *Sweep…* for a list of targets (multi-ISPPA). |
 

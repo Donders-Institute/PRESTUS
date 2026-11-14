@@ -489,6 +489,44 @@ deprecated:
   io.external_acoustic_nifti: {use: path.acoustic_input, source: load_parameters.m}
 
 extra:
+  # Set by the pipelines on the per-run parameters (sequential_pipeline, multi_isppa_pipeline,
+  # async_transducer_pipeline, uncertainty_pipeline); listed so a config that sets them is not
+  # flagged as unknown. checks.followup_issues validates the adopted_* files.
+  io.adopted_heatmap:
+    kind: str
+    default: []
+    derived: true
+    help: Temperature map a sequential follow-up starts from (sequential_pipeline sets it to the previous run's _heating_end map); used only when the file exists.
+  io.adopted_cem43:
+    kind: str
+    default: []
+    derived: true
+    help: CEM43 map a sequential follow-up starts from (sequential_pipeline); used only when the file exists.
+  io.adopted_cem43_iso:
+    kind: str
+    default: []
+    derived: true
+    help: Isoeffective CEM43 map a sequential follow-up starts from (sequential_pipeline); used only when the file exists.
+  io.preproc_affix:
+    kind: str
+    default: []
+    derived: true
+    help: Affix of the preprocessing cache to load (set by the multi-ISPPA, async, sequential and uncertainty pipelines so their runs reuse one grid).
+  io.medium_affix:
+    kind: str
+    default: []
+    derived: true
+    help: Affix of the medium cache (set by uncertainty_pipeline for each property variant).
+  io.acoustic_cache_affix:
+    kind: str
+    default: []
+    derived: true
+    help: Affix of the acoustic cache to load (set by multi_isppa_pipeline so all intensities reuse one acoustic simulation, and by async_transducer_pipeline for the combined field).
+  io.thermal_cache_affix:
+    kind: str
+    default: []
+    derived: true
+    help: Affix of the thermal cache (set by sequential_pipeline to the follow-up's own output affix).
   babelbrain.tight_narrow_beam:
     kind: bool
     default: []
@@ -1203,6 +1241,10 @@ display:
   babelbrain.air_regions: {label: "BabelBrain internal air regions", group: pct}
   babelbrain.air_hu_window: {label: "BabelBrain air HU window", group: pct, advanced: true}
   babelbrain.air_keep_boundary: {label: "BabelBrain: keep air at the domain boundary", group: pct, advanced: true}
+  io.adopted_heatmap: {label: "Starting temperature map"}
+  io.adopted_cem43: {label: "Starting CEM43 map"}
+  io.adopted_cem43_iso: {label: "Starting CEM43 map (ISO)"}
+  io.preproc_affix: {label: "Preprocessing cache affix"}
   transducer.tx_calibration: {label: "Drive calibration record"}
   transducer.combo: {label: "Device combination"}
   grid.water_margin_mm: {label: "Lateral water margin"}
