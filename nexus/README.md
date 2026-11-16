@@ -9,11 +9,13 @@ In place: config builder, transducer library panel, placement viewer with 3D vie
 Install (Python ≥ 3.10; all packages are listed in `pyproject.toml`):
 
 ```bash
-cd PRESTUS/nexus
+bash nexus/install.sh                      # macOS/Linux; nexus\install.bat on Windows
+# or, with conda set up, in this folder:
 conda env create -f environment.yml        # creates the env 'prestus-nexus' with everything
-conda activate prestus-nexus
 # without conda, in any Python ≥ 3.10 environment:  pip install -e .
 ```
+
+The installers create or update the env `prestus-nexus` and install Miniforge first if conda is missing.
 
 Run:
 
@@ -23,7 +25,7 @@ prestus-nexus path/to/config_x.yaml
 python -m prestus_nexus [config_x.yaml]    # the same, from this folder
 ```
 
-From MATLAB: `prestus_nexus` or `prestus_nexus('config_x.yaml', Python='/path/to/python')`.
+From MATLAB: `prestus_nexus` or `prestus_nexus('config_x.yaml')`. The Python is found by `find_nexus_python` (`$PRESTUS_NEXUS_PYTHON`, the last one used, the env `prestus-nexus`, `python3`) and remembered; `Python='/path/to/python'` overrides it.
 
 PRESTUS itself is found automatically, as the checkout this folder lives in. You can override that with `--prestus-root` or `$PRESTUS_ROOT`.
 

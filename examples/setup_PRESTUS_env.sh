@@ -18,7 +18,8 @@
 #   parameters.simnibs_bin_path      = '<HOME>/.conda/envs/PRESTUS_env_4.6.0/bin'
 #   parameters.placement.plantus.env_path = '<HOME>/.conda/envs/PRESTUS_env_4.6.0/bin'
 #
-# Requirements: conda (Anaconda / Miniconda), internet access
+# Requirements: Linux, conda (Anaconda / Miniconda / Miniforge), internet access.
+# On macOS and Windows, use the SimNIBS installer instead (the script says where).
 
 set -euo pipefail
 
@@ -40,6 +41,14 @@ for arg in "$@"; do
     esac
 done
 
+if [ "$(uname)" != "Linux" ]; then
+    echo "This script installs the Linux build of SimNIBS ${SIMNIBS_VERSION}."
+    echo "On macOS or Windows, use the SimNIBS installer instead:"
+    echo "  https://simnibs.github.io/simnibs/build/html/installation/simnibs_installer.html"
+    echo "PRESTUS then finds charm in the install's bin folder (run prestus_check_install in MATLAB)."
+    exit 1
+fi
+
 echo "============================================================"
 echo " PRESTUS environment setup: ${ENV_NAME}"
 echo "============================================================"
@@ -47,7 +56,11 @@ echo "============================================================"
 # ── 1. Download SimNIBS conda environment spec ────────────────────────────────
 TMP_YML=$(mktemp /tmp/environment_simnibs_XXXXXX.yml)
 echo "[1/6] Downloading SimNIBS ${SIMNIBS_VERSION} environment spec..."
-wget -q "${SIMNIBS_ENV_URL}" -O "${TMP_YML}"
+if command -v wget >/dev/null 2>&1; then
+    wget -q "${SIMNIBS_ENV_URL}" -O "${TMP_YML}"
+else
+    curl -fsSL "${SIMNIBS_ENV_URL}" -o "${TMP_YML}"
+fi
 
 # ── 2. Create conda environment ───────────────────────────────────────────────
 echo "[2/6] Creating conda environment '${ENV_NAME}'..."

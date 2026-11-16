@@ -4,6 +4,7 @@ PRESTUS runs in [MATLAB](https://www.mathworks.com/products/matlab.html) and sim
 
 On this page:
 
+- [Quick Install](#quick-install): three steps to a working free-water setup, and the Nexus.
 - [Required Components](#required-components): which component each kind of simulation requires.
 - [Install PRESTUS](#install-prestus): the clone with its submodules and the MATLAB path.
 - [Install SimNIBS](#install-simnibs): the SimNIBS environment for head segmentation, and how PRESTUS finds it.
@@ -12,6 +13,33 @@ On this page:
 !!! note "At a glance"
     - **When you need it:** Before your [first simulation](doc_getting-started.md).
     - **Before you start:** MATLAB R2023b (other versions may work; R2023b is the tested default). Installing SimNIBS takes the most time, so start with the free-water simulation if you only want to try PRESTUS.
+
+## Quick Install
+
+1. Clone PRESTUS (or download it as a zip from GitHub):
+
+    ```bash
+    git clone https://github.com/Donders-Institute/PRESTUS.git
+    ```
+
+2. In MATLAB, go to the PRESTUS folder and run:
+
+    ```matlab
+    prestus_setup(Save=true)
+    ```
+
+    This puts PRESTUS on the MATLAB path for this and later sessions, fetches the required submodules (k-Wave, export_fig, FEX-minimize, xml2struct) with git, and prints what is installed and what is missing, with how to fix each item. Run `prestus_check_install` at any time to see the same report.
+
+3. Optional, for the [PRESTUS Nexus](doc_nexus.md): install its Python environment once.
+
+    | System | Run |
+    |---|---|
+    | macOS, Linux | `bash nexus/install.sh` in the PRESTUS folder |
+    | Windows | double-click `nexus\install.bat` |
+
+    The installer uses conda if you have it and otherwise offers to install [Miniforge](https://github.com/conda-forge/miniforge). Then `prestus_nexus` in MATLAB finds the environment by itself.
+
+That is enough for a free-water simulation: continue with [Your first simulation](doc_getting-started.md). Head simulations also need [SimNIBS](#install-simnibs).
 
 ## Required Components
 
@@ -25,7 +53,7 @@ On this page:
 
 ## Install PRESTUS
 
-Clone the repository with its submodules. This fetches k-Wave and the other MATLAB dependencies into `external/`:
+Clone the repository and run `prestus_setup` in MATLAB, as in the [Quick Install](#quick-install). `prestus_setup` fetches only the required submodules; `--recurse-submodules` also fetches the optional ones (BabelBrain, PlanTUS):
 
 ```bash
 git clone --recurse-submodules https://github.com/Donders-Institute/PRESTUS.git
@@ -33,16 +61,10 @@ git clone --recurse-submodules https://github.com/Donders-Institute/PRESTUS.git
 git clone --recurse-submodules -b development https://github.com/Donders-Institute/PRESTUS.git
 ```
 
-Then add PRESTUS to the MATLAB path at the start of every session, as `simple_main.m` does:
-
-```matlab
-addpath(genpath('functions')); addpath(genpath('config')); addpath(genpath('external'));
-```
-
-That is all a free-water simulation needs. Continue with [Your first simulation](doc_getting-started.md) and come back here for SimNIBS when you want a head simulation.
+`prestus_setup` adds `functions/`, `config/` and `external/` to the MATLAB path from any folder (`run('/path/to/PRESTUS/prestus_setup')`). Without `Save=true` the path holds for the current session only. If MATLAB cannot save the path (no write access to `pathdef.m`, common on clusters), add the `run(...)` line to your `startup.m`.
 
 ??? note "Submodules and manual downloads"
-    k-Wave 1.4 is supported, but version 1.4.1 (currently [GitHub only](https://github.com/ucl-bug/k-wave/releases/tag/v1.4.1)) adds GPU support for thermal simulations with `kWaveDiffusion`, so the submodule points there. If you updated an existing clone, fetch the submodules with:
+    k-Wave 1.4 is supported, but version 1.4.1 (currently [GitHub only](https://github.com/ucl-bug/k-wave/releases/tag/v1.4.1)) adds GPU support for thermal simulations with `kWaveDiffusion`, so the submodule points there. If you updated an existing clone, `prestus_setup` fetches missing required submodules; to update all of them:
 
     ```bash
     cd PRESTUS
@@ -63,9 +85,11 @@ That is all a free-water simulation needs. Continue with [Your first simulation]
 
 ## Install SimNIBS
 
-Head simulations need [SimNIBS 4](https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4) for the `charm` segmentation. Install it in its own [conda](https://docs.conda.io/) environment; this also works on clusters that restrict user permissions and lets several SimNIBS versions coexist.
+Head simulations need [SimNIBS 4](https://simnibs.github.io/simnibs/build/html/index.html#simnibs-4) for the `charm` segmentation.
 
-The quickest route is the setup script in `examples/`, which creates a `PRESTUS_env_4.6.0` environment with SimNIBS and the optional PlanTUS and [Connectome Workbench](https://www.humanconnectome.org/software/connectome-workbench) dependencies in one step:
+On macOS and Windows, use the [SimNIBS installer](https://simnibs.github.io/simnibs/build/html/installation/simnibs_installer.html). `prestus_check_install` then reports the bin folder it installed `charm` into, as the value for `startup.simnibs_bin_path`.
+
+On Linux and clusters, install SimNIBS in its own [conda](https://docs.conda.io/) environment; this also works on clusters that restrict user permissions and lets several SimNIBS versions coexist. The quickest route is the setup script in `examples/`, which creates a `PRESTUS_env_4.6.0` environment with SimNIBS and the optional PlanTUS and [Connectome Workbench](https://www.humanconnectome.org/software/connectome-workbench) dependencies in one step:
 
 ```bash
 bash examples/setup_PRESTUS_env.sh
@@ -134,7 +158,7 @@ PRESTUS itself is MATLAB, but several optional parts run in their own Python (or
 | BabelBrain | `acoustic_backend` / `thermal_backend: babelbrain` | `external/BabelBrain/environment_<platform>.yml` ([BabelBrain](doc_babelbrain.md)) | `babelbrain.python_env` |
 | jwave | `acoustic_backend: jwave` | `conda create` + `pip install` ([jwave](doc_jwave.md)) | `jwave.python_env`, `jwave.python_env_gpu` |
 | `tus_entry` | TUS_entry placement (R) | `examples/environment_tus_entry.yml` ([Placement](doc_placement.md)) | `placement.tus_entry.env_path` |
-| `prestus-nexus` | PRESTUS Nexus (config builder GUI) | `conda env create -f nexus/environment.yml` ([Nexus](doc_nexus.md#installation)) | `prestus_nexus(Python='<env>/bin/python')`; default `python3` |
+| `prestus-nexus` | PRESTUS Nexus (config builder GUI) | `nexus/install.sh` or `nexus/install.bat` ([Nexus](doc_nexus.md#installation)) | found by `prestus_nexus`; override with `Python='<env>/bin/python'` |
 
 The Nexus runs where you edit configs and needs a display; the others run where the pipeline runs (typically the cluster). After setting up or updating a BabelBrain or jwave environment, run `smoke_test_backends` (in `tests/`).
 

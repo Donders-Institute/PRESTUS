@@ -18,8 +18,7 @@ If you prefer forms to code, the [PRESTUS Nexus](doc_nexus.md) builds the same c
 Free water needs no images: the transducer sits in a homogeneous water grid. The settings below are the ones the pipeline test `tests/test_integration_water.m` runs (a single-element 250 kHz bowl on a small 1 mm grid).
 
 ```matlab
-% from the PRESTUS root folder
-addpath(genpath('functions')); addpath(genpath('config')); addpath(genpath('external'));
+prestus_setup(Check=false);                   % PRESTUS on the path (in the PRESTUS folder)
 
 out = fullfile(tempdir, 'prestus_first');  mkdir(out);
 

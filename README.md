@@ -20,6 +20,14 @@ Key features include:
 These features make PRESTUS an accessible tool for researchers to plan, validate, and report transcranial ultrasound targeting. 
 A recent overview poster can be found [here](https://jkosciessa.github.io/downloads/2025-FUN25-PRESTUS.pdf).
 
+# Installation
+
+```bash
+git clone https://github.com/Donders-Institute/PRESTUS.git
+```
+
+Then, in MATLAB in the PRESTUS folder, run `prestus_setup(Save=true)`. It puts PRESTUS on the path, fetches the required submodules and reports what else is installed. For the PRESTUS Nexus, run `bash nexus/install.sh` (macOS, Linux) or `nexus\install.bat` (Windows). Head simulations also need SimNIBS 4. See [Installation](https://donders-institute.github.io/PRESTUS/doc_installation/) for details and optional components.
+
 # Documentation
 
 Please see the [PRESTUS documentation](https://donders-institute.github.io/PRESTUS/).

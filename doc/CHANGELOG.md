@@ -6,6 +6,10 @@ Notable changes to this project are documented here.
 
 ## v0.7-pre (development)
 
+- Installation: `prestus_setup` puts PRESTUS on the MATLAB path from any folder, fetches missing required submodules and reports the installation; `prestus_check_install` prints that report on its own.
+- Nexus: `nexus/install.sh` (macOS, Linux) and `nexus/install.bat` (Windows) create or update the `prestus-nexus` environment, installing Miniforge if conda is missing; `prestus_nexus` finds and remembers the environment's Python instead of defaulting to `python3`.
+- `examples/setup_PRESTUS_env.sh` stops on macOS and Windows with a pointer to the SimNIBS installer, and downloads with `curl` when `wget` is missing.
+
 **Fixes**
 - Sequential chains: the follow-up's start state is the base run's T1w end map (heating, CEM43, CEM43 ISO), resampled into its own grid. The NIfTI stage is enabled for chained runs, and dispatch errors (`sequential_pipeline:missingThermalEnd`) when a map is missing, instead of starting from the water baseline.
 - `convert_final_to_MNI_simnibs`: `subject2mni` runs one volume at a time in the foreground. A failed conversion now raises `PRESTUS:MNIConversionFailed` and fails the job. The previous background path discarded output and reported success when volumes were missing.

@@ -1,0 +1,104 @@
+name: Installation
+
+# Runs the installation as a new user would, on Windows, macOS and Linux:
+# the Nexus installers on runners without conda on PATH (so they also install
+# Miniforge), and prestus_setup on a clone without submodules (so it fetches
+# them). Runs when the installation files change, weekly, and on demand.
+
+on:
+  push:
+    branches: [development, main]
+    paths:
+      - 'nexus/install.sh'
+      - 'nexus/install.bat'
+      - 'nexus/environment.yml'
+      - 'nexus/pyproject.toml'
+      - 'prestus_setup.m'
+      - 'functions/helper/prestus_check_install.m'
+      - 'functions/helper/find_nexus_python.m'
+      - 'functions/helper/conda_env_dirs.m'
+      - '.gitmodules'
+      - '.github/workflows/install.yml'
+  pull_request:
+    paths:
+      - 'nexus/install.sh'
+      - 'nexus/install.bat'
+      - 'nexus/environment.yml'
+      - 'nexus/pyproject.toml'
+      - 'prestus_setup.m'
+      - 'functions/helper/prestus_check_install.m'
+      - 'functions/helper/find_nexus_python.m'
+      - 'functions/helper/conda_env_dirs.m'
+      - '.gitmodules'
+      - '.github/workflows/install.yml'
+  schedule:
+    - cron: '0 4 * * 1'          # Mondays 04:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: install-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nexus-installer:
+    name: Nexus installer (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - name: Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libdbus-1-3 libfontconfig1
+      - name: Install (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: bash nexus/install.sh --yes
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call nexus\install.bat /y
+      - name: Installing again updates the environment
+        if: runner.os != 'Windows'
+        run: bash nexus/install.sh --yes
+      - name: Installing again updates the environment (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call nexus\install.bat /y
+      - name: Nexus tests in the installed environment
+        shell: bash
+        working-directory: nexus
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            py="$(cygpath "$USERPROFILE")/miniforge3/envs/prestus-nexus/python.exe"
+          else
+            py="$HOME/miniforge3/envs/prestus-nexus/bin/python"
+          fi
+          test -f "$py" || { echo "no Nexus environment at $py"; exit 1; }
+          echo "Python: $py"
+          "$py" -m pytest -q -m "not matlab"
+
+  prestus-setup:
+    name: prestus_setup on a bare clone (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4      # no submodules: prestus_setup fetches them
+      - uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2023b
+      - uses: matlab-actions/run-command@v2
+        with:
+          command: >
+            prestus_setup(Save=true);
+            c = prestus_check_install(Quiet=true, Nexus=false);
+            assert(all([c([c.required]).ok]), 'required parts missing after prestus_setup');
+            r = runtests(fullfile('tests', 'test_install_check.m'));
+            assertSuccess(r);

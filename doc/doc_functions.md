@@ -260,6 +260,7 @@ On this page:
 | `check_sidecar_signature`               | Compare a sidecar's recorded settings with the current run's |
 | `check_tool_availability`               | Check that the external tools the requested stages need exist |
 | `compute_ramp_factor`                   | Pulse-average / temporal-peak intensity ratio for a ramped pulse |
+| `conda_env_dirs`                        | Folders of the conda environments on this computer |
 | `config_known_extra_keys`               | Config keys PRESTUS reads that config_default.yaml omits |
 | `config_unknown_keys`                   | Dotted keys of a user config that PRESTUS does not know |
 | `confirm_overwriting`                   | Check overwriting (manual). |
@@ -268,6 +269,7 @@ On this page:
 | `distribution_stats`                    | Summary statistics and histogram of a numeric vector |
 | `ensure_hdf5_plugin_path`               | Set HDF5_PLUGIN_PATH so MATLAB's h5read/h5write don't fail |
 | `find_min_factor`                       | Find the number with the smallest maximum factor in a range. |
+| `find_nexus_python`                     | A Python that can start the PRESTUS Nexus |
 | `find_pseudoct_dir`                     | Folder holding this subject's existing pseudoCT.nii.gz |
 | `find_sidecar`                          | JSON sidecar of a data file: same name with .json (BIDS convention) |
 | `get_crop_dims`                         | Computes cropping dimensions for a 3D image with a margin. |
@@ -294,6 +296,7 @@ On this page:
 | `outputs_follow_recompute`              | Let a recomputed stage replace its existing output files |
 | `parse_memory_tags`                     | Extract peak memory figures from [memory]/[memory_bb] log lines. |
 | `predict_outputs`                       | Predict the pipeline mode and the CSV/HTML files a run will write, before submission (read-only). |
+| `prestus_check_install`                 | Report what a PRESTUS installation has and what it lacks |
 | `prestus_version`                       | Print PRESTUS version info and optionally return the git hash. |
 | `print_predicted_outputs`               | Print `predict_outputs`' plan to the console. |
 | `r_quote_string`                        | Escape a string for safe embedding in a generated R string literal. |

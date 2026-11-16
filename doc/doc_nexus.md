@@ -20,12 +20,12 @@ Subpages:
 
 ## Installation
 
-```bash
-cd PRESTUS/nexus
-conda env create -f environment.yml
-```
+| System | Run in the PRESTUS folder |
+|---|---|
+| macOS, Linux | `bash nexus/install.sh` |
+| Windows | `nexus\install.bat` (or double-click it) |
 
-This creates the environment `prestus-nexus`. After a PRESTUS update that changes the dependencies, run `conda env update -n prestus-nexus -f environment.yml`. Installing without conda, the standalone app and the cache folder are described under [Installation options](#installation-options).
+The installer creates the conda environment `prestus-nexus` from `nexus/environment.yml`. If conda is missing, it offers to install [Miniforge](https://github.com/conda-forge/miniforge) into your home folder first. Run it again after a PRESTUS update: it then updates the environment. With conda already set up, `conda env create -f environment.yml` in `PRESTUS/nexus` does the same. Installing without conda, the standalone app and the cache folder are described under [Installation options](#installation-options).
 
 ### Installation Options
 
@@ -61,7 +61,7 @@ conda activate prestus-nexus
 prestus-nexus [config_study.yaml]
 ```
 
-MATLAB's default `python3` usually lacks [PyQt6](https://www.riverbankcomputing.com/software/pyqt/), so from MATLAB pass the environment's Python: `prestus_nexus(Python='<conda>/envs/prestus-nexus/bin/python')`.
+From MATLAB, `prestus_nexus` finds the environment's Python by itself: `$PRESTUS_NEXUS_PYTHON` if set, the Python of the last start, the conda environment `prestus-nexus`, then `python3`. It uses the first that can start the Nexus and remembers it. If none can, the error lists what it tried; pass `Python=` to choose one.
 
 ### Opening a Study Config
 

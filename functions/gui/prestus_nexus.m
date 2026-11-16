@@ -9,20 +9,22 @@ function prestus_nexus(config_file, options)
 % Use as:
 %   prestus_nexus()                          % untitled study (File > New study… / Open…)
 %   prestus_nexus('config_study.yaml')       % open a study config
-%   prestus_nexus(..., Python='/opt/miniconda3/envs/prestus-gui/bin/python')
+%   prestus_nexus(..., Python='/opt/miniconda3/envs/prestus-nexus/bin/python')
 %
 % Input:
 %   config_file - (optional) char path of a study config YAML
 %
 % Name-value options:
-%   Python - (1,:) char Python executable with PyQt6, PyYAML (and numpy,
-%            nibabel, matplotlib for the placement viewer); default 'python3'
+%   Python - (1,:) char Python executable of the Nexus environment; default ''
+%            finds it (FIND_NEXUS_PYTHON: $PRESTUS_NEXUS_PYTHON, the Python
+%            of the last start, the conda env 'prestus-nexus', python3). The
+%            Python that started the Nexus is remembered for the next call.
 %
-% See also: PRESTUS_GUI, LOAD_PARAMETERS, PRESTUS_CONFIG_INIT
+% See also: PRESTUS_GUI, FIND_NEXUS_PYTHON, LOAD_PARAMETERS, PRESTUS_CONFIG_INIT
 
 arguments
     config_file (1,:) char = ''
-    options.Python (1,:) char = 'python3'
+    options.Python (1,:) char = ''
 end
 
     nexus_dir = fullfile(get_prestus_path(), 'nexus');
@@ -30,25 +32,50 @@ end
         error('prestus_nexus:notFound', 'PRESTUS Nexus not found in %s.', nexus_dir);
     end
 
-    % The Nexus runs in the background with its output discarded, so check
-    % first that this Python can start a Qt app (PyQt6 installed, platform
-    % plugin loadable) and report why not.
-    [status, cmdout] = run_command({options.Python, '-c', ...
-        'import yaml; from PyQt6.QtWidgets import QApplication; QApplication([])'});
-    if status ~= 0
-        error('prestus_nexus:python', ...
-            ['%s cannot start the PRESTUS Nexus (exit %d):\n%s\n' ...
-             'Pass a Python with PyQt6 and PyYAML, e.g. from the env in ' ...
-             '%s:\n  conda env create -f environment.yml\n' ...
-             '  prestus_nexus(Python=''<conda>/envs/prestus-nexus/bin/python'')'], ...
-            options.Python, status, strtrim(cmdout), nexus_dir);
+    if isempty(options.Python)
+        [python, tried] = find_nexus_python();
+        if isempty(python)
+            if ispc
+                install = fullfile(nexus_dir, 'install.bat');
+            else
+                install = ['bash ' fullfile(nexus_dir, 'install.sh')];
+            end
+            error('prestus_nexus:python', ...
+                ['No Python that can start the PRESTUS Nexus was found.\n%s\n' ...
+                 'Install the Nexus environment once:\n  %s\n' ...
+                 'or pass a Python: prestus_nexus(Python=''<env python>'')'], ...
+                tried_summary(tried), install);
+        end
+    else
+        python = options.Python;
+        [status, cmdout] = run_command({python, '-c', ...
+            'import yaml; from PyQt6.QtWidgets import QApplication; QApplication([])'});
+        if status ~= 0
+            error('prestus_nexus:python', ...
+                '%s cannot start the PRESTUS Nexus (exit %d):\n%s', ...
+                python, status, strtrim(cmdout));
+        end
     end
+    setpref('prestus', 'nexus_python', python);
 
-    argv = {options.Python, '-m', 'prestus_nexus'};
+    argv = {python, '-m', 'prestus_nexus'};
     if ~isempty(config_file)
         argv{end + 1} = char(java.io.File(config_file).getAbsolutePath());
     end
     run_command(argv, 'Background', true, 'WorkingDir', nexus_dir, ...
         'Env', struct('PYTHONPATH', nexus_dir));
-    fprintf('PRESTUS Nexus started (%s).\n', options.Python);
+    fprintf('PRESTUS Nexus started (%s).\n', python);
+end
+
+function txt = tried_summary(tried)
+    lines = arrayfun(@(t) sprintf('  %s: %s', t.python, ...
+        first_line(t.detail)), tried, 'UniformOutput', false);
+    txt = ['Tried:' newline strjoin(lines, newline)];
+end
+
+function s = first_line(s)
+    s = strtrim(regexprep(s, '[\r\n].*$', ''));
+    if isempty(s)
+        s = 'failed';
+    end
 end
