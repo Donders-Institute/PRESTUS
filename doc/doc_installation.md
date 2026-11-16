@@ -97,7 +97,7 @@ bash examples/setup_PRESTUS_env.sh
 
 Optional flags:
 
-- `--no-plantus`: skip the PlanTUS Python packages (`nilearn`, `vtk`, `h5py`)
+- `--no-plantus`: skip the PlanTUS Python packages (`nilearn`, `pyyaml`, `h5py`, `trimesh`, `vtk`, `PyQt5`, `potpourri3d`, `pynput`)
 - `--no-workbench`: skip Connectome Workbench (e.g. when `wb_command` is available as an HPC module)
 
 When it finishes, the script prints the `simnibs_bin_path` value to put in your config; `hpc.ld_library_path` and the PlanTUS `env_path` follow it while they are empty. Alternatively, follow the [official conda guide](https://simnibs.github.io/simnibs/build/html/installation/conda.html).
@@ -172,8 +172,8 @@ The optional `plantus` placement mode needs [PlanTUS](https://github.com/mluecke
 
 ```bash
 source activate simnibs_v4.6.0
-pip install nilearn vtk h5py trimesh pynput
-python -c "import nilearn, vtk, h5py, trimesh, pynput; print('PlanTUS dependencies OK')"
+pip install nilearn pyyaml h5py trimesh vtk PyQt5 potpourri3d pynput
+python -c "import nilearn, yaml, h5py, trimesh, vtk, potpourri3d; print('PlanTUS dependencies OK')"
 ```
 
 Connectome Workbench is needed only to choose the position in Workbench (`wb_view`), and with PlanTUS 1.x, which also calls `wb_command`. Either install it into the SimNIBS environment, where PRESTUS finds it in the environment's `bin/` without further settings:

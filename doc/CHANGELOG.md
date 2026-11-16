@@ -8,6 +8,7 @@ Notable changes to this project are documented here.
 
 - Installation: `prestus_setup` puts PRESTUS on the MATLAB path from any folder, fetches missing required submodules and reports the installation; `prestus_check_install` prints that report on its own.
 - Nexus: `nexus/install.sh` (macOS, Linux) and `nexus/install.bat` (Windows) create or update the `prestus-nexus` environment, installing Miniforge if conda is missing; `prestus_nexus` finds and remembers the environment's Python instead of defaulting to `python3`.
+- Dependencies: export_fig v3.46 → v3.58 (bug fixes); the PlanTUS submodule moves to v2.0.0 with later fixes (5b69f66), and the PlanTUS setup also installs `pyyaml`, `PyQt5` and `potpourri3d`.
 - `examples/setup_PRESTUS_env.sh` stops on macOS and Windows with a pointer to the SimNIBS installer, and downloads with `curl` when `wget` is missing.
 
 **Fixes**

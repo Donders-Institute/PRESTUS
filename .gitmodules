@@ -1,7 +1,7 @@
 [submodule "external/export_fig"]
 	path = external/export_fig
 	url = https://github.com/altmany/export_fig
-	# c6cdb2f	v3.46
+	# b9c20a5	v3.58
 [submodule "external/xml2struct"]
 	path = external/xml2struct
 	url = https://github.com/joe-of-all-trades/xml2struct
@@ -13,10 +13,11 @@
 [submodule "external/FEX-minimize"]
 	path = external/FEX-minimize
 	url = https://github.com/rodyo/FEX-minimize.git
-	# 2f6ee87	v1.7
+	# 2f6ee87	v1.7 (= v1.8)
 [submodule "external/PlanTUS"]
 	path = external/PlanTUS
 	url = https://github.com/mlueckel/PlanTUS
+	# 5b69f66	v2.0.0 + fixes (main, 2026-10-14)
 [submodule "external/BabelBrain"]
 	path = external/BabelBrain
 	url = https://github.com/ProteusMRIgHIFU/BabelBrain

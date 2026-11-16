@@ -249,9 +249,9 @@ For the selected vertex, PlanTUS computes the beam direction and the transducer 
 
 The launchers detect the PlanTUS version from `code/PlanTUS.py` and check for the tools that version needs before they start.
 
-Install trimesh (PlanTUS 2.0) and `pynput` (Workbench picker) in the SimNIBS [conda](https://docs.conda.io/) environment:
+Install trimesh (PlanTUS 2.0), `potpourri3d` and `pynput` (Workbench picker) in the SimNIBS [conda](https://docs.conda.io/) environment. PlanTUS 2.0 uses `potpourri3d` for exact geodesic distances when it shrinks the avoidance mask; without it, PlanTUS falls back to an approximation, so the mask can differ slightly between installs:
 
 ```bash
 conda activate simnibs_v4.6.0
-pip install trimesh pynput
+pip install trimesh potpourri3d pynput
 ```
