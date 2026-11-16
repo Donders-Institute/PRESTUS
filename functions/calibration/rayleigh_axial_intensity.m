@@ -11,9 +11,10 @@ function I_axial = rayleigh_axial_intensity(phases_rad, velocity, parameters, di
 %   p(z) = (i k rho c) / (2 pi) * integral_over_element
 %              exp(-i k r) / r  dS
 %
-% where r = sqrt(rho_s^2 + z^2) for a source point at lateral position rho_s.
-% For on-axis evaluation this reduces to a 1-D integral over the radial
-% coordinate of each ring (azimuthal integral is 2pi * rho_s * d_rho_s).
+% where r = sqrt(rho_s^2 + (z - z_s)^2) for a source point on the bowl at
+% lateral position rho_s and depth z_s = R_c - sqrt(R_c^2 - rho_s^2). On the
+% axis this reduces to a 1-D integral over rho_s with the bowl surface
+% element dS = 2pi * rho_s * R_c / sqrt(R_c^2 - rho_s^2) * d_rho_s.
 %
 % This model is more accurate than O'Neil near the natural focus and for
 % configurations where phase steering moves the focus well away from the
@@ -89,17 +90,14 @@ for i = 1:n_elem
     for iz = 1:N_pts
         z = z_eval(iz);
 
-        % Distance from each ring point to axial evaluation point
-        % Bowl surface offset: source points on curved bowl at z_s = -(R_c - sqrt(R_c^2 - rho_s^2))
-        % For simplicity (flat-piston approximation per ring, valid when ring width << R_c):
-        %   r = sqrt(rho_s^2 + z^2)
-        % For full spherical bowl: add z_s offset per source point
+        % Distance from each ring point on the bowl to the axial evaluation point
         z_s = R_c - sqrt(max(R_c^2 - rho_s.^2, 0));   % axial position of source on bowl [m]
         r   = sqrt(rho_s.^2 + (z - z_s).^2);          % source-to-field distance [m]
 
-        % Rayleigh–Sommerfeld kernel (first Rayleigh integral):
-        %   (i k / 2 pi) * exp(-i k r) / r * (2 pi * rho_s)  per unit rho_s
-        kernel = (1i * k / (2*pi)) .* exp(-1i * k .* r) ./ r .* (2*pi * rho_s);
+        % Rayleigh–Sommerfeld kernel (first Rayleigh integral) per unit rho_s,
+        % with the bowl surface element dS = 2 pi rho_s R_c / sqrt(R_c^2 - rho_s^2)
+        dS     = 2*pi * rho_s .* R_c ./ sqrt(R_c^2 - rho_s.^2);
+        kernel = (1i * k / (2*pi)) .* exp(-1i * k .* r) ./ r .* dS;
 
         p_total(iz) = p_total(iz) + u0 * rho * c * sum(dw .* kernel);
     end

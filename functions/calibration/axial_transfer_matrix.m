@@ -26,8 +26,9 @@ function H = axial_transfer_matrix(tran, z_bowl_mm, c, rho, forward_model)
 % RING_PROFILE_TRANSDUCER) multiplies each column by its complex weight.
 %
 % Notes:
-%   'rayleigh' reproduces RAYLEIGH_AXIAL_INTENSITY (same quadrature and bowl
-%   sagitta) but vectorised: |H*w|.^2/(2*rho*c)*1e-4 equals
+%   'rayleigh' integrates over the curved bowl surface; for a full bowl it
+%   equals O'Neil's on-axis solution. It reproduces RAYLEIGH_AXIAL_INTENSITY
+%   (same quadrature, bowl sagitta and surface element) but vectorised: |H*w|.^2/(2*rho*c)*1e-4 equals
 %   rayleigh_axial_intensity(angle(w), v, ...) for uniform |w| = v.
 %   'oneil' builds each column from the complex per-ring O'Neil field
 %   (FOCUSEDBOWLONEIL outer minus inner bowl), i.e. the terms that
@@ -55,7 +56,9 @@ function H = axial_transfer_matrix(tran, z_bowl_mm, c, rho, forward_model)
                 dw    = (0.5 * (b(i) - a(i)) * wi)';
                 z_s   = R_c - sqrt(max(R_c^2 - rho_s.^2, 0));
                 r     = sqrt(rho_s.^2 + (z - z_s).^2);                     % [N_z x nq]
-                kern  = (1i * k / (2*pi)) .* exp(-1i * k .* r) ./ r .* (2*pi * rho_s);
+                % bowl surface element dS = 2*pi*rho_s * R_c/sqrt(R_c^2-rho_s^2) d(rho_s)
+                dS    = 2*pi * rho_s .* R_c ./ sqrt(R_c^2 - rho_s.^2);
+                kern  = (1i * k / (2*pi)) .* exp(-1i * k .* r) ./ r .* dS;
                 H(:, i) = rho * c * (kern * dw');
             end
         case 'oneil'

@@ -64,9 +64,10 @@ function H = field_transfer_matrix(tran, r_mm, z_bowl_mm, c, rho, n_phi)
             s  = 0.5 * (b - a) * xi + 0.5 * (b + a);   % [nq x 1] ring radius samples
             ws = 0.5 * (b - a) * wi;
             zs = R - sqrt(max(R^2 - s.^2, 0));
+            js = R ./ sqrt(R^2 - s.^2);                                    % bowl surface element / projected area
             d  = sqrt(rp.^2 + s.^2 - 2 * rp .* s .* cphi + (zp - zs).^2);   % [nq x n_phi x np]
             kern = exp(-1i * k * d) ./ d;
-            I = squeeze(sum(sum(kern .* (ws .* s), 1) * dphi, 2));         % ∫∫ e^{-ikd}/d ρ dρ dφ
+            I = squeeze(sum(sum(kern .* (ws .* s .* js), 1) * dphi, 2));   % ∫∫ e^{-ikd}/d dS over the bowl
             H(jdx, i) = rho * c * (1i * k / (2 * pi)) * I(:);
           end
         end
