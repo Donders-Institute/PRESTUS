@@ -1,4 +1,4 @@
-meta: {geometry_fingerprint: '00f48fc7090b', tran_serial: BSonix_35mm, created_at: '2026-11-13', last_updated: '2026-11-13',
-  calibration_type: geometric, prestus_version: d018b87a}
+meta: {geometry_fingerprint: 00f48fc7090b, tran_serial: BSonix_35mm, created_at: '2026-11-13',
+  last_updated: '2026-11-16', calibration_type: geometric, prestus_version: '881e7082'}
 global_model:
   elem_phase_correction_deg: []
