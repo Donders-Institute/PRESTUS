@@ -167,11 +167,10 @@ def test_deprecated_device_is_labelled(library):
     assert dev.deprecated and dev.label().endswith("(deprecated)")
 
 
-def test_opm_variants_are_excluded_but_resolve(library):
-    for serial in ("IS_PCD15473_01001_OPM", "IS_PCD15473_01003_OPM"):
-        dev = library.get(serial)
-        assert dev is not None and dev.excluded and dev.label().endswith("(excluded)")
-        assert dev.geometry                                 # still usable by earlier studies
+def test_excluded_device_is_labelled(library):
+    from dataclasses import replace
+    dev = replace(library.get("IS_PCD15473_01001"), status="excluded")
+    assert dev.excluded and dev.label().endswith("(excluded)")
     assert not library.get("IS_PCD15473_01001").excluded
 
 

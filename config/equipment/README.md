@@ -10,7 +10,7 @@ This folder contains transducer YAML files and supporting data used by the calib
 |---|---|---|---|
 | Device model | `<MODEL>` | `CTX_500`, `IS_PCD15473`, `H246` | the model's specification |
 | Measured unit | `<MODEL>_<unit id>` | `CTX_500_026`, `IS_PCD15473_01001` | the unit, with its own calibration |
-| Variant of a unit | `<MODEL>_<unit id>_<variant>` | `IS_PCD15473_01001_OPM` (excluded) | the unit in another configuration |
+| Variant of a unit | `<MODEL>_<unit id>_<variant>` | `IS_PCD15473_01001_OPM` (none shipped) | the unit in another configuration |
 
 `<MODEL>` is the model designation with `-` and spaces written as `_` (e.g. NeuroFUS CTX-250 2 ch. → `CTX_250_2ch`, BrainSonix BSonix 55 mm → `BSonix_55mm`); Imasonic models keep the `IS_PCD` prefix of their units. Use a unit's entry when it is in the library, since its calibration is specific to it, and the model entry otherwise. A study naming a unit serial that has no entry (`CTX_500_031`) uses the model entry of its longest `<MODEL>_` prefix (`CTX_500`), with a warning (`resolve_transducer_from_serial`). Every entry names its model in `model:` (absent for `CTX_500_006`, a 2-channel CTX-500 with no model entry). The units `CTX_250_009` and `CTX_250_014` predate this scheme: they are of model `CTX_250_2ch`.
 
