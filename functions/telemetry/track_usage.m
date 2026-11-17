@@ -125,6 +125,16 @@ function payload = build_payload(event, parameters, options, pipe_options)
     end
     payload.modules_enabled = modules_on;
 
+    % --- simulation size and duration (Nexus resource prediction) ---
+    % Allow-listed numeric fields of the run_stats record: grid size, time
+    % steps, stage durations, peak RAM. Never the host, paths or timestamps.
+    payload.resolution_mm    = safe_get(parameters, {'grid', 'resolution_mm'}, NaN);
+    payload.acoustic_backend = safe_get(parameters, {'acoustic_backend'}, 'kwave');
+    payload.n_cpu_alloc      = str2double(getenv('SLURM_CPUS_PER_TASK'));   % NaN outside SLURM
+    if isfield(options, 'sim_stats') && isstruct(options.sim_stats)
+        payload.sim_stats = sim_stats_fields(options.sim_stats);
+    end
+
     % --- outcome fields (populated on run_end / run_error) ---
     if isfield(options, 'run_id'),      payload.run_id      = options.run_id;       end
     if isfield(options, 'duration_s'),  payload.duration_s  = options.duration_s;  end
@@ -314,6 +324,26 @@ function names = get_toolbox_names()
         names = names(~strcmp(names, 'MATLAB'));
     catch
         names = {};
+    end
+end
+
+% -------------------------------------------------------------------------
+function out = sim_stats_fields(rec)
+% Numeric run_stats fields only (see RUN_STATS); anything else is dropped.
+    keep = {'acoustic_voxels', 'acoustic_dims', 'acoustic_pml', 'axisymmetric', ...
+            'acoustic_nt', 'acoustic_s', 'thermal_voxels', 'thermal_steps', ...
+            'thermal_s', 'peak_ram_gb', 'n_cpu'};
+    out = struct();
+    if ~isstruct(rec)
+        return
+    end
+    fn = fieldnames(rec);
+    stages = fn(~cellfun(@isempty, regexp(fn, '^stage_[a-z_]+_s$', 'once')));   % stage times
+    keep = [keep, stages(:)'];
+    for k = 1:numel(keep)
+        if isfield(rec, keep{k}) && isnumeric(rec.(keep{k}))
+            out.(keep{k}) = double(rec.(keep{k}));
+        end
     end
 end
 

@@ -258,6 +258,24 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_teleme
             tc.verifyTrue(isfile(fullfile(prefdir_prestus(), 'uuid.txt')));
         end
 
+        function test_track_usage_sim_stats_allow_list(tc)
+            tc.install_webwrite_stub();
+            telemetry_set_consent_quiet(true);
+            rec = struct('acoustic_dims', [240 71], 'acoustic_nt', 2871, 'acoustic_s', 12.5, ...
+                'thermal_steps', 880, 'host', 'dccn-c091', 'timestamp', '2026-11-16T10:00:00Z', ...
+                'hpc_partition', 'gpu40g', 'stage_preproc_s', 214.5, 'stage_note_s', 'text');
+            track_usage('run_end', track_params(), struct('status', 'success', 'sim_stats', rec));
+            lines = strsplit(strtrim(fileread(tc.WebLog)), newline);
+            payload = jsondecode(lines{2});
+            tc.verifyEqual(payload.sim_stats.acoustic_dims(:)', [240 71]);
+            tc.verifyEqual(payload.sim_stats.acoustic_nt, 2871);
+            tc.verifyEqual(payload.sim_stats.thermal_steps, 880);
+            tc.verifyEqual(payload.sim_stats.stage_preproc_s, 214.5);
+            tc.verifyFalse(contains(lines{2}, 'dccn-c091'), 'payload contains the host name');
+            tc.verifyEqual(sort(fieldnames(payload.sim_stats))', ...
+                sort({'acoustic_dims', 'acoustic_nt', 'acoustic_s', 'stage_preproc_s', 'thermal_steps'}));
+        end
+
     end
 
     methods (Access = private)

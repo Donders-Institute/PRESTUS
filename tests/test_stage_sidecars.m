@@ -34,9 +34,30 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
             tc.verifyEqual(string(sc.kind), "demo");
             tc.verifyEqual(sc.subject_id, 1);
             tc.verifyEqual(string(sc.generated_by.name), "PRESTUS");
+            tc.verifyTrue(all(isfield(sc.generated_by, {'version', 'commit', 'commit_date', 'dirty'})));
             tc.verifyTrue(check_sidecar_signature(f, sc.signature, struct('a', [1 2 3]), p));
             tc.verifyError(@() check_sidecar_signature(f, sc.signature, struct('a', [1 2 4]), p), ...
                 'prestus:cache:signatureMismatch');
+        end
+
+        function test_sidecar_uses_run_version(tc)
+            % The run's recorded version wins over the current checkout.
+            p = params(tc.TmpDir);
+            p.io.prestus_version = struct('version', 'v9.9.9-1-gabc1234', 'commit', 'abc1234', ...
+                'commit_date', '2026-01-02', 'branch', 'x', 'dirty', 'yes');
+            f = write_sidecar(fullfile(tc.TmpDir, 'v.json'), 'demo', struct('value', 1), p);
+            sc = read_sidecar(f);
+            tc.verifyEqual(string(sc.generated_by.commit), "abc1234");
+            tc.verifyEqual(string(sc.generated_by.commit_date), "2026-01-02");
+            tc.verifyEqual(string(sc.generated_by.dirty), "yes");
+        end
+
+        function test_prestus_version_info(tc)
+            [hash, ver, info] = prestus_version();
+            tc.verifyTrue(all(isfield(info, {'version', 'commit', 'commit_date', 'branch', 'dirty'})));
+            tc.verifyEqual(info.commit, hash);
+            tc.verifyEqual(info.version, ver);
+            tc.verifyTrue(ismember(info.dirty, {'yes', 'no', 'unknown'}));
         end
 
         function test_find_sidecar(tc)
@@ -60,7 +81,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
         end
 
         function test_pct_legacy_sidecar(tc)
-            % pseudoCT.json written before v0.6.2: only SkullMapping
+            % pseudoCT.json with only SkullMapping (no signature)
             p = params(tc.TmpDir);
             p.pct = struct('skull_mapping', 'carpino');
             fid = fopen(fullfile(tc.TmpDir, 'pseudoCT.json'), 'w');

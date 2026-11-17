@@ -11,7 +11,9 @@ function sidecar_file = write_sidecar(sidecar_file, kind, content, parameters)
 %   "sidecar_version": 1
 %   "kind":            "placement" | "pseudoCT" | "acoustic_pressure"
 %   "created":         ISO 8601 time
-%   "generated_by":    {"name": "PRESTUS", "version": <git describe or VERSION>}
+%   "generated_by":    {"name": "PRESTUS", "version": <git describe or VERSION>,
+%                       "commit": <short hash>, "commit_date": <yyyy-mm-dd>,
+%                       "dirty": "yes" | "no" | "unknown"}
 %   "subject_id":      <parameters.subject_id>
 %   ...                kind-specific fields from CONTENT
 %
@@ -42,16 +44,26 @@ end
 
     sidecar_file = char(sidecar_file);
     try
-        version_str = 'unknown';
-        try
-            [~, version_str] = prestus_version();
-        catch
+        % The run's own record (path_log_setup) when available, so the
+        % sidecar names the code that produced the output.
+        if isfield(parameters, 'io') && isfield(parameters.io, 'prestus_version') && ...
+                isstruct(parameters.io.prestus_version)
+            info = parameters.io.prestus_version;
+        else
+            info = struct('version', 'unknown', 'commit', 'unknown', 'commit_date', '', ...
+                'branch', '', 'dirty', 'unknown');
+            try
+                [~, ~, info] = prestus_version();
+            catch
+            end
         end
         out = struct( ...
             'sidecar_version', 1, ...
             'kind',            char(kind), ...
             'created',         char(datetime('now', 'Format', 'yyyy-MM-dd''T''HH:mm:ss')), ...
-            'generated_by',    struct('name', 'PRESTUS', 'version', version_str), ...
+            'generated_by',    struct('name', 'PRESTUS', 'version', info.version, ...
+                                      'commit', info.commit, 'commit_date', info.commit_date, ...
+                                      'dirty', info.dirty), ...
             'subject_id',      parameters.subject_id);
         fields = fieldnames(content);
         for i = 1:numel(fields)

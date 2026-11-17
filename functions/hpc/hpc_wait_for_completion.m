@@ -37,6 +37,7 @@ if nargin < 5, log_dir    = []; end
 disp('User has chosen to wait until job is finished...');
 job_completed = false;
 checks = 0;
+seen_once = false;   % qsub fallback: job seen in qstat during this call
 tic_start = tic;
 
 while ~job_completed && checks < max_checks
@@ -119,9 +120,7 @@ while ~job_completed && checks < max_checks
             % Fallback: simple qstat. run_command invokes qstat directly
             % via argv, no shell at all.
             [status_check, ~] = run_command({'qstat', job_id_str});
-            persistent seen_once;
-            if isempty(seen_once), seen_once = false; end
-            
+
             if status_check ~= 0 && seen_once
                 fprintf('✓ qsub Job %s gone from queue → COMPLETE\n', job_id_str);
                 job_completed = true;

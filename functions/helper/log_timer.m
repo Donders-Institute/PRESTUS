@@ -21,7 +21,8 @@ function varargout = log_timer(action, label, varargin)
 % Output:
 %   none. 'stop' prints one line: elapsed wall-clock time [s], RAM increase
 %   from start to peak [GB], peak RAM [GB] and the change in used disk
-%   space on the monitored path [GB and MB].
+%   space on the monitored path [GB and MB]. It also adds the time to the
+%   run record as stage_<label>_s (RUN_STATS), except for 'prestus_pipeline'.
 %
 % Note:
 %   Uses MATLAB persistent variables and timer() objects. If MATLAB exits
@@ -81,6 +82,10 @@ switch action
         
         fprintf('⏱ %-20s %.2fs | ΔRAM %.2fGB | PEAKRAM %.2fGB | ΔHDD %.2fGB (%.0fMB) [#%d]\n', ...
             label, time_sec, ram_peak_delta, state.peak_ram_gb, used_delta_gb, used_delta_mb, state.counter);
+        % Stage time for run_stats.jsonl (summed over repeats; the whole run is total_s)
+        if ~strcmp(label, 'prestus_pipeline') && isvarname(['stage_' label '_s'])
+            run_stats('add', ['stage_' label '_s'], time_sec);
+        end
 
         TIMER_STATES.remove(label);
         

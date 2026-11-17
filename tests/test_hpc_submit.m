@@ -1,8 +1,8 @@
 classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_hpc_submit < matlab.unittest.TestCase
-% TEST_HPC_SUBMIT  Job IDs from sbatch output (PARSE_SBATCH_JOB_ID).
+% TEST_HPC_SUBMIT  Job IDs from sbatch output, job scripts, parameter validation, and job polling.
 %
-% Regression: the first number anywhere in sbatch's output was taken as the
-% job ID, so a warning line such as 'sbatch: warning: 2 GPUs ...' gave job 2.
+% PARSE_SBATCH_JOB_ID takes the job ID, not the first number in sbatch's
+% output (a warning line such as 'sbatch: warning: 2 GPUs ...' precedes it).
 %
 %   results = runtests('tests/test_hpc_submit.m');
 
@@ -59,6 +59,31 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_hpc_su
             tc.verifyEmpty(strfind(txt, 'gpus='));
         end
 
+        function test_job_logs_are_per_job(tc)
+            % Each job writes its own log. SLURM expands %j in #SBATCH
+            % directives; PBS expands nothing in #PBS directives, so the
+            % qsub script must not name its logs there with %j.
+            tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            p = hpc_params();
+            try %#ok<TRYNC>
+                hpc_submit_job('qsub', 'job_m', p, tmp);
+            end
+            txt = fileread(only_file(tc, tmp, 'temp_qsub_*.sh'));
+            tc.verifyEmpty(regexp(txt, '#PBS -[oe] ', 'once'), 'PBS -o/-e with a fixed name is shared by all jobs');
+            tc.verifyEmpty(strfind(txt, '%j'));
+            tc.verifySubstring(txt, 'sub-001_qsub_output_${PBS_JOBID}.log');
+            tc.verifySubstring(txt, 'sub-001_qsub_error_${PBS_JOBID}.log');
+            % The redirect precedes the MATLAB call
+            tc.verifyLessThan(strfind(txt, 'exec >'), strfind(txt, 'matlab -batch'));
+
+            try %#ok<TRYNC>
+                hpc_submit_job('slurm', 'job_m', p, tmp);
+            end
+            txt = fileread(only_file(tc, tmp, 'temp_slurm_*.sh'));
+            tc.verifySubstring(txt, '#SBATCH --output=sub-001_slurm_output_%j.log');
+            tc.verifySubstring(txt, '#SBATCH --error=sub-001_slurm_error_%j.log');
+        end
+
         function test_snellius_timelimit_check(tc)
             tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
             p = hpc_params();
@@ -82,8 +107,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_hpc_su
                 % acoustic, thermal, heating, code_type, jwave.use_gpu, bb backend, GPU?
                 'kwave',      'kwave',      0, 'matlab_gpu', [],    'auto', true; ...
                 'kwave',      'kwave',      0, 'matlab_cpu', [],    'auto', false; ...
-                'babelbrain', 'babelbrain', 1, 'matlab_cpu', [],    'auto', true; ...   % was: no GPU
-                'babelbrain', 'babelbrain', 1, 'matlab_gpu', [],    'cpu',  false; ...  % was: GPU
+                'babelbrain', 'babelbrain', 1, 'matlab_cpu', [],    'auto', true; ...
+                'babelbrain', 'babelbrain', 1, 'matlab_gpu', [],    'cpu',  false; ...
                 'babelbrain', 'kwave',      1, 'matlab_gpu', [],    'cpu',  true; ...   % k-Wave heating
                 'jwave',      'kwave',      0, 'matlab_cpu', [],    'auto', true; ...   % auto-detect
                 'jwave',      'kwave',      0, 'matlab_gpu', false, 'auto', false};
@@ -105,6 +130,74 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_hpc_su
         end
 
     end
+
+
+    % Parameter validation
+    methods (Test, TestTags = {'hpc_validate_parameters'})
+
+        function test_validate_returns_non_interactive(tc)
+            for platform = {'slurm', 'qsub'}
+                for interactive = [0 1]
+                    p = hpc_params();
+                    p.simulation.interactive = interactive;
+                    p.io.overwrite_files = 'always';
+                    [~, out] = evalc('hpc_validate_parameters(p, platform{1})');
+                    tc.verifyFalse(logical(out.simulation.interactive));
+                    tc.verifyEqual(rmfield(out, 'simulation'), rmfield(p, 'simulation'));
+                end
+            end
+        end
+
+        function test_validate_without_output(tc)
+            % A caller that ignores the output still validates.
+            p = hpc_params();
+            p.simulation.interactive = 0;
+            p.io.overwrite_files = 'never';
+            tc.verifyWarningFree(@() hpc_validate_parameters(p, 'slurm'));
+        end
+
+        function test_validate_rejects_ask(tc)
+            % Negative control: 'ask' would block an unattended job.
+            p = hpc_params();
+            p.simulation.interactive = 0;
+            p.io.overwrite_files = 'ask';
+            tc.verifyError(@() hpc_validate_parameters(p, 'slurm'), ?MException);
+        end
+
+    end
+
+
+    % Job polling
+    methods (Test, TestTags = {'hpc_wait_for_completion'})
+
+        function test_qsub_wait_state_is_per_call(tc)
+            % qstat stub: the job is never listed. Each call must first wait
+            % for the job to appear, so with one check every call times out;
+            % no state carries over from an earlier call.
+            stubs = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            write_function(stubs, 'run_command', ...
+                'function [status, out] = run_command(varargin)', 'status = 1; out = '''';');
+            write_function(stubs, 'pause', 'function pause(varargin)', '');
+            tc.applyFixture(matlab.unittest.fixtures.PathFixture(stubs));
+            rehash;
+            tc.assertEqual(which('run_command'), fullfile(stubs, 'run_command.m'));
+            for k = 1:3
+                out = evalc('hpc_wait_for_completion(''123.server'', ''qsub'', 1)');
+                tc.verifySubstring(out, 'to appear', sprintf('call %d', k));
+                tc.verifyEmpty(strfind(out, 'COMPLETE'), sprintf('call %d', k));
+            end
+            % Negative control: two checks see the job gone after it was waited for
+            out = evalc('hpc_wait_for_completion(''123.server'', ''qsub'', 2)');
+            tc.verifySubstring(out, 'COMPLETE');
+        end
+
+    end
+end
+
+function write_function(folder, name, signature, body)
+    fid = fopen(fullfile(folder, [name '.m']), 'w');
+    fprintf(fid, '%s\n', signature, body, 'end');
+    fclose(fid);
 end
 
 function p = hpc_params()

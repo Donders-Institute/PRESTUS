@@ -1,19 +1,21 @@
-function hpc_validate_parameters(parameters, hpc_type)
+function parameters = hpc_validate_parameters(parameters, hpc_type)
 % HPC_VALIDATE_PARAMETERS  Validate and enforce settings required for HPC batch submission
 %
 % Checks that parameters are compatible with non-interactive HPC execution.
 % Warns and disables interactive mode if enabled. Asserts that overwrite_files
 % is set to 'always', 'force' or 'never' (not 'ask', which would block an unattended job).
-% This function has no return value — it errors or warns rather than returning a flag.
 %
 % Use as:
-%   hpc_validate_parameters(parameters, hpc_type)
+%   parameters = hpc_validate_parameters(parameters, hpc_type)
 %
 % Input:
 %   parameters - PRESTUS config struct; checked fields:
 %                  .simulation.interactive — must be false for batch jobs
 %                  .io.overwrite_files     — must be 'always', 'force' or 'never'
 %   hpc_type   - 'slurm' or 'qsub' (used in warning/error messages)
+%
+% Output:
+%   parameters - input struct with .simulation.interactive set to false
 %
 % See also: HPC_DETECT_SYSTEM, HPC_SUBMIT_JOB
 

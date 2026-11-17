@@ -17,7 +17,8 @@ function [parameters] = path_log_setup(parameters, prestus_path)
 %
 % Output:
 %   parameters   - input extended with io.dir_output, io.dir_cache,
-%                  io.dir_debug (and subdirs), io.log_file, io.filename_table
+%                  io.dir_debug (and subdirs), io.log_file, io.filename_table,
+%                  io.prestus_version (PRESTUS_VERSION provenance struct)
 %
 % See also: LOAD_PARAMETERS, PRINT_PARAMETER_SUMMARY, PRESTUS_PIPELINE_START
 
@@ -25,8 +26,6 @@ arguments
     parameters   (1,1) struct
     prestus_path (1,:) char
 end
-
-    % currentLoc | Root of PRESTUS' 'functions' folder
 
     disp(['Location of PRESTUS: ', prestus_path])
 
@@ -59,12 +58,15 @@ end
     if isfield(parameters.startup, 'subpaths_to_add') && ~isempty(parameters.startup.subpaths_to_add)
         for nPaths = 1:length(parameters.startup.subpaths_to_add)
             addpath(genpath(parameters.startup.subpaths_to_add{nPaths}))
-            disp(['Adding ', parameters.startup.subpaths_to_add{nPaths}, 'and subfolders']);
+            disp(['Adding ', parameters.startup.subpaths_to_add{nPaths}, ' and subfolders']);
         end
     end
     
-    % Print current PRESTUS version (Git-based)
+    % Print current PRESTUS version (Git-based) and keep it with the run:
+    % io.prestus_version goes into the parameter snapshots (.mat, .yaml),
+    % from which result summaries read which code produced the outputs.
     prestus_version(prestus_path);
+    [~, ~, parameters.io.prestus_version] = prestus_version(prestus_path);
 
     % Verify that kwave is added and print k-wave information
     if ~exist('makeBowl','file')
@@ -111,7 +113,8 @@ end
     % ├── img/     — all PNG visualizations (acoustic, thermal, preprocessing)
     % ├── log/     — diary log files
     % ├── cache/   — regenerable intermediates (checkpoints, matrices)
-    % └── debug/   — diagnostic artefacts written only when debug=1
+    % └── debug/   — diagnostic artefacts written only when simulation.debug=1
+    %     ├── manifest.jsonl — one line per debug output (DEBUG_REGISTER)
     %     ├── preproc/   — head preprocessing (rotation, cropping, skull visualizations)
     %     ├── medium/    — medium mapping (grid-space property matrices, pCT)
     %     ├── source/    — source/transducer setup (element distribution plots)
@@ -145,11 +148,13 @@ end
             if ~isfolder(d{1}); mkdir(d{1}); end
         end
 
-        if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'debug') && ...
-                parameters.simulation.debug == 1
-            for d = {parameters.io.dir_debug, parameters.io.dir_debug_preproc, ...
-                     parameters.io.dir_debug_medium, parameters.io.dir_debug_source, ...
-                     parameters.io.dir_debug_babelbrain}
+        if debug_on(parameters)
+            % Folders of the stages selected by simulation.debug_stages
+            % (DEBUG_STAGES errors on an unknown stage name)
+            stages = debug_stages(parameters);
+            dirs = [{parameters.io.dir_debug}, ...
+                cellfun(@(s) parameters.io.(['dir_debug_' s]), stages, 'UniformOutput', false)];
+            for d = dirs
                 if ~isfolder(d{1}); mkdir(d{1}); end
             end
         end
@@ -199,7 +204,7 @@ end
 
         % Create a log.
         % Use a pre-assigned path if one was set -- by uncertainty_pipeline
-        % (so all five stage logs have known, deterministic paths) or at HPC
+        % (so every stage log has a known, deterministic path) or at HPC
         % submission (so hpc_job_report can parse it); otherwise fall back to
         % a timestamp-based name.
         if isfield(parameters.io, 'log_file') && ~isempty(parameters.io.log_file)
@@ -209,6 +214,9 @@ end
         end
         parameters.io.log_file = filename_log;
         diary(filename_log);
+        v = parameters.io.prestus_version;
+        fprintf('PRESTUS %s (commit %s, %s; uncommitted changes: %s)\n', ...
+            v.version, v.commit, v.commit_date, v.dirty);
     end
 
     % summarize parameters
@@ -221,7 +229,7 @@ end
             subject_id, parameters.simulation.medium, parameters.io.output_affix));
     end
 
-    % suppress unneccessary warnings from export_fig when running without OpenGL
+    % suppress unnecessary warnings from export_fig when running without OpenGL
     warning('off','MATLAB:prnRenderer:opengl');
     
     % display GPU information (if requested)

@@ -140,7 +140,7 @@ function [job_id, jobs] = prestus_pipeline_start(parameters, options)
                 job_id = [];
                 return;
             end
-            hpc_validate_parameters(parameters, platform);
+            parameters = hpc_validate_parameters(parameters, platform);
             [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
                 hpc_setup_temp_files(parameters);
 

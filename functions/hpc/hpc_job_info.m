@@ -53,7 +53,6 @@ function display_info = hpc_job_info(platform, job_id, job_name, ...
         fprintf('═════════════════════════════\n');
         fprintf('Job ID:       %s\n', display_info.id);
         fprintf('Job name:     %s\n', display_info.name);
-        fprintf('Subject:      %s\n', job_name);
         fprintf('Memory:       %.0f GB\n', display_info.memory_gb);
         fprintf('Time limit:   %s\n', display_info.timelimit);
         fprintf('Log dir:      %s\n', display_info.log_dir);

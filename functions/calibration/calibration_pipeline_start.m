@@ -77,7 +77,7 @@ function job_id = calibration_pipeline_start(...
                 parameters.hpc.job_prefix = 'CAL';
             end
 
-            hpc_validate_parameters(parameters, platform);
+            parameters = hpc_validate_parameters(parameters, platform);
 
             %% Set up log directory under calibration output
             cal_output = parameters.calibration.path_output;

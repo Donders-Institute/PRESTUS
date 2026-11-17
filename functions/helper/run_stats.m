@@ -23,10 +23,15 @@ function out = run_stats(action, varargin)
 %   out - the record struct ('get', 'write'); empty otherwise
 %
 % Record fields: timestamp, platform, hpc_name, hpc_partition, host,
-% gpu_model, code_type, precision, acoustic_backend, medium, resolution_mm,
-% acoustic_voxels, acoustic_nt, acoustic_s, thermal_voxels, thermal_steps,
-% thermal_s, total_s, peak_ram_gb. A stage that did not simulate (cache
-% reuse, dry run, stage off) leaves its fields out.
+% n_cpu, gpu_model, code_type, precision, acoustic_backend, medium,
+% resolution_mm, acoustic_voxels, acoustic_dims, acoustic_pml, axisymmetric,
+% acoustic_nt, acoustic_s, thermal_voxels, thermal_steps, thermal_s, total_s,
+% peak_ram_gb, and stage_<label>_s per timed stage (LOG_TIMER labels, e.g.
+% stage_preproc_s, stage_freefield_baseline_s; summed over repeats). The acoustic fields describe the grid the solver ran on (the
+% 2D plane of an axisymmetric run; PML not included in voxels or dims).
+% n_cpu is the job's CPU allocation under SLURM, else the machine's cores.
+% A stage that did not simulate (cache reuse, dry run, stage off) leaves its
+% fields out.
 %
 % Peak RAM is the MATLAB process high-water mark, or the job cgroup peak
 % (which includes child solvers) under SLURM; Linux only, NaN elsewhere.
@@ -81,6 +86,7 @@ rec.platform         = char(get_nonempty_field(parameters, {'platform'}, 'matlab
 rec.hpc_name         = char(get_nonempty_field(parameters, {'hpc', 'name'}, ''));
 rec.hpc_partition    = char(get_nonempty_field(parameters, {'hpc', 'partition'}, ''));
 rec.host             = host_name();
+rec.n_cpu            = cpu_count();
 rec.code_type        = char(get_nonempty_field(parameters, {'simulation', 'code_type'}, ''));
 rec.gpu_model        = '';
 if contains(rec.code_type, 'gpu')
@@ -117,6 +123,13 @@ if isempty(name)
     [~, name] = system('hostname');
 end
 name = strtrim(name);
+end
+
+function n = cpu_count()
+n = str2double(getenv('SLURM_CPUS_PER_TASK'));
+if ~isfinite(n)
+    n = feature('numcores');
+end
 end
 
 function name = gpu_name()
