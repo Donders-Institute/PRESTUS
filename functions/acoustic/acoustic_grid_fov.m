@@ -3,8 +3,8 @@ function [parameters_fov, kwave_medium_fov, medium_masks_fov, ...
     acoustic_grid_fov(parameters, kwave_medium, medium_masks, trans_pos, focus_pos)
 % ACOUSTIC_GRID_FOV  Crop the acoustic simulation domain to a beam-axis FOV box.
 %
-% Reduces the k-Wave grid to a rectangular box centred on the focus before
-% acoustic simulation.  When grid.mode = 'focal_axis' (default) or
+% Reduces the acoustic grid to a rectangular box around the beam before the
+% simulation: laterally centred on the focus, axially from the transducer.  When grid.mode = 'focal_axis' (default) or
 % 'transducer_axis', the grid z-axis is the acoustic beam axis of a single
 % transducer; x and y are lateral.  The FOV box
 % dimensions are therefore:
@@ -106,7 +106,7 @@ if ras_plus_mode
          'FOV orientation may be approximate.'], beam_dim);
     lateral_dims = setdiff(1:3, beam_dim);
 else
-    % transducer_axis mode: z (dim 3) is the beam axis.
+    % focal_axis / transducer_axis mode: z (dim 3) is the beam axis.
     beam_dim     = 3;
     lateral_dims = [1 2];
 end
@@ -129,12 +129,16 @@ fov_hi_mm = zeros(1, 3);
 % Extend in the direction the beam actually travels (sign of focus−trans),
 % not always in +beam_dim, so the FOV contains the focus even when the
 % transducer sits at a higher coordinate than the focal point.
+% The box starts back_mm behind the transducer centre: kWaveArray spreads each
+% source point over neighbouring voxels (band-limited interpolation), and a box
+% edge at the apex cut those behind it (12 % of the source voxels, 2026-11-16).
+back_mm = 8 * dx_mm;
 if focus_mm(beam_dim) >= trans_mm(beam_dim)
-    fov_lo_mm(beam_dim) = trans_mm(beam_dim);
+    fov_lo_mm(beam_dim) = trans_mm(beam_dim) - back_mm;
     fov_hi_mm(beam_dim) = trans_mm(beam_dim) + fov_length_mm;
 else
     fov_lo_mm(beam_dim) = trans_mm(beam_dim) - fov_length_mm;
-    fov_hi_mm(beam_dim) = trans_mm(beam_dim);
+    fov_hi_mm(beam_dim) = trans_mm(beam_dim) + back_mm;
 end
 
 % Lateral: centred on focus
@@ -148,7 +152,9 @@ fov_hi_mm(lateral_dims) = focus_mm(lateral_dims) + fov_diameter_mm / 2;
 % the box above, centred laterally on the focus, would cut off its bowl.
 n_tx = numel(parameters.transducer);
 u_beam  = (focus_pos - trans_pos) / max(norm(focus_pos - trans_pos), eps);
-oblique = ~ras_plus_mode && acosd(min(1, abs(u_beam(beam_dim)))) > 2;
+% Applies in ras_plus mode too, where beams are generally oblique to the grid:
+% an axis-aligned box centred on the focus cut off the bowl there (0 source voxels).
+oblique = acosd(min(1, abs(u_beam(beam_dim)))) > 2;
 if n_tx > 1 || oblique
     [fov_lo_mm, fov_hi_mm] = multi_transducer_box(parameters, trans_pos, focus_pos, ...
         fov_diameter_mm, fov_length_mm, dx_mm);
@@ -278,9 +284,9 @@ for ti = 1:n_tx
         t = parameters.transducer(ti).trans_pos(:)';
         f = parameters.transducer(ti).focus_pos(:)';
     end
-    t_mm = (t - 1) * dx_mm;
     u    = (f - t) / max(norm(f - t), eps);
-    e_mm = t_mm + len(ti) * u;
+    t_mm = (t - 1) * dx_mm - 8 * dx_mm * u;   % 8 voxels behind the transducer (source spread, see above)
+    e_mm = (t - 1) * dx_mm + len(ti) * u;
     % half-extent of a disc of radius r with normal u, per axis
     r_ax = diam(ti) / 2 * sqrt(max(0, 1 - u.^2));
     lo_mm = min(lo_mm, min(t_mm, e_mm) - r_ax);

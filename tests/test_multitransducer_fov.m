@@ -18,10 +18,12 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_multit
             % One transducer: lateral box centred on the focus, axial from the transducer
             p = fov_params(1);
             [pf, ~, ~, t_fov, f_fov, off] = run_fov(p);
-            tc.verifyEqual(off, [20 20 5]);              % focus 29 +- 10 mm, z from the transducer
-            tc.verifyEqual(pf.grid.dims, [21 21 41]);
-            tc.verifyEqual(t_fov, [11 11 1]);
-            tc.verifyEqual(f_fov, [11 11 36]);
+            % lateral: focus 29 +- 10 mm; axial: from 8 voxels behind the transducer
+            % (clamped at the grid edge) to 40 mm beyond it
+            tc.verifyEqual(off, [20 20 1]);
+            tc.verifyEqual(pf.grid.dims, [21 21 45]);
+            tc.verifyEqual(t_fov, [11 11 5]);
+            tc.verifyEqual(f_fov, [11 11 40]);
         end
 
         function test_oblique_single_beam_keeps_transducer(tc)
@@ -35,6 +37,26 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_multit
             tc.verifyEqual(t_fov, [3 30 20] - off + 1);
             tc.verifyEqual(f_fov, [30 30 40] - off + 1);
             tc.verifyTrue(all(t_fov >= 1 & t_fov <= pf.grid.dims));
+        end
+
+        function test_box_holds_source_spread_behind_transducer(tc)
+            % The source is spread over voxels behind the bowl apex: the box keeps 8 of them
+            p = fov_params(1);
+            p.transducer(1).trans_pos = [30 30 20];
+            [~, ~, ~, t_fov] = run_fov(p);
+            tc.verifyEqual(t_fov(3), 9);
+        end
+
+        function test_ras_plus_oblique_beam_keeps_transducer(tc)
+            % ras_plus grid (no rotation): an oblique beam gets the beam-axis box too,
+            % not a grid-aligned box centred on the focus that cuts off the bowl
+            p = fov_params(1);
+            p.grid.mode = 'ras_plus';
+            p.transducer(1).trans_pos = [8 40 20];
+            p.transducer(1).focus_pos = [40 25 30];          % ~30 deg off the x axis
+            [pf, ~, ~, t_fov, f_fov] = run_fov(p);
+            tc.verifyTrue(all(t_fov >= 1 & t_fov <= pf.grid.dims));
+            tc.verifyTrue(all(f_fov >= 1 & f_fov <= pf.grid.dims));
         end
 
         function test_opposed_transducers_share_box(tc)
@@ -123,7 +145,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_multit
         end
 
         function test_combine_mixed_fov_and_full(tc)
-            % An FOV cache and a full-grid cache on the same grid (used to error)
+            % An FOV cache and a full-grid cache on the same grid combine
             d = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
             full = [8 8 8];
             f1 = write_cache(fullfile(d, 'a.mat'), ones(full), [], []);

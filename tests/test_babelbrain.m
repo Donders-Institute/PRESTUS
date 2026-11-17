@@ -419,7 +419,6 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'standalone'}) test_
             p.babelbrain.computing_backend           = 1;   % CUDA
             p.babelbrain.ppw                        = 6;
             p.babelbrain.do_refocusing              = false;
-            p.babelbrain.z_beyond_focus_mm          = 40;
             p.babelbrain.python_env                 = tc.PyBin;
             p.babelbrain.root                       = fullfile(prestus_root, 'external', 'BabelBrain');
             p.babelbrain.dry_run                    = dry_run;

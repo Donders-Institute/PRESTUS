@@ -99,12 +99,13 @@ function [elem_pos_m, tr] = extract_element_pos(parameters, tr, trans_pos_m)
 
         new_ROC_mm = file_ext.ROC_projection.new_ROC_mm;
 
-        r = hypot(phys_positions_m(:,1), phys_positions_m(:,2));
-        r_max = max(r);
+        r_mm = 1000 * hypot(phys_positions_m(:,1), phys_positions_m(:,2));
+        r_max = max(r_mm);   % [mm], as ROC and new_ROC_mm
 
         sag_old = ROC - sqrt(ROC^2 - r_max^2);
         sag_new = new_ROC_mm - sqrt(new_ROC_mm^2 - r_max^2);
 
+        % Scale the depth below the rim (unitless) so the rim-to-apex depth becomes sag_new
         scale_factor = sag_new / sag_old;
 
         z_ref = max(phys_positions_m(:,3));
@@ -133,7 +134,7 @@ function [elem_pos_m, tr] = extract_element_pos(parameters, tr, trans_pos_m)
         fprintf('Best-fit radius = %.6f m\n', R_fit);
     
         % [DEBUG] visualize grid
-        if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'debug') && parameters.simulation.debug == 1
+        if debug_on(parameters, 'source', 'figures')
             h = figure('Name', 'Transducer Element Distribution');
             hold on; grid on;
 
@@ -147,16 +148,13 @@ function [elem_pos_m, tr] = extract_element_pos(parameters, tr, trans_pos_m)
             xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]');
             title('Transducer Element Distribution (3D)');
             legend('Location', 'best');
-            view([90 0]); % Top-down view
 
             % Save figure
             fig_name = sprintf('sub-%03d_%s_transducer_redone_element_distribution%s', ...
                 parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix);
 
-            saveas(h, fullfile(parameters.io.dir_debug_source, [fig_name '.fig']));
-            saveas(h, fullfile(parameters.io.dir_debug_source, [fig_name '.png']));
-
-            close(h);
+            debug_save_figure(parameters, 'source', h, fig_name, ...
+                'Matrix elements from file: original (blue) and projected onto the fitted sphere (red)', 'Views', {'beam', 'side', 'oblique'});
         end
 
     end

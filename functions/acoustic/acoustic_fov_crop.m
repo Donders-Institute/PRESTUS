@@ -54,8 +54,11 @@ if ~has_acoustic_fov
     return;
 end
 
-% jwave embeds its PML inside the domain.  Expand the requested FOV by
-% 2*pml_size on each side so the physical FOV occupies the non-PML region.
+% jwave embeds its PML inside the domain. Expand the requested FOV by one
+% PML thickness on each side so the physical FOV occupies the non-PML region.
+% The thickness is resolved as jwave_wrapper does (resolve_jwave_pml_size,
+% sized from the maximum sound speed); the full-grid maximum is used, which
+% equals the cropped one unless the fastest voxel lies outside the FOV.
 use_jwave = isfield(parameters, 'acoustic_backend') && ...
     strcmpi(parameters.acoustic_backend, 'jwave');
 if use_jwave
@@ -64,19 +67,10 @@ if use_jwave
     else
         jw_pml_raw = 'auto';
     end
+    jw_pml_eff = max(resolve_jwave_pml_size(jw_pml_raw, parameters.transducer(1).freq_hz, ...
+        max(kwave_medium.sound_speed(:)), parameters.grid.resolution_mm / 1e3));
     if (ischar(jw_pml_raw) || isstring(jw_pml_raw)) && strcmp(jw_pml_raw, 'auto')
-        dx_m    = parameters.grid.resolution_mm / 1e3;
-        jw_dims = parameters.grid.dims;
-        if numel(jw_dims) == 3
-            tmp_kg = kWaveGrid(jw_dims(1), dx_m, jw_dims(2), dx_m, jw_dims(3), dx_m);
-        else
-            tmp_kg = kWaveGrid(jw_dims(1), dx_m, jw_dims(2), dx_m);
-        end
-        jw_pml_eff = max(resolve_pml_size(jw_pml_raw, tmp_kg));
-        clear tmp_kg jw_dims dx_m
         fprintf('[pipeline] jwave pfov PML expansion: pml_size=''auto'' resolved to %d voxels.\n', jw_pml_eff);
-    else
-        jw_pml_eff = max(double(jw_pml_raw(:)));
     end
     jw_pml_mm = jw_pml_eff * parameters.grid.resolution_mm;
     parameters.grid.acoustic_fov_diameter_mm = parameters.grid.acoustic_fov_diameter_mm + 2 * jw_pml_mm;

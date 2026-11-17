@@ -16,14 +16,16 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
 % display mask. After the k-Wave run, detects axisymmetric grid output and
 % expands it: phantom simulations and runs with heating always expand to 3D
 % (radial expansion via radialExpand2DTo3D); acoustic-only non-phantom runs
-% expand to a bilateral 2D cross-section instead. The full set of simulation
-% matrices is optionally saved to disk as a -v7.3 .mat file.
+% expand to a bilateral 2D cross-section instead. Complex fields
+% (io.save_p_complex) go to their own files (WRITE_P_COMPLEX_FILES); the
+% simulation matrices are cached with CACHE_ACOUSTIC (io.save_acoustic_matrices).
 %
 % Use as:
 %   [sensor_data, parameters, segmentation, medium_masks, kwave_medium, ...
 %    kgrid, source, source_labels] = ...
 %       acoustic_wrapper(parameters, kgrid, kwave_medium, source, sensor, ...
 %                        medium_masks, filename_sensor_data, segmentation, source_labels)
+%       acoustic_wrapper(..., acoustic_provenance)
 %
 % Input:
 %   parameters          - (1,1) struct, PRESTUS config
@@ -35,6 +37,8 @@ function [sensor_data, parameters, segmentation, medium_masks, kwave_medium, kgr
 %   filename_sensor_data- (1,:) char, path for optional .mat output file
 %   segmentation        - (:,:) or (:,:,:) numeric, CHARM tissue label map
 %   source_labels       - (:,:) or (:,:,:) numeric, transducer element label map
+%   acoustic_provenance - (1,1) struct, optional; FOV crop offsets (fov_offset_ac,
+%                         full_ac_dims) for the p_complex files, saved in the cache
 %
 % Output:
 %   sensor_data  - (1,1) struct, k-Wave output expanded to 2D or 3D [Pa]
@@ -70,21 +74,8 @@ end
     %
     % Resolve 'auto' to the actual size via getOptimalPMLSize so the effective
     % value is available for reporting and reproducibility.
-    pml_size_val = parameters.grid.pml_size;
-    if (ischar(pml_size_val) || isstring(pml_size_val)) && strcmp(pml_size_val, 'auto')
-        axisym = isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1;
-        pml_range = [];   % k-Wave default [10, 40]
-        if isfield(parameters.grid, 'pml_size_range'); pml_range = parameters.grid.pml_size_range; end
-        if axisym
-            effective_pml = getOptimalPMLSize(kgrid, pml_range, 'WSWA');
-        else
-            effective_pml = getOptimalPMLSize(kgrid, pml_range);
-        end
-        parameters.grid.pml_size_effective = effective_pml;
-    else
-        effective_pml = double(pml_size_val);
-        parameters.grid.pml_size_effective = effective_pml;
-    end
+    [effective_pml, pml_alpha] = kwave_pml_settings(parameters, kgrid);
+    parameters.grid.pml_size_effective = effective_pml;
 
     % --- Simulation summary (mirrors jwave_wrapper format) ---
     grid_dims   = parameters.grid.dims;
@@ -157,7 +148,7 @@ end
             % by approximately the GPU footprint on top of what is already
             % allocated (source weights, medium maps, etc.).
             fprintf('[acoustic_wrapper]   ⚠  matlab_gpu DataCast: CPU+GPU copies coexist (~%.1f GB extra RAM)\n', gpu_mem_gb);
-            fprintf('[acoustic_wrapper]      Recommended PBS mem ≥ current_workspace + %.0f GB.\n', ceil(gpu_mem_gb));
+            fprintf('[acoustic_wrapper]      Recommended job memory ≥ current_workspace + %.0f GB.\n', ceil(gpu_mem_gb));
             fprintf('[acoustic_wrapper]   ℹ  cpp_gpu avoids this spike: medium/source arrays are\n');
             fprintf('[acoustic_wrapper]      serialised to HDF5 on disk before the C++ binary\n');
             fprintf('[acoustic_wrapper]      allocates GPU memory in its own process, so MATLAB''s\n');
@@ -172,8 +163,8 @@ end
     kwave_input_args = struct('PMLInside', false, ...
         'PMLSize', effective_pml, ...
         'PlotPML', true);
-    if isfield(parameters.grid, 'pml_alpha') && ~isempty(parameters.grid.pml_alpha)
-        kwave_input_args.PMLAlpha = parameters.grid.pml_alpha;   % else k-Wave's 2
+    if ~isempty(pml_alpha)
+        kwave_input_args.PMLAlpha = pml_alpha;   % else k-Wave's 2
     end
 
     if contains(parameters.simulation.medium, {'layered'}) && ...
@@ -190,11 +181,12 @@ end
         error('Source setup not requested. Not able to proceed with acoustic simulation.')
     end
 
-    % Record the steady-state time series only when the complex pressure field
-    % is explicitly requested — storing p for an all-grid sensor is large.
+    % Complex pressure field only when explicitly requested: the solver records
+    % the steady-state time series at every grid point (ACOUSTIC_SIMULATION).
     save_p_complex = isfield(parameters.io, 'save_p_complex') && parameters.io.save_p_complex;
-    if save_p_complex && ~ismember('p', sensor.record)
-        sensor.record{end+1} = 'p';
+    p_complex_freqs = [];
+    if save_p_complex
+        p_complex_freqs = unique([parameters.transducer.freq_hz]);
     end
 
     % perform the acoustic simulation
@@ -212,49 +204,44 @@ end
     else
         sim_medium = kwave_medium;
     end
-    sensor_data = acoustic_simulation(kgrid, sim_medium, source, sensor, kwave_input_args, parameters);
+    sensor_data = acoustic_simulation(kgrid, sim_medium, source, sensor, kwave_input_args, parameters, p_complex_freqs);
     clear sim_medium
 
-    % Extract complex pressure amplitude from the recorded steady-state time series.
+    % Complex pressure amplitude over the recorded steady-state window
+    % (STEADY_STATE_COMPLEX_AMPLITUDE, via ACOUSTIC_SIMULATION).
     % p_complex = amp * exp(1i * phase) preserves interference information for
-    % coherent multi-transducer superposition. For multi-frequency setups, the DFT
-    % isolates each tone's component independently, so extractAmpPhase is run once
-    % per unique frequency. A single-frequency setup produces the original
-    % sensor_data.p_complex field; a multi-frequency setup produces one field per
-    % unique frequency, keyed as p_complex_<freq_Hz>Hz.
-    % extractAmpPhase returns the phase relative to the first recorded sample;
-    % subtracting 2*pi*f*t0 refers it to t = 0 of the simulation, where every
-    % run's source signal starts. Fields from separate runs (e.g. one per
-    % transducer, possibly on FOV sub-grids with a different dt) can then be
-    % added coherently (SUPERPOSE_COMPLEX_FIELDS).
-    if isfield(sensor_data, 'p')
-        freqs_all    = [parameters.transducer.freq_hz];
-        unique_freqs = unique(freqs_all);
-        t0_s = 0;
-        if isfield(sensor, 'record_start_index') && ~isempty(sensor.record_start_index)
-            t0_s = (double(sensor.record_start_index) - 1) * kgrid.dt;
-        end
+    % coherent multi-transducer superposition. A single-frequency setup produces
+    % sensor_data.p_complex; a multi-frequency setup produces one field per unique
+    % frequency, keyed as p_complex_<freq_Hz>Hz. The phase is referred to t = 0
+    % of the simulation, where every run's source signal starts, so fields from
+    % separate runs (e.g. one per transducer, possibly on FOV sub-grids with a
+    % different dt) can be added coherently (SUPERPOSE_COMPLEX_FIELDS).
+    if isfield(sensor_data, 'p_complex_fit')
+        unique_freqs = p_complex_freqs;
+        p_window = sensor_data.p_complex_window;   % set by ACOUSTIC_SIMULATION
+        sensor_data = rmfield(sensor_data, 'p_complex_window');
+        t0_s = (double(p_window.record_start_index) - 1) * kgrid.dt;
         p_complex_keys = cell(1, numel(unique_freqs));
         if numel(unique_freqs) > 1
             fprintf('Multi-frequency setup: extracting p_complex at %d frequencies (%s Hz).\n', ...
                 numel(unique_freqs), num2str(unique_freqs));
         end
         for fi = 1:numel(unique_freqs)
-            [amp, phase] = extractAmpPhase(sensor_data.p, 1/kgrid.dt, unique_freqs(fi), 'Dim', ndims(sensor_data.p));
-            % k-Wave returns p as [sensor points x time]; the sensor mask is the
-            % whole grid, so the points are in linear-index order.
-            if numel(amp) == prod(parameters.grid.dims) && ~isequal(size(amp), parameters.grid.dims)
-                amp   = reshape(amp,   parameters.grid.dims);
-                phase = reshape(phase, parameters.grid.dims);
+            % one value per sensor point; the sensor mask is the whole grid, so
+            % the points are in linear-index order
+            pc = cast(sensor_data.p_complex_fit(:, fi), char(parameters.simulation.precision));
+            if numel(pc) == prod(parameters.grid.dims)
+                pc = reshape(pc, parameters.grid.dims);
             end
             if numel(unique_freqs) == 1
                 p_complex_keys{fi} = 'p_complex';
             else
                 p_complex_keys{fi} = sprintf('p_complex_%gHz', unique_freqs(fi));
             end
-            sensor_data.(p_complex_keys{fi}) = amp .* exp(1i .* (phase - 2 * pi * unique_freqs(fi) * t0_s));
+            sensor_data.(p_complex_keys{fi}) = pc;
         end
-        sensor_data = rmfield(sensor_data, 'p');
+        clear pc
+        sensor_data = rmfield(sensor_data, 'p_complex_fit');
         % Saved with each p_complex file (one entry per frequency below).
         p_complex_meta = struct( ...
             'phase_reference', 'simulation_t0', ...
@@ -262,6 +249,9 @@ end
             'field_names',     {p_complex_keys}, ...
             'record_t0_s',     t0_s, ...
             'dt_s',            kgrid.dt, ...
+            'method',          p_window.method, ...           % 'quarter_period' | 'steady_state_window'
+            'n_samples',       p_window.n_samples, ...        % recorded time steps used by the fit
+            'p_max_from_fit',  p_window.p_max_from_fit, ...   % p_max_all / p_min_all are +/- |p_complex|
             'drive_level',     'simulated', ...   % before any ISPPA rescaling
             'grid_dims',       [], ...
             'fov_offset_ac',   [], ...
@@ -288,32 +278,10 @@ end
     acoustic_info.parameters = parameters;
     acoustic_info.kwave_input_args = kwave_input_args;
 
-    % Save p_complex field(s) to separate cache file(s) when explicitly requested.
-    % Single-frequency: saves p_complex as before.
-    % Multi-frequency: saves one file per unique frequency with a _<freq>Hz suffix.
-    p_complex_fields = fieldnames(sensor_data);
-    p_complex_fields = p_complex_fields(startsWith(p_complex_fields, 'p_complex'));
-    if ~isempty(p_complex_fields)
-        [fdir, fname, fext] = fileparts(filename_sensor_data);
-        for fi = 1:numel(p_complex_fields)
-            fld = p_complex_fields{fi};
-            if isfield(parameters.io, 'save_p_complex') && parameters.io.save_p_complex
-                % For backward compatibility, the single-frequency file keeps the original name.
-                if strcmp(fld, 'p_complex')
-                    filename_p_complex = fullfile(fdir, [strrep(fname, '_results', '_p_complex'), fext]);
-                else
-                    freq_suffix = fld(length('p_complex')+1:end); % e.g. '_500Hz'
-                    filename_p_complex = fullfile(fdir, [strrep(fname, '_results', ['_p_complex' freq_suffix]), fext]);
-                end
-                p_complex = sensor_data.(fld);
-                p_complex_info = rmfield(p_complex_meta, 'field_names');
-                p_complex_info.freq_hz   = p_complex_meta.freq_hz(strcmp(p_complex_meta.field_names, fld));
-                p_complex_info.grid_dims = size(p_complex);
-                save(filename_p_complex, 'p_complex', 'p_complex_info', '-v7.3');
-                fprintf('Saved complex pressure field (%s) to %s\n', fld, filename_p_complex);
-            end
-            sensor_data = rmfield(sensor_data, fld);
-        end
+    % Save p_complex field(s) to separate cache file(s) when explicitly requested
+    % (one per unique frequency; WRITE_P_COMPLEX_FILES).
+    if exist('p_complex_meta', 'var')
+        sensor_data = write_p_complex_files(parameters, sensor_data, filename_sensor_data, p_complex_meta);
     end
 
     if ~should_save_output(parameters.io, 'save_acoustic_matrices')
@@ -328,16 +296,16 @@ end
 
 function save_elastic_debug_maps(parameters, elastic_medium)
 % [DEBUG] Save the simulation-grid shear speed / shear absorption maps.
-    if parameters.simulation.debug ~= 1 || ~isfield(parameters.io, 'dir_debug_medium')
+    if ~debug_on(parameters, 'medium', 'volumes') || ~isfield(parameters.io, 'dir_debug_medium')
         return
     end
     try
-        niftiwrite(single(elastic_medium.sound_speed_shear), ...
-            fullfile(parameters.io.dir_debug_medium, ['matrix_sound_speed_shear' char(parameters.io.output_affix) '.nii']), ...
-            'Compressed', true);
-        niftiwrite(single(elastic_medium.alpha_coeff_shear), ...
-            fullfile(parameters.io.dir_debug_medium, ['matrix_alpha_coeff_shear' char(parameters.io.output_affix) '.nii']), ...
-            'Compressed', true);
+        f_speed = fullfile(parameters.io.dir_debug_medium, ['matrix_sound_speed_shear' char(parameters.io.output_affix) '.nii']);
+        niftiwrite(single(elastic_medium.sound_speed_shear), f_speed, 'Compressed', true);
+        debug_register(parameters, 'medium', f_speed, 'Elastic skull: shear sound speed [m/s], simulation grid', 'volume');
+        f_alpha = fullfile(parameters.io.dir_debug_medium, ['matrix_alpha_coeff_shear' char(parameters.io.output_affix) '.nii']);
+        niftiwrite(single(elastic_medium.alpha_coeff_shear), f_alpha, 'Compressed', true);
+        debug_register(parameters, 'medium', f_alpha, 'Elastic skull: shear attenuation, simulation grid', 'volume');
     catch ME
         warn('acoustic_wrapper:elasticDebugNifti', 'Could not save elastic debug maps: %s', ME.message);
     end
