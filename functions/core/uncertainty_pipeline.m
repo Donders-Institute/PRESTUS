@@ -58,10 +58,6 @@ function jobs = uncertainty_pipeline(parameters, options)
 %                .affixes             — struct with one field per variant name
 %                                       (default, temp_high, temp_low, trans_high,
 %                                       trans_low): filename suffixes per variant
-%                .<name>_config       — path to the medium YAML of variant <name>
-%                                       (e.g. .temp_high_config; default:
-%                                       simulation.uncertainty_<name>, else the
-%                                       shipped file; see UNCERTAINTY_MEDIUM_CONFIG)
 %                .stage1_timelimit    — HPC wall time for stage 1 (default '12:00:00')
 %                .sim_timelimit       — HPC wall time for stages 2-6 (default '06:00:00')
 %                .report_timelimit    — HPC wall time for stage 7 (default '00:30:00')
@@ -112,11 +108,17 @@ if ~isfield(options, 'affixes')
         options.affixes.(variants(v).name) = [base_affix variants(v).desc];
     end
 end
-% Variant medium files: options.* > simulation.uncertainty_<variant> > shipped file.
+% Variant media: the shipped ITRUSST bounds with the study's edits
+% (simulation.uncertainty_overrides) merged on top; see UNCERTAINTY_MEDIUM_LAYER.
+options.variant_layers = struct();
 for v = 2:numel(variants)
-    key = [variants(v).name '_config'];
-    if ~isfield(options, key)
-        options.(key) = uncertainty_medium_config(parameters, variants(v).name);
+    [options.variant_layers.(variants(v).name), edits] = ...
+        uncertainty_medium_layer(parameters, variants(v).name);
+    if ~isempty(fieldnames(edits))
+        warning('uncertainty_pipeline:editedBounds', ...
+            ['%s uses edited bounds (simulation.uncertainty_overrides.%s): its results no ' ...
+             'longer bracket the ITRUSST tissue-property bounds. Report the values used.'], ...
+            variants(v).label, variants(v).name);
     end
 end
 if ~isfield(options, 'stage1_timelimit');    options.stage1_timelimit    = '12:00:00'; end
@@ -160,16 +162,13 @@ if ~isfield(options, 'report_memorylimit'); options.report_memorylimit  = []; en
 %                       Variants always load the stage-1 head/grid caches
 %                       (io.reuse_upstream_caches).
 %
-%   io.overwrite_simnibs  Hardcoded to 0 for the same reason.
+%   io.overwrite_simnibs  Set to 0: no stage re-runs the segmentation.
 %
-%   io.save_grid_cache         Stage 1: 1 (write cache for stages 2–6)
-%                              Stages 2–6: 0 (already written)
-%   io.save_source_matrices    Stage 1: 1 (write source for stages 2–6)
-%                              Stages 2–6: 0 (already written)
+%   io.save_source_matrices    All stages: 0 (each variant computes its own source)
 %   io.save_acoustic_matrices  All stages: 0 (large; not needed after analysis)
-%   io.save_thermal_matrices   Default and Temp variants: inherited from base
-%                              modules.run_heating_sims; Trans variants and
-%                              Stage 1: 0 (no thermal sim)
+%   io.save_thermal_matrices   Default and Temp variants: 1 when they run the
+%                              thermal simulation (base modules.run_heating_sims);
+%                              Trans variants and Stage 1: 0 (no thermal sim)
 %
 %   simulation.interactive  Hardcoded to 0; HPC jobs cannot show dialogs.
 %
@@ -186,6 +185,14 @@ if ~isfield(options, 'report_memorylimit'); options.report_memorylimit  = []; en
 % =========================================================================
 %% Resolve platform
 % =========================================================================
+
+% The variants change tissue properties only: in free water all five runs
+% would be the same simulation.
+if strcmp(parameters.simulation.medium, 'water')
+    error('prestus:uncertainty:water', ...
+        ['Uncertainty mode does not apply to simulation.medium = ''water'': the ' ...
+         'variants change tissue properties only. Set simulation.uncertainty = false.']);
+end
 
 if ~isfield(parameters, 'platform')
     parameters.platform = 'auto';
@@ -234,7 +241,7 @@ n_var      = numel(variants);
 p_variants = cell(1, n_var);
 for v = 1:n_var
     p_variants{v} = make_sim_params(parameters, options.affixes.(variants(v).name), ...
-                        get_variant_medium_config(variants(v).name, options), ...
+                        variant_medium_layer(variants(v).name, options), ...
                         variants(v).heating, ow);
 end
 
@@ -313,7 +320,7 @@ switch platform
 
         % Clean up intermediate files when save_matrices = 0
         if ~should_save_output(parameters.io, 'save_matrices')
-            cleanup_uncertainty_intermediates(parameters, options.affixes);
+            cleanup_uncertainty_intermediates(parameters);
         end
 
         % Sequential runs: each follow-up run repeats the uncertainty
@@ -467,12 +474,12 @@ function [sorted_fields, sorted_numbers] = sort_seq_configs(seq_configs)
     sorted_fields = fields(idx);
 end
 
-function medium_config = get_variant_medium_config(variant_name, options)
-% Return the YAML override path for a given variant name ([] for default).
+function medium_layer = variant_medium_layer(variant_name, options)
+% Medium-property layer of a variant ([] for default); see UNCERTAINTY_MEDIUM_LAYER.
     if strcmp(variant_name, 'default')
-        medium_config = [];
+        medium_layer = [];
     else
-        medium_config = options.([variant_name '_config']);
+        medium_layer = options.variant_layers.(variant_name);
     end
 end
 
@@ -484,8 +491,16 @@ function label = variant_stage_label(variant)
 end
 
 function reject_legacy_options(options)
-% The liberal / conservative variants of v0.6 were replaced by the Temp and
-% Trans pairs; their options do not map onto either pair.
+% Rejects variant-file options and those of the removed liberal / conservative
+% variants: they do not map onto the Temp and Trans pairs.
+    files = {'temp_high_config', 'temp_low_config', 'trans_high_config', 'trans_low_config'};
+    used = files(isfield(options, files));
+    if ~isempty(used)
+        error('uncertainty_pipeline:variantFile', ...
+            ['options.%s: variant medium files are not read. The variants use the shipped ' ...
+             'ITRUSST bounds; edit single values with simulation.uncertainty_overrides ' ...
+             '(see doc_uncertainty.md).'], strjoin(used, ', options.'));
+    end
     legacy = {'liberal_config', 'conservative_config'};
     used = legacy(isfield(options, legacy));
     if isfield(options, 'affixes') && isstruct(options.affixes) && ...
@@ -495,9 +510,8 @@ function reject_legacy_options(options)
     if ~isempty(used)
         error('uncertainty_pipeline:legacyVariant', ...
             ['options.%s belong to the removed liberal/conservative variants. Use ' ...
-             'options.temp_high_config, .temp_low_config, .trans_high_config, ' ...
-             '.trans_low_config and options.affixes.<variant> (see UNCERTAINTY_VARIANTS ' ...
-             'and doc_uncertainty.md).'], strjoin(used, ', options.'));
+             'options.affixes.<variant> and simulation.uncertainty_overrides (see ' ...
+             'UNCERTAINTY_VARIANTS and doc_uncertainty.md).'], strjoin(used, ', options.'));
     end
 end
 
@@ -538,9 +552,9 @@ function seq_run_params = run_sequential_matlab(base_parameters, options, run_in
             vname       = variants(vi).name;
             cur_affix   = seq_aff.(vname);
             prior_affix = prior_affixes.(vname);
-            med_cfg     = get_variant_medium_config(vname, options);
+            med_lyr     = variant_medium_layer(vname, options);
 
-            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg, variants(vi).heating, ow);
+            p_v = make_sim_params(seq_p_base, cur_affix, med_lyr, variants(vi).heating, ow);
             if variants(vi).heating
                 p_v = wire_thermal_handoff(p_v, nii_dir, prior_affix, subject_id, medium);
             end
@@ -615,9 +629,9 @@ function [all_ids, prior_job_id_report] = submit_sequential_hpc( ...
         for vi = 1:n_var
             vname       = variants(vi).name;
             cur_affix   = seq_aff.(vname);
-            med_cfg     = get_variant_medium_config(vname, options);
+            med_lyr     = variant_medium_layer(vname, options);
 
-            p_v = make_sim_params(seq_p_base, cur_affix, med_cfg, variants(vi).heating, ow);
+            p_v = make_sim_params(seq_p_base, cur_affix, med_lyr, variants(vi).heating, ow);
             if variants(vi).heating
                 p_v = wire_thermal_handoff(p_v, nii_dir, prior_affixes.(vname), subject_id, medium);
             end
@@ -938,26 +952,21 @@ function p = make_stage1_params(base, ow)
     p                                  = strip_gpu_requirements(p);
 end
 
-function p = make_sim_params(base, affix, medium_config, heating, ow)
+function p = make_sim_params(base, affix, medium_layer, heating, ow)
 % Stages 2–6: acoustic simulation, plus thermal when heating is true and the
 % base config runs it (heating = false for the acoustic-only Trans variants).
 %
-% If medium_config is a valid YAML path, its properties are merged on top
-% of the base parameters (only the overridden fields change; all transducer,
-% grid, and path settings are inherited).
+% A medium_layer (UNCERTAINTY_MEDIUM_LAYER) is merged on top of the base
+% parameters (only its medium properties change; all transducer, grid, and
+% path settings are inherited).
 %
-% run_source_setup = 1 is intentional: each variant checks for cached source
-% files from stage 1 and skips recomputation unless overwrite_files = 'always'.
+% run_source_setup = 1: each variant computes its own source, because the
+% time axis depends on the variant's medium sound speed.
     p = clear_uncertainty_flag(base);
 
-    if ~isempty(medium_config)
-        if ~(ischar(medium_config) || isstring(medium_config)) || ~isfile(medium_config)
-            error('uncertainty_pipeline:configNotFound', ...
-                'Medium config file not found: %s', medium_config);
-        end
-        extra = yaml.loadFile(char(medium_config), 'ConvertToArray', true);
-        p     = mergestruct(p, extra);
-        p     = medium_absorption_layer(p, extra, char(medium_config));
+    if ~isempty(medium_layer)
+        p = mergestruct(p, medium_layer);
+        p = medium_absorption_layer(p, medium_layer, 'uncertainty variant bounds');
     end
 
     p.modules.run_source_setup         = 1;
@@ -972,7 +981,7 @@ function p = make_sim_params(base, affix, medium_config, heating, ow)
     % With a pseudo-CT, only the default variant maps the skull from it; the
     % bound variants keep its head geometry with a homogeneous skull layer
     % (PCT_SKULL_MAPPED).
-    p.uncertainty.homogeneous_skull    = ~isempty(medium_config);
+    p.uncertainty.homogeneous_skull    = ~isempty(medium_layer);
     p.modules.run_heating_sims         = run_thermal;
     p.modules.run_thermal_analysis     = run_thermal && ...
                                          isfield(base.modules, 'run_thermal_analysis') && ...
@@ -985,8 +994,7 @@ function p = make_sim_params(base, affix, medium_config, heating, ow)
     p.modules.run_water_baseline       = 'auto';
     p.modules.generate_report          = 1;
     p.io.output_affix                  = affix;
-    % Both the grid cache and kwave source were written by stage 1 with
-    % affix ''. Point lookups at those files rather than recomputing.
+    % Stage 1 wrote the head/grid caches with affix ''; point lookups at them.
     p.io.preproc_affix                 = '';
     % The medium is variant-specific: keep each variant's medium cache apart.
     p.io.medium_affix                  = affix;
@@ -1030,11 +1038,12 @@ function p = make_report_params(base, affixes, log_files, ow, options)
     p.simulation.interactive         = 0;
     p.uncertainty.affixes            = affixes;
     p.uncertainty.log_files          = log_files;
-    % Medium file of each bound variant, for the pseudo-CT comparison
-    p.uncertainty.medium_files       = struct();
+    % Skull values of each bound variant, for the pseudo-CT comparison
+    p.uncertainty.bound_skull        = struct();
     for v = uncertainty_variants()
         if ~strcmp(v.name, 'default')
-            p.uncertainty.medium_files.(v.name) = get_variant_medium_config(v.name, options);
+            p.uncertainty.bound_skull.(v.name) = ...
+                variant_medium_layer(v.name, options).medium_properties.skull;
         end
     end
     % The report is named after the default variant's affix (base affix and,

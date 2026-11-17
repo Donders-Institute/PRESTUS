@@ -61,9 +61,11 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_pct_un
             tc.verifyEqual(s.bounds.trans_high.sound_speed, 2190);
         end
 
-        function unreadableBoundFileWarns(tc)
+        function rejectedBoundIsSkipped(tc)
             p = native_pct(tc.TmpDir);
-            p.simulation.uncertainty_trans_high = fullfile(tc.TmpDir, 'missing.yaml');
+            % an edit the trans_high bounds reject (thermal, acoustic-only variant)
+            p.simulation.uncertainty_overrides = struct('trans_high', ...
+                struct('brain', struct('perfusion', 1)));
             s = tc.verifyWarning(@() pct_predict_skull_properties(p, write=false), ...
                 'pct_predict_skull_properties:boundFile');
             tc.verifyFalse(isfield(s.bounds, 'trans_high'));

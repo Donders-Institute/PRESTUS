@@ -3,10 +3,15 @@
 # Per property, the bound that lowered brain heating in the ITRUSST one-at-a-time sweep.
 #
 # Brain and skull values: lower (LOW) or upper (HIGH) bound of each property in the ITRUSST
-# tissue property table (PRESTUS_itrusst data/tissue_parameters.csv and tissue_setups.csv;
-# sources in data/tissue_parameters_source.md). Attenuation and absorption are 1 MHz
+# tissue property table (TUS Tissue Properties data set). Attenuation and absorption are 1 MHz
 # coefficients with y = 1 (alpha_coeff = alpha_500kHz / 0.5). The single skull bound is used
 # for all skull compartments. Tissues and properties not listed keep the default medium.
+#
+# Sources:
+#   Kosciessa, J. Q., Webb, T., Martin, E., Treeby, B., Butts Pauly, K., Verhagen, L., & Pichardo, S.
+#   (2026). TUS Tissue Properties [Data set]. Zenodo. https://doi.org/10.5281/zenodo.23811004
+#   Kosciessa, J. Q., Webb, T., Martin, E., Treeby, B., Butts Pauly, K., Verhagen, L., & Pichardo, S.
+#   (in preparation). Impact of acoustic property uncertainty on transcranial ultrasound simulation.
 
 medium_properties:
   brain:

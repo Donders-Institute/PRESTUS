@@ -276,10 +276,40 @@ function html = build_header(subject_id, medium, parameters, variants, variant_a
         html = [html sprintf('<tr><th>%s affix</th><td><code>%s</code></td></tr>', ...
             html_utils.escape(variants(v).label), html_utils.escape(variant_affixes{v}))]; %#ok<AGROW>
     end
+    edits = edited_bounds(parameters, variants);
+    if isempty(edits)
+        html = [html '<tr><th>Variant bounds</th><td>ITRUSST bounds (config/uncertainty/), unchanged</td></tr>'];
+    else
+        html = [html sprintf(['<tr><th>Variant bounds</th><td style="color:#b91c1c;font-weight:600;">' ...
+            'Edited (simulation.uncertainty_overrides): %s. These variants no longer bracket the ' ...
+            'ITRUSST bounds.</td></tr>'], html_utils.escape(strjoin(edits, '; ')))];
+    end
     html = [html sprintf('<tr><th>Output dir</th><td>%s</td></tr>', html_utils.escape(parameters.io.dir_output))];
     html = [html sprintf('<tr><th>Generated</th><td>%s</td></tr>', datestr(now, 'yyyy-mm-dd HH:MM:SS'))];
     html = [html '</table>'];
     html = [html '</section>'];
+end
+
+function edits = edited_bounds(parameters, variants)
+% 'Temp-H brain.sound_speed = 1560' per value in simulation.uncertainty_overrides.
+    edits = {};
+    if ~isfield(parameters, 'simulation') || ~isfield(parameters.simulation, 'uncertainty_overrides') || ...
+            ~isstruct(parameters.simulation.uncertainty_overrides)
+        return
+    end
+    ov = parameters.simulation.uncertainty_overrides;
+    for v = variants(:)'
+        if ~isfield(ov, v.name) || ~isstruct(ov.(v.name))
+            continue
+        end
+        for t = fieldnames(ov.(v.name))'
+            props = ov.(v.name).(t{1});
+            if ~isstruct(props); continue; end
+            for q = fieldnames(props)'
+                edits{end+1} = sprintf('%s %s.%s = %g', v.label, t{1}, q{1}, props.(q{1})); %#ok<AGROW>
+            end
+        end
+    end
 end
 
 function html = build_safety_dashboard(tables, variants, is_layered)
@@ -680,15 +710,13 @@ function html = build_pct_bounds_section(parameters, variants, default_affix)
 
     bounds = struct();
     for v = variants(~strcmp({variants.name}, 'default'))
-        file = '';
-        if isfield(parameters, 'uncertainty') && isfield(parameters.uncertainty, 'medium_files') && ...
-                isfield(parameters.uncertainty.medium_files, v.name)
-            file = parameters.uncertainty.medium_files.(v.name);
+        if isfield(parameters, 'uncertainty') && isfield(parameters.uncertainty, 'bound_skull') && ...
+                isfield(parameters.uncertainty.bound_skull, v.name)
+            bounds.(v.name) = parameters.uncertainty.bound_skull.(v.name);
+            continue
         end
-        if isempty(file); file = uncertainty_medium_config(parameters, v.name); end
         try
-            m = yaml.loadFile(char(file), 'ConvertToArray', true);
-            bounds.(v.name) = m.medium_properties.skull;
+            bounds.(v.name) = uncertainty_medium_layer(parameters, v.name).medium_properties.skull;
         catch
         end
     end
@@ -697,7 +725,7 @@ function html = build_pct_bounds_section(parameters, variants, default_affix)
              'alpha_coeff', 'Attenuation [dB/(cm&#183;MHz^y)]'};
     html = ['<p style="font-size:0.85em;color:#64748b;margin:0 0 12px;">The default variant maps the skull ' ...
         'from the pseudo-CT; the bound variants give the same skull voxels the homogeneous values of their ' ...
-        'medium file. Histogram: ' origin '. Shaded band: range of the bound variants'' skull values. ' ...
+        'bounds. Histogram: ' origin '. Shaded band: range of the bound variants'' skull values. ' ...
         sprintf('Mapping: density %s, sound speed %s, attenuation %s.</p>', ...
         html_utils.escape(char(stats.mapping.density)), html_utils.escape(char(stats.mapping.sound_speed)), ...
         html_utils.escape(char(stats.mapping.attenuation)))];

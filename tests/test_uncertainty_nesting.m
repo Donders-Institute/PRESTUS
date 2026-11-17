@@ -7,8 +7,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_uncert
 % chained pipelines build their full job graph without simulating or
 % submitting anything. Each recorded job is what the real launcher would
 % receive; the checks are on that graph:
-%   - no recorded job re-enters a chained mode (the bug class that broke
-%     async preprocessing/combine jobs carrying sweep vectors),
+%   - no recorded job re-enters a chained mode (e.g. async
+%     preprocessing/combine jobs carrying sweep vectors),
 %   - affixes, cache affixes and dependencies of every stage,
 %   - one uncertainty report per sweep point, after every job it reads.
 %
@@ -170,7 +170,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_uncert
 
         function matlabDispatchIsUncertaintyFirst(tc)
             % The real launcher on 'matlab' must route uncertainty + sweep to
-            % uncertainty_pipeline (it used to run the sweep outermost).
+            % uncertainty_pipeline (uncertainty is the outer mode).
             % telemetry_setup prompts once per user in an interactive session.
             tc.assumeTrue(batchStartupOptionUsed || ...
                 isfile(fullfile(prefdir_prestus(), 'telemetry.json')), ...
@@ -290,7 +290,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_uncert
                 tc.verifyEqual(pct_skull_mapped(sim{1}.p), v == 1, name{v});
             end
             r = find_jobs(jobs, 'u7-report');
-            tc.verifyEqual(sort(fieldnames(r{1}.p.uncertainty.medium_files)), sort(name(2:end))');
+            tc.verifyEqual(sort(fieldnames(r{1}.p.uncertainty.bound_skull)), sort(name(2:end))');
         end
 
         function legacyOptionsError(tc)
@@ -300,6 +300,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_uncert
             tc.verifyError(@() uncertainty_pipeline(p, struct('affixes', ...
                 struct('default', '', 'liberal', '_l', 'conservative', '_c'))), ...
                 'uncertainty_pipeline:legacyVariant');
+            tc.verifyError(@() uncertainty_pipeline(p, struct('temp_high_config', 'x.yaml')), ...
+                'uncertainty_pipeline:variantFile');
             tc.verifyEmpty(recorded(), 'nothing may be submitted before the error');
         end
 

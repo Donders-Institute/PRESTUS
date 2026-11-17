@@ -22,7 +22,7 @@ function variants = uncertainty_variants()
 %              .heating  true when the variant runs the thermal stages
 %                        (the default variant follows modules.run_heating_sims)
 %
-% See also: UNCERTAINTY_PIPELINE, UNCERTAINTY_MEDIUM_CONFIG, GENERATE_UNCERTAINTY_REPORT
+% See also: UNCERTAINTY_PIPELINE, UNCERTAINTY_MEDIUM_LAYER, GENERATE_UNCERTAINTY_REPORT
 
 names   = {'default', 'temp_high', 'temp_low', 'trans_high', 'trans_low'};
 labels  = {'Default', 'Temp-H',    'Temp-L',   'Trans-H',    'Trans-L'};

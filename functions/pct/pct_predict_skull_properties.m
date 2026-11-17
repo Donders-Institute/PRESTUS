@@ -124,14 +124,14 @@ function [pseudoCT, skull_idx, source] = load_skull_hu(parameters, cache_dir, so
 end
 
 function bounds = bound_values(parameters)
-% Skull values of the uncertainty bound variants' medium files; an unreadable
-% file is skipped with a warning, so the band it would widen is reported.
+% Skull values of the uncertainty bound variants (UNCERTAINTY_MEDIUM_LAYER);
+% a variant that cannot be read is skipped with a warning, so the band it
+% would widen is reported.
     bounds = struct();
     variants = uncertainty_variants();
     for v = variants(2:end)
         try
-            file = yaml.loadFile(uncertainty_medium_config(parameters, v.name), 'ConvertToArray', true);
-            s = file.medium_properties.skull;
+            s = uncertainty_medium_layer(parameters, v.name).medium_properties.skull;
             bounds.(v.name) = struct('label', v.label, 'density', s.density, ...
                                      'sound_speed', s.sound_speed, 'alpha_coeff', s.alpha_coeff);
         catch ME
