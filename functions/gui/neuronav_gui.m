@@ -1,5 +1,5 @@
 function fig = neuronav_gui(init)
-%NEURONAV_GUI  Stand-alone GUI for Localite marker ingestion (neuronav Stage 1).
+% NEURONAV_GUI  Stand-alone GUI for Localite marker ingestion
 %
 %   Front-end to NEURONAV_INGEST_MARKERS. Works in two steps:
 %
@@ -44,7 +44,7 @@ function fig = neuronav_gui(init)
 %   Requirements: MATLAB R2023b, PRESTUS functions on the MATLAB path.
 %
 % See also: NEURONAV_INGEST_MARKERS, NEURONAV_INGEST_BATCH,
-%           NEURONAV_SUMMARY_TO_MNI, NEURONAV_BUILD_TARGET_MAP, PRESTUS_GUI
+%           NEURONAV_SUMMARY_TO_MNI, NEURONAV_BUILD_TARGET_MAP, PRESTUS_NEXUS
 
     if nargin < 1, init = []; end
 
@@ -62,7 +62,7 @@ S.results     = {};      % per-series stats from the detect step
 S.markertype  = '';
 S.sources     = {};      % raw file name(s) used by the detect step
 S.candidates  = [];      % named planned targets (neuronav_read_label_candidates)
-S.suggest     = [];      % per-series naming result (neuronav_suggest_target_names)
+S.suggest     = [];      % per-series naming result (neuronav_name_series)
 S.D           = [];      % detection result (neuronav_detect_series)
 S.N           = [];      % naming result (neuronav_name_series)
 S.base        = struct();% loaded config; GUI fields override it (see collect_settings)
@@ -104,7 +104,7 @@ o = uilabel(hdr, 'Text', 'Localite marker ingestion', 'FontName', st.font, ...
     'FontSize', st.fs_xl, 'FontWeight', 'bold', 'FontColor', st.text, ...
     'VerticalAlignment', 'bottom');
 place(o, 1, 2);
-o = uilabel(hdr, 'Text', ['neuronav Stage 1 — raw TriggerMarkers / GUMMarkers → ' ...
+o = uilabel(hdr, 'Text', ['Raw TriggerMarkers / GUMMarkers → ' ...
     'InstrumentMarker XML + QC sidecar'], 'FontName', st.font, 'FontSize', st.fs_sm, ...
     'FontColor', st.text_sub, 'VerticalAlignment', 'top');
 place(o, 2, 2);
@@ -1536,7 +1536,7 @@ function [out, txt, ME] = run_captured(fcn, nout)
 end
 
 function s = sty()
-% Palette shared with prestus_gui (derived from the PRESTUS logo).
+% Palette derived from the PRESTUS logo.
     s.bg_fig    = [0.945 0.945 0.947];
     s.bg_panel  = [1.000 1.000 1.000];
     s.bg_dark   = [0.122 0.122 0.125];

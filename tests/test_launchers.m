@@ -34,7 +34,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_launch
         function test_unknown_platform_errors(tc)
             p = struct('platform', 'lsf');
             try
-                evalc('calibration_pipeline_start(''p.csv'', ''CTX-500'', 30, 50, p, 1)');
+                evalc('calibration_pipeline_start(''p.csv'', ''CTX_500'', 30, 50, p, 1)');
                 tc.verifyFail('no error for an unknown platform');
             catch ME
                 tc.verifySubstring(ME.message, 'unknown platform ''lsf''');
@@ -44,11 +44,11 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_launch
         function test_matlab_platform_calls_calibration_directly(tc)
             tc.install_stubs();
             p = struct('platform', 'matlab');
-            [~, job_id] = evalc('calibration_pipeline_start(''prof.csv'', ''CTX-500'', [20 30], 55, p, 7)');
+            [~, job_id] = evalc('calibration_pipeline_start(''prof.csv'', ''CTX_500'', [20 30], 55, p, 7)');
             tc.verifyEmpty(job_id);
             rec = load(fullfile(tc.StubDir, 'calibration_transducer.mat'));
             tc.verifyEqual(rec.args{1}, 'prof.csv');
-            tc.verifyEqual(rec.args{2}, 'CTX-500');
+            tc.verifyEqual(rec.args{2}, 'CTX_500');
             tc.verifyEqual(rec.args{3}, [20 30]);
             tc.verifyEqual(rec.args{4}, 55);
             tc.verifyEqual(rec.args{6}, 7);
@@ -61,7 +61,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_launch
                 'simulation', struct('interactive', 1), ...
                 'hpc', struct('wait_for_job', 0), ...
                 'calibration', struct('path_output', tc.Dir));
-            [~, job_id] = evalc('calibration_pipeline_start(''prof.csv'', ''CTX-500'', 30, 55, p, 7)');
+            [~, job_id] = evalc('calibration_pipeline_start(''prof.csv'', ''CTX_500'', 30, 55, p, 7)');
             tc.verifyEqual(job_id, 4242);
             sub = load(fullfile(tc.StubDir, 'hpc_submit_job.mat'));
             tc.verifyEqual(sub.args{1}, 'slurm');
@@ -79,30 +79,10 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_launch
             tc.verifyEqual(payload.parameters.simulation.interactive, 0);
             tc.verifyEqual(payload.parameters.subject_id, 7);
             tc.verifyEqual(payload.parameters.hpc.job_prefix, 'CAL');
-            tc.verifyEqual(payload.cal_args.equipment_name, 'CTX-500');
+            tc.verifyEqual(payload.cal_args.equipment_name, 'CTX_500');
             tc.verifyEqual(payload.cal_args.desired_intensity, 30);
             % The job's parameters as submitted carry the HPC prefix too
             tc.verifyEqual(sub.args{3}.hpc.job_prefix, 'CAL');
-        end
-
-    end
-
-    % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'prestus_gui'})
-
-        function test_gui_builds_and_closes(tc)
-            tc.assumeTrue(telemetry_has_display(), 'No display: PRESTUS GUI smoke test skipped.');
-            orig_home = char(java.lang.System.getProperty('user.home'));
-            java.lang.System.setProperty('user.home', tc.Dir);
-            tc.addTeardown(@() java.lang.System.setProperty('user.home', orig_home));
-            evalc('telemetry_set_consent(false)');                % no consent dialog
-            tc.addTeardown(@() delete(findall(groot, 'Tag', 'prestus_gui')));
-            evalc('prestus_gui()');
-            fig = findall(groot, 'Tag', 'prestus_gui');
-            tc.verifyNumElements(fig, 1);
-            tc.verifyEqual(char(fig.Visible), 'on');
-            tc.verifyEqual(fig.Name, 'PRESTUS');
-            tc.verifyNotEmpty(findall(fig, 'Type', 'uitabgroup'));
         end
 
     end
@@ -118,7 +98,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_launch
             write_stub(tc.StubDir, 'calibration_transducer', ...
                 'function calibration_transducer(varargin)', '');
             write_stub(tc.StubDir, 'hpc_validate_parameters', ...
-                'function hpc_validate_parameters(varargin)', '');
+                'function parameters = hpc_validate_parameters(varargin)', ...
+                'parameters = varargin{1};');
             write_stub(tc.StubDir, 'hpc_submit_job', ...
                 'function [job_id, parameters] = hpc_submit_job(varargin)', ...
                 'job_id = 4242; parameters = varargin{3};');

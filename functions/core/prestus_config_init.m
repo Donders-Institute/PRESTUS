@@ -3,7 +3,7 @@ function prestus_config_init(target_dir, options)
 %
 % Copies config_default.yaml from the toolbox into a project config directory
 % and optionally creates an empty project-specific override file.
-% Optionally opens the deprecated PRESTUS GUI for interactive refinement.
+% Optionally opens the config in the PRESTUS Nexus for interactive refinement.
 %
 % Use as:
 %   prestus_config_init(target_dir)
@@ -16,9 +16,8 @@ function prestus_config_init(target_dir, options)
 %   project_name - (name-value, default '') short label for the override file,
 %                  e.g. 'myStudy' produces config_myStudy.yaml;
 %                  if empty, only config_default.yaml is copied
-%   open_gui     - (name-value, default false) open the PRESTUS GUI after
-%                  writing the files so parameters can be reviewed visually
-%                  (deprecated with prestus_gui; use prestus_nexus instead)
+%   open_gui     - (name-value, default false) open the written config in the
+%                  PRESTUS Nexus (PRESTUS_NEXUS) so parameters can be reviewed
 %
 % Output files written to target_dir:
 %   config_default.yaml        - full copy of the toolbox default (base config)
@@ -91,17 +90,15 @@ function prestus_config_init(target_dir, options)
         fprintf('  parameters = load_parameters(''config_<project>.yaml'', ''%s'');\n\n', target_dir);
     end
 
-    %% Optionally open GUI
+    %% Optionally open the config in the PRESTUS Nexus
     if options.open_gui
-        fprintf('Opening PRESTUS GUI for interactive refinement...\n');
         if ~isempty(project_config_name)
             gui_config_file = project_config_name;
         else
             gui_config_file = 'config_default.yaml';
         end
-        parameters = load_parameters(gui_config_file, target_dir);
-        parameters.config_path = fullfile(target_dir, gui_config_file);
-        prestus_gui(parameters);
+        fprintf('Opening %s in the PRESTUS Nexus...\n', gui_config_file);
+        prestus_nexus(fullfile(target_dir, gui_config_file));
     end
 
 end

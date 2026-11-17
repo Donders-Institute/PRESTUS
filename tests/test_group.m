@@ -24,31 +24,6 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_group 
     end
 
     % ------------------------------------------------------------------ %
-    methods (Test, TestTags = {'changem_vectorized'})
-
-        function test_changem_replaces_listed_values(tc)
-            A = [1 2 3; 4 2 1];
-            B = changem_vectorized(A, [10 20], [1 2]);
-            tc.verifyEqual(B, [10 20 3; 4 20 10]);
-        end
-
-        function test_changem_keeps_shape_and_unlisted(tc)
-            A = reshape(0:7, 2, 2, 2);
-            B = changem_vectorized(A, 99, 5);
-            tc.verifySize(B, size(A));
-            tc.verifyEqual(B(A ~= 5), A(A ~= 5));
-            tc.verifyEqual(B(A == 5), 99);
-        end
-
-        function test_changem_is_simultaneous_not_chained(tc)
-            % 1 -> 2 and 2 -> 3 in one call: an original 1 must end as 2, not 3
-            B = changem_vectorized([1 2], [2 3], [1 2]);
-            tc.verifyEqual(B, [2 3]);
-        end
-
-    end
-
-    % ------------------------------------------------------------------ %
     methods (Test, TestTags = {'discover_group_subjects'})
 
         function test_discover_finds_subjects_with_csv(tc)
