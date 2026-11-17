@@ -95,7 +95,7 @@ function sig = cache_signature(parameters, kind)
             hmod = get_field(parameters, {'headmodel'});
             sig.headmodel = struct();
             for f = {'smooth_method', 'smooth_threshold_skull', 'smooth_threshold_other', 'smooth_fwhm_mm', ...
-                     'skull_fill_method', 'skull_wrap_radius'}
+                     'skull_fill_method', 'skull_wrap_radius_mm'}
                 if isstruct(hmod) && isfield(hmod, f{1}), sig.headmodel.(f{1}) = hmod.(f{1}); end
             end
             mp = get_field(parameters, {'medium_properties'});

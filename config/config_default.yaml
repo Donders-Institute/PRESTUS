@@ -555,7 +555,7 @@ headmodel:
   smooth_properties: false # Apply smoothing with parameters above to acoustic property maps?
   # Settings for skull hole-filling
   skull_fill_method: 'rubberwrap' # Method for filling holes in the skull ['rubberwrap'(default)/'imclose']
-  skull_wrap_radius: 10 # Rubber-wrap radius [grid voxels]; larger = tighter rubber ignoring bigger dents (recommendation: 2–10)
+  skull_wrap_radius_mm: 5 # Rubber-wrap radius [mm]; the wrap bridges skull holes up to about twice this width
   skull_wrap_visualize: 0 # Visualize rubber-wrap result? (Currently causes issues on HPC)
   reuse_across_placements: false # Build the smoothed head model once per subject (unrotated, at grid.resolution_mm; <dir_cache>/sub-XXX_<medium>_headmodel_<res>mm.mat) and only rotate and crop it for each transducer placement
 

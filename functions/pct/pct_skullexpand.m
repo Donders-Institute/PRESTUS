@@ -1,9 +1,9 @@
 function pct_skullexpand(seg_path, path_pct)
 % PCT_SKULLEXPAND  Load SimNIBS NIfTIs, run skull rubber wrap, and save output
 %
-% Loads tissue labels and skull mask from seg_path, constructs the
-% parameters struct for skull_rubber_wrap, runs the balloon inflation, and
-% saves the updated skull mask back to pct_path.
+% Loads tissue labels from seg_path and the skull mask from path_pct,
+% constructs the parameters struct for skull_rubber_wrap, runs the rubber
+% wrap, and saves the filled skull mask back to path_pct with its header.
 %
 % Use as:
 %   pct_skullexpand(seg_path, path_pct)
@@ -46,18 +46,14 @@ function pct_skullexpand(seg_path, path_pct)
 
     %% --- Parameters ---
     parameters = struct();
-    parameters.simulation.debug = 1;
+    parameters.simulation.debug = 0;
 
     parameters.path.seg   = seg_path;
     parameters.debug_path = path_pct;
 
-    % skull_rubber_wrap resolves a header reference from path.anat/t1_pattern;
-    % final_tissues is on the same grid and always present in seg_path
-    parameters.path.anat       = seg_path;
-    parameters.path.t1_pattern = 'final_tissues.nii.gz';
     parameters.subject_id      = '';
 
-    parameters.headmodel.skull_wrap_radius = 10;
+    parameters.headmodel.skull_wrap_radius_mm = 10;   % 10 voxels on the usual 1 mm segmentation grid
     parameters.headmodel.skull_wrap_visualize = 0;
 
     parameters.io.dir_debug_preproc = path_pct;       % where skull_rubber_wrap_visualize writes images
@@ -91,12 +87,11 @@ function pct_skullexpand(seg_path, path_pct)
     medium_masks(ismember(segmented_img, parameters.layers.brain)) = find(strcmp(medium_labels, 'brain'));
     medium_masks(ismember(segmented_img, parameters.layers.skin))  = find(strcmp(medium_labels, 'skin'));
 
-    %% --- Run skull wrap (must exist on path) ---
-    skull_rubber_wrap(parameters, BW, medium_masks, segmented_img);
+    %% --- Run skull wrap ---
+    skull_filled = skull_rubber_wrap(parameters, BW, medium_masks, segmented_img);
 
-    %% Replace skull mask
+    %% Replace skull mask, keeping its header
     disp('Updating skull mask...')
-    cd(path_pct);
-    movefile('balloon_mask_final.nii.gz', skull_path);
+    niftiwrite(cast(skull_filled, info_skull.Datatype), fullfile(path_pct, 'skull_mask'), info_skull, 'Compressed', true);
 
 end

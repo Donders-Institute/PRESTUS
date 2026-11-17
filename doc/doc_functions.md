@@ -238,7 +238,7 @@ On this page:
 | `segmentation_check_existing`           | How an existing segmentation differs from the selected SimNIBS |
 | `segmentation_run`                      | Submit SimNIBS segmentation |
 | `skull_fill_holes`                      | Fill holes in skull segmentation and between skull and skin |
-| `skull_rubber_wrap`                     | Inflate the skull layer to locally fill potential holes |
+| `skull_rubber_wrap`                     | Fill skull holes where brain meets skin, as a rubber sheet around the skull would |
 | `skull_rubber_wrap_visualize`           | Visualize results of skull rubber expansion |
 | `smooth_img`                            | Apply 3D smoothing |
 | `write_placement_positions`             | Write the resolved transducer positions as a JSON sidecar |
@@ -292,6 +292,7 @@ On this page:
 | `masked_max_3d`                         | Computes the maximum intensity within a masked 3D region. |
 | `matlab_escape_quotes`                  | Escapes text for a single-quoted MATLAB literal in generated job scripts (doubles `'`). |
 | `mergestruct`                           | Recursively merge fields and subfields of two structures; treats `yaml.Null` as empty so YAML-loaded null values are always overwritten. |
+| `morph_close_sphere`                    | Morphological closing of a 3-D mask by a sphere of radius r |
 | `nearest_fill_nan`                      | Replace NaN voxels with the value of the nearest non-NaN voxel |
 | `outputs_follow_recompute`              | Let a recomputed stage replace its existing output files |
 | `parse_memory_tags`                     | Extract peak memory figures from [memory]/[memory_bb] log lines. |

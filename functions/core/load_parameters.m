@@ -241,6 +241,21 @@ function parameters = load_parameters(varargin)
         parameters.io = rmfield(parameters.io, 'external_acoustic_nifti');
     end
 
+    %% Backwards compatibility: headmodel.skull_wrap_radius [voxels] → headmodel.skull_wrap_radius_mm
+    % The old radius counted grid voxels, so its size in mm followed grid.resolution_mm;
+    % the conversion keeps the radius of the run it was set for.
+    if isfield(parameters, 'headmodel') && isfield(parameters.headmodel, 'skull_wrap_radius')
+        r_vox = parameters.headmodel.skull_wrap_radius;
+        if ~isempty(r_vox)
+            parameters.headmodel.skull_wrap_radius_mm = r_vox * parameters.grid.resolution_mm;
+            warning('prestus:deprecatedField', ...
+                ['headmodel.skull_wrap_radius (%g grid voxels) is deprecated; set headmodel.skull_wrap_radius_mm ' ...
+                 'instead. At grid.resolution_mm = %g it is %g mm, used this run.'], ...
+                r_vox, parameters.grid.resolution_mm, parameters.headmodel.skull_wrap_radius_mm);
+        end
+        parameters.headmodel = rmfield(parameters.headmodel, 'skull_wrap_radius');
+    end
+
     %% Check interactive mode requirements
 
     assert(parameters.simulation.interactive == 0 || usejava('desktop'), ...

@@ -10,6 +10,8 @@ Notable changes to this project are documented here.
 - Nexus: `nexus/install.sh` (macOS, Linux) and `nexus/install.bat` (Windows) create or update the `prestus-nexus` environment, installing Miniforge if conda is missing; `prestus_nexus` finds and remembers the environment's Python instead of defaulting to `python3`.
 - Dependencies: export_fig v3.46 → v3.58 (bug fixes); the PlanTUS submodule moves to v2.0.0 with later fixes (5b69f66), and the PlanTUS setup also installs `pyyaml`, `PyQt5` and `potpourri3d`.
 - `examples/setup_PRESTUS_env.sh` stops on macOS and Windows with a pointer to the SimNIBS installer, and downloads with `curl` when `wget` is missing.
+- Rubber-wrap skull fill: the wrap is evaluated only around voxels where brain meets skin instead of over the whole grid, with the same result; its closing no longer needs the Image Processing Toolbox.
+- ⚠️ Rubber-wrap skull fill: the radius is set in mm (`headmodel.skull_wrap_radius_mm`, default 5 mm, the old default of 10 voxels on the default 0.5 mm grid) instead of grid voxels, so the filled holes no longer depend on `grid.resolution_mm`; a config's `headmodel.skull_wrap_radius` is converted at its run's resolution. Rerun the grid stage of head runs at resolutions other than 0.5 mm that used the default radius.
 
 **Fixes**
 - Sequential chains: the follow-up's start state is the base run's T1w end map (heating, CEM43, CEM43 ISO), resampled into its own grid. The NIfTI stage is enabled for chained runs, and dispatch errors (`sequential_pipeline:missingThermalEnd`) when a map is missing, instead of starting from the water baseline.
@@ -20,6 +22,7 @@ Notable changes to this project are documented here.
 - ⚠️ **Fixed:** the Rayleigh calibration model integrated over the projected ring area instead of the bowl surface, which lowered the on-axis focal pressure by 1–9 % (more for strongly curved bowls) and under-weighted outer rings; refit library entries and calibrations made with the default `rayleigh_phase_gain` preset or, in v0.6.1, with `calibration.forward_model: rayleigh`
 - ⚠️ **Fixed:** the rubber-wrap skull fill (`headmodel.skull_fill_method: rubberwrap`) ignored the brain and skin layers, so skull gaps where brain meets skin stayed open; rerun the grid stage of head runs
 - ⚠️ **Fixed:** with separate cortical and trabecular skull layers, filled skull holes were labelled trabecular instead of cortical; rerun the grid stage of runs with both layers
+- Pseudo-CT: the rubber-wrapped skull mask (`pct_skullexpand`) is written with the header of `skull_mask.nii.gz` instead of without one.
 
 Adds BabelBrain and jwave as selectable acoustic backends, a transducer calibration library with per-depth refinement, partial-FOV acoustic simulations, study manifests with group analysis, and the PRESTUS Nexus as the new configuration and run interface. Placement gains MNI and TUS_entry modes, a placement report and reusable placement runs; pseudo-CT gains new skull mappings and CT calibrations. Several result-changing fixes affect MI, simulation duration, axisymmetric sources, coherent multi-transducer runs, RAS coordinate conversion and Localite placement; check the ⚠️ lines below.
 

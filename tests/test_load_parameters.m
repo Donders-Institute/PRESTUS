@@ -115,6 +115,34 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_load_p
 
     end
 
+    methods (Test, TestTags = {'deprecated'})
+
+        function test_skull_wrap_radius_voxels_converted_to_mm(tc)
+            % the voxel radius keeps its size in mm at the run's resolution, for every resolution
+            for res = [0.5, 0.75, 1]
+                override = tc.quiet();
+                override.simulation.interactive = 0;
+                override.grid.resolution_mm = res;
+                override.headmodel.skull_wrap_radius = 10;
+                p = tc.verifyWarning(@() load_parameters(override), 'prestus:deprecatedField');
+                tc.verifyEqual(p.headmodel.skull_wrap_radius_mm, 10 * res, 'AbsTol', 1e-12);
+                tc.verifyFalse(isfield(p.headmodel, 'skull_wrap_radius'));
+            end
+        end
+
+        function test_skull_wrap_radius_mm_default_unchanged_without_old_key(tc)
+            % negative control: no old key, no deprecation warning, default radius in mm
+            override = tc.quiet();
+            override.simulation.interactive = 0;
+            ws = warning('error', 'prestus:deprecatedField'); %#ok<CTPCT>
+            tc.addTeardown(@() warning(ws));
+            p = load_parameters(override);
+            tc.verifyEqual(p.headmodel.skull_wrap_radius_mm, 5);
+            tc.verifyFalse(isfield(p.headmodel, 'skull_wrap_radius'));
+        end
+
+    end
+
     methods (Test, TestTags = {'backends'})
 
         function test_unknown_thermal_backend_errors(tc)
