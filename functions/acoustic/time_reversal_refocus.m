@@ -125,11 +125,23 @@ end
         'pred_refocused',     []);
 
     if options.PredictShift
-        res.pred_current = predict_focal_shift(pts_m, q_cur, target_m, beam_u, k_target);
+        res.pred_current = predict_shift_widening(pts_m, q_cur, target_m, beam_u, k_target);
         if ~strcmp(capability, 'none')
-            res.pred_refocused = predict_focal_shift(pts_m, q_tr, target_m, beam_u, k_target);
+            res.pred_refocused = predict_shift_widening(pts_m, q_tr, target_m, beam_u, k_target);
         end
     end
+end
+
+function pred = predict_shift_widening(pts_m, q, target_m, beam_u, k)
+% Focal-shift prediction in a +-10 mm cube; when the peak lies on its boundary
+% (shift beyond the cube), search once more in a +-60 mm cube at 2 mm steps, so
+% large shifts (e.g. a geometric drive that cannot reach a shallow target) are
+% predicted rather than clipped at the cube edge. at_edge stays true if the peak
+% is still on the wider boundary.
+pred = predict_focal_shift(pts_m, q, target_m, beam_u, k);
+if pred.at_edge
+    pred = predict_focal_shift(pts_m, q, target_m, beam_u, k, 'HalfWidth', 60e-3, 'Step', 2e-3, 'FineStep', 0.5e-3);
+end
 end
 
 function c = point_coherence(pts_m, q, k)

@@ -66,19 +66,19 @@ end
     source.p_mask = false(dims);
     idx = num2cell(target_vox);
     source.p_mask(idx{:}) = true;
-    source.p = cast(createCWSignals(kgrid.t_array, freq_hz, 1, 0), parameters.simulation.precision);
+    source.p = cast(createCWSignals(kgrid.t_array, freq_hz, 1, 0, cw_ramp_periods(kgrid.t_array, freq_hz)), parameters.simulation.precision);
 
     rev_sensor = struct();
     rev_sensor.mask   = logical(sensor_mask);
     rev_sensor.record = {'p'};
     rev_sensor.record_start_index = sensor.record_start_index;
 
-    % PML as ACOUSTIC_WRAPPER (outside the grid, 'auto' resolved by k-Wave's rule)
-    pml = parameters.grid.pml_size;
-    if (ischar(pml) || isstring(pml)) && strcmp(pml, 'auto')
-        pml = getOptimalPMLSize(kgrid);
+    % PML as ACOUSTIC_WRAPPER (outside the grid; size, search range, and absorption)
+    [pml, pml_alpha] = kwave_pml_settings(parameters, kgrid);
+    input_args = struct('PMLInside', false, 'PMLSize', pml, 'PlotPML', false);
+    if ~isempty(pml_alpha)
+        input_args.PMLAlpha = pml_alpha;
     end
-    input_args = struct('PMLInside', false, 'PMLSize', double(pml), 'PlotPML', false);
 
     % The reverse run is a fluid k-Wave run whatever the forward backend: the
     % jwave/BabelBrain forward runs use the same medium, an elastic forward run
@@ -102,27 +102,10 @@ end
     p_t = sensor_data.p;                                  % [n_points x n_t], kept in its class (single)
     clear sensor_data
 
-    % Complex amplitude at freq_hz by a single-frequency DFT over the last
-    % whole number of periods of the recorded window (exact for a steady
-    % state), in blocks of points, so the recording is never copied to double
-    % as a whole. Same convention as extractAmpPhase: signal = a*cos(w*t + phi)
-    % -> a*exp(1i*phi), referred to t = 0 of the simulation.
-    n_t   = size(p_t, 2);
-    ppp   = 1 / (freq_hz * kgrid.dt);                     % points per period
-    n_use = max(1, round(floor(n_t / ppp) * ppp));
-    if n_use > n_t, n_use = n_t; end
-    k0    = n_t - n_use;                                  % first sample used (0-based in the window)
-    w     = 2 * pi * freq_hz * kgrid.dt;
-    E     = exp(-1i * w * (0:n_use-1)).' * (2 / n_use);   % [n_use x 1]
-    t0_s  = (double(sensor.record_start_index) - 1 + k0) * kgrid.dt;
-    p_complex = complex(zeros(size(p_t, 1), 1));
-    blk = max(1, floor(2e8 / (8 * n_use)));               % ~200 MB of doubles per block
-    for i0 = 1:blk:size(p_t, 1)
-        r = i0:min(i0 + blk - 1, size(p_t, 1));
-        p_complex(r) = double(p_t(r, k0+1:end)) * E;
-    end
+    % Complex amplitude at freq_hz (extractAmpPhase convention, referred to
+    % t = 0 of the simulation), without copying the recording as a whole.
+    p_complex = steady_state_complex_amplitude(p_t, kgrid.dt, freq_hz, sensor.record_start_index);
     clear p_t
-    p_complex = p_complex .* exp(-1i * 2 * pi * freq_hz * t0_s);
 
     info = struct('target_vox', target_vox, 'n_points', numel(p_complex), ...
         'record_start_index', sensor.record_start_index, ...
