@@ -36,7 +36,7 @@ function [source, source_labels, tr_arr, src_weights] = source_create(parameters
 % geometry creation.
 %
 % Use as:
-%   [source, source_labels, tr_arr] = source_create(parameters, kgrid, trans_pos, focus_pos)
+%   [source, source_labels, tr_arr, src_weights] = source_create(parameters, kgrid, trans_pos, focus_pos)
 %
 % Input:
 %   parameters - PRESTUS config; must contain grid.dims, grid.resolution_mm [mm],
@@ -143,7 +143,8 @@ end
                 kgrid.t_array, ...
                 freqs(it), ...              % per-transducer frequency
                 tr.(tr.type).elem_p_amp, ...
-                tr.(tr.type).elem_phase_rad);       % [elem_n x Nt]
+                tr.(tr.type).elem_phase_rad, ...
+                cw_ramp_periods(kgrid.t_array, freqs(it)));   % [elem_n x Nt]
 
             n_elements_per_T(it) = tr.(tr.type).elem_n;
         end
@@ -289,7 +290,8 @@ end
             end
 
             cw_signal = createCWSignals(kgrid.t_array, tr.freq_hz, ...
-                tr.(tr.type).elem_p_amp, tr.(tr.type).elem_phase_rad);
+                tr.(tr.type).elem_p_amp, tr.(tr.type).elem_phase_rad, ...
+                cw_ramp_periods(kgrid.t_array, tr.freq_hz));
 
             kgrid_mirrored = kWaveGrid(kgrid.Nx, kgrid.dx, 2*kgrid.Ny - 1, kgrid.dy);
             karray_full = kWaveArray('Axisymmetric', false, 'BLITolerance', bli(1), 'UpsamplingRate', bli(2));
@@ -341,9 +343,9 @@ end
                 grid_weights_3d(el_i, :, :) = karray_full.getElementGridWeights(kgrid_mirrored, el_i);
                 % Keep every grid point with a non-zero BLI weight, including the
                 % negative sinc side lobes, as the 3D path (getElementBinaryMask)
-                % and k-Wave do. A positive threshold (formerly > 0.25) drops part
-                % of the band-limited source and raised the free-water focal
-                % pressure by 6-11 % (ITRUSST BM1, 0.5-0.25 mm; see test_itrusst_benchmark).
+                % and k-Wave do. A positive threshold drops part of the
+                % band-limited source and raises the free-water focal pressure
+                % (6-11 % for ITRUSST BM1 at 0.5-0.25 mm).
                 source_mask_full = source_mask_full | (squeeze(grid_weights_3d(el_i, :, :)) ~= 0);
             end
 
@@ -463,20 +465,17 @@ end
                                 error('Matrix shape %s is unknown or not implemented.', tr.matrix.matrix_shape.type)
                         end
 
-                        if parameters.simulation.debug == 1
+                        if debug_on(parameters, 'source', 'figures')
                             elem_pos_mm = elem_pos_m' * 1e3;
                             h = figure;
                             scatter3(elem_pos_mm(:,1), elem_pos_mm(:,2), elem_pos_mm(:,3), 60, 'filled');
                             axis equal; xlabel('X [mm]'); ylabel('Y [mm]'); zlabel('Z [mm]');
-                            view([0 90]); title('Transducer Element Distribution'); grid on;
+                            title('Transducer Element Distribution'); grid on;
                             src_trans_suffix = trans_suffix(it, transducer_N);
-                            fig_filename = fullfile(parameters.io.dir_debug_source, ...
-                                sprintf('sub-%03d_%s_transducer_element_distribution%s%s.fig', ...
-                                parameters.subject_id, parameters.simulation.medium, src_trans_suffix, parameters.io.output_affix));
-                            png_filename = fullfile(parameters.io.dir_debug_source, ...
-                                sprintf('sub-%03d_%s_transducer_element_distribution%s%s.png', ...
-                                parameters.subject_id, parameters.simulation.medium, src_trans_suffix, parameters.io.output_affix));
-                            saveas(h, fig_filename, 'fig'); saveas(h, png_filename, 'png'); close(h);
+                            debug_save_figure(parameters, 'source', h, ...
+                                sprintf('sub-%03d_%s_transducer_element_distribution%s%s', ...
+                                parameters.subject_id, parameters.simulation.medium, src_trans_suffix, parameters.io.output_affix), ...
+                                sprintf('Matrix transducer%s: element positions [mm]', src_trans_suffix), 'Views', {'beam', 'side', 'oblique'});
                         end
 
                         [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem_pos_m, trans_pos_it, focus_pos_it);
@@ -487,7 +486,8 @@ end
 
                 elem_counts(it)    = tr.(tr.type).elem_n;
                 cw_signals_all{it} = createCWSignals(kgrid.t_array, tr.freq_hz, ...
-                                                      tr.(tr.type).elem_p_amp, tr.(tr.type).elem_phase_rad);
+                                                      tr.(tr.type).elem_p_amp, tr.(tr.type).elem_phase_rad, ...
+                                                      cw_ramp_periods(kgrid.t_array, tr.freq_hz));
                 tr_arr(it) = tr;
             end
 
@@ -597,9 +597,26 @@ end
             src_weights = struct('W', W_src, 'mask_ind', mask_ind, 'elem_counts', elem_counts, ...
                                  'drive', element_drive(tr_arr));
 
-            if parameters.simulation.debug == 1
+            if debug_on(parameters, 'source', 'figures')
                 show_binary_mask_transducer(karray, kgrid, parameters);
             end
+        end
+    end
+
+    % [DEBUG] source mask of all transducers, in acoustic-grid voxels: open it
+    % with the debug medium matrices to see where the bowls sit against the skin
+    % (same grid unless a partial acoustic FOV crops it)
+    if debug_on(parameters, 'source', 'volumes') && isfield(parameters.io, 'dir_debug_source')
+        try
+            if ~isfolder(parameters.io.dir_debug_source); mkdir(parameters.io.dir_debug_source); end
+            mask_file = fullfile(parameters.io.dir_debug_source, sprintf('sub-%03d_%s_source_mask%s', ...
+                parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+            niftiwrite(uint8(source.p_mask ~= 0), mask_file, 'Compressed', true);
+            debug_register(parameters, 'source', mask_file, ...
+                ['Source mask of all transducers, acoustic grid; overlays the debug medium matrices ' ...
+                 'unless a partial acoustic FOV cropped the grid'], 'volume');
+        catch ME
+            warning('source_create:debugMask', 'Could not save the debug source mask: %s', ME.message);
         end
     end
 

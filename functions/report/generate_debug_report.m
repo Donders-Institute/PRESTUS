@@ -1,0 +1,412 @@
+function report_path = generate_debug_report(parameters, ME)
+% GENERATE_DEBUG_REPORT  One HTML page indexing all debug outputs of a run
+%
+% Written when simulation.debug and report.debug are on: at the end of the
+% pipeline and, after an error, from the pipeline's error handler, so a
+% failed run can be inspected in one place. Sections:
+%   Run error      - the error message and stack (only after an error)
+%   Settings       - debug settings, number and size of the debug files
+%   One section per debug stage (preproc, medium, source, babelbrain) -
+%                    figures with captions and the function that wrote
+%                    them, and a table of volumes and other files
+%   Related outputs - segmentation report, charm --debug output
+%                    (segmentation.debug), pseudo-CT intermediates (pct.debug)
+%   Unregistered files - files in debug/ that no function registered
+%
+% Captions and sources come from <io.dir_debug>/manifest.jsonl
+% (DEBUG_REGISTER); the latest entry of a file wins. Figures are linked, not
+% embedded, so the page stays small; keep it next to its debug/ folder.
+%
+% Use as:
+%   report_path = generate_debug_report(parameters)
+%   report_path = generate_debug_report(parameters, ME)
+%
+% Input:
+%   parameters - PRESTUS parameters of the run
+%   ME         - MException of a failed run (optional)
+%
+% Output:
+%   report_path - <io.dir_reports>/sub-XXX_<medium>_debug_report<affix>.html,
+%                 or '' when skipped or failed (failures are warnings only)
+%
+% See also: DEBUG_REGISTER, DEBUG_ON, GENERATE_SEGMENTATION_REPORT
+
+arguments
+    parameters (1,1) struct
+    ME = []
+end
+
+report_path = '';
+try
+    if ~debug_on(parameters) || ~report_flag(parameters, 'debug')
+        return
+    end
+    parameters = resolve_io_dirs(parameters);
+    if ~isfield(parameters.io, 'dir_reports') || isempty(parameters.io.dir_reports)
+        return
+    end
+    subject_id = parameters.subject_id;
+    medium = parameters.simulation.medium;
+    affix = '';
+    if isfield(parameters.io, 'output_affix'); affix = char(parameters.io.output_affix); end
+    style_opts = report_styles.options(parameters);
+    report_dir = parameters.io.dir_reports;
+    if ~isfolder(report_dir); mkdir(report_dir); end
+    report_path = fullfile(report_dir, sprintf('sub-%03d_%s_debug_report%s.html', subject_id, medium, affix));
+
+    entries = read_manifest(parameters.io.dir_debug, affix);
+    files = list_debug_files(parameters.io.dir_debug);
+
+    h = {};
+    h{end+1} = '<!DOCTYPE html>';
+    h{end+1} = sprintf('<html lang="en" data-theme="light" data-style="%s">', style_opts.name);
+    h{end+1} = '<head><meta charset="UTF-8">';
+    h{end+1} = '<meta name="viewport" content="width=device-width, initial-scale=1.0">';
+    h{end+1} = ['<script>try{var t=localStorage.getItem("prestus-theme")||' ...
+        '((window.matchMedia&&matchMedia("(prefers-color-scheme:dark)").matches)?"dark":"light");' ...
+        'document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>'];
+    h{end+1} = sprintf('<title>PRESTUS Debug — sub-%03d %s%s</title>', subject_id, medium, affix);
+    h{end+1} = ['<style>' css_styles_base() report_styles.css(style_opts) local_css() '</style>'];
+    h{end+1} = '</head><body><a id="top"></a>';
+
+    sections = cell(0, 4);
+    if ~isempty(ME)
+        sections(end+1, :) = {'Run error', @() build_error_section(ME), true, 'error'};
+    end
+    sections(end+1, :) = {'Debug settings', @() build_settings_section(parameters, entries, files), true, 'settings'};
+    [~, known] = debug_stages(parameters);
+    titles = struct('preproc', 'Head preprocessing', 'medium', 'Medium', ...
+        'source', 'Source and transducer', 'babelbrain', 'BabelBrain');
+    for i = 1:numel(known)
+        st = known{i};
+        sel = entries(strcmp({entries.stage}, st));
+        if isempty(sel), continue; end
+        sections(end+1, :) = {sprintf('%s (%d)', titles.(st), numel(sel)), ...
+            @() build_stage_section(sel, parameters, report_dir), true, ['stage-' st]}; %#ok<AGROW>
+    end
+    sections(end+1, :) = {'Related outputs', @() build_related_section(parameters, report_dir), true, 'related'};
+    unreg = unregistered(files, entries, parameters.io.dir_debug);
+    if ~isempty(unreg)
+        sections(end+1, :) = {sprintf('Unregistered files (%d)', numel(unreg)), ...
+            @() build_unregistered_section(unreg, parameters.io.dir_debug, report_dir), false, 'unregistered'};
+    end
+
+    h{end+1} = build_header(parameters, affix, isempty(ME), sections(:, [1 4]));
+    for i = 1:size(sections, 1)
+        try
+            h{end+1} = html_utils.collapsible(sections{i, 1}, sections{i, 2}(), ...
+                sections{i, 3}, sections{i, 4}); %#ok<AGROW>
+        catch MEs
+            h{end+1} = html_utils.section_error(sections{i, 1}, MEs); %#ok<AGROW>
+        end
+    end
+    h{end+1} = sprintf('<footer><p>Generated by PRESTUS %s</p></footer>', ...
+        char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
+    h{end+1} = html_utils.lightbox();
+    h{end+1} = report_scripts.common();
+    h{end+1} = report_styles.script(style_opts);
+    h{end+1} = '</body></html>';
+
+    fid = fopen(report_path, 'w', 'n', 'UTF-8');
+    if fid == -1
+        warning('PRESTUS:debugReport:fileOpen', 'Cannot open %s for writing.', report_path);
+        report_path = '';
+        return
+    end
+    fprintf(fid, '%s\n', h{:});
+    fclose(fid);
+    fprintf('Debug report saved to: %s\n', report_path);
+catch MEr
+    warning('PRESTUS:debugReport:failed', 'Debug report failed: %s', MEr.message);
+    report_path = '';
+end
+end
+
+% ── Manifest and files ─────────────────────────────────────────────────
+function entries = read_manifest(dir_debug, affix)
+% Entries of this run (affix), latest per file
+    entries = struct('stage', {}, 'file', {}, 'caption', {}, 'kind', {}, 'group', {}, 'source', {}, 'affix', {}, 'time', {});
+    mf = fullfile(dir_debug, 'manifest.jsonl');
+    if ~isfile(mf), return; end
+    lines = splitlines(fileread(mf));
+    keys = {};
+    for i = 1:numel(lines)
+        ln = strtrim(lines{i});
+        if isempty(ln), continue; end
+        try
+            r = jsondecode(ln);
+        catch
+            continue    % a line cut short by a concurrent write
+        end
+        if ~isfield(r, 'affix') || ~strcmp(char(r.affix), affix), continue; end
+        group = '';
+        if isfield(r, 'group'); group = char(r.group); end
+        e = struct('stage', char(r.stage), 'file', char(r.file), 'caption', char(r.caption), ...
+            'kind', char(r.kind), 'group', group, 'source', char(r.source), 'affix', char(r.affix), ...
+            'time', char(r.time));
+        k = find(strcmp(keys, e.file), 1);
+        if isempty(k)
+            entries(end+1) = e; %#ok<AGROW>
+            keys{end+1} = e.file; %#ok<AGROW>
+        else
+            entries(k) = e;
+        end
+    end
+end
+
+function files = list_debug_files(dir_debug)
+    files = struct('rel', {}, 'bytes', {});
+    if ~isfolder(dir_debug), return; end
+    d = dir(fullfile(dir_debug, '**', '*'));
+    d = d(~[d.isdir]);
+    prefix = [char(dir_debug) filesep];
+    for i = 1:numel(d)
+        full = fullfile(d(i).folder, d(i).name);
+        rel = strrep(full(numel(prefix)+1:end), filesep, '/');
+        if strcmp(rel, 'manifest.jsonl'), continue; end
+        files(end+1) = struct('rel', rel, 'bytes', d(i).bytes); %#ok<AGROW>
+    end
+end
+
+function unreg = unregistered(files, entries, dir_debug) %#ok<INUSD>
+% Debug files not in this run's manifest (other affixes count as registered
+% elsewhere only if their manifest line exists)
+    all_reg = {};
+    mf = fullfile(dir_debug, 'manifest.jsonl');
+    if isfile(mf)
+        tok = regexp(fileread(mf), '"file":"((?:[^"\\]|\\.)*)"', 'tokens');
+        all_reg = cellfun(@(t) strrep(t{1}, '\/', '/'), tok, 'UniformOutput', false);
+    end
+    keep = ~ismember({files.rel}, all_reg);
+    unreg = files(keep);
+end
+
+function p = abs_path(file, dir_debug)
+    if is_absolute(file)
+        p = file;
+    else
+        p = fullfile(dir_debug, strrep(file, '/', filesep));
+    end
+end
+
+function tf = is_absolute(p)
+    tf = startsWith(p, '/') || ~isempty(regexp(p, '^[A-Za-z]:[\\/]', 'once')) || startsWith(p, '\\');
+end
+
+% ── Sections ───────────────────────────────────────────────────────────
+function html = build_header(parameters, affix, ok, toc)
+    html = '<section class="report-section" id="header">';
+    html = [html '<h1>PRESTUS Debug Report</h1><table class="info-table">'];
+    html = [html kv('Subject', sprintf('sub-%03d', parameters.subject_id))];
+    html = [html kv('Medium', html_utils.escape(parameters.simulation.medium))];
+    if ~isempty(affix); html = [html kv('Affix', html_utils.escape(affix))]; end
+    if ok
+        html = [html kv('Run', 'finished')];
+    else
+        html = [html kv('Run', '<span class="badge badge-amber">failed</span> (see Run error)')];
+    end
+    html = [html kv('Output folder', html_utils.escape(parameters.io.dir_output))];
+    html = [html kv('Generated', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')))];
+    html = [html '</table><p class="note">'];
+    links = cellfun(@(t, id) sprintf('<a href="#%s">%s</a>', id, html_utils.escape(t)), ...
+        toc(:, 1), toc(:, 2), 'UniformOutput', false);
+    html = [html strjoin(links', ' &middot; ') '</p></section>'];
+end
+
+function html = build_error_section(ME)
+    html = sprintf('<p class="error-notice"><strong>%s</strong></p>', html_utils.escape(ME.message));
+    if ~isempty(ME.identifier)
+        html = [html sprintf('<p>Identifier: <code>%s</code></p>', html_utils.escape(ME.identifier))];
+    end
+    if ~isempty(ME.stack)
+        rows = arrayfun(@(s) sprintf('<tr><td><code>%s</code></td><td>%d</td><td class="path">%s</td></tr>', ...
+            html_utils.escape(s.name), s.line, html_utils.escape(s.file)), ME.stack, 'UniformOutput', false);
+        html = [html '<table class="data-table"><thead><tr><th>Function</th><th>Line</th><th>File</th></tr></thead><tbody>' ...
+            strjoin(rows', '') '</tbody></table>'];
+    end
+end
+
+function html = build_settings_section(parameters, entries, files)
+    sim = parameters.simulation;
+    stages = debug_stages(parameters);
+    html = '<table class="info-table">';
+    html = [html kv('Stages', html_utils.escape(strjoin(stages, ', ')))];
+    html = [html kv('Figures (PNG)', onoff(debug_on(parameters, '', 'figures')))];
+    html = [html kv('Volumes (NIfTI)', onoff(debug_on(parameters, '', 'volumes')))];
+    seg_dbg = isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'debug') && ...
+        isequal(double(parameters.segmentation.debug), 1);
+    html = [html kv('charm --debug (segmentation.debug)', onoff(seg_dbg))];
+    html = [html kv('Files registered by this run', sprintf('%d', numel(entries)))];
+    total = sum([files.bytes]);
+    html = [html kv('Size of debug/ (all runs in this folder)', ...
+        sprintf('%s in %d files', human_bytes(total), numel(files)))];
+    html = [html '</table>'];
+    if isfield(sim, 'debug_volumes') && isequal(double(sim.debug_volumes), 1) && total > 1e9
+        html = [html '<p class="note">Debug volumes take most of this space; set ' ...
+            '<code>simulation.debug_volumes: 0</code> to keep only figures.</p>'];
+    end
+end
+
+function html = build_stage_section(sel, parameters, report_dir)
+    dir_debug = parameters.io.dir_debug;
+    figs = sel(strcmp({sel.kind}, 'figure'));
+    rest = sel(~strcmp({sel.kind}, 'figure'));
+    html = '';
+    if ~isempty(figs)
+        html = [html '<div class="image-grid debug-grid">'];
+        done = false(1, numel(figs));
+        for i = 1:numel(figs)
+            if done(i), continue; end
+            if isempty(figs(i).group)
+                html = [html figure_html(figs(i), dir_debug, report_dir)]; %#ok<AGROW>
+                done(i) = true;
+                continue
+            end
+            % views of one 3D figure (DEBUG_SAVE_FIGURE 'Views'): one full-width row
+            members = find(strcmp({figs.group}, figs(i).group) & ~done);
+            done(members) = true;
+            html = [html '<div class="debug-views">']; %#ok<AGROW>
+            for m = members
+                html = [html figure_html(figs(m), dir_debug, report_dir)]; %#ok<AGROW>
+            end
+            html = [html '</div>']; %#ok<AGROW>
+        end
+        html = [html '</div>'];
+    end
+    if ~isempty(rest)
+        html = [html '<table class="data-table"><thead><tr><th>File</th><th>Content</th>' ...
+            '<th>Kind</th><th>Size</th><th>Written by</th></tr></thead><tbody>'];
+        for i = 1:numel(rest)
+            p = abs_path(rest(i).file, dir_debug);
+            sz = '<span class="badge badge-amber">missing</span>';
+            if isfile(p)
+                d = dir(p); sz = human_bytes(d.bytes);
+            end
+            html = [html sprintf('<tr><td><a href="%s">%s</a></td><td>%s</td><td>%s</td><td>%s</td><td><code>%s</code></td></tr>', ...
+                html_utils.escape(report_link(p, report_dir)), html_utils.escape(file_name(rest(i).file)), ...
+                html_utils.escape(rest(i).caption), html_utils.escape(strrep(rest(i).kind, '_', ' ')), ...
+                sz, html_utils.escape(rest(i).source))]; %#ok<AGROW>
+        end
+        html = [html '</tbody></table>'];
+        if any(strcmp({rest.kind}, 'volume'))
+            html = [html '<p class="note">Volumes named <code>matrix_*</code>, <code>balloon_mask*</code> and ' ...
+                '<code>*_source_mask</code> are in simulation-grid voxels without a T1 header; the <code>*_final</code> volumes ' ...
+                'are back-projected to the T1 and overlay it in any NIfTI viewer.</p>'];
+        end
+    end
+end
+
+function html = figure_html(fg, dir_debug, report_dir)
+    p = abs_path(fg.file, dir_debug);
+    if ~isfile(p)
+        html = sprintf('<figure class="missing"><p>Missing: %s</p><figcaption>%s</figcaption></figure>', ...
+            html_utils.escape(fg.file), html_utils.escape(fg.caption));
+        return
+    end
+    html = sprintf(['<figure><img loading="lazy" src="%s" alt="%s">' ...
+        '<figcaption>%s<br><span class="src">%s &middot; %s</span></figcaption></figure>'], ...
+        html_utils.escape(report_link(p, report_dir)), html_utils.escape(fg.caption), ...
+        html_utils.escape(fg.caption), html_utils.escape(fg.source), html_utils.escape(file_name(fg.file)));
+end
+
+function html = build_related_section(parameters, report_dir)
+    rows = {};
+    seg_report = fullfile(report_dir, sprintf('sub-%03d_%s_segmentation_report%s.html', ...
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    if isfile(seg_report)
+        rows{end+1} = row_link('Segmentation report (head-model postprocessing)', seg_report, report_dir);
+    end
+    sim_report = fullfile(report_dir, sprintf('sub-%03d_%s_report%s.html', ...
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    if isfile(sim_report) || (isfield(parameters, 'modules') && isfield(parameters.modules, 'generate_report') && ...
+            isequal(double(parameters.modules.generate_report), 1))
+        rows{end+1} = row_link('Simulation report', sim_report, report_dir);
+    end
+    if isfield(parameters, 'path') && isfield(parameters.path, 'seg') && ~isempty(parameters.path.seg)
+        m2m = fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id));
+        charm_report = fullfile(m2m, 'charm_report.html');
+        if isfile(charm_report)
+            rows{end+1} = row_link('SimNIBS charm report', charm_report, report_dir);
+        end
+        if isfolder(fullfile(m2m, 'segmentation'))
+            rows{end+1} = row_link('charm intermediate segmentation (segmentation.debug keeps more)', ...
+                fullfile(m2m, 'segmentation'), report_dir);
+        end
+    end
+    if isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && isequal(double(parameters.pct.enabled), 1) ...
+            && isfield(parameters.io, 'dir_pct') && isfolder(parameters.io.dir_pct)
+        rows{end+1} = row_link('Pseudo-CT folder (intermediates kept with pct.debug)', parameters.io.dir_pct, report_dir);
+    end
+    logs = fullfile(parameters.io.dir_output, 'log');
+    if isfolder(logs)
+        rows{end+1} = row_link('Run logs', logs, report_dir);
+    end
+    if isempty(rows)
+        html = '<p class="placeholder">No related outputs found.</p>';
+        return
+    end
+    html = ['<table class="data-table"><tbody>' strjoin(rows, '') '</tbody></table>'];
+end
+
+function html = build_unregistered_section(unreg, dir_debug, report_dir)
+    html = ['<p class="note">Files in <code>debug/</code> that no function registered: written by an ' ...
+        'earlier PRESTUS version, another affix without a manifest entry, or an external tool.</p>' ...
+        '<table class="data-table"><thead><tr><th>File</th><th>Size</th></tr></thead><tbody>'];
+    for i = 1:numel(unreg)
+        p = fullfile(dir_debug, strrep(unreg(i).rel, '/', filesep));
+        html = [html sprintf('<tr><td><a href="%s">%s</a></td><td>%s</td></tr>', ...
+            html_utils.escape(report_link(p, report_dir)), html_utils.escape(unreg(i).rel), ...
+            human_bytes(unreg(i).bytes))]; %#ok<AGROW>
+    end
+    html = [html '</tbody></table>'];
+end
+
+% ── Helpers ────────────────────────────────────────────────────────────
+function r = row_link(label, target, report_dir)
+    r = sprintf('<tr><td>%s</td><td><a href="%s">%s</a></td></tr>', html_utils.escape(label), ...
+        html_utils.escape(report_link(target, report_dir)), html_utils.escape(target));
+end
+
+function s = kv(k, v)
+    s = sprintf('<tr><th>%s</th><td>%s</td></tr>', html_utils.escape(k), v);
+end
+
+function s = onoff(tf)
+    if tf, s = 'on'; else, s = 'off'; end
+end
+
+function n = file_name(f)
+    [~, a, b] = fileparts(f);
+    n = [a b];
+end
+
+function s = human_bytes(b)
+    u = {'B', 'kB', 'MB', 'GB', 'TB'};
+    k = 1;
+    while b >= 1000 && k < numel(u)
+        b = b / 1000; k = k + 1;
+    end
+    if k == 1
+        s = sprintf('%d %s', round(b), u{k});
+    else
+        s = sprintf('%.1f %s', b, u{k});
+    end
+end
+
+function tf = report_flag(parameters, name)
+    tf = true;
+    if isfield(parameters, 'report') && isfield(parameters.report, name) && ~isempty(parameters.report.(name))
+        v = parameters.report.(name);
+        tf = isequal(double(v), 1) || isequal(v, true);
+    end
+end
+
+function css = local_css()
+    css = ['.debug-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem}' ...
+        '.debug-grid figure{margin:0}.debug-grid img{width:100%;height:auto}' ...
+        '.debug-grid .src{opacity:.7;font-size:.8em}' ...
+        '.debug-grid figure.missing{border:1px dashed currentColor;padding:.5rem;opacity:.7}' ...
+        '.debug-views{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem}' ...
+        'td.path{word-break:break-all;font-size:.85em}' ...
+        '.data-table td{white-space:normal;overflow-wrap:anywhere}'];
+end

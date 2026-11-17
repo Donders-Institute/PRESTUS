@@ -21,8 +21,10 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
 %   crop_at_target - [1x3] crop flags per axis (default: [0 0 0])
 %   view_angle     - [1x2] [azimuth, elevation] for MATLAB view (default: [0 0])
 %   open_figure    - create a new figure (default: true)
+%   apply_deface   - zero anterior face voxels before rendering (DEFACE_VOLUME;
+%                    default: true)
 %
-% See also: PLOT_CORONAL_SLICES, SHOW_POSITIONING_PLOTS
+% See also: SHOW_POSITIONING_PLOTS
 
     arguments
         segmented_img (:,:,:)
@@ -105,9 +107,9 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
     if ~isempty(cap_surf.vertices)
         cap_surf.vertices = cap_surf.vertices - origin_shift;
         hcap = patch(cap_surf, 'FaceColor', 'interp', 'EdgeColor', 'none', 'facealpha', 0.8);
+        hcap.AmbientStrength = 0.6;
     end
     lighting gouraud;
-    hcap.AmbientStrength = 0.6;
 
     [X, Y, Z] = sphere(8);
 
@@ -141,10 +143,9 @@ function show_3d_head(segmented_img, target_xyz, trans_xyz, parameters, pixel_si
                 norm_vec = (thisTrans - thisTarg) / norm(thisTrans - thisTarg);
 
             else
-                % Use the natural focus based on transducer curvature
+                % Use the natural focus based on transducer curvature (+z, voxel space)
                 curv_radius = tr.(tr.type).curv_radius_mm;
-                natural_focus = trans_pos_grid + [0, 0, curv_radius / parameters.grid.resolution_mm];
-                natural_focus_grid = natural_focus / pixel_size;
+                natural_focus_grid = thisTrans + [0, 0, curv_radius / pixel_size];
 
                 norm_vec = (thisTrans - natural_focus_grid) / norm(thisTrans - natural_focus_grid);
             end

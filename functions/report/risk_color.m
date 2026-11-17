@@ -16,7 +16,7 @@ function color = risk_color(value, limit)
 %   color - 'green', 'amber', 'red', 'gray', or 'info'
 %
 % See also: GET_RISK_LIMITS, GENERATE_SIMULATION_REPORT
-    if isnan(value) || isempty(value)
+    if isempty(value) || isnan(value)
         color = 'gray';
     elseif isinf(limit)
         color = 'info'; % informational, no limit

@@ -126,6 +126,27 @@ switch mode
             artifacts(end+1) = art(sprintf('sub-%03d_%s%s_targeting.csv', subject_id, medium, base_affix), ...
                 'targeting accuracy');
         end
+        if strcmp(medium, 'layered') && get_flag(parameters, 'report', 'segmentation', true)
+            artifacts(end+1) = art(sprintf('sub-%03d_%s_segmentation_report%s.html', subject_id, medium, base_affix), ...
+                'segmentation report (head-model postprocessing)');
+        end
+        if debug_on(parameters) && get_flag(parameters, 'report', 'debug', true)
+            artifacts(end+1) = art(sprintf('sub-%03d_%s_debug_report%s.html', subject_id, medium, base_affix), ...
+                'debug report');
+        end
+        % PREPROC_TRANSDUCER_PLACEMENT: an empty placement.report counts as on
+        if get_flag(parameters, 'modules', 'run_transducer_placement', true) && ...
+                flag_or_default(parameters, 'placement', 'report', true)
+            artifacts(end+1) = art(sprintf('sub-%03d_placement_%s%s.html', subject_id, ...
+                placement_mode(parameters), base_affix), 'placement report');
+        end
+        % TIME_REVERSAL_STAGE (k-Wave source setup only; skipped with BabelBrain)
+        if flag_or_default(parameters, 'time_reversal', 'enabled', false) && ~babelbrain_acoustic(parameters)
+            artifacts(end+1) = art(sprintf('sub-%03d_%s%s_timereversal_summary.csv', subject_id, medium, base_affix), ...
+                'time reversal: refocusing and aberration per transducer');
+            artifacts(end+1) = art(sprintf('sub-%03d_%s%s_timereversal_elements.csv', subject_id, medium, base_affix), ...
+                'time reversal: transfer and phases per element');
+        end
         jobs{end+1} = '1 job — the full pipeline, start to finish (prestus_pipeline.m)';
 
     case 'async'
@@ -147,16 +168,16 @@ switch mode
             artifacts(end+1) = art(sprintf('sub-%03d_%s%s.csv', subject_id, medium, affix), label);
             artifacts(end+1) = art(sprintf('sub-%03d_%s_report%s.html', subject_id, medium, affix), label);
         end
-        async_grid_mode = 'shared';
-        if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'async_grid_mode') && ...
-                ~isempty(parameters.simulation.async_grid_mode)
-            async_grid_mode = parameters.simulation.async_grid_mode;
+        async_layout = 'shared';
+        if isfield(parameters, 'grid') && isfield(parameters.grid, 'async_layout') && ...
+                ~isempty(parameters.grid.async_layout)
+            async_layout = parameters.grid.async_layout;
         end
-        if strcmp(async_grid_mode, 'per_transducer')
-            jobs{end+1} = sprintf(['%d preprocessing jobs — async_grid_mode=''per_transducer'', ' ...
+        if strcmp(async_layout, 'per_transducer')
+            jobs{end+1} = sprintf(['%d preprocessing jobs — grid.async_layout=''per_transducer'', ' ...
                 'one grid each'], N);
         else
-            jobs{end+1} = ['1 shared preprocessing stage — async_grid_mode=''shared'', one grid ' ...
+            jobs{end+1} = ['1 shared preprocessing stage — grid.async_layout=''shared'', one grid ' ...
                 'for all transducers'];
         end
         jobs{end+1} = sprintf('%d acoustic jobs — one per transducer', N);
@@ -275,6 +296,28 @@ end
 
 function a = art(name, note)
 a = struct('name', name, 'note', note);
+end
+
+function tf = flag_or_default(parameters, section, field, default)
+% As GET_FLAG, but an empty value also gives the default
+tf = default;
+if isfield(parameters, section) && isfield(parameters.(section), field) ...
+        && ~isempty(parameters.(section).(field))
+    tf = logical(parameters.(section).(field));
+end
+end
+
+function m = placement_mode(parameters)
+% As PREPROC_TRANSDUCER_PLACEMENT: lower case, 'manual' when unset
+m = 'manual';
+if isfield(parameters, 'placement') && isfield(parameters.placement, 'mode') ...
+        && ~isempty(parameters.placement.mode)
+    m = lower(char(parameters.placement.mode));
+end
+end
+
+function tf = babelbrain_acoustic(parameters)
+tf = isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'babelbrain');
 end
 
 function tf = get_flag(parameters, section, field, default)

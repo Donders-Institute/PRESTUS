@@ -1,6 +1,5 @@
 function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h] = ...
     plot_overlay(overlay_image, bg_image, transducer_bowl, parameters, slice, trans_pos, focus_pos, max_data_pos, options)
-
 % PLOT_OVERLAY  Overlay a metric map on a 2D slice of a 3D background image
 %
 % Extracts a specified orthogonal slice from a 3D volume and overlays a
@@ -36,7 +35,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
 %   bg_max          - maximum background intensity
 %   h               - figure handle
 %
-% See also: PLOT_OVERLAY_2D, PLOT_CORONAL_SLICES
+% See also: PLOT_OVERLAY_2D
 
     arguments
         overlay_image (:,:,:)
@@ -319,7 +318,7 @@ function [bg_slice, transducer_bowl, overlay_image, ax1, ax2, bg_min, bg_max, h]
     imagesc(ax2, overlay_image,'alphadata', intensity_alpha);
 
     cr = options.overlay_color_range;
-    if any(isnan(cr))
+    if any(~isfinite(cr))
         cr = [0, 1];
     elseif cr(2) <= cr(1)
         cr(2) = cr(1) + 1;

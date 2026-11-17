@@ -11,8 +11,7 @@ function sensor_data = read_babelbrain_output(h5_path, use_refocus, parameters, 
 % This may differ from parameters.grid.resolution_mm (the PRESTUS acoustic grid
 % step). When they differ, p_amp is resampled onto the PRESTUS grid using the
 % same affine_resample_3d approach used by read_babelbrain_thermal. When
-% parameters / planimg are not supplied, no resampling is performed (legacy
-% behaviour).
+% parameters / planimg are not supplied, no resampling is performed.
 %
 % BabelBrain HDF5 output keys (babel_integration_base.py Step 9/10):
 %   /p_amp          - [Nx x Ny x Nz] float32, peak positive pressure [Pa]
@@ -26,6 +25,7 @@ function sensor_data = read_babelbrain_output(h5_path, use_refocus, parameters, 
 %   sensor_data = read_babelbrain_output(h5_path)
 %   sensor_data = read_babelbrain_output(h5_path, true)
 %   sensor_data = read_babelbrain_output(h5_path, use_refocus, parameters, planimg)
+%   sensor_data = read_babelbrain_output(..., focus_pos, focal_length_mm, trans_pos)
 %
 % Input:
 %   h5_path      - path to *DataForSim.h5 produced by RUN_SIM().RunCases()
@@ -34,6 +34,11 @@ function sensor_data = read_babelbrain_output(h5_path, use_refocus, parameters, 
 %                  (uses grid.resolution_mm and grid.dims)
 %   planimg      - (optional) planimg struct from grid_tissue_setup; required
 %                  for affine-correct resampling in layered (subject) mode
+%   focus_pos    - (optional) [1x3] focus voxel; anchors the depth resample on
+%                  BabelBrain's /TargetLocation marker
+%   focal_length_mm - (optional) preset FocalLength [mm]; anchor fallback when
+%                  /TargetLocation is absent
+%   trans_pos    - (optional) [1x3] transducer voxel; sets the beam direction
 %
 % Output:
 %   sensor_data  - struct with fields:
@@ -41,8 +46,12 @@ function sensor_data = read_babelbrain_output(h5_path, use_refocus, parameters, 
 %                    .p_complex   [Nx x Ny x Nz] complex double [Pa], Fourier
 %                                 pressure (amplitude + phase); present when
 %                                 /p_complex exists in the HDF5 file
-%                  Both are at parameters.grid.resolution_mm resolution when
-%                  resampled. Also contains .babelbrain_source = h5_path.
+%                    .babelbrain_material_map  BabelBrain labels on the PRESTUS
+%                                 grid (when resampled and /MaterialMap exists)
+%                    .babelbrain_x_vec/_y_vec/_z_vec  BabelBrain grid coordinates
+%                    .babelbrain_source  h5_path
+%                  Volumes are at parameters.grid.resolution_mm resolution when
+%                  resampled.
 %
 % See also: BABELBRAIN_WRAPPER, ACOUSTIC_WRAPPER, READ_BABELBRAIN_THERMAL
 
@@ -259,8 +268,7 @@ if needs_resample
     end
 end
 
-debug_on = isfield(parameters, 'simulation') && isfield(parameters.simulation, 'debug') ...
-           && parameters.simulation.debug == 1;
+bb_debug = debug_on(parameters, 'babelbrain');
 
 if needs_resample
     res_mm = parameters.grid.resolution_mm;
@@ -280,11 +288,10 @@ if needs_resample
 
     % Always resample BabelBrain's MaterialMap onto the PRESTUS grid (not only in
     % debug): acoustic_analysis uses it to mask the field with BabelBrain's OWN
-    % segmentation. BabelBrain places its source/field (and material map) ~1.4 mm
-    % forward of the /TargetLocation marker the resample anchors on, so masking
-    % the field with PRESTUS's own (unshifted) medium_masks mis-attributes voxels
-    % at the skull-brain interface (a reflection hotspot lands in PRESTUS-brain
-    % while BabelBrain labels it cortical bone, inflating Isppa_brain). Mode
+    % segmentation, the medium the field was solved on, so voxels at the
+    % skull-brain interface are attributed as BabelBrain labelled them (a
+    % reflection hotspot in BabelBrain's cortical bone does not count as
+    % brain). Mode
     % (majority) resampling — integer label data on a finer BB grid. BB labels:
     % 0=water 1=skin 2=cortical 3=trabecular 4=brain.
     if any(strcmp(ds_names, 'MaterialMap'))
@@ -307,7 +314,7 @@ if needs_resample
             'Check focus_pos, focal_length_mm, and BabelBrain coordinate vectors.'], ...
             act(1), act(2), act(3), exp(1), exp(2), exp(3));
     end
-    if debug_on
+    if bb_debug
         % MaterialMap ground truth (when present): BabelBrain's own tissue-index
         % volume, on the SAME grid/indexing as p_amp (both flipped identically
         % before saving; see babel_integration_base.py Step10_GetResults). Resample
@@ -371,7 +378,11 @@ if needs_resample
             end
             p_out = fullfile(bb_dbg_dir, sprintf('sub-%03d_babelbrain_pressure%s', ...
                 parameters.subject_id, parameters.io.output_affix));
-            write_bb_t1w_debug(p_amp, p_out, planimg, fov_offset, 'single', 32, 'linear');
+            if debug_on(parameters, 'babelbrain', 'volumes')
+                write_bb_t1w_debug(p_amp, p_out, planimg, fov_offset, 'single', 32, 'linear');
+                debug_register(parameters, 'babelbrain', [p_out '.nii.gz'], ...
+                    'BabelBrain output pressure amplitude in T1w space', 'volume');
+            end
         catch ME
             warning('read_babelbrain_output:pressureT1wDebugFailed', ...
                 'Could not write T1w pressure debug NIfTI: %s', ME.message);
@@ -605,9 +616,13 @@ function plot_babelbrain_fov_debug(p_amp_bb_native, p_amp_resampled, x_mm, y_mm,
     png_path = fullfile(out_dir, sprintf('sub-%03d_babelbrain_fov_debug%s.png', ...
         parameters.subject_id, parameters.io.output_affix));
     set(h, 'InvertHardcopy', 'off');
-    saveas(h, png_path, 'png');
+    if debug_on(parameters, 'babelbrain', 'figures')
+        saveas(h, png_path, 'png');
+        fprintf('[read_babelbrain_output] Saved: %s\n', png_path);
+        debug_register(parameters, 'babelbrain', png_path, ...
+            'BabelBrain domain against the PRESTUS grid along the beam (zero-filled depths shaded)', 'figure');
+    end
     close(h);
-    fprintf('[read_babelbrain_output] Saved: %s\n', png_path);
 
     T = table(bb_z_lo, bb_z_hi, prestus_z_lo, prestus_z_hi, trunc_proximal_mm, trunc_distal_mm, anchor_mismatch_mm, ...
         'VariableNames', {'bb_depth_rel_focus_min_mm', 'bb_depth_rel_focus_max_mm', ...
@@ -617,17 +632,21 @@ function plot_babelbrain_fov_debug(p_amp_bb_native, p_amp_resampled, x_mm, y_mm,
         parameters.subject_id, parameters.io.output_affix));
     writetable(T, csv_path);
     fprintf('[read_babelbrain_output] Saved: %s\n', csv_path);
+    debug_register(parameters, 'babelbrain', csv_path, ...
+        'BabelBrain and PRESTUS depth ranges relative to the focus, and zero-filled depths', 'other');
 
     % Save the resampled MaterialMap (the BabelBrain INPUT tissue map) as a NIfTI
     % in T1w space so it overlays the T1/medium_masks in an external viewer. See
     % write_bb_t1w_debug for the alignment rationale (back-transform into T1 voxel
     % space + reuse planimg.t1_header, the same path nifti_to_t1w uses).
-    if has_material
+    if has_material && debug_on(parameters, 'babelbrain', 'volumes')
         try
             mat_path = fullfile(out_dir, sprintf('sub-%03d_babelbrain_material_map%s', ...
                 parameters.subject_id, parameters.io.output_affix));
             write_bb_t1w_debug(uint8(round(material_resampled)), mat_path, planimg, fov_offset, ...
                 'uint8', 8, 'nearest');
+            debug_register(parameters, 'babelbrain', [mat_path '.nii.gz'], ...
+                'BabelBrain input material map in T1w space', 'volume');
         catch ME
             warning('read_babelbrain_output:materialMapSaveFailed', ...
                 'Could not save resampled MaterialMap NIfTI: %s', ME.message);

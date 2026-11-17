@@ -13,7 +13,7 @@ function [elem_pos_m, aim_pos_m] = create_clover_array(parameters, tr_matrix, el
 %   [elem_pos_m, aim_pos_m] = create_clover_array(parameters, tr_matrix, elem_pos_m, trans_pos_m, focus_pos_m)
 %
 % Input:
-%   parameters  - PRESTUS config; parameters.simulation.debug controls figure generation
+%   parameters  - PRESTUS config; the debug settings (DEBUG_ON) control figure generation
 %   tr_matrix   - matrix + clover geometry fields: tr_matrix.clover.n_leaves,
 %                 tr_matrix.clover.ROC_parent [mm], tr_matrix.outer_diameter_mm [mm],
 %                 tr_matrix.curv_radius_mm [mm], tr_matrix.elem_shape;
@@ -96,7 +96,7 @@ end
 
 
     % [DEBUG] visualize leaf orientation
-    if parameters.simulation.debug == 1
+    if debug_on(parameters, 'source', 'figures')
         h = figure;
         hold on;
         axis equal;
@@ -135,7 +135,7 @@ end
         dist_focus = norm(parent_center_mm' - nat_focus);
 
         % [DEBUG] visualize leaf orientation
-        if parameters.simulation.debug == 1
+        if debug_on(parameters, 'source', 'figures')
             legend_entries(i) = sprintf('Leaf %d (focus offset: %.2f mm)', i, dist_focus);
 
             scatter3(elems_rot(:,1), elems_rot(:,2), elems_rot(:,3), ...
@@ -162,7 +162,7 @@ end
     % Debug plot
     % --------------------------------------------------------------------
     % [DEBUG] visualize leaf orientation
-    if parameters.simulation.debug == 1
+    if debug_on(parameters, 'source', 'figures')
         h_parent = scatter3(parent_center_mm(1), parent_center_mm(2), ...
             parent_center_mm(3), 100, 'r', 'filled');
         h_focus  = scatter3(focus_pos_m(1)*1e3, focus_pos_m(2)*1e3, focus_pos_m(3)*1e3, 100, 'b', 'filled');
@@ -185,15 +185,11 @@ end
         title(sprintf('Clover Array (%d leaves) ROC sub-arrray %.1f mm', n_leaves, ROC_leaf));
 
         grid on;
-        view([20 25 30]);
-
-        output_file = fullfile(parameters.io.dir_debug_source, ...
-            sprintf('sub-%03d_%s_clover%s.png',...
+        debug_save_figure(parameters, 'source', h, ...
+            sprintf('sub-%03d_%s_clover%s',...
             parameters.subject_id, parameters.simulation.medium, ...
-            parameters.io.output_affix));
-
-        saveas(h, output_file);
-        close(h);
+            parameters.io.output_affix), ...
+            sprintf('Clover array: %d leaves, parent bowl centre, focus and transducer centre [mm]', n_leaves), 'Views', {'beam', 'side', 'oblique'});
     end
 
 end

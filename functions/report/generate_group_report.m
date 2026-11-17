@@ -956,17 +956,17 @@ function html = build_group_dashboard(subjects_meta, limits, is_layered)
         switch metric_group(name, limits.(name))
             case 'mechanical'
                 % Group Safety board reports one top-line MI tile per medium
-                % (MI free-water or MI_tc transcranial) plus peak pressure —
+                % (MI free-water or MI_tc transcranial) —
                 % per-tissue MI_brain/MI_skull/MI_skin are intentionally
                 % excluded here (still available in the CSV / box plots).
-                if strcmp(name, 'MI_tc') || strcmp(name, 'MI') || strcmp(name, 'Psptp')
+                if strcmp(name, 'MI_tc') || strcmp(name, 'MI')
                     mech_keys{end+1} = name; %#ok<AGROW>
                 end
             case 'thermal'
                 therm_keys{end+1} = name; %#ok<AGROW>
         end
     end
-    html = [html render_group_grid(mech_keys,  'mech', 'Mechanical', 'mechanical index (MI) &amp; peak pressure', limits, subjects_meta)];
+    html = [html render_group_grid(mech_keys,  'mech', 'Mechanical', 'mechanical index (MI)', limits, subjects_meta)];
     html = [html render_group_grid(therm_keys, 'th',   'Thermal',    'temperature &amp; dose', limits, subjects_meta)];
     if isempty(mech_keys) && isempty(therm_keys)
         html = [html '<p class="placeholder">No tissue-specific ITRUSST-limited metrics for this medium &mdash; see Other exposure metrics below.</p>'];
@@ -983,7 +983,7 @@ function html = build_group_dashboard(subjects_meta, limits, is_layered)
     html = [html '</section>'];
 end
 function html = build_group_other_metrics(subjects_meta, limits)
-% Informational group metrics (no ITRUSST limit): TIC, ISPPA, peak pressure.
+% Informational group metrics (no ITRUSST limit): TIC, ISPPA.
     metric_names = fieldnames(limits);
     other_keys = {};
     for i = 1:numel(metric_names)
@@ -998,16 +998,16 @@ function html = build_group_other_metrics(subjects_meta, limits)
         return
     end
     html = [html render_group_grid(other_keys, 'other', '', '', limits, subjects_meta)];
-    html = [html '<p class="safety-footnote">These intensity, pressure and output-display indices have ' ...
+    html = [html '<p class="safety-footnote">These intensity and output-display indices have ' ...
         'no ITRUSST non-significant-risk limit and are shown for reference only.</p>'];
     html = [html '</section>'];
 end
 function g = metric_group(name, info)
-% Classify a metric: 'other' (informational / Inf limit), 'mechanical' (MI*
-% or peak pressure), else 'thermal'. Mirrors the per-subject report split.
+% Classify a metric: 'other' (informational / Inf limit), 'mechanical' (MI*),
+% else 'thermal'. Mirrors the per-subject report split.
     if isinf(info.limit)
         g = 'other';
-    elseif startsWith(name, 'MI') || strcmp(name, 'Psptp')
+    elseif startsWith(name, 'MI')
         g = 'mechanical';
     else
         g = 'thermal';

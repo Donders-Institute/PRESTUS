@@ -7,7 +7,8 @@ function [parameters] = prestus_pipeline(parameters, options)
 %
 % Pipeline stages (each independently toggled via parameters.modules.*):
 %   1. Segmentation      SimNIBS charm segmentation of structural MRI
-%   2. Transducer placement  Neuronavigation-guided entry/target point setup
+%   2. Transducer placement  transducer and focus positions (placement.mode: manual,
+%                        localite, heuristic, mni, plantus, or tus_entry)
 %   3. Grid & head model grid_stage — reorientation, rescaling, smoothing,
 %                        and cropping of the segmented head to the simulation grid
 %   4. Medium setup      medium_stage — assignment of acoustic/thermal tissue
@@ -40,7 +41,7 @@ function [parameters] = prestus_pipeline(parameters, options)
 % Output:
 %   parameters - updated struct with pipeline outputs (io.dir_output, etc.)
 %
-% Dependencies: SimNIBS 4, k-Wave >= 1.4.1, MATLAB >= 2023b
+% Dependencies: SimNIBS 4, k-Wave >= 1.4.1, MATLAB R2023b (tested; warns below R2022b)
 %
 % See also: PRESTUS_PIPELINE_START, LOAD_PARAMETERS, UNCERTAINTY_PIPELINE,
 %           SEQUENTIAL_PIPELINE
@@ -98,10 +99,14 @@ function [parameters] = prestus_pipeline(parameters, options)
         if isfield(parameters.async_combine, 'targets_wcm2')
             targets = parameters.async_combine.targets_wcm2;
         end
+        mode = 'async';
+        if isfield(parameters.async_combine, 'mode') && ~isempty(parameters.async_combine.mode)
+            mode = parameters.async_combine.mode;
+        end
         combine_async_intensity( ...
             parameters.async_combine.files_in, ...
             parameters.async_combine.file_out, ...
-            targets);
+            targets, mode);
         return;
     end
 
@@ -168,6 +173,9 @@ function [parameters] = prestus_pipeline(parameters, options)
         grid_stage(parameters);
 
     log_timer('stop','preproc');
+
+    % Head-model postprocessing, step by step (report.segmentation; layered media)
+    generate_segmentation_report(parameters);
 
     % ====================================================================
     %% STAGE 4 — MEDIUM PROPERTY MAPPING
@@ -495,18 +503,26 @@ function [parameters] = prestus_pipeline(parameters, options)
         catch ME
             warning('prestus_pipeline:reportParams', 'Could not save report parameters: %s', ME.message);
         end
+        log_timer('start', 'report');        % run_stats: stage_report_s
         generate_simulation_report(parameters);
+        log_timer('stop', 'report');
     end
+
+    % All debug outputs of the run on one page (simulation.debug, report.debug)
+    generate_debug_report(parameters);
 
     if isfield(parameters.modules, 'generate_group_report') && parameters.modules.generate_group_report
         try
             group_subjects = discover_group_subjects(parameters);
             if ~isempty(group_subjects)
+                log_timer('start', 'group_report');   % run_stats: stage_group_report_s
                 generate_group_report(parameters, group_subjects);
+                log_timer('stop', 'group_report');
             end
         catch ME
             warning('prestus_pipeline:groupReport', ...
                 'Group report generation failed: %s', ME.message);
+            try, log_timer('stop', 'group_report'); catch, end   % release its RAM sampler
         end
     end
 
@@ -523,7 +539,7 @@ function [parameters] = prestus_pipeline(parameters, options)
         if isfield(parameters, 'uncertainty') && isfield(parameters.uncertainty, 'affixes')
             generate_uncertainty_report(parameters, parameters.uncertainty.affixes);
             if ~should_save_output(parameters.io, 'save_matrices')
-                cleanup_uncertainty_intermediates(parameters, parameters.uncertainty.affixes);
+                cleanup_uncertainty_intermediates(parameters);
             end
         else
             generate_uncertainty_report(parameters);
@@ -534,7 +550,8 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     % Record this run's size and resources before post-hoc water or
     % follow-up runs (which may run inline) start records of their own.
-    run_stats('write', parameters, toc(telemetry_t0));
+    % The record also goes into telemetry (sizes and durations only).
+    run_record = run_stats('write', parameters, toc(telemetry_t0));
 
     % ====================================================================
     %% STAGE 11 — POST-HOC WATER SIMULATION  (optional)
@@ -568,15 +585,19 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
 
     track_usage('run_end', parameters, ...
-        struct('duration_s', toc(telemetry_t0), 'status', 'success', 'run_id', telemetry_rid), options);
+        struct('duration_s', toc(telemetry_t0), 'status', 'success', 'run_id', telemetry_rid, ...
+               'sim_stats', run_record), options);
 
     catch me_
         diary('off')   % do not keep logging into this run's log after it failed
+        % Debug outputs written before the error, with the error itself
+        generate_debug_report(parameters, me_);
         track_usage('run_error', parameters, struct( ...
             'duration_s', toc(telemetry_t0), ...
             'status',     'error', ...
             'run_id',     telemetry_rid, ...
-            'error_id',   me_.identifier), options);
+            'error_id',   me_.identifier, ...
+            'sim_stats',  run_stats('get')), options);   % stages done before the error
         rethrow(me_);
     end
 

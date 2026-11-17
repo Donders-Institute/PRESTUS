@@ -31,7 +31,7 @@ function [karray, tr] = create_matrix_karray(kgrid, karray, parameters, tr, elem
 %   kgrid      - kWaveGrid object
 %   karray     - kWaveArray object to which elements are added
 %   parameters - PRESTUS config; must contain medium_properties.water.sound_speed [m/s]
-%                and simulation.debug
+%                and the debug settings (DEBUG_ON)
 %   tr         - transducer geometry: tr.matrix.elem_shape, tr.matrix.curv_radius_mm [mm],
 %                tr.matrix.elem_height_mm [mm], tr.matrix.elem_width_mm [mm],
 %                tr.matrix.elem_p_amp, tr.freq_hz [Hz]; optional
@@ -206,7 +206,7 @@ end
     tr.matrix.elem_phase_deg = rad2deg(elem_phase_rad);
 
     % [DEBUG] visualize matrix element orientation
-    if parameters.simulation.debug == 1
+    if debug_on(parameters, 'source', 'figures')
         h = figure;
         hold on;
         axis equal;
@@ -261,7 +261,6 @@ end
     
         end
     
-        view(0, 0);
         xlabel('x [m]'); ylabel('y [m]'); zlabel('z [m]');
         title('Element Orientation Validation (Red = Euler, Green = Ground Truth)')
         grid on;
@@ -271,9 +270,7 @@ end
         base_name = sprintf('sub-%03d_%s_transducer_element_orientation%s', ...
             parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix);
     
-        saveas(h, fullfile(parameters.io.dir_debug_source, [base_name '.fig']))
-        saveas(h, fullfile(parameters.io.dir_debug_source, [base_name '.png']))
-    
-        close(h)
+        debug_save_figure(parameters, 'source', h, base_name, ...
+            'Matrix elements: orientation from Euler angles (red) against ground truth (green)', 'Views', {'beam', 'side', 'oblique'});
     end
 end

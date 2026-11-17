@@ -44,6 +44,16 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_placem
             tc.verifyEmpty(strfind(html, 'class="error-notice"'), 'A report section failed.');
         end
 
+        function test_flags_are_plain_tinted_boxes(tc)
+            % every .pl-flag rule: tint only, no coloured left accent bar
+            html = fileread(generate_placement_report(make_params(tc.TmpDir, 'manual')));
+            rules = regexp(html, '\.pl-flag[^{]*\{[^}]*\}', 'match');
+            tc.assertNotEmpty(rules, 'No .pl-flag rules found.');
+            for k = 1:numel(rules)
+                tc.verifyEmpty(regexp(rules{k}, 'border-(left|color)', 'once'), rules{k});
+            end
+        end
+
         function test_no_output_dir_skips_quietly(tc)
             p = make_params(tc.TmpDir, 'manual');
             p = rmfield(p, 'io');

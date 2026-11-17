@@ -166,7 +166,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_report
         function test_methods_text_jwave_states_resolved_pml(tc)
             p = local_make_subject_params(tc.tmp);
             p.acoustic_backend = 'jwave';
-            p.jwave = struct('solver', 'helmholtz', 'precision', 'single', 'pml_size', 'auto');
+            p.jwave = struct('solver', 'helmholtz', 'pml_size', 'auto');
             p.grid.pml_size = 'auto';
             p.grid.pml_size_effective = 24;
             txt = fileread(generate_simulation_report(p));
@@ -217,6 +217,83 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_report
             tc.verifyEmpty(strfind(j, '</'));
             tc.verifyEqual(jsondecode(j).label, '</script><script>alert(1)</script>');
             tc.verifyEqual(html_utils.escape('a''b'), 'a&#39;b');
+        end
+
+    end
+
+    % risk colours and style tokens
+    methods (Test, TestTags = {'reports'})
+
+        function test_risk_color_all_branches(tc)
+            % [] errored before: isnan([]) gives an empty operand to ||
+            tc.verifyEqual(risk_color([], 2), 'gray');
+            tc.verifyEqual(risk_color([], Inf), 'gray');
+            tc.verifyEqual(risk_color(NaN, 2), 'gray');
+            tc.verifyEqual(risk_color(1, Inf), 'info');
+            tc.verifyEqual(risk_color(3, 2), 'red');
+            tc.verifyEqual(risk_color(1, 2), 'amber');
+            tc.verifyEqual(risk_color(2, 2), 'amber');      % at the limit
+            tc.verifyEqual(risk_color(0.5, 2), 'green');
+        end
+
+        function test_css_tokens_are_defined(tc)
+            % every var(--name) in the report and group CSS resolves to a
+            % token defined there (--border and --mono did not exist)
+            root = fileparts(fileparts(which('risk_color')));
+            files = [dir(fullfile(root, 'report', '*.m')); dir(fullfile(root, 'group', '*.m'))];
+            src = cell(numel(files), 1);
+            for k = 1:numel(files)
+                src{k} = fileread(fullfile(files(k).folder, files(k).name));
+            end
+            t = regexp(strjoin(src, newline), '--([A-Za-z0-9-]+)\s*:', 'tokens');
+            defined = unique([t{:}]);
+            tc.assertNotEmpty(defined);
+            for k = 1:numel(files)
+                t = regexp(src{k}, 'var\(--([A-Za-z0-9-]+)', 'tokens');
+                if isempty(t); continue; end
+                used = unique([t{:}]);
+                tc.verifyEmpty(setdiff(used, defined), ...
+                    sprintf('%s uses undefined CSS tokens', files(k).name));
+            end
+            % negative control: an undefined token is caught
+            tc.verifyNotEmpty(setdiff({'mono'}, defined));
+        end
+
+        function test_css_has_no_left_accent_bar(tc)
+            % banners, callouts, flags, and cards are plain tinted boxes in
+            % the base CSS and in every skin (the base had 4px coloured
+            % left borders, a left inset shadow, and ::before bars)
+            sheets = {'css_styles_base', css_styles_base()};
+            skins = report_styles.names();
+            for k = 1:numel(skins)
+                sheets(end+1, :) = {skins{k}, ...
+                    report_styles.css(struct('name', skins{k}, 'switcher', false))}; %#ok<AGROW>
+            end
+            sheets(end+1, :) = {'switcher', ...
+                report_styles.css(struct('name', 'instrument', 'switcher', true))};
+            for k = 1:size(sheets, 1)
+                bars = local_left_bars(sheets{k, 2});
+                tc.verifyEmpty(bars, sprintf('left accent bar in %s CSS: %s', ...
+                    sheets{k, 1}, strjoin(bars, ' | ')));
+            end
+            % negative controls: each form of left bar is caught
+            bad = {'.a{border-left:4px solid var(--red)}', ...
+                   '.a{border-inline-start:2px solid var(--line)}', ...
+                   '.a{border-left:1px solid var(--info)}', ...
+                   '.a{border:0;border-left-color:var(--green)}', ...
+                   '.a{border-left-width:3px}', ...
+                   'tr td{box-shadow:inset 3px 0 0 var(--red)}', ...
+                   '.a::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px}'};
+            for k = 1:numel(bad)
+                tc.verifyNotEmpty(local_left_bars(bad{k}), sprintf('not caught: %s', bad{k}));
+            end
+            % allowed: thin neutral rule, full ring, full tinted border
+            ok = {'.a{border-left:1px solid var(--line)}', ...
+                  '.a{box-shadow:0 0 0 2px var(--red) inset}', ...
+                  '.a{border:1px solid color-mix(in srgb,var(--red) 30%,transparent)}'};
+            for k = 1:numel(ok)
+                tc.verifyEmpty(local_left_bars(ok{k}), sprintf('false positive: %s', ok{k}));
+            end
         end
 
     end
@@ -280,5 +357,59 @@ function ids = local_make_group_dir(sim)
         if ~exist(d, 'dir'); mkdir(d); end
         row = local_csv_row(ids(k), rises(k));
         writetable(row, fullfile(d, sprintf('sub-%03d_layered_test.csv', ids(k))));
+    end
+end
+
+function bars = local_left_bars(css)
+% Rules in css that draw a left accent bar: a border-left/border-inline-start
+% wider than 1px or coloured other than var(--line), a left inset box-shadow,
+% or an absolutely positioned narrow ::before/::after pinned to the left edge.
+    bars = {};
+    rules = regexp(css, '([^{}]+)\{([^{}]*)\}', 'tokens');
+    for r = 1:numel(rules)
+        sel = strtrim(rules{r}{1});
+        body = rules{r}{2};
+        decl = regexp(body, '(border-(?:left|inline-start)(?:-color|-width|-style)?)\s*:\s*([^;]*)', 'tokens');
+        for d = 1:numel(decl)
+            prop = decl{d}{1};
+            val = strtrim(regexprep(decl{d}{2}, '\s*!important', ''));
+            if endsWith(prop, '-style'); continue; end
+            w = str2double(regexp(val, '(\d*\.?\d+)px', 'tokens', 'once'));
+            colour = strtrim(regexprep(val, ...
+                '(\d*\.?\d+px|\<(solid|dashed|dotted|double|none|hidden|thin|medium|thick|0)\>)', ''));
+            if endsWith(prop, '-width')
+                colour = '';
+            elseif endsWith(prop, '-color')
+                w = NaN;
+                colour = val;
+            end
+            if any(strcmp(val, {'0', 'none'})); continue; end
+            if (~isnan(w) && w > 1) || any(strcmp(val, {'medium', 'thick'})) ...
+                    || (~isempty(colour) && ~strcmp(colour, 'var(--line)'))
+                bars{end+1} = sprintf('%s{%s:%s}', sel, prop, val); %#ok<AGROW>
+            end
+        end
+        sh = regexp(body, 'box-shadow\s*:\s*([^;]*)', 'tokens');
+        for s = 1:numel(sh)
+            parts = strsplit(sh{s}{1}, ',');
+            for p = 1:numel(parts)
+                if ~contains(parts{p}, 'inset'); continue; end
+                xy = regexp(strtrim(strrep(parts{p}, 'inset', '')), ...
+                    '^(-?\d*\.?\d+)(?:px)?\s+(-?\d*\.?\d+)(?:px)?\s+(-?\d*\.?\d+)(?:px)?', 'tokens', 'once');
+                if ~isempty(xy) && str2double(xy{1}) > 0 && str2double(xy{2}) == 0
+                    bars{end+1} = sprintf('%s{box-shadow:%s}', sel, sh{s}{1}); %#ok<AGROW>
+                end
+            end
+        end
+        if ~isempty(regexp(sel, '::?(before|after)', 'once')) ...
+                && ~isempty(regexp(body, 'position\s*:\s*absolute', 'once')) ...
+                && ~isempty(regexp(body, '(^|;)\s*left\s*:\s*0', 'once')) ...
+                && ~isempty(regexp(body, '(^|;)\s*top\s*:\s*0', 'once')) ...
+                && ~isempty(regexp(body, '(^|;)\s*bottom\s*:\s*0', 'once'))
+            w = str2double(regexp(body, '(?:^|;)\s*width\s*:\s*(\d*\.?\d+)px', 'tokens', 'once'));
+            if ~isnan(w) && w <= 10
+                bars{end+1} = sprintf('%s{%s}', sel, body); %#ok<AGROW>
+            end
+        end
     end
 end

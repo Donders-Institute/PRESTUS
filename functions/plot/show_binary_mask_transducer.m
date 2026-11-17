@@ -31,9 +31,11 @@ function show_binary_mask_transducer(karray, kgrid, parameters)
         h = figure('Name', '3D Transducer Binary Mask');
         hold on;
 
-        % Extract isosurface from binary mask
-        p = patch(isosurface(source_mask, 0.5));  % 0.5 is the threshold for binary mask
-        isonormals(source_mask, p);  % Add surface normals for better visualization
+        % Extract isosurface from binary mask. isosurface reads a volume in
+        % meshgrid order (first dimension = y), so permute to keep x = grid dim 1
+        mask_xy = permute(source_mask, [2 1 3]);
+        p = patch(isosurface(mask_xy, 0.5));  % 0.5 is the threshold for binary mask
+        isonormals(mask_xy, p);  % Add surface normals for better visualization
 
         set(p, 'FaceColor', 'r', 'EdgeColor', 'none');
 
@@ -44,11 +46,8 @@ function show_binary_mask_transducer(karray, kgrid, parameters)
         xlabel('x-grid'); ylabel('y-grid'); zlabel('z-grid');
         title('3D Visualization of Transducer Binary Mask');
 
-        % Save figure
-        saveas(h, fullfile(parameters.io.dir_debug_source, [base_filename '.fig']));
-        saveas(h, fullfile(parameters.io.dir_debug_source, [base_filename '.png']));
-
-        close(h);
+        debug_save_figure(parameters, 'source', h, base_filename, ...
+            'Transducer binary mask in the simulation grid', 'Views', {'beam', 'side', 'oblique'});
     else
         % -----------------------------------------------------------------
         % 2D visualization
@@ -62,9 +61,7 @@ function show_binary_mask_transducer(karray, kgrid, parameters)
         colorbar;
         title('Transducer Binary Mask in Simulation Grid');
 
-        % Save figure
-        saveas(h, fullfile(parameters.io.dir_debug_source, [base_filename '.png']));
-
-        close(h);
+        debug_save_figure(parameters, 'source', h, base_filename, ...
+            'Transducer binary mask in the simulation grid');
     end
 end

@@ -29,7 +29,6 @@ function limits = get_risk_limits(is_layered)
         % Safety board can show both MI tiles side by side; with no MI_tc
         % column in a water-medium CSV it naturally renders as N/A (gray).
         limits.MI_tc = struct('label', 'MI (transcranial)', 'limit', 1.9, 'unit', '');
-        limits.Psptp = struct('label', 'Max pressure',     'limit', 2e6, 'unit', 'Pa');
         limits.TIC   = struct('label', 'Cranial TI (TIC)', 'limit', Inf, 'unit', '');
         return
     end
@@ -46,9 +45,6 @@ function limits = get_risk_limits(is_layered)
     limits.MI_brain = struct('label', 'MI (brain)',        'limit', 1.9, 'unit', '');
     limits.MI_skull = struct('label', 'MI (skull)',        'limit', 1.9, 'unit', '');
     limits.MI_skin  = struct('label', 'MI (skin)',         'limit', 1.9, 'unit', '');
-
-    % Peak pressure (kept below 2 MPa)
-    limits.Psptp = struct('label', 'Max pressure', 'limit', 2e6, 'unit', 'Pa');
 
     % Cranial Thermal Index (IEC 62359) — informational, no hard ITRUSST limit
     limits.TIC      = struct('label', 'Cranial TI (TIC)',  'limit', Inf, 'unit', '');

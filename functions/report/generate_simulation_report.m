@@ -34,7 +34,7 @@ try
         affix = parameters.io.output_affix;
     end
 
-    % Visual skin (modules.report_style / report_style_switcher)
+    % Visual skin (report.style / report.style_switcher)
     style_opts = report_styles.options(parameters);
 
     report_filename = sprintf('sub-%03d_%s_report%s.html', subject_id, medium, affix);
@@ -85,28 +85,28 @@ try
         html_parts{end+1} = html_utils.section_error('Safety verdict', ME);
     end
 
-    % Section 1: Safety dashboard (ITRUSST-limited metrics only)
+    % Safety dashboard (ITRUSST-limited metrics only)
     try
         html_parts{end+1} = build_safety_dashboard(csv_table, parameters, is_layered);
     catch ME
         html_parts{end+1} = html_utils.section_error('Safety dashboard', ME);
     end
 
-    % Section 1b: Other (informational) exposure metrics
+    % Other (informational) exposure metrics
     try
         html_parts{end+1} = build_other_metrics(csv_table, parameters, is_layered);
     catch ME
         html_parts{end+1} = html_utils.section_error('Other exposure metrics', ME);
     end
 
-    % Section 2: Header (always open, no toggle)
+    % Header (always open, no toggle)
     try
         html_parts{end+1} = build_header(subject_id, medium, affix, parameters, is_layered);
     catch ME
         html_parts{end+1} = html_utils.section_error('Header', ME);
     end
 
-    % Section 3: Methods Boilerplate (collapsed by default)
+    % Methods Boilerplate (collapsed by default)
     try
         html_parts{end+1} = html_utils.collapsible('Methods', ...
             build_methods_boilerplate(parameters, is_layered, csv_table), false, 'methods');
@@ -114,14 +114,14 @@ try
         html_parts{end+1} = html_utils.section_error('Methods', ME);
     end
 
-    % Section 4 (formerly 3): Simulation Summary (always open, no toggle)
+    % Simulation Summary (always open, no toggle)
     try
         html_parts{end+1} = build_simulation_summary(csv_table, parameters, is_layered);
     catch ME
         html_parts{end+1} = html_utils.section_error('Simulation Summary', ME);
     end
 
-    % Section 5: Configuration Summary (collapsed by default)
+    % Configuration Summary (collapsed by default)
     try
         html_parts{end+1} = html_utils.collapsible('Configuration Summary', ...
             [build_config_summary(parameters, csv_table) ...
@@ -131,7 +131,7 @@ try
         html_parts{end+1} = html_utils.section_error('Configuration Summary', ME);
     end
 
-    % Section 5: Medium Properties (layered only, collapsed by default)
+    % Medium Properties (layered only, collapsed by default)
     if is_layered
         try
             html_parts{end+1} = html_utils.collapsible('Medium Properties', ...
@@ -141,7 +141,7 @@ try
         end
     end
 
-    % Section 6: pseudoCT [Optional] (collapsed by default)
+    % pseudoCT [Optional] (collapsed by default)
     try
         if pct_skull_mapped(parameters)
             html_parts{end+1} = html_utils.collapsible('pseudo-CT', ...
@@ -152,7 +152,7 @@ try
         html_parts{end+1} = html_utils.section_error('pseudo-CT', ME);
     end
 
-    % Section 7: Positioning (open by default)
+    % Positioning (open by default)
     try
         html_parts{end+1} = html_utils.collapsible('Transducer Positioning', ...
             build_positioning_section(parameters, subject_id, affix), true, 'positioning');
@@ -160,7 +160,7 @@ try
         html_parts{end+1} = html_utils.section_error('Positioning', ME);
     end
 
-    % Section 8: Acoustic Results (open by default)
+    % Acoustic Results (open by default)
     try
         html_parts{end+1} = html_utils.collapsible('Acoustic Results', ...
             build_acoustic_section(csv_table, parameters, subject_id, medium, affix, is_layered), true, 'acoustic');
@@ -168,7 +168,7 @@ try
         html_parts{end+1} = html_utils.section_error('Acoustic Results', ME);
     end
 
-    % Section 9: Thermal Results (open by default, conditional)
+    % Thermal Results (open by default, conditional)
     try
         if isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims
             html_parts{end+1} = html_utils.collapsible('Thermal Results', ...
@@ -178,17 +178,17 @@ try
         html_parts{end+1} = html_utils.section_error('Thermal Results', ME);
     end
 
-    % Section 10: Debug Information (collapsed by default, layered only)
+    % Diagnostics — links to the segmentation and debug reports
     try
-        if isfield(parameters.simulation, 'debug') && parameters.simulation.debug && is_layered
-            html_parts{end+1} = html_utils.collapsible('Debug Information', ...
+        if has_diagnostics(parameters, is_layered)
+            html_parts{end+1} = html_utils.collapsible('Diagnostics', ...
                 build_debug_section(parameters, subject_id, medium, affix), false, 'debug');
         end
     catch ME
-        html_parts{end+1} = html_utils.section_error('Debug Information', ME);
+        html_parts{end+1} = html_utils.section_error('Diagnostics', ME);
     end
 
-    % Section 11: Post-hoc Water Simulation (collapsed by default, layered only)
+    % Post-hoc Water Simulation (collapsed by default, layered only)
     if is_layered
         try
             html_parts{end+1} = html_utils.collapsible('Post-hoc Water Simulation', ...
@@ -198,7 +198,7 @@ try
         end
     end
 
-    % Section 12: Performance (collapsed by default)
+    % Performance (collapsed by default)
     try
         html_parts{end+1} = html_utils.collapsible('Performance', ...
             build_performance_section(parameters, subject_id, medium, affix), false, 'performance');
@@ -206,7 +206,7 @@ try
         html_parts{end+1} = html_utils.section_error('Performance', ME);
     end
 
-    % Section 13: Log (collapsed by default)
+    % Log (collapsed by default)
     try
         html_parts{end+1} = html_utils.collapsible('Log', ...
             build_log_section(parameters, subject_id, medium, affix), false, 'log');
@@ -275,7 +275,7 @@ function html = build_safety_dashboard(csv_table, parameters, is_layered)
             case 'thermal',    therm_keys{end+1} = metric_names{i}; %#ok<AGROW>
         end
     end
-    html = [html render_dash_group(mech_keys, 'mech', 'Mechanical', 'mechanical index (MI) &amp; peak pressure', ...
+    html = [html render_dash_group(mech_keys, 'mech', 'Mechanical', 'mechanical index (MI)', ...
         limits, csv_table, use_cem43_iso, cem43_iso_map)];
     html = [html render_dash_group(therm_keys, 'th', 'Thermal', 'temperature &amp; dose', ...
         limits, csv_table, use_cem43_iso, cem43_iso_map)];
@@ -295,7 +295,7 @@ end
 
 function html = build_other_metrics(csv_table, parameters, is_layered)
 % Informational exposure metrics (no ITRUSST NSR limit): TIC, ISPPA (global /
-% per tissue) and peak pressure. Rendered as a flat grid in its own section.
+% per tissue). Rendered as a flat grid in its own section.
     limits = get_risk_limits(is_layered);
     metric_names = fieldnames(limits);
     [use_iso, iso_map] = local_cem43_iso(parameters);
@@ -312,7 +312,7 @@ function html = build_other_metrics(csv_table, parameters, is_layered)
         return
     end
     html = [html render_dash_group(other_keys, 'other', '', '', limits, csv_table, use_iso, iso_map)];
-    html = [html '<p class="safety-footnote">These intensity, pressure and output-display indices have ' ...
+    html = [html '<p class="safety-footnote">These intensity and output-display indices have ' ...
             'no ITRUSST non-significant-risk limit and are shown for reference only.</p>'];
     html = [html '</section>'];
 end
@@ -340,9 +340,6 @@ function html = render_dash_group(keys, dom_class, title, subtitle, limits, csv_
             if isnumeric(val) && ~isempty(val)
                 value = val(end);
             end
-        end
-        if strcmp(name, 'Psptp') && ~isnan(value)
-            [value, display_unit] = scale_pressure(value);
         end
         color = risk_color(value, info.limit);
         flagcls = ''; flagbadge = '';
@@ -376,11 +373,11 @@ end
 function g = metric_group(name, info)
 % Classify a metric for the dashboard split:
 %   'other'      — informational (no finite ITRUSST limit; e.g. TIC, ISPPA)
-%   'mechanical' — MI family (transcranial / per-tissue mechanical index) or peak pressure
+%   'mechanical' — MI family (transcranial / per-tissue mechanical index)
 %   'thermal'    — temperature / dose ITRUSST metrics (riseT, riseT37, maxT, CEM43)
     if isinf(info.limit)
         g = 'other';
-    elseif startsWith(name, 'MI') || strcmp(name, 'Psptp')
+    elseif startsWith(name, 'MI')
         g = 'mechanical';
     else
         g = 'thermal';
@@ -411,7 +408,6 @@ function s = metric_tooltip(name, info)
         case 'Isppa_brain', d = '<b>I<sub>SPPA</sub> (brain)</b> &mdash; spatial-peak pulse-average intensity in brain.';
         case 'Isppa_skull', d = '<b>I<sub>SPPA</sub> (skull)</b> &mdash; spatial-peak pulse-average intensity in bone.';
         case 'Isppa_skin',  d = '<b>I<sub>SPPA</sub> (skin)</b> &mdash; spatial-peak pulse-average intensity in skin.';
-        case 'Psptp',    d = '<b>P<sub>sptp</sub></b> &mdash; spatial-peak temporal-peak pressure.';
         case 'maxT_brain', d = '<b>T<sub>max</sub> (brain)</b> &mdash; peak absolute temperature in brain.';
         case 'maxT_skull', d = '<b>T<sub>max</sub> (skull)</b> &mdash; peak absolute temperature in bone.';
         case 'maxT_skin',  d = '<b>T<sub>max</sub> (skin)</b> &mdash; peak absolute temperature in skin.';
@@ -510,8 +506,9 @@ function html = build_header(subject_id, medium, affix, parameters, is_layered)
         html = [html sprintf('<tr><th>Affix</th><td>%s</td></tr>', html_utils.escape(affix))];
     end
     html = [html sprintf('<tr><th>Generated</th><td>%s</td></tr>', datestr(now, 'yyyy-mm-dd HH:MM:SS'))];
-    prestus_v = get_prestus_version(parameters);
+    [prestus_v, prestus_detail] = get_prestus_version(parameters);
     if ~isempty(prestus_v)
+        if ~isempty(prestus_detail), prestus_v = sprintf('%s (%s)', prestus_v, prestus_detail); end
         html = [html sprintf('<tr><th>PRESTUS version</th><td>%s</td></tr>', html_utils.escape(prestus_v))];
     end
     kwave_v = get_kwave_version(parameters);
@@ -711,16 +708,12 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
                                strcmpi(parameters.acoustic_backend, 'jwave');
 
     jw_solver      = '';
-    jw_precision   = '';
     jw_fd_accuracy = NaN;
     jw_compute     = '';
     if use_jwave_acoustic && isfield(parameters, 'jwave')
         jw = parameters.jwave;
         if isfield(jw, 'solver') && ~isempty(jw.solver)
             jw_solver = jw.solver;
-        end
-        if isfield(jw, 'precision') && ~isempty(jw.precision)
-            jw_precision = jw.precision;
         end
         if isfield(jw, 'fd_accuracy') && ~isempty(jw.fd_accuracy)
             jw_fd_accuracy = jw.fd_accuracy;
@@ -938,7 +931,17 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
             'interpolation, and the results were resampled back to the PRESTUS grid. '], ...
             grid_str, ppw_str, fmt(grid_res, '%.2g', '?'));
 
-        if isempty(bb_ct_mapping)
+        bb_shear_on = isfield(parameters, 'babelbrain') && isfield(parameters.babelbrain, 'shear') && ...
+            (ischar(parameters.babelbrain.shear) || isstring(parameters.babelbrain.shear)) && ...
+            strcmpi(parameters.babelbrain.shear, 'prestus_elastic');
+        if isempty(bb_ct_mapping) && bb_shear_on
+            mat_prop_str = [ ...
+                'Bone was modelled as an elastic solid with the shear wave speed, shear '    ...
+                'attenuation and longitudinal attenuation of the PRESTUS elastic skull '     ...
+                'model at the drive frequency, and BabelBrain&#x2019;s built-in material '   ...
+                'table was replaced by the PRESTUS tissue properties listed below, so that ' ...
+                'skull properties matched those of the k-Wave elastic solver. '];
+        elseif isempty(bb_ct_mapping)
             mat_prop_str = [ ...
                 'Bone was modelled as a fluid (shear wave speed set to zero), and '          ...
                 'BabelBrain&#x2019;s built-in material table was replaced by the PRESTUS '    ...
@@ -979,7 +982,6 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
             medium_desc, seg_sentence, skull_sentence, props_sentence, gpu_str);
     elseif use_jwave_acoustic
         solver_str    = iff(~isempty(jw_solver),    html_utils.escape(jw_solver),    'helmholtz');
-        precision_str = iff(~isempty(jw_precision), html_utils.escape(jw_precision), 'single');
         % PML: jwave reads grid.pml_size; the resolved
         % thickness is recorded in grid.pml_size_effective by acoustic_stage.
         pml_str = fmt_pml(pml);
@@ -993,7 +995,7 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
             'Acoustic pressure field propagation was modelled in %dD '                  ...
             'using j-Wave %s(Stanziola et al., 2023), a JAX-based open-source '         ...
             'differentiable wave simulator. '                                            ...
-            'The %s solver was used with %s-precision (float%s) arithmetic, '           ...
+            'The %s solver was used with single-precision (float32) arithmetic, '       ...
             'on a %s&#8201;mm isotropic Cartesian grid '                                ...
             '(perfectly matched layer thickness: %s grid points). %s%s%s'               ...
             'The medium was represented as %s.%s%s%s '                                  ...
@@ -1003,8 +1005,7 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
             b(['Acoustic simulation and ' em('in situ') ' exposure estimates.']),        ...
             n_dims,                                                                      ...
             jw_ver_str,                                                                  ...
-            solver_desc, precision_str,                                                  ...
-            iff(strcmpi(precision_str,'single'),'32','64'),                              ...
+            solver_desc,                                                                 ...
             fmt(grid_res, '%.2g', '?'),                                                 ...
             pml_str, jw_timing_sentence, jw_window_sentence, compute_str,               ...
             medium_desc, seg_sentence, skull_sentence, props_sentence);
@@ -1166,11 +1167,40 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
     para6 = build_exposure_results_sentence(csv_table, is_layered, run_thermal, use_cem43_iso);
 
     % ------------------------------------------------------------------ %
+    %  7. Output spaces (MNI maps: layered media with NIfTI creation and io.save_MNI)
+    % ------------------------------------------------------------------ %
+    save_mni = is_layered && isfield(parameters, 'io') && ...
+        should_save_output(parameters.io, 'save_MNI') && ...
+        ~(isfield(parameters, 'modules') && isfield(parameters.modules, 'run_nifti_creation') && ...
+          ~parameters.modules.run_nifti_creation);
+    para7 = '';
+    if save_mni
+        simnibs_ver_txt = '';
+        if isfield(parameters, 'simnibs_version') && ~isempty(parameters.simnibs_version) && ...
+                ~strcmpi(parameters.simnibs_version, 'unknown')
+            simnibs_ver_txt = [' ' html_utils.escape(char(parameters.simnibs_version))];
+        end
+        % SimNIBS resamples onto its templates/MNI152_T1_1mm.nii.gz, which is
+        % FSL's MNI152_T1_1mm (shape, affine and data identical; checked for SimNIBS 4.1.0).
+        para7 = sprintf([...
+            '%s Output maps were written in the native T1-weighted image space '     ...
+            'and, in addition, transformed to MNI space with the nonlinear '          ...
+            'transformation estimated by SimNIBS%s ' em('charm') ' ('                 ...
+            em('subject2mni') '), resampled onto the 1&#8201;mm FSL MNI ICBM 152 '    ...
+            'non-linear 6th generation asymmetric template (Evans et al., 2012; '     ...
+            'TemplateFlow ID: MNI152NLin6Asym).'],                                    ...
+            b('Output spaces.'), simnibs_ver_txt);
+    end
+
+    % ------------------------------------------------------------------ %
     %  Assemble single text block
     % ------------------------------------------------------------------ %
     paras = {para0, para1, para2, para3, para4};
     if run_thermal
         paras{end+1} = para5;
+    end
+    if ~isempty(para7)
+        paras{end+1} = para7;
     end
     if ~isempty(para6)
         paras{end+1} = [b('Simulated exposure.') ' ' para6];
@@ -1194,7 +1224,8 @@ function html = build_methods_boilerplate(parameters, is_layered, csv_table)
         'run_thermal',             run_thermal,             ...
         'use_cem43_iso',           run_thermal && use_cem43_iso, ...
         'use_babelbrain_thermal',  use_babelbrain_thermal,  ...
-        'use_pct',                 use_pct);
+        'use_pct',                 use_pct,                 ...
+        'save_mni',                save_mni);
     refs_html = build_references_block(ref_flags);
 
     if ~isempty(prestus_ver)
@@ -1272,6 +1303,15 @@ function html = build_references_block(f)
             ['Puonti, O., Van Leemput, K., Saturnino, G. B., Siebner, H. R., Madsen, K. H., &amp; Thielscher, A. (2020). Reproducible and automated T1-only segmentation of the brain and skull using the SimNIBS <em>charm</em> pipeline. ' ...
             '<em>NeuroImage</em>, <strong>204</strong>, 116237. ' ...
             '<a href="https://doi.org/10.1016/j.neuroimage.2019.116237" target="_blank" rel="noopener">https://doi.org/10.1016/j.neuroimage.2019.116237</a>']);
+    end
+
+    % MNI template of the MNI-space output maps
+    if isfield(f, 'save_mni') && f.save_mni
+        refs{end+1} = ref( ...
+            'Evans et al., 2012', ...
+            ['Evans, A. C., Janke, A. L., Collins, D. L., &amp; Baillet, S. (2012). Brain templates and atlases. ' ...
+            '<em>NeuroImage</em>, <strong>62</strong>, 911&#8211;922. ' ...
+            '<a href="https://doi.org/10.1016/j.neuroimage.2012.01.024" target="_blank" rel="noopener">https://doi.org/10.1016/j.neuroimage.2012.01.024</a>']);
     end
 
     % Thermal
@@ -1468,10 +1508,38 @@ function s = build_exposure_results_sentence(csv_table, is_layered, run_thermal,
 end
 
 
-function v = get_prestus_version(parameters)
-% Read PRESTUS version from VERSION file next to this function's directory.
-% Returns version string (e.g. 'v0.6.1') or empty string if not found.
+function [v, detail] = get_prestus_version(parameters)
+% PRESTUS version of the code that ran the simulation: io.prestus_version
+% (recorded by path_log_setup), else the current checkout (git describe),
+% else the VERSION file. Returns the version string (e.g.
+% 'v0.6.1-406-g881e7082') and a detail string with commit, commit date and
+% uncommitted changes, or empty strings if not found.
+    % parameters.version overrides everything (non-standard installs).
     v = '';
+    detail = '';
+    info = [];
+    if isfield(parameters, 'io') && isfield(parameters.io, 'prestus_version') && ...
+            isstruct(parameters.io.prestus_version)
+        info = parameters.io.prestus_version;
+    else
+        try
+            [~, ~, info] = prestus_version();
+        catch
+        end
+    end
+    if ~isempty(info) && ~strcmp(info.version, 'unknown')
+        v = info.version;
+        detail = sprintf('commit %s, %s', info.commit, info.commit_date);
+        if strcmp(info.dirty, 'yes'), detail = [detail ', with uncommitted changes']; end
+        if ~isfield(parameters, 'io') || ~isfield(parameters.io, 'prestus_version')
+            detail = [detail '; read at report time, not recorded by the run'];
+        end
+    end
+    if isfield(parameters, 'version') && ischar(parameters.version) && ~isempty(parameters.version)
+        v = parameters.version;
+        detail = '';
+    end
+    if ~isempty(v), return; end
     try
         this_dir = fileparts(mfilename('fullpath'));   % functions/report/
         repo_root = fullfile(this_dir, '..', '..');    % PRESTUS root
@@ -1483,10 +1551,6 @@ function v = get_prestus_version(parameters)
             end
         end
     catch
-    end
-    % Also allow override via parameters.version for non-standard installs
-    if isfield(parameters, 'version') && ischar(parameters.version) && ~isempty(parameters.version)
-        v = parameters.version;
     end
 end
 
@@ -2030,7 +2094,7 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
 
         % Intensity on segmentation: acoustic_analysis writes per-slice
         % _x/_y/_z files for 3D grids and a single no-dim file for 2D. Probe
-        % both (fix for the previously missing 3D segmentation overlay).
+        % both.
         html = [html html_utils.embed_image_dims(parameters.io.dir_img, ...
             sprintf('sub-%03d_%s_intensity', subject_id, medium), ...
             sprintf('%s%s', t_suffix, affix), ...
@@ -2135,8 +2199,7 @@ function html = build_thermal_section(csv_table, parameters, subject_id, medium,
 
     html = [html '<div class="image-grid">'];
     % Max-temperature anatomical overlay: thermal_analysis writes per-slice
-    % _x/_y/_z files for 3D grids and a single no-dim file for 2D. Probe both
-    % (this is the fix for the previously missing heating overlay in 3D runs).
+    % _x/_y/_z files for 3D grids and a single no-dim file for 2D. Probe both.
     html = [html html_utils.embed_image_dims(td, ...
         sprintf('sub-%03d_%s_maxT', subject_id, medium), affix, ...
         'Max temperature overlay', 'Max temperature overlay')];
@@ -2159,75 +2222,45 @@ function html = build_thermal_section(csv_table, parameters, subject_id, medium,
 
 end
 
-function html = build_debug_section(parameters, subject_id, medium, affix)
-    html = '';
+function tf = has_diagnostics(parameters, is_layered)
+% Diagnostics section: with debug outputs or a segmentation report
+    seg = is_layered;
+    if isfield(parameters, 'report') && isfield(parameters.report, 'segmentation') && ~isempty(parameters.report.segmentation)
+        seg = seg && isequal(double(parameters.report.segmentation), 1);
+    end
+    tf = seg || debug_on(parameters);
+end
 
-    debug_dir_preproc = '';
-    debug_dir_medium  = '';
-    if isfield(parameters.io, 'debug_dir_preproc')
-        debug_dir_preproc = parameters.io.dir_debug_preproc;
-    elseif isfield(parameters.io, 'debug_dir')
-        debug_dir_preproc = fullfile(parameters.io.dir_debug, 'preproc');
+function html = build_debug_section(parameters, subject_id, medium, affix)
+% Links to the stand-alone segmentation and debug reports, which hold the
+% head-model postprocessing steps and every debug output of the run
+    report_dir = parameters.io.dir_reports;
+    items = {
+        sprintf('sub-%03d_%s_segmentation_report%s.html', subject_id, medium, affix), ...
+            'Segmentation report', ...
+            'how the SimNIBS segmentation became the simulation medium, step by step (report.segmentation)'
+        sprintf('sub-%03d_%s_debug_report%s.html', subject_id, medium, affix), ...
+            'Debug report', ...
+            'all debug figures and volumes of this run, by stage (simulation.debug, report.debug)'
+        };
+    % the debug report is written after this one, at the end of the run
+    debug_expected = debug_on(parameters) && ~(isfield(parameters, 'report') && ...
+        isfield(parameters.report, 'debug') && isequal(double(parameters.report.debug), 0));
+    expected = [false, debug_expected];
+    rows = {};
+    for i = 1:size(items, 1)
+        f = fullfile(report_dir, items{i, 1});
+        if isfile(f) || expected(i)
+            rows{end+1} = sprintf('<tr><td><a href="%s">%s</a></td><td>%s</td></tr>', ...
+                html_utils.escape(report_link(f, report_dir)), items{i, 2}, html_utils.escape(items{i, 3})); %#ok<AGROW>
+        end
     end
-    if isfield(parameters.io, 'debug_dir_medium')
-        debug_dir_medium = parameters.io.dir_debug_medium;
-    elseif isfield(parameters.io, 'debug_dir')
-        debug_dir_medium = fullfile(parameters.io.dir_debug, 'medium');
-    end
-    if isempty(debug_dir_preproc) || ~isfolder(debug_dir_preproc)
-        html = '<p class="placeholder">Debug directory not found.</p>';
+    if isempty(rows)
+        html = ['<p class="placeholder">No segmentation or debug report found next to this report ' ...
+            '(the debug report is written at the end of the run).</p>'];
         return
     end
-
-    n_trans = 1;
-    if isfield(parameters, 'transducer')
-        n_trans = numel(parameters.transducer);
-    end
-    % Sync: segmentation is computed on a shared grid — no trans-XX suffix.
-    n_seg_imgs = n_trans;
-    if n_trans > 1 && ~is_async_mode(parameters)
-        n_seg_imgs = 1;
-    end
-
-    % Preprocessing debug images
-    preproc_images = {
-        'sub-%03d_t1w_rotated_scaled%s.png',          'T1w rotation & scaling';
-        'sub-%03d_segmented_rotated_scaled%s.png',   'Segmentation rotation & scaling';
-        'sub-%03d_rotated_scaled_orig%s.png',        'Bone mask rotation & scaling';
-        'sub-%03d_t1w_skin_skull%s.png',             'T1w skin/skull overlay';
-    };
-
-    html = [html '<div class="image-grid image-grid--narrow">'];
-    for i = 1:size(preproc_images, 1)
-        img_path = fullfile(debug_dir_preproc, sprintf(preproc_images{i,1}, subject_id, affix));
-        img_html = html_utils.embed_image(img_path, preproc_images{i,2}, preproc_images{i,2});
-        if ~isempty(img_html)
-            html = [html img_html];
-        end
-    end
-
-    % Per-transducer debug images
-    for t = 1:n_seg_imgs
-        seg_trans_suffix = trans_suffix(t, n_seg_imgs);
-        img_path = fullfile(debug_dir_preproc, ...
-            sprintf('sub-%03d_%s_segmented_brain_final%s%s.png', subject_id, medium, seg_trans_suffix, affix));
-        img_html = html_utils.embed_image(img_path, sprintf('Final segmentation%s', seg_trans_suffix), ...
-            sprintf('Final segmentation%s', seg_trans_suffix));
-        if ~isempty(img_html)
-            html = [html img_html];
-        end
-    end
-
-    % Attenuation fit (medium stage)
-    if ~isempty(debug_dir_medium) && isfolder(debug_dir_medium)
-        img_path = fullfile(debug_dir_medium, sprintf('attenuation_fit%s.png', affix));
-        img_html = html_utils.embed_image(img_path, 'Attenuation fit', 'Attenuation fit');
-        if ~isempty(img_html)
-            html = [html img_html];
-        end
-    end
-
-    html = [html '</div>'];
+    html = ['<table class="data-table"><tbody>' strjoin(rows, '') '</tbody></table>'];
 end
 
 function html = build_posthoc_section(parameters)
@@ -2305,7 +2338,7 @@ function html = build_pseudoCT_section(parameters)
     if isfield(parameters.io, 'output_affix')
         affix = parameters.io.output_affix;
     end
-    if isfield(parameters.io, 'debug_dir_medium')
+    if isfield(parameters.io, 'dir_debug_medium')
         debug_path = parameters.io.dir_debug_medium;
     else
         debug_path = fullfile(parameters.io.dir_output, 'debug', 'medium');
@@ -2524,8 +2557,8 @@ function html = build_toc(parameters, is_layered, extra_html)
     if isfield(parameters.modules, 'run_heating_sims') && parameters.modules.run_heating_sims
         html = [html '<a href="#thermal">Thermal</a>'];
     end
-    if isfield(parameters.simulation, 'debug') && parameters.simulation.debug && is_layered
-        html = [html '<a href="#debug">Debug</a>'];
+    if has_diagnostics(parameters, is_layered)
+        html = [html '<a href="#debug">Diagnostics</a>'];
     end
     if is_layered
         html = [html '<a href="#posthoc">Post-hoc</a>'];

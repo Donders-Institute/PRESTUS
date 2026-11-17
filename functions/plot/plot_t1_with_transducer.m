@@ -1,10 +1,9 @@
 function [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, trans_pos_grid, focus_pos_grid, parameters, plot_options)
-
 % PLOT_T1_WITH_TRANSDUCER  Plot a T1 slice with transducer mask overlaid
 %
-% Generates a visualisation of a T1 image slice oriented along the
-% transducer axis, with the transducer bowl mask and focus position
-% overlaid as an RGB image.
+% Generates a visualisation of a T1 image slice along slice_dim (default:
+% through the transducer position), with the transducer bowl mask and focus
+% position overlaid as an RGB image.
 %
 % Use as:
 %   [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, ...
@@ -92,7 +91,8 @@ function [res_image, tr] = plot_t1_with_transducer(t1_image, voxel_size_mm, tran
     res_image(focus_pos_grid(focus_pos_ind(1)) + (-2:2), ... % Draw square around focus position in green channel
               focus_pos_grid(focus_pos_ind(2)) + (-2:2), ...
               2) = 1;
-    catch warn('Boxes may be out of bounds...');
+    catch
+        warn('Boxes may be out of bounds...');
     end
 
 end
