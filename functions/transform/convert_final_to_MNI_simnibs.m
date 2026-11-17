@@ -99,9 +99,8 @@ function convert_simnibs(input_list, output_list, n, m2m_folder, parameters, opt
         simnibs_names{k} = strrep(output_list{k}, '.nii.gz', '_MNI.nii.gz');
     end
 
-    % Each conversion runs in the foreground and is checked. Background runs
-    % discard their output and cannot report a failure, so a missing volume used
-    % to end the job as "completed". run_command invokes subject2mni directly via
+    % Each conversion runs in the foreground and is checked, so a missing
+    % volume raises an error. run_command invokes subject2mni directly via
     % argv, so input/output/m2m paths reach the process as literal arguments.
     failed = {};
     for k = 1:n
@@ -198,7 +197,8 @@ function convert_native(input_list, output_list, n, m2m_folder, options)
 
     % --- Process each image ---
     for k = 1:n
-        restore = set_writable_tmpdir(input_list{k});
+        % temporary unzip next to the output: the input may sit in a read-only m2m folder
+        restore = set_writable_tmpdir(output_list{k});
         in_info = niftiinfo(input_list{k});
         in_data = single(niftiread(in_info));
         in_A    = in_info.Transform.T';
@@ -261,8 +261,9 @@ end
 
 % -------------------------------------------------------------------------
 function restore_fn = set_writable_tmpdir(ref_file)
-% Point TMPDIR at the directory containing ref_file so that niftiinfo can
-% unzip .nii.gz files even when the system tempdir is not writable (e.g. HPC).
+% Point TMPDIR at the directory containing ref_file (when it exists) so that
+% niftiinfo can unzip .nii.gz files even when the system tempdir is not
+% writable (e.g. HPC).
     prev = getenv('TMPDIR');
     candidate = fileparts(ref_file);
     if ~isempty(candidate) && isfolder(candidate)

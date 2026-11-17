@@ -1,5 +1,4 @@
 function parameters = preproc_segmentation(parameters)
-
 % PREPROC_SEGMENTATION  Segment structural MRI using SimNIBS
 %
 % Locates T1 (and optionally T2/UTE/CT) images following BIDS naming,
@@ -118,16 +117,21 @@ end
             check_pct_sidecar(pct_dir, parameters);
         else
             fprintf('[preproc_segmentation] %s\n', 'Starting pseudoCT generation...');
+            log_timer('start', 'pct');       % run_stats: stage_pct_s (part of the segmentation stage)
             pct_create_pCT_run(parameters);
+            log_timer('stop', 'pct');
         end
     end
 
     %% MNI SPACE T1
-    % charm does not produce a T1-in-MNI image, so create one post-hoc
+    % charm does not produce a T1-in-MNI image, so create one post-hoc,
+    % outside the m2m folder (GET_T1_MNI_FILE)
     if ~strcmp(parameters.simulation.medium, 'phantom')
         path_to_input_img  = fullfile(segmentation_folder, 'T1.nii.gz');
-        path_to_output_img = fullfile(segmentation_folder, 'toMNI', 'T1_to_MNI_post-hoc.nii.gz');
+        path_to_output_img = get_t1_mni_file(parameters.path.seg, parameters.subject_id);
         if ~exist(path_to_output_img, 'file')
+            out_dir = fileparts(path_to_output_img);
+            if ~isfolder(out_dir); mkdir(out_dir); end
             mni_warp_method = 'simnibs';
             if isfield(parameters, 'analysis') && isfield(parameters.analysis, 'mni_warp_method')
                 mni_warp_method = parameters.analysis.mni_warp_method;
@@ -138,7 +142,8 @@ end
 
     %% DEFACED DERIVATIVE
     % Produces m2m_sub-NNN_defaced/ for sharing; original folder is unchanged.
-    % Runs after MNI registration so toMNI/T1_to_MNI_post-hoc.nii.gz is included.
+    % A T1-in-MNI image inside m2m (earlier outputs) is defaced too; the
+    % current one lives outside m2m (GET_T1_MNI_FILE) and is not copied.
     % Off by default — enable with parameters.segmentation.deface = 1.
     if isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'deface') && parameters.segmentation.deface
         preproc_deface_m2m(segmentation_folder, parameters);

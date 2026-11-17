@@ -24,7 +24,7 @@ function transducer_positioning_start(parameters, pn, target_name, mni_targets)
     end
 
     % ========== PLATFORM SELECTION ==========
-    if ~isfield(parameters, 'hpc') || ~isfield(parameters, 'platform') || strcmp(parameters.platform, 'auto')
+    if ~isfield(parameters, 'platform') || strcmp(parameters.platform, 'auto')
         platform = hpc_detect_system();
         parameters.platform = platform;
         fprintf('➤ auto-detected: %s\n', upper(platform));
@@ -34,14 +34,14 @@ function transducer_positioning_start(parameters, pn, target_name, mni_targets)
     end
 
     % ========== DISPATCH EXECUTION ==========
-    switch parameters.platform
+    switch platform
         case 'matlab'
             fprintf('🖥️  Running in MATLAB\n\n');
             transducer_positioning(parameters, pn, target_name, mni_targets);
             
         case {'slurm', 'qsub'}
             % ========== HPC EXECUTION ==========
-            hpc_validate_parameters(parameters, platform)
+            parameters = hpc_validate_parameters(parameters, platform);
 
             [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
                 hpc_setup_temp_files(parameters);
@@ -67,7 +67,7 @@ function transducer_positioning_start(parameters, pn, target_name, mni_targets)
                 fprintf('⏳ Waiting for job completion...\n');
                 fprintf('═══════════════════════════════\n');
                 hpc_wait_for_completion(job_id, platform, parameters.hpc.max_wait_checks, parameters, log_dir);
-                fprintf('✅ Job %s completed\n\n', job_id_display);
+                fprintf('✅ Job %s completed\n\n', job_info.id);
             end
             
             % Save job ID for chaining

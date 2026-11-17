@@ -3,9 +3,9 @@ function [trans_pos_grid, target_pos_grid, best_trans_pos] = ...
 % TP_SELECT_HEURISTIC_POSITION  Select optimal transducer position and export Localite coordinates
 %
 % Applies a multi-step heuristic: filters candidates by intersection
-% fraction, auto-expands the criterion if no candidates survive, then
-% selects the position with minimum distance to the target. Exports
-% Localite-compatible coordinates.
+% fraction, auto-expands the criterion (up to 0.3) if no candidates survive,
+% then selects the position with minimum distance to the target. Errors when
+% no candidate survives. Exports Localite-compatible coordinates.
 %
 % Use as:
 %   [trans_pos_grid, target_pos_grid, best_trans_pos] = ...
@@ -129,16 +129,19 @@ else
         i = find(locs.idx == tppf.idx(1));
         fprintf('[TP_HEURISTIC] Selected %d final candidate(s).\n', size(tppf,1));
     else
-        warn('[TP_HEURISTIC] No candidates remain.');
-        i = [];
+        error('PRESTUS:heuristic:noCandidate', ...
+            ['No heuristic candidate has an intersection fraction below 0.3 (%d candidates). ' ...
+             'Check the target and the skull mask, or set placement.heuristic.candidate.'], height(locs));
     end
 end
 
 %% Extract HEURISTIC position
 
 best_trans_pos = locs(i, :);
-trans_pos_grid = floor(table2array(best_trans_pos(1, ["trans_x", "trans_y", "trans_z"])));
-target_pos_grid = floor(table2array(best_trans_pos(1, ["targ_x", "targ_y", "targ_z"])));
+% Nearest voxel; the table columns, Localite, and RAS coordinates below all
+% use these same voxel positions.
+trans_pos_grid = round(table2array(best_trans_pos(1, ["trans_x", "trans_y", "trans_z"])));
+target_pos_grid = round(table2array(best_trans_pos(1, ["targ_x", "targ_y", "targ_z"])));
 
 %% Convert to Localite physical coordinates (mm)
 % IMPORTANT: Assumes that localite planning image has
@@ -154,9 +157,12 @@ target_pos_ras = round(transform_coordinates(parameters, target_pos_grid, 'grid'
 
 %% Add Localite coordinates to output table
 
-best_trans_pos.trans_x = round(best_trans_pos.trans_x);
-best_trans_pos.trans_y = round(best_trans_pos.trans_y); 
-best_trans_pos.trans_z = round(best_trans_pos.trans_z);
+best_trans_pos.trans_x = trans_pos_grid(1);
+best_trans_pos.trans_y = trans_pos_grid(2);
+best_trans_pos.trans_z = trans_pos_grid(3);
+best_trans_pos.targ_x = target_pos_grid(1);
+best_trans_pos.targ_y = target_pos_grid(2);
+best_trans_pos.targ_z = target_pos_grid(3);
 
 best_trans_pos.LOCALITE_Transducer_mm = Inf;
 

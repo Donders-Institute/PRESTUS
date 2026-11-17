@@ -42,16 +42,15 @@ img_header = niftiinfo(filename);
 voxel_size = mean(img_header.PixelDimensions);
 
 % [DEBUG] plot the segmentation
-if parameters.simulation.debug
+if debug_on(parameters, 'preproc', 'figures')
     h = figure;
     im_center = round(size(img)/2);
     montage({rot90(squeeze(img(im_center(1),:,:))), ...
         rot90(squeeze(img(:,im_center(2),:))), ...
         squeeze(img(:,:,im_center(3)))}, ...
         viridis(8), 'Size', [1 3]);
-    saveas(h, fullfile(parameters.io.dir_debug_preproc, ...
-        sprintf('sub-%03d_segmentation.png', subject_id)), 'png');
-    close(h);
+    debug_save_figure(parameters, 'preproc', h, sprintf('sub-%03d_segmentation', subject_id), ...
+        'Heuristic placement: segmentation through the volume centre (three planes)');
     clear im_center;
 end
 

@@ -14,7 +14,7 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
 %   3. Runs TUS_entry.R via Rscript from the configured conda environment.
 %   4. Reads the output report and coordinate files.
 %   5. Converts scalp-entry voxel coordinates → PRESTUS trans_pos/focus_pos.
-%   6. Optionally returns the full angle-ranked candidate list.
+%   6. Optionally saves the angle-ranked candidate list (RDS, readable in R).
 %
 % Use as:
 %   [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras] = ...
@@ -33,10 +33,9 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
 %   focus_pos      - [1×3] acoustic focus position in voxel coordinates (ijk)
 %   trans_pos_ras  - [1×3] bowl rear-centre in RAS space (mm)
 %   focus_pos_ras  - [1×3] acoustic focus in RAS space (mm)
-%   candidates     - [N×1] struct array of angle-ranked candidates (empty when
-%                    placement.tus_entry.return_candidates = false, the default).
-%                    Fields per entry: vox [1×3], ras [1×3], angle_score,
-%                    distance_mm, rank.
+%   candidates     - empty struct array (fields vox, ras, angle_score,
+%                    distance_mm, rank); with return_candidates the ranked
+%                    list goes to tus_entry_candidates.rds in the run folder.
 %
 % Required configuration (parameters.placement.tus_entry):
 %   script_path      - Path to TUS_entry.R (full path to the R script file)
@@ -59,9 +58,9 @@ function [trans_pos, focus_pos, trans_pos_ras, focus_pos_ras, candidates] = ...
 %   voxel_size_cm        - Voxel size [cm/voxel] (default: mean T1 voxel size
 %                          from t1_header; TUS_entry assumes isotropic voxels)
 %   resolution_cm        - Spatial decimation step [cm] (default 0.33)
-%   return_candidates    - Return full ranked candidate list (default false)
+%   return_candidates    - Save the ranked candidate list as RDS (default false)
 %   target_name          - Label for output files (default 'target')
-%   work_dir             - Override working directory for TUS_entry outputs
+%   work_dir             - Run folder for TUS_entry inputs and outputs
 %                          (default <placement dir>/tus_entry/<target_name>, PLACEMENT_RUN_DIR)
 %
 % See also: PREPROC_TRANSDUCER_PLACEMENT, PLACEMENT_RUN_DIR, RAS_TO_GRID,
@@ -404,6 +403,12 @@ function write_target_mask(t1_path, target_ras, mask_path, radius_mm)
             ((Y - center_vox(2)) .* ps(2)).^2 + ...
             ((Z - center_vox(3)) .* ps(3)).^2;
     vol(dist2 <= radius_mm^2) = 1;
+    % Single mask under the T1 header: drop the T1 datatype and scaling
+    % (niftiwrite needs the class to match; scl_slope/inter would rescale).
+    info.Datatype              = 'single';
+    info.BitsPerPixel          = 32;
+    info.MultiplicativeScaling = 1;
+    info.AdditiveOffset        = 0;
     nii_path = regexprep(mask_path, '\.nii\.gz$', '.nii');
     niftiwrite(vol, nii_path, info);
     gzip(nii_path);

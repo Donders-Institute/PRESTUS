@@ -13,10 +13,10 @@ function maps = create_group_maps(runs, out_dir, options)
 %
 % in <out_dir>/maps/, plus one figure per condition in <out_dir>/plots/:
 % three orthogonal MNI slices through the voxel of highest overlap over the
-% mean MNI-space T1 of the subjects (m2m_sub-XXX/toMNI/T1_to_MNI_post-hoc.nii.gz,
-% when present), with the ROI outline, the per-run focal centroids and the
-% targets from the targeting sidecars. Runs whose MNI grid differs from the
-% first run's are skipped with a warning.
+% mean MNI-space T1 of the subjects (GET_T1_MNI_FILE, when present), with
+% the ROI outline, the per-run focal centroids, and the targets from the
+% targeting sidecars. Runs whose MNI grid differs from the first run's are
+% skipped with a warning.
 %
 % Use as:
 %   maps = create_group_maps(runs, out_dir)
@@ -27,7 +27,7 @@ function maps = create_group_maps(runs, out_dir, options)
 %             (STUDY_RUN_TABLE, included rows only)
 %   out_dir - group output folder
 %   options - name-value pairs:
-%     'SegDir' folder with the m2m_sub-XXX folders (background T1); '' = none
+%     'SegDir' path.seg, locates the background T1 (GET_T1_MNI_FILE); '' = none
 %     'RoiMni' MNI ROI mask (NIfTI) to outline; '' = none
 %     'Plot'   write the figures (default true)
 %
@@ -178,7 +178,8 @@ function bg = mean_background(subjects, seg_dir, ref)
     if isempty(seg_dir); return; end
     acc = []; k = 0;
     for s = subjects(:)'
-        f = fullfile(seg_dir, sprintf('m2m_sub-%03d', s), 'toMNI', 'T1_to_MNI_post-hoc.nii.gz');
+        [f, f_m2m] = get_t1_mni_file(seg_dir, s);
+        if ~isfile(f); f = f_m2m; end                   % earlier outputs (read only)
         if ~isfile(f); continue; end
         h = niftiinfo(f);
         if ~same_grid(h, ref); continue; end

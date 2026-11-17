@@ -1,12 +1,11 @@
 classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_neuronav_io < matlab.unittest.TestCase
-% TEST_NEURONAV_IO  Localite I/O: folder layout, path keys and pose selection.
+% TEST_NEURONAV_IO  Localite I/O: folder layout, path keys, pose selection, and session CSVs.
 %
 % Self-contained: builds synthetic Localite TriggerMarkers exports with known
-% 4×4 poses in a temporary folder, so no study data is needed.
-%
-%   Pose regression: the matrix handed to localite_matrix_to_positions must
-%   have the recorded position in column 4 (a transpose used to put it at
-%   the origin).
+% 4×4 poses in a temporary folder, so no study data is needed. The matrix
+% handed to LOCALITE_MATRIX_TO_POSITIONS has the recorded position in column 4.
+% Session CSVs written by NEURONAV_EXPORT_SESSION_CSV are read back by
+% NEURONAV_GET_GROUP_MEAN_MNI.
 
     properties
         Root    % temporary folder
@@ -125,6 +124,55 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_neuron
             p = base_parameters();
             tc.verifyError(@() neuronav_localite_pose(p), 'PRESTUS:localite:noSource');
         end
+    end
+
+    methods (Test, TestTags = {'neuronav_group_mean'})
+
+        function test_group_mean_reads_exported_csv(tc)
+            % Two subjects, two targets each, plus an interpolated row that
+            % must not count. Fails when the reader expects a column the
+            % exporter does not write (every CSV is skipped).
+            root = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            targets = {'L_M1'; 'R_M1'};
+            mni = {[10 20 30; -10 20 30], [12 22 32; -12 22 32]};
+            for s = 1:2
+                sub_id = sprintf('sub-%03d', s);
+                out = fullfile(root, sub_id);
+                mkdir(out);
+                evalc(['neuronav_export_session_csv(sub_id, ''ses-01'', targets, out, ' ...
+                    'ones(2,3), ones(2,3), ones(2,3), ones(2,3), ' ...
+                    'mni{s} + 100, mni{s} + 50, mni{s}, mni{s} + 1, 0)']);
+            end
+            % Interpolated session: far-off values, excluded from the mean
+            evalc(['neuronav_export_session_csv(''sub-003'', ''ses-01'', targets, root, ' ...
+                'ones(2,3), ones(2,3), ones(2,3), ones(2,3), ' ...
+                'ones(2,3)*900, ones(2,3)*900, ones(2,3)*900, ones(2,3)*900, 1)']);
+            movefile(fullfile(root, 'sub-003_ses-01_info.csv'), fullfile(root, 'sub-001'));
+
+            p.path.sim = root;
+            [~, trans_mm, targ_mm, trans_vox, targ_vox] = evalc( ...
+                'neuronav_get_group_mean_mni({''l_m1''; ''R_M1''}, p)');
+            % Means over sub-001 and sub-002 (target names match case-insensitively)
+            tc.verifyEqual(trans_mm, [11 21 31; -11 21 31]);
+            tc.verifyEqual(targ_mm, [12 22 32; -10 22 32]);
+            tc.verifyEqual(trans_vox, [111 121 131; 89 121 131]);
+            tc.verifyEqual(targ_vox, [61 71 81; 39 71 81]);
+        end
+
+        function test_group_mean_unknown_target_is_nan(tc)
+            % Negative control: a target absent from every CSV gives NaN.
+            root = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            mkdir(fullfile(root, 'sub-001'));
+            evalc(['neuronav_export_session_csv(''sub-001'', ''ses-01'', {''M1''}, ' ...
+                'fullfile(root, ''sub-001''), ones(1,3), ones(1,3), [], [], ' ...
+                '[], [], [1 2 3], [4 5 6], 0)']);
+            p.path.sim = root;
+            [~, trans_mm] = evalc('neuronav_get_group_mean_mni({''V1''}, p)');
+            tc.verifyTrue(all(isnan(trans_mm)));
+            [~, trans_mm] = evalc('neuronav_get_group_mean_mni({''M1''}, p)');
+            tc.verifyEqual(trans_mm, [1 2 3]);
+        end
+
     end
 
     methods

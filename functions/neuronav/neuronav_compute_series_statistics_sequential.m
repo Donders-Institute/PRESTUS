@@ -1,5 +1,5 @@
-function stats = neuronav_compute_series_statistics(localite, voxel_size, expected_segment_length, markertype, gap_threshold_s)
-% NEURONAV_COMPUTE_SERIES_STATISTICS  Compute per-series position and orientation statistics
+function stats = neuronav_compute_series_statistics_sequential(localite, voxel_size, expected_segment_length, markertype, gap_threshold_s)
+% NEURONAV_COMPUTE_SERIES_STATISTICS_SEQUENTIAL  Per-series position and orientation statistics with a settable series gap
 %
 % Segments a parsed Localite XML struct into series by gaps in the marker
 % recording time and computes mean position, mean 4×4 matrix, and
@@ -7,9 +7,9 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
 % a new series can be given explicitly (in seconds) or left adaptive.
 %
 % Use as:
-%   stats = neuronav_compute_series_statistics(localite, voxel_size)
-%   stats = neuronav_compute_series_statistics(localite, voxel_size, expected_segment_length, markertype)
-%   stats = neuronav_compute_series_statistics(localite, voxel_size, expected_segment_length, markertype, gap_threshold_s)
+%   stats = neuronav_compute_series_statistics_sequential(localite, voxel_size)
+%   stats = neuronav_compute_series_statistics_sequential(localite, voxel_size, expected_segment_length, markertype)
+%   stats = neuronav_compute_series_statistics_sequential(localite, voxel_size, expected_segment_length, markertype, gap_threshold_s)
 %
 % Input:
 %   localite                - struct from neuronav_select_localite or readstruct
@@ -20,8 +20,8 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
 %                             consecutive markers before a NEW series begins.
 %                             recordingTime is assumed to be in milliseconds, so
 %                             the function splits where diff(recordingTime) >
-%                             gap_threshold_s*1000. [] (default) reproduces the
-%                             original adaptive behaviour (3 × median gap).
+%                             gap_threshold_s*1000. [] (default) uses an
+%                             adaptive threshold (3 × median gap).
 %                             Only used for 'TriggerMarkers'; GUMMarkers and
 %                             InstrumentMarker have no timing and form one series.
 %

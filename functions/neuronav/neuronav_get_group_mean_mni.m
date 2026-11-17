@@ -4,21 +4,22 @@ function [mean_mni_trans_mm, mean_mni_targ_mm, mean_mni_trans_vox, mean_mni_targ
 %
 % Reads per-subject session CSVs from parameters.path.sim, filters to
 % non-interpolated rows, and returns mean transducer and target positions
-% for the specified target label in both RAS mm and voxel MNI coordinates.
+% for each specified target in both RAS mm and voxel MNI coordinates.
 %
 % Use as:
 %   [mean_mni_trans_mm, mean_mni_targ_mm, mean_mni_trans_vox, mean_mni_targ_vox] = ...
 %       neuronav_get_group_mean_mni(session_target, parameters)
 %
 % Input:
-%   session_target - target label string to average over
+%   session_target - {Nx1} cell array of target names (CSV column 'target')
 %   parameters     - (1,1) simulation parameters struct with path.sim field
 %
 % Output:
-%   mean_mni_trans_mm  - [1x3] mean transducer position in MNI RAS space [mm]
-%   mean_mni_targ_mm   - [1x3] mean target position in MNI RAS space [mm]
-%   mean_mni_trans_vox - [1x3] mean transducer position in MNI voxel space
-%   mean_mni_targ_vox  - [1x3] mean target position in MNI voxel space
+%   mean_mni_trans_mm  - [Nx3] mean transducer position in MNI RAS space [mm]
+%   mean_mni_targ_mm   - [Nx3] mean target position in MNI RAS space [mm]
+%   mean_mni_trans_vox - [Nx3] mean transducer position in MNI voxel space
+%   mean_mni_targ_vox  - [Nx3] mean target position in MNI voxel space
+%   All outputs are rounded; NaN rows mark targets without recorded data.
 %
 % See also: NEURONAV_EXPORT_SESSION_CSV, NEURONAV_CONVERT_NATIVE_TO_MNI
 
@@ -30,7 +31,7 @@ expected_vars = { ...
     'target_MNI_mm_x', 'target_MNI_mm_y', 'target_MNI_mm_z', ...
     'trans_MNI_vox_x', 'trans_MNI_vox_y', 'trans_MNI_vox_z', ...
     'target_MNI_vox_x', 'target_MNI_vox_y', 'target_MNI_vox_z', ...
-    'target_label', 'interpolated'};
+    'target', 'interpolated'};
 
 all_data = table();
 
@@ -57,7 +58,11 @@ mean_mni_targ_vox  = nan(n_targets, 3);
 % Loop over each target and average mm + voxel values
 for i = 1:n_targets
     name = strtrim(lower(session_target{i}));
-    idx = strcmpi(strtrim(all_data.target_label), name) & all_data.interpolated == 0;
+    if isempty(all_data)
+        idx = false;
+    else
+        idx = strcmpi(strtrim(string(all_data.target)), name) & all_data.interpolated == 0;
+    end
 
     if any(idx)
         % RAS mm
@@ -86,7 +91,7 @@ for i = 1:n_targets
     end
 end
 
-% Optional rounding for mm coordinates
+% Round mm and voxel coordinates
 mean_mni_trans_mm  = round(mean_mni_trans_mm);
 mean_mni_targ_mm   = round(mean_mni_targ_mm);
 mean_mni_trans_vox = round(mean_mni_trans_vox);
