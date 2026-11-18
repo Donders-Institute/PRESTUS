@@ -33,7 +33,9 @@ function [kgrid_th, kwave_medium_th, medium_masks_th, parameters_th, transf_th] 
 %   kwave_medium_th - kwave_medium fields resampled to thermal grid
 %   medium_masks_th - medium_masks resampled to thermal grid (nearest)
 %   parameters_th   - parameters copy with grid.dims and transducer(1).trans_pos
-%                     updated to thermal grid coordinates
+%                     updated to thermal grid coordinates; when the grids
+%                     differ, also grid.thermal_fov_start_ac / _end_ac (the
+%                     acoustic-grid voxel box the thermal grid covers)
 %   transf_th       - 4×4 affine: T1 voxels → thermal grid voxels
 %                     (for resampling NIfTIs into the thermal grid)
 %
@@ -122,6 +124,14 @@ if same_grid
     fprintf('[thermal_grid_setup] Thermal  grid : %.4f mm | [%s] vox\n', th_dx_mm, num2str(th_dims));
     fprintf('[thermal_grid_setup] Resampling ratio: %.4f (thermal grid identical to acoustic grid — no resampling performed)\n', scale);
     return
+end
+
+% The resampling (imresize3), the 4x4 affine below and the map of the results
+% back onto the acoustic grid (thermal_stage) are 3-D only
+if ndim ~= 3
+    error('thermal_grid_setup:needs3D', ...
+        ['grid.thermal_resolution_mm / grid.thermal_fov_mm need a 3-D grid; this grid is %d-D. ' ...
+         'Leave both empty for 2-D and axisymmetric runs.'], ndim);
 end
 
 % -------------------------------------------------------------------------
@@ -236,5 +246,9 @@ end
 parameters_th.grid.thermal_focus_pos_exact = ((focus_pos - 1) * ac_dx_mm - fov_origin_mm) / th_dx_mm + 1;
 parameters_th.grid.thermal_trans_pos_exact = ((trans_pos - 1) * ac_dx_mm - fov_origin_mm) / th_dx_mm + 1;
 parameters_th.grid.thermal_resolution_mm   = th_dx_mm;
+% Acoustic-grid voxel box the thermal grid covers, for mapping the thermal
+% results back onto the acoustic grid (thermal_stage)
+parameters_th.grid.thermal_fov_start_ac = fov_start_ac;
+parameters_th.grid.thermal_fov_end_ac   = fov_end_ac;
 
 end

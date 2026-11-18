@@ -56,6 +56,14 @@ end
         focal_planeT = gather(focal_planeT);
     end
 
+    % Focal-plane frames: the time_status_seq entries flagged 'plane' (thermal_simulation
+    % may keep every k-th segment); runs without the flag have one frame per entry
+    if isfield(time_status_seq, 'plane')
+        plane_sel = [time_status_seq.plane] == 1;
+    else
+        plane_sel = [time_status_seq.recorded] == 1;
+    end
+
     %% Plot data for the focal axis
     % Skip focal-axis plots when focal_planeT is empty (e.g. BabelBrain thermal
     % backend does not produce a time-resolved focal-plane volume).
@@ -89,34 +97,34 @@ end
 
     %% [focal axis] temperature over time
 
-    HEAT.recordedtime = [time_status_seq(find([time_status_seq.recorded]==1)).time];
+    HEAT.planetime = [time_status_seq(plane_sel).time];
 
     h = figure;
     hold on;
     leg_handles = []; leg_labels = {};
-    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    data2plot = NaN(numel(HEAT.planetime), 1);
     if any(mask.skull)
-        data2plot = max(focal_axis_temperature(mask.skull, 1:size(time_status_seq,2)),[],1);
+        data2plot = max(focal_axis_temperature(mask.skull, 1:numel(HEAT.planetime)),[],1);
     end
     HEAT.temp.Skull = data2plot;
-    p1 = plot(HEAT.recordedtime, HEAT.temp.Skull, 'LineWidth', 2);
+    p1 = plot(HEAT.planetime, HEAT.temp.Skull, 'LineWidth', 2);
     if any(mask.skull), leg_handles(end+1) = p1; leg_labels{end+1} = 'skull'; end
-    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    data2plot = NaN(numel(HEAT.planetime), 1);
     if any(mask.skin)
-        data2plot = max(focal_axis_temperature(mask.skin, 1:size(time_status_seq,2)),[],1);
+        data2plot = max(focal_axis_temperature(mask.skin, 1:numel(HEAT.planetime)),[],1);
     end
     HEAT.temp.Skin = data2plot;
-    p2 = plot(HEAT.recordedtime, HEAT.temp.Skin, 'LineWidth', 2);
+    p2 = plot(HEAT.planetime, HEAT.temp.Skin, 'LineWidth', 2);
     if any(mask.skin), leg_handles(end+1) = p2; leg_labels{end+1} = 'skin'; end
-    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    data2plot = NaN(numel(HEAT.planetime), 1);
     if any(mask.brain)
-        data2plot = max(focal_axis_temperature(mask.brain, 1:size(time_status_seq,2)),[],1);
+        data2plot = max(focal_axis_temperature(mask.brain, 1:numel(HEAT.planetime)),[],1);
     end
     HEAT.temp.Brain = data2plot;
-    p3 = plot(HEAT.recordedtime, HEAT.temp.Brain, 'LineWidth', 2);
+    p3 = plot(HEAT.planetime, HEAT.temp.Brain, 'LineWidth', 2);
     if any(mask.brain), leg_handles(end+1) = p3; leg_labels{end+1} = 'brain'; end
-    HEAT.temp.TARGET = focal_axis_temperature(target_pos_focal, 1:size(time_status_seq,2));
-    p4 = plot(HEAT.recordedtime, HEAT.temp.TARGET, 'LineWidth', 2);
+    HEAT.temp.TARGET = focal_axis_temperature(target_pos_focal, 1:numel(HEAT.planetime));
+    p4 = plot(HEAT.planetime, HEAT.temp.TARGET, 'LineWidth', 2);
     leg_handles(end+1) = p4; leg_labels{end+1} = 'target';
     colormap('lines')
     xlabel('Time [s]');
@@ -131,7 +139,7 @@ end
         a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
         a.FaceAlpha = 0.1;
     end
-    xlim([0, HEAT.recordedtime(end)]);
+    xlim([0, HEAT.planetime(end)]);
     hold off
     legend(leg_handles, leg_labels);
     legend('boxoff');
@@ -144,29 +152,29 @@ end
     h = figure;
     hold on;
     leg_handles = []; leg_labels = {};
-    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    data2plot = NaN(numel(HEAT.planetime), 1);
     if any(mask.skull)
-        data2plot = max(focal_axis_trise(mask.skull, 1:size(time_status_seq,2)),[],1);
+        data2plot = max(focal_axis_trise(mask.skull, 1:numel(HEAT.planetime)),[],1);
     end
     HEAT.tempRise.Skull = data2plot;
-    p1 = plot(HEAT.recordedtime, HEAT.tempRise.Skull, 'LineWidth', 2);
+    p1 = plot(HEAT.planetime, HEAT.tempRise.Skull, 'LineWidth', 2);
     if any(mask.skull), leg_handles(end+1) = p1; leg_labels{end+1} = 'skull'; end
-    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    data2plot = NaN(numel(HEAT.planetime), 1);
     if any(mask.skin)
-        data2plot = max(focal_axis_trise(mask.skin, 1:size(time_status_seq,2)),[],1);
+        data2plot = max(focal_axis_trise(mask.skin, 1:numel(HEAT.planetime)),[],1);
     end
     HEAT.tempRise.Skin = data2plot;
-    p2 = plot(HEAT.recordedtime, HEAT.tempRise.Skin, 'LineWidth', 2);
+    p2 = plot(HEAT.planetime, HEAT.tempRise.Skin, 'LineWidth', 2);
     if any(mask.skin), leg_handles(end+1) = p2; leg_labels{end+1} = 'skin'; end
-    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    data2plot = NaN(numel(HEAT.planetime), 1);
     if any(mask.brain)
-        data2plot = max(focal_axis_trise(mask.brain, 1:size(time_status_seq,2)),[],1);
+        data2plot = max(focal_axis_trise(mask.brain, 1:numel(HEAT.planetime)),[],1);
     end
     HEAT.tempRise.Brain = data2plot;
-    p3 = plot(HEAT.recordedtime, HEAT.tempRise.Brain, 'LineWidth', 2);
+    p3 = plot(HEAT.planetime, HEAT.tempRise.Brain, 'LineWidth', 2);
     if any(mask.brain), leg_handles(end+1) = p3; leg_labels{end+1} = 'brain'; end
-    HEAT.tempRise.TARGET = focal_axis_trise(target_pos_focal, 1:size(time_status_seq,2));
-    p4 = plot(HEAT.recordedtime, HEAT.tempRise.TARGET, 'LineWidth', 2);
+    HEAT.tempRise.TARGET = focal_axis_trise(target_pos_focal, 1:numel(HEAT.planetime));
+    p4 = plot(HEAT.planetime, HEAT.tempRise.TARGET, 'LineWidth', 2);
     leg_handles(end+1) = p4; leg_labels{end+1} = 'target';
     colormap('lines')
     xlabel('Time [s]');
@@ -181,7 +189,7 @@ end
         a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
         a.FaceAlpha = 0.1;
     end
-    xlim([0, HEAT.recordedtime(end)]);
+    xlim([0, HEAT.planetime(end)]);
     hold off
     legend(leg_handles, leg_labels, 'location', 'NorthWest');
     legend('boxoff');
@@ -194,29 +202,29 @@ end
     g = figure;
     hold on;
     leg_handles = []; leg_labels = {};
-    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    data2plot = NaN(numel(HEAT.planetime), 1);
     if any(mask.skull)
-        data2plot = max(focal_CEM(mask.skull, 1:size(time_status_seq,2)),[],1);
+        data2plot = max(focal_CEM(mask.skull, 1:numel(HEAT.planetime)),[],1);
     end
     HEAT.CEM43.Skull = data2plot;
-    p1 = plot(HEAT.recordedtime, HEAT.CEM43.Skull, 'LineWidth', 2);
+    p1 = plot(HEAT.planetime, HEAT.CEM43.Skull, 'LineWidth', 2);
     if any(mask.skull), leg_handles(end+1) = p1; leg_labels{end+1} = 'skull'; end
-    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    data2plot = NaN(numel(HEAT.planetime), 1);
     if any(mask.skin)
-        data2plot = max(focal_CEM(mask.skin, 1:size(time_status_seq,2)),[],1);
+        data2plot = max(focal_CEM(mask.skin, 1:numel(HEAT.planetime)),[],1);
     end
     HEAT.CEM43.Skin = data2plot;
-    p2 = plot(HEAT.recordedtime, HEAT.CEM43.Skin, 'LineWidth', 2);
+    p2 = plot(HEAT.planetime, HEAT.CEM43.Skin, 'LineWidth', 2);
     if any(mask.skin), leg_handles(end+1) = p2; leg_labels{end+1} = 'skin'; end
-    data2plot = NaN(numel(HEAT.recordedtime), 1);
+    data2plot = NaN(numel(HEAT.planetime), 1);
     if any(mask.brain)
-        data2plot = max(focal_CEM(mask.brain, 1:size(time_status_seq,2)),[],1);
+        data2plot = max(focal_CEM(mask.brain, 1:numel(HEAT.planetime)),[],1);
     end
     HEAT.CEM43.Brain = data2plot;
-    p3 = plot(HEAT.recordedtime, HEAT.CEM43.Brain, 'LineWidth', 2);
+    p3 = plot(HEAT.planetime, HEAT.CEM43.Brain, 'LineWidth', 2);
     if any(mask.brain), leg_handles(end+1) = p3; leg_labels{end+1} = 'brain'; end
-    HEAT.CEM43.TARGET = focal_CEM(target_pos_focal, 1:size(time_status_seq,2));
-    p4 = plot(HEAT.recordedtime, HEAT.CEM43.TARGET, 'LineWidth', 2);
+    HEAT.CEM43.TARGET = focal_CEM(target_pos_focal, 1:numel(HEAT.planetime));
+    p4 = plot(HEAT.planetime, HEAT.CEM43.TARGET, 'LineWidth', 2);
     leg_handles(end+1) = p4; leg_labels{end+1} = 'target';
     colormap('lines')
     xlabel('Time [s]');
@@ -231,7 +239,7 @@ end
         a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
         a.FaceAlpha = 0.1;
     end
-    xlim([0, HEAT.recordedtime(end)]);
+    xlim([0, HEAT.planetime(end)]);
     hold off
     legend(leg_handles, leg_labels, 'location', 'NorthWest');
     legend('boxoff');
@@ -246,25 +254,25 @@ end
         focal_CEM_iso = squeeze(CEM43_iso(trans_pos(1),:,:));
         g = figure; hold on;
         leg_handles = []; leg_labels = {};
-        data2plot = NaN(numel(HEAT.recordedtime), 1);
+        data2plot = NaN(numel(HEAT.planetime), 1);
         if any(mask.skull)
-            data2plot = max(focal_CEM_iso(mask.skull, 1:size(time_status_seq,2)),[],1);
+            data2plot = max(focal_CEM_iso(mask.skull, 1:numel(HEAT.planetime)),[],1);
         end
-        p1 = plot(HEAT.recordedtime, data2plot, 'LineWidth', 2);
+        p1 = plot(HEAT.planetime, data2plot, 'LineWidth', 2);
         if any(mask.skull), leg_handles(end+1) = p1; leg_labels{end+1} = 'skull'; end
-        data2plot = NaN(numel(HEAT.recordedtime), 1);
+        data2plot = NaN(numel(HEAT.planetime), 1);
         if any(mask.skin)
-            data2plot = max(focal_CEM_iso(mask.skin, 1:size(time_status_seq,2)),[],1);
+            data2plot = max(focal_CEM_iso(mask.skin, 1:numel(HEAT.planetime)),[],1);
         end
-        p2 = plot(HEAT.recordedtime, data2plot, 'LineWidth', 2);
+        p2 = plot(HEAT.planetime, data2plot, 'LineWidth', 2);
         if any(mask.skin), leg_handles(end+1) = p2; leg_labels{end+1} = 'skin'; end
-        data2plot = NaN(numel(HEAT.recordedtime), 1);
+        data2plot = NaN(numel(HEAT.planetime), 1);
         if any(mask.brain)
-            data2plot = max(focal_CEM_iso(mask.brain, 1:size(time_status_seq,2)),[],1);
+            data2plot = max(focal_CEM_iso(mask.brain, 1:numel(HEAT.planetime)),[],1);
         end
-        p3 = plot(HEAT.recordedtime, data2plot, 'LineWidth', 2);
+        p3 = plot(HEAT.planetime, data2plot, 'LineWidth', 2);
         if any(mask.brain), leg_handles(end+1) = p3; leg_labels{end+1} = 'brain'; end
-        p4 = plot(HEAT.recordedtime, focal_CEM_iso(target_pos_focal, 1:size(time_status_seq,2)), 'LineWidth', 2);
+        p4 = plot(HEAT.planetime, focal_CEM_iso(target_pos_focal, 1:numel(HEAT.planetime)), 'LineWidth', 2);
         leg_handles(end+1) = p4; leg_labels{end+1} = 'target';
         colormap('lines')
         xlabel('Time [s]'); ylabel('CEM43 (ISO)');
@@ -276,7 +284,7 @@ end
             a = fill(x_points, y_points, [0.5 0.5 0.5],'EdgeColor','none', 'FaceAlpha', 0.1);
             a.FaceAlpha = 0.1;
         end
-        xlim([0, HEAT.recordedtime(end)]); hold off
+        xlim([0, HEAT.planetime(end)]); hold off
         legend(leg_handles, leg_labels, 'location', 'NorthWest');
         legend('boxoff');
         title('CEM43 ISO in focal plane (NOT overall tissue max.)');
@@ -469,7 +477,7 @@ end
         v.FrameRate = 2; % frames per second
         open(v);
         g = figure('Position', [100 100 304 156]);
-        tss_recorded = time_status_seq(find([time_status_seq.recorded]==1));
+        tss_recorded = time_status_seq(plane_sel);
         gray_img_brain = repmat(mat2gray(brain_slice),[1 1 3]);
         for k = 1:size(focal_planeT,3)
             cur_temp = squeeze(focal_planeT(:, :,  k));

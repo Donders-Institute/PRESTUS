@@ -338,6 +338,8 @@ fields:
         - '> R stays 0.5 once 43 °C has been reached (no thermotolerance after 43 °C); above 57 °C the ISO formula is not valid, so PRESTUS flags the voxel.'
   thermal.temp_0.*: {unit: °C}
   thermal.log_thermal_updates: {kind: flag}
+  thermal.pulse_model: {choices: [train_averaged, pulse_resolved]}
+  thermal.max_focal_plane_gb: {unit: GB}
 
   # ── Backends ─────────────────────────────────────────────────────────
   jwave: {visible_if: {key: acoustic_backend, in: [jwave]}}
@@ -1176,6 +1178,8 @@ display:
   thermal.cem43_iso: {label: CEM43 form in the report, advanced: false, help: "Thermal dose form the HTML report uses (dashboard, safety verdict, methods text): k-Wave's kWaveDiffusion form or the ISO 14708-3 / ITRUSST form. Both forms are always computed and saved."}
   thermal.temp_0: {label: Initial temperatures}
   thermal.log_thermal_updates: {label: Verbose thermal log}
+  thermal.pulse_model: {label: Pulse model, help: "'train_averaged' heats each pulse train as one segment weighted by PD/PRI, as k-Plan (much faster); 'pulse_resolved' heats pulse by pulse."}
+  thermal.max_focal_plane_gb: {label: "Memory limit, focal-plane time courses", help: "Memory for the focal-plane time courses and the heating video. Above it every k-th step is kept; 0 keeps every step."}
 
   # Readable labels for keys whose names do not read as words (labels.py covers the rest)
   hpc.exclude: {label: "Excluded nodes"}

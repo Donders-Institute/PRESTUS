@@ -628,6 +628,7 @@ thermal:
     skull_trabecular: 37
     skull_cortical: 37
   log_thermal_updates: 0    # show verbose k-Wave thermal output for every time step; if 0, only the first step is shown in full and subsequent steps are silent
+  max_focal_plane_gb: 2     # [GB] memory for the focal-plane time courses and heating video; above it every k-th step is kept; 0 = keep every step
 
 #------------ Time reversal (reciprocity): refocusing phases, aberration metrics, pose search (see doc_time_reversal.md)
 # One extra k-Wave run per target with a point source at the target, before the acoustic simulation.

@@ -3,9 +3,10 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
 %
 % Covers THERMAL_SIMULATION (k-Wave diffusion on a 16^3 homogeneous brain grid
 % with a synthetic Gaussian pressure field: heating at the focus, no rise for a
-% zero source, temperature rise linear in intensity, analytic early-time rise),
-% THERMAL_STAGE (module/acoustics gating, run -> cache -> reload, missing cache
-% with overwrite 'never'), CACHE_ACOUSTIC (save/load round trip, ISPPA rescaling
+% zero source, temperature rise linear in intensity, analytic early-time rise,
+% k-Plan skull density on skull labels only), THERMAL_PLOT_SIM (heating video
+% with two transducers), THERMAL_STAGE (module/acoustics gating, run -> cache -> reload, missing cache
+% with overwrite 'never', separate thermal resolution / FOV, heating on the acoustic FOV), CACHE_ACOUSTIC (save/load round trip, ISPPA rescaling
 % on load, stale-grid and corrupt-cache errors, kwave_medium flag) and
 % ACOUSTIC_STAGE's cache paths (no simulation requested, cache
 % hit, baseline taken from the live run, stale cache without a source, source
@@ -232,6 +233,123 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
             sd = struct('p_max_all', gaussian_p(p, 1e6));
             out = call_thermal_stage(p, sd, kgrid, med, plus, masks);
             tc.verifyEqual(out.parameters.state.heating_available, 1);
+        end
+
+        function test_thermal_stage_separate_thermal_grid(tc)
+            % grid.thermal_resolution_mm and grid.thermal_fov_mm: the pressure
+            % is resampled onto the thermal grid, and the results come back on
+            % the acoustic grid (what thermal_analysis / nifti_thermal read),
+            % with a peak rise close to the acoustic-grid run.
+            p = stage_params(tc.Dir);
+            p.modules.run_heating_sims = 1;
+            p.state.acoustics_available = 1;
+            [kgrid, med, masks, plus] = brain_medium(p);
+            sd = struct('p_max_all', gaussian_p(p, 1e6));
+            t0 = plus.temp_0;
+            if isscalar(t0); t0 = repmat(t0, p.grid.dims); end
+            ref = call_thermal_stage(p, sd, kgrid, med, plus, masks);
+            rise_ref = max(ref.results_heating.maxT - t0, [], 'all');
+            tc.assumeGreaterThan(rise_ref, 0);
+
+            cases = struct('key', {'thermal_resolution_mm', 'thermal_fov_mm'}, ...
+                'value', {2, [10 10 10]}, 'tol', {[0.3 1.2], [0.8 1.25]});
+            for c = cases
+                q = p;
+                q.grid.(c.key) = c.value;
+                out = call_thermal_stage(q, sd, kgrid, med, plus, masks);
+                r = out.results_heating;
+                tc.verifyEqual(out.parameters.state.heating_available, 1, c.key);
+                for f = {'maxT', 'heating_endT', 'CEM43', 'CEM43_end', 'CEM43_iso', 'CEM43_iso_end'}
+                    tc.verifySize(r.(f{1}), p.grid.dims, [c.key ': ' f{1}]);
+                end
+                tc.verifyEqual(size(r.focal_planeT, [1 2]), p.grid.dims([1 3]), c.key);
+                rise = max(r.maxT - t0, [], 'all');
+                tc.verifyGreaterThan(rise, c.tol(1) * rise_ref, c.key);
+                tc.verifyLessThan(rise, c.tol(2) * rise_ref, c.key);
+            end
+
+            % Thermal FOV: 10 mm box centred on the focus [8 8 10] (1 mm
+            % voxels) covers acoustic voxels 3:13, 3:13, 5:15; outside it the
+            % maps hold the baseline temperature and zero dose
+            outside = true(p.grid.dims);
+            outside(3:13, 3:13, 5:15) = false;
+            tc.verifyEqual(r.maxT(outside), t0(outside));
+            tc.verifyEqual(r.CEM43(outside), zeros(nnz(outside), 1));
+        end
+
+        function test_thermal_stage_same_thermal_resolution_is_unchanged(tc)
+            % Negative control: thermal_resolution_mm equal to resolution_mm
+            % keeps the acoustic grid, with results identical to a run without it
+            p = stage_params(tc.Dir);
+            p.modules.run_heating_sims = 1;
+            p.state.acoustics_available = 1;
+            [kgrid, med, masks, plus] = brain_medium(p);
+            sd = struct('p_max_all', gaussian_p(p, 1e6));
+            ref = call_thermal_stage(p, sd, kgrid, med, plus, masks);
+            p.grid.thermal_resolution_mm = p.grid.resolution_mm;
+            out = call_thermal_stage(p, sd, kgrid, med, plus, masks);
+            tc.verifyEqual(out.results_heating.maxT, ref.results_heating.maxT);
+            tc.verifyEqual(out.results_heating.CEM43, ref.results_heating.CEM43);
+        end
+
+        function test_thermal_stage_heats_on_acoustic_fov(tc)
+            % grid.thermal_use_acoustic_fov: the thermal simulation stays on the
+            % acoustic FOV, and thermal_stage crops the full-grid medium_plus
+            % maps (temp_0, absorption) to it. A temperature gradient along
+            % every axis makes a wrong crop offset visible. Reference: the same
+            % run given the maps already cropped, without an active FOV.
+            p_full = stage_params(tc.Dir);
+            p_full.modules.run_heating_sims = 1;
+            p_full.state.acoustics_available = 1;
+            p_full.transducer.trans_pos = [8 8 3];   % inside the FOV below
+            [~, ~, ~, plus_full] = brain_medium(p_full);
+            [x, y, z] = ndgrid(1:16, 1:16, 1:16);
+            plus_full.temp_0 = 37 + 0.01 * x + 0.02 * y + 0.03 * z;
+            for f = {'absorption_np', 'absorption_fraction'}
+                if isfield(plus_full, f{1}) && isscalar(plus_full.(f{1}))
+                    plus_full.(f{1}) = repmat(plus_full.(f{1}), p_full.grid.dims);
+                end
+            end
+
+            offset = [4 4 3];
+            p = p_full;
+            p.grid.dims = [10 10 12];
+            p.transducer.trans_pos = p_full.transducer.trans_pos - offset + 1;
+            p.transducer.focus_pos = p_full.transducer.focus_pos - offset + 1;
+            p.grid.thermal_use_acoustic_fov = 1;
+            [kgrid, med, masks] = brain_medium(p);
+            sd = struct('p_max_all', gaussian_p(p, 1e6));
+            fov = struct('active', true, 'offset', offset, 'full_dims', p_full.grid.dims);
+            out = call_thermal_stage(p, sd, kgrid, med, plus_full, masks, fov);
+
+            e = offset + p.grid.dims - 1;
+            plus_crop = plus_full;
+            for f = {'temp_0', 'absorption_np', 'absorption_fraction'}
+                if isfield(plus_crop, f{1})
+                    plus_crop.(f{1}) = plus_full.(f{1})(offset(1):e(1), offset(2):e(2), offset(3):e(3));
+                end
+            end
+            ref = call_thermal_stage(p, sd, kgrid, med, plus_crop, masks);
+
+            r = out.results_heating;
+            tc.verifyEqual(out.parameters.state.heating_available, 1);
+            tc.verifySize(r.maxT, p.grid.dims);
+            tc.verifyEqual(r.maxT, ref.results_heating.maxT, 'AbsTol', 1e-9);
+            tc.verifyEqual(r.CEM43, ref.results_heating.CEM43, 'AbsTol', 1e-9);
+            tc.verifyGreaterThan(max(r.maxT - plus_crop.temp_0, [], 'all'), 0);
+            % Far corner, unheated: the cropped baseline, not the full grid's corner
+            tc.verifyEqual(r.maxT(1, 1, 1), plus_full.temp_0(offset(1), offset(2), offset(3)), 'AbsTol', 1e-3);
+        end
+
+        function test_thermal_simulation_rejects_pressure_off_thermal_grid(tc)
+            % Negative control: acoustic-grid pressure with a thermal-grid
+            % medium stops with a clear error instead of a size error in Q
+            p = stage_params(tc.Dir);
+            p8 = p;
+            p8.grid.dims = [8 8 8];
+            [kgrid8, med8, masks8] = brain_medium(p8);
+            tc.verifyError(@() run_thermal(p8, gaussian_p(p, 1e6), kgrid8, med8, masks8), ...
+                'thermal_simulation:gridMismatch');
         end
 
     end
@@ -480,7 +598,9 @@ function pr = gaussian_p(p, p0)
     pr = p0 * exp(-((x - f(1)).^2 + (y - f(2)).^2 + (z - f(3)).^2) / (2 * 2^2));
 end
 
-function [obj, tss, res] = run_thermal(p, pr, kgrid, kwave_medium, masks)
+function [obj, tss, res] = run_thermal(p, pr, kgrid, kwave_medium, masks, p_th)
+% p builds the thermal medium fields; p_th (default p) goes to THERMAL_SIMULATION.
+    if nargin < 6; p_th = p; end
     [~, plus] = medium_setup(p, masks, struct());
     kwave_medium.temp_0 = plus.temp_0;
     if plus.absorption_from_coeff   % as thermal_stage
@@ -490,17 +610,18 @@ function [obj, tss, res] = run_thermal(p, pr, kgrid, kwave_medium, masks)
     end
     sensor = struct('mask', ones(p.grid.dims));
     source = struct('Q', zeros(p.grid.dims));
-    [~, obj, tss, res] = evalc_out(@() thermal_simulation(p, struct('p_max_all', pr), kgrid, ...
+    [~, obj, tss, res] = evalc_out(@() thermal_simulation(p_th, struct('p_max_all', pr), kgrid, ...
         kwave_medium, sensor, source, eye(4), masks));
 end
 
-function out = call_thermal_stage(p, sd, kgrid, kwave_medium, medium_plus, masks)
-    if nargin < 6; masks = ones(p.grid.dims); end
+function out = call_thermal_stage(p, sd, kgrid, kwave_medium, medium_plus, masks, fov)
+% fov: fov_state of ACOUSTIC_FOV_CROP (default: no acoustic FOV)
+    if nargin < 6 || isempty(masks); masks = ones(p.grid.dims); end
+    if nargin < 7; fov = struct('active', false); end
     if isempty(fieldnames(kwave_medium)); kwave_medium = struct('density', 1); end
     planimg = struct('transf', eye(4));
     sensor = struct('mask', ones(p.grid.dims));
     source = struct('Q', zeros(p.grid.dims));
-    fov = struct('active', false);
     [~, out.results_heating, out.time_status_seq, ~, ~, ~, ~, ~, out.parameters] = evalc_out( ...
         @() thermal_stage(p, sd, kgrid, kwave_medium, medium_plus, masks, masks, planimg, ...
         source, sensor, p.transducer.trans_pos, p.transducer.focus_pos, struct(), fov));

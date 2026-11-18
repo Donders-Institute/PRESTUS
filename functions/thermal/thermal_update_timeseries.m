@@ -13,7 +13,9 @@ function timeseries = thermal_update_timeseries(parameters, medium_masks, timese
 %
 % Input:
 %   parameters   - PRESTUS config; must contain thermal.temp_0 per-layer baseline [°C]
-%   medium_masks - layer label map
+%   medium_masks - layer label map, or the struct of per-layer logical masks
+%                  (TISSUEMASK_BINARY) built once by the caller: rebuilding them at
+%                  every segment of a long protocol costs more than the diffusion step
 %   timeseries   - existing timeseries struct to extend (omit or [] to initialise)
 %   curT         - current temperature volume [°C]
 %   curCEM43     - current k-Wave CEM43 volume [min]
@@ -25,8 +27,12 @@ function timeseries = thermal_update_timeseries(parameters, medium_masks, timese
 %
 % See also: THERMAL_SIMULATION, TISSUEMASK_BINARY
 
-    % Get masks
-    mask = tissuemask_binary(parameters, medium_masks);
+    % Get masks (precomputed by the caller, or built from the label map)
+    if isstruct(medium_masks)
+        mask = medium_masks;
+    else
+        mask = tissuemask_binary(parameters, medium_masks);
+    end
     layers = fieldnames(mask);
 
     track_iso = nargin >= 6 && ~isempty(curCEM43_iso);

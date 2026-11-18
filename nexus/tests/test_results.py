@@ -188,6 +188,21 @@ def test_read_heat(tmp_path):
         rs.read_heat(tmp_path / "missing.mat")
 
 
+def test_read_heat_thinned_focal_plane(tmp_path):
+    # Focal-axis series on every 2nd frame (HEAT.planetime); tissue series on every segment
+    sio = pytest.importorskip("scipy.io")
+    path = tmp_path / "cache" / f"{TAG}_{MED}_HEAT.mat"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    t, tp = np.arange(7, dtype=float), np.array([0.0, 2.0, 4.0, 6.0])
+    sio.savemat(str(path), {
+        "timeseries": {"T": {"brain": np.linspace(37, 38, 6)}},
+        "HEAT": {"recordedtime": t, "planetime": tp, "temp": {"TARGET": tp + 37}}})
+    heat = rs.read_heat(path)
+    assert np.allclose(heat.metrics["Temperature (focal axis)"].time, tp)
+    assert np.allclose(heat.metrics["Temperature (focal axis)"].tissues["TARGET"], tp + 37)
+    assert np.allclose(heat.metrics["Temperature (tissue max)"].time, t[1:])
+
+
 def test_heating_tab(schema, tmp_path):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PyQt6")

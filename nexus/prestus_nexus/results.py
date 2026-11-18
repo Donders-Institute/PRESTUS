@@ -301,7 +301,9 @@ class HeatReadError(RuntimeError):
 def read_heat(path: Path) -> HeatData:
     """Thermal time courses from a run's HEAT .mat file. The time axis follows
     thermal_plot_sim.m: TimeProfileTarget when it has one entry per sample (BabelBrain),
-    else HEAT.recordedtime without its t=0 entry. Sonication-on intervals come from
+    else HEAT.recordedtime without its t=0 entry; the focal-axis series ('HEAT') use
+    HEAT.planetime when present (PRESTUS may keep every k-th focal-plane frame), else
+    HEAT.recordedtime. Sonication-on intervals come from
     time_status_seq, which PRESTUS saves there since 2026-10-05 (else none)."""
     import numpy as np
     if not path.is_file():
@@ -314,6 +316,7 @@ def read_heat(path: Path) -> HeatData:
         raise HeatReadError(f"Cannot read {path.name}: {exc}") from exc
     ts, heat = raw.get("timeseries") or {}, raw.get("HEAT") or {}
     rec = np.ravel(np.asarray(heat.get("recordedtime", []), dtype=float))
+    plane_t = np.ravel(np.asarray(heat.get("planetime", []), dtype=float))
     metrics: dict[str, HeatSeries] = {}
     for label, (struct, fld, unit) in HEAT_METRICS.items():
         src = (ts if struct == "timeseries" else heat).get(fld)
@@ -333,7 +336,7 @@ def read_heat(path: Path) -> HeatData:
             else:
                 t = rec
         else:
-            t = rec
+            t = plane_t if plane_t.size else rec
         if t.size == 0:
             t = np.arange(n, dtype=float)
         n = min(n, t.size)

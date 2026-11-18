@@ -32,7 +32,9 @@ function [results_heating, time_status_seq, kwave_medium, medium_masks, ...
 %   All other inputs mirror the pipeline workspace after acoustic stage.
 %
 % Outputs:
-%   results_heating  - struct with temperature and CEM43 timeseries
+%   results_heating  - struct with temperature and CEM43 timeseries, on the
+%                      acoustic grid (a separate thermal grid's results are
+%                      mapped back: grid.thermal_resolution_mm / thermal_fov_mm)
 %   time_status_seq  - protocol on/off event sequence for thermal_plot_sim
 %   kwave_medium     - input kwave_medium updated with temp_0 from thermal grid
 %   medium_masks     - tissue masks in the coordinate space used by thermal sim
@@ -149,6 +151,20 @@ if run_new_sim
     else
         kwave_medium.absorption_fraction = medium_plus.absorption_fraction;
     end
+    % async transducers at different frequencies: absorption at each frequency
+    if isfield(medium_plus, 'absorption_power') && numel(unique([parameters.transducer.freq_hz])) > 1
+        kwave_medium.absorption_power = medium_plus.absorption_power;
+    end
+    % medium_plus holds full-grid maps; with thermal_use_acoustic_fov the medium
+    % stays on the acoustic FOV, so crop them to it
+    if thermal_use_acoustic_fov
+        for fn = {'temp_0', 'absorption_np', 'absorption_fraction', 'absorption_power'}
+            if isfield(kwave_medium, fn{1})
+                kwave_medium.(fn{1}) = crop_to_fov(kwave_medium.(fn{1}), fov_state.offset, ...
+                    parameters.grid.dims, fov_state.full_dims);
+            end
+        end
+    end
 
     use_babelbrain_acoustic = isfield(parameters, 'acoustic_backend') && ...
         strcmpi(parameters.acoustic_backend, 'babelbrain');
@@ -159,9 +175,28 @@ if run_new_sim
          parameters.grid.thermal_resolution_mm ~= parameters.grid.resolution_mm) || ...
         (isfield(parameters.grid, 'thermal_fov_mm') && ~isempty(parameters.grid.thermal_fov_mm));
 
+    use_bb_thermal = isfield(parameters, 'thermal_backend') && ...
+        strcmpi(parameters.thermal_backend, 'babelbrain');
+
     if use_separate_grid
+        % k-Wave heating needs the pressure on the thermal grid: it gets the
+        % medium's crop and resampling, as p^2 so that each thermal voxel
+        % holds the mean intensity (heat source) over the voxels it covers.
+        % BabelBrain thermal reads the acoustic-grid pressure itself.
+        medium_in  = kwave_medium;
+        resample_p = ~use_bb_thermal && isstruct(sensor_data) && isfield(sensor_data, 'p_max_all');
+        if resample_p
+            medium_in.p_sq_for_thermal = single(gather(sensor_data.p_max_all)).^2;
+        end
         [kgrid_th, kwave_medium_th, medium_masks_th, parameters_th, transf_th] = ...
-            thermal_grid_setup(parameters, planimg, kwave_medium, medium_masks, trans_pos, focus_pos);
+            thermal_grid_setup(parameters, planimg, medium_in, medium_masks, trans_pos, focus_pos);
+        clear medium_in
+        if resample_p
+            if isfield(parameters_th.grid, 'thermal_fov_start_ac')   % grids differ
+                sensor_data.p_max_all = sqrt(max(kwave_medium_th.p_sq_for_thermal, 0));
+            end
+            kwave_medium_th = rmfield(kwave_medium_th, 'p_sq_for_thermal');
+        end
         sensor_th      = struct('mask', ones(parameters_th.grid.dims));
         source_th      = struct('Q',    zeros(parameters_th.grid.dims));
     else
@@ -182,9 +217,6 @@ if run_new_sim
             source_th = struct('Q',    zeros(parameters_th.grid.dims));
         end
     end
-
-    use_bb_thermal = isfield(parameters, 'thermal_backend') && ...
-        strcmpi(parameters.thermal_backend, 'babelbrain');
 
     if use_bb_thermal
         % Propagate free-water ISPPA for the wrapper's transmission log line.
@@ -251,6 +283,13 @@ if run_new_sim
         run_stats('set', 'thermal_voxels', kgrid_th.total_grid_points);
     end
 
+    % A separate thermal grid: the results go back onto the acoustic grid, on
+    % which the cache, thermal_analysis and nifti_thermal (masks, planimg) work
+    if isfield(parameters_th.grid, 'thermal_fov_start_ac')
+        results_heating = thermal_results_to_acoustic(results_heating, parameters, ...
+            parameters_th, kwave_medium.temp_0);
+    end
+
     if should_save_output(parameters.io, 'save_thermal_matrices')
         save(filename_heating_data, ...
             'kwaveDiffusion', 'time_status_seq', 'sensor_th', ...
@@ -259,7 +298,7 @@ if run_new_sim
         disp('Not saving thermal simulation output matrices ...')
     end
 
-    if isfield(kwave_medium_th, 'temp_0')
+    if isfield(kwave_medium_th, 'temp_0') && ~isfield(parameters_th.grid, 'thermal_fov_start_ac')
         kwave_medium.temp_0 = kwave_medium_th.temp_0;
     end
 
@@ -275,15 +314,86 @@ elseif exist(filename_heating_data, 'file')
     end
     if isfield(loaded, 'kwave_medium_th') && isfield(loaded.kwave_medium_th, 'temp_0')
         kwave_medium.temp_0 = loaded.kwave_medium_th.temp_0;
+        % a separate thermal grid's temp_0 is not on the acoustic grid
+        if ~isequal(size(kwave_medium.temp_0), double(parameters.grid.dims)) && ...
+                isstruct(medium_plus) && isfield(medium_plus, 'temp_0') && ...
+                isequal(size(medium_plus.temp_0), double(parameters.grid.dims))
+            kwave_medium.temp_0 = medium_plus.temp_0;
+        end
     end
     parameters.state.heating_available = 1;
 
 else
+    % Reached only when an interactive user declines the thermal simulation
     warning('prestus_pipeline:thermalNoAcoustics', ...
-        ['Heating simulations requested but no acoustic results are available. ' ...
-         'Check that run_acoustic_sims is enabled and the acoustic cache file exists.']);
+        'Thermal simulation not run and no heating cache found (%s); skipping thermal analysis.', ...
+        filename_heating_data);
     parameters.state.heating_available  = 0;
     parameters.modules.run_thermal_analysis = 0;
 end
 
+end
+
+% =========================================================================
+function res = thermal_results_to_acoustic(res, parameters, parameters_th, temp_0_ac)
+% Map thermal-grid result volumes (3-D maps and [x z t] focal planes) onto the
+% acoustic grid. Nearest-neighbour, so every thermal voxel value (and so each
+% peak) is kept. Outside the thermal FOV: the baseline temperature temp_0_ac
+% for temperatures, 0 for everything else (CEM43, pressure). The maps take the
+% class of temp_0_ac: the thermal grid works in single (thermal_grid_setup),
+% and results should not change class with the thermal grid option.
+lo      = parameters_th.grid.thermal_fov_start_ac;
+hi      = parameters_th.grid.thermal_fov_end_ac;
+box     = hi - lo + 1;
+ac_dims = double(parameters.grid.dims);
+th_dims = double(parameters_th.grid.dims);
+y_ac    = parameters.transducer(1).trans_pos(2);   % focal plane, as thermal_analysis reads it
+temp_0_ac = gather(temp_0_ac);
+if isscalar(temp_0_ac)
+    temp_0_ac = repmat(temp_0_ac, ac_dims);
+end
+temp_fields = {'maxT', 'heating_endT', 'focal_planeT'};
+fns = fieldnames(res);
+for i = 1:numel(fns)
+    f = fns{i};
+    v = res.(f);
+    if ~isnumeric(v) || isempty(v)
+        continue
+    end
+    v = cast(gather(v), 'like', temp_0_ac);
+    is_temp = ismember(f, temp_fields);
+    if startsWith(f, 'focal_plane')
+        if ~isequal(size(v, [1 2]), th_dims([1 3]))
+            continue
+        end
+        nt = size(v, 3);
+        if is_temp
+            out = repmat(cast(squeeze(temp_0_ac(:, y_ac, :)), 'like', v), [1 1 nt]);
+        else
+            out = zeros([ac_dims([1 3]) nt], 'like', v);
+        end
+        out(lo(1):hi(1), lo(3):hi(3), :) = imresize3(v, [box([1 3]) nt], 'nearest');
+    elseif isequal(size(v), th_dims)
+        if is_temp
+            out = cast(temp_0_ac, 'like', v);
+        else
+            out = zeros(ac_dims, 'like', v);
+        end
+        out(lo(1):hi(1), lo(2):hi(2), lo(3):hi(3)) = imresize3(v, box, 'nearest');
+    else
+        continue
+    end
+    res.(f) = out;
+end
+end
+
+function v = crop_to_fov(v, offset, dims, full_dims)
+% Crop a full-grid map (first three dimensions) to the acoustic FOV; scalars and
+% maps already on the FOV pass through.
+sz = size(v);
+if numel(sz) < 3 || ~isequal(sz(1:3), double(full_dims(:)'))
+    return
+end
+e = offset + dims - 1;
+v = v(offset(1):e(1), offset(2):e(2), offset(3):e(3), :);
 end

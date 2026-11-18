@@ -301,12 +301,19 @@ params_thermal = thermal_parameters(parameters);
 thermal_plot_protocol(params_thermal, parameters);
 
 fprintf('[thermal_simulation] ---- thermal simulation summary ----\n');
-fprintf('[thermal_simulation]   grid dims      : %d x %d x %d\n', parameters.grid.dims(1), parameters.grid.dims(2), parameters.grid.dims(3));
-fprintf('[thermal_simulation]   resolution     : %.2f x %.2f x %.2f mm\n', kgrid.dx*1e3, kgrid.dy*1e3, kgrid.dz*1e3);
-fprintf('[thermal_simulation]   ON phases      : %d  (n_ptri_reps=%d, n_pulses_per_pt=%d)\n', params_thermal.n_ptri_reps*params_thermal.n_pulses_per_pt, params_thermal.n_ptri_reps, params_thermal.n_pulses_per_pt);
-fprintf('[thermal_simulation]   OFF phases     : %d\n', params_thermal.n_ptri_reps*params_thermal.n_pulses_per_pt*(params_thermal.pt_off_steps_n>0) + params_thermal.n_ptri_reps*(params_thermal.ptri_off_steps_n>0) + (params_thermal.post_ptri_steps_n>0));
-fprintf('[thermal_simulation]   heating dur    : %.1f ms\n', params_thermal.n_ptri_reps*params_thermal.n_pulses_per_pt*params_thermal.pt_on_steps_n*params_thermal.pt_on_steps_dur*1e3);
-fprintf('[thermal_simulation]   total sim time : %.1f ms\n', (params_thermal.n_ptri_reps*(params_thermal.n_pulses_per_pt*(params_thermal.pt_on_steps_n*params_thermal.pt_on_steps_dur + params_thermal.pt_off_steps_n*params_thermal.pt_off_steps_dur) + params_thermal.ptri_off_steps_n*params_thermal.ptri_off_step_dur) + params_thermal.post_ptri_steps_n*params_thermal.post_ptri_step_dur)*1e3);
+% 2D or 3D: print as many dimensions as the grid has
+grid_spacing_mm = [kgrid.dx, kgrid.dy, kgrid.dz] * 1e3;
+fprintf('[thermal_simulation]   grid dims      : %s\n', strjoin(string(parameters.grid.dims), ' x '));
+fprintf('[thermal_simulation]   resolution     : %s mm\n', ...
+    strjoin(compose('%.2f', grid_spacing_mm(1:numel(parameters.grid.dims))), ' x '));
+if n_src > 1
+    fprintf('[thermal_simulation]   heat sources   : %d (async schedule ''%s''; offsets %s s)\n', ...
+        n_src, sched.mode, mat2str([sched.source.offset_s], 4));
+end
+fprintf('[thermal_simulation]   ON segments    : %d\n', nnz(any(sched.active, 2)));
+fprintf('[thermal_simulation]   OFF segments   : %d\n', nnz(~any(sched.active, 2)));
+fprintf('[thermal_simulation]   heating dur    : %.1f ms\n', sum(sched.dur(any(sched.active, 2)))*1e3);
+fprintf('[thermal_simulation]   total sim time : %.1f ms\n', sched.t_end*1e3);
 if strcmp(parameters.simulation.code_type, 'matlab_gpu') || strcmp(parameters.simulation.code_type, 'cpp_gpu')
     fprintf('[thermal_simulation]   compute mode   : GPU (%s)\n', parameters.simulation.code_type);
 else
@@ -326,41 +333,57 @@ total_timepoints = 1 + n_ptri_reps * snapshots_per_ptri + params_thermal.post_pt
 % ETA below). kWaveDiffusion's own built-in estimate (external/k-wave)
 % requires >=10 steps within a single takeTimeStep call to fire, which the
 % short per-pulse ON/OFF calls here rarely reach — so PRESTUS times the first
-% ON-phase call itself and extrapolates across calls instead.
-total_thermal_steps = n_ptri_reps * (n_pulses_pt * (params_thermal.pt_on_steps_n + params_thermal.pt_off_steps_n) ...
-    + params_thermal.ptri_off_steps_n) + params_thermal.post_ptri_steps_n;
+% call itself and extrapolates across calls instead.
+total_thermal_steps = sched.total_steps;
+
+% Focal-plane frames (x-z plane through the transducer in 3D, the whole grid in
+% 2D): three arrays of one frame per timepoint. Long protocols on large planes
+% keep every k-th segment (plus the initial and final state) within
+% thermal.max_focal_plane_gb; the per-tissue time series and the max/end maps
+% use every segment.
+max_plane_gb = 2;
+if isfield(parameters, 'thermal') && isfield(parameters.thermal, 'max_focal_plane_gb') ...
+        && ~isempty(parameters.thermal.max_focal_plane_gb)
+    max_plane_gb = parameters.thermal.max_focal_plane_gb;
+end
+if ndims(T_max) == 3
+    plane_numel = size(T_max, 1) * size(T_max, 3);
+else
+    plane_numel = numel(T_max);
+end
+[plane_keep, plane_stride] = thermal_plane_frames(total_timepoints, plane_numel, max_plane_gb);
+n_plane = nnz(plane_keep);
+if plane_stride > 1
+    fprintf(['[thermal_simulation]   focal plane    : every %d. segment (%d of %d frames; ' ...
+        'thermal.max_focal_plane_gb = %g)\n'], plane_stride, n_plane, total_timepoints, max_plane_gb);
+end
 
 % Resize focal arrays
 if ndims(T_max) == 3
-    T_focal         = NaN([size(T_max,[1,3]) total_timepoints]);
-    CEM43_focal     = NaN([size(T_max,[1,3]) total_timepoints]);
-    CEM43_iso_focal = NaN([size(T_max,[1,3]) total_timepoints]);
+    T_focal         = NaN([size(T_max,[1,3]) n_plane]);
+    CEM43_focal     = NaN([size(T_max,[1,3]) n_plane]);
+    CEM43_iso_focal = NaN([size(T_max,[1,3]) n_plane]);
     T_focal(:,:,1)         = squeeze(T_max(:,tr.trans_pos(2),:));
     CEM43_focal(:,:,1)     = squeeze(CEM43_max(:,tr.trans_pos(2),:));
     CEM43_iso_focal(:,:,1) = squeeze(CEM43_iso_max(:,tr.trans_pos(2),:));
 elseif ndims(T_max) == 2
-    T_focal         = NaN([size(T_max) total_timepoints]);
-    CEM43_focal     = NaN([size(CEM43_max) total_timepoints]);
-    CEM43_iso_focal = NaN([size(CEM43_iso_max) total_timepoints]);
+    T_focal         = NaN([size(T_max) n_plane]);
+    CEM43_focal     = NaN([size(CEM43_max) n_plane]);
+    CEM43_iso_focal = NaN([size(CEM43_iso_max) n_plane]);
     T_focal(:,:,1)         = T_max;
     CEM43_focal(:,:,1)     = CEM43_max;
     CEM43_iso_focal(:,:,1) = CEM43_iso_max;
 end
 
-% setup structure for layer-specific timerseries
-timeseries = thermal_update_timeseries(parameters, medium_masks);
-
-cur_timepoint = 1;
-time_status_seq = struct('status', {'off'}, 'time', {0}, 'step', {0}, 'recorded', {1});
-
-fprintf('Starting %d PTRI reps (PTRD=%.1fs), each with %d pulses (PTD=%.2fs)\n', ...
-    n_ptri_reps, params_thermal.ptrd, n_pulses_pt, params_thermal.ptd);
-
-% === Outer loop - PTRI (Pulse Train Repetitions) ===
-for rep_i = 1:n_ptri_reps
-    fprintf('Pulse Train Repetition %d/%d\n', rep_i, n_ptri_reps);
-    if mod(rep_i, max(1, floor(n_ptri_reps/5))) == 0
-        fprintf('[thermal_simulation]   phase %d/%d\n', rep_i, n_ptri_reps);
+% Per-layer masks for the time series, built once (on the GPU for GPU runs):
+% rebuilding them at every segment cost seconds per segment on large grids
+on_gpu = any(strcmp(parameters.simulation.code_type, {'matlab_gpu', 'cpp_gpu'}));
+ts_masks = tissuemask_binary(parameters, medium_masks);
+for f = fieldnames(ts_masks)'
+    if nnz(ts_masks.(f{1})) == 0
+        ts_masks = rmfield(ts_masks, f{1});
+    elseif on_gpu
+        ts_masks.(f{1}) = gpuArray(ts_masks.(f{1}));
     end
     
     % === 1. Inner loop: Pulse Trains (multiple pulses) ===
@@ -396,27 +419,26 @@ for rep_i = 1:n_ptri_reps
             figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
         end
 
-        % CEM43 iso update — R uses T_max so that any voxel that has previously
-        % exceeded 43 °C permanently accumulates at R=0.5, even after cooling.
-        % Irreversible damage (T>=57 ever reached) is recorded as Inf. See doc_simulations-thermal.md.
-        tmp_obj.cem43_iso = tmp_obj.cem43_iso + ...
-            cem43_iso_increment(thermal_diff_obj.T, T_max, params_thermal.pt_on_steps_n*params_thermal.pt_on_steps_dur);
-        
-        % Record status
-        time_status_seq = [time_status_seq, struct(...
-            'time', num2cell(max([time_status_seq(:).time]) + params_thermal.pt_on_steps_n*params_thermal.pt_on_steps_dur), ...
-            'step', num2cell(max([time_status_seq(:).step]) + params_thermal.pt_on_steps_n), ...
-            'status', tmp_status, 'recorded', 1)];
-        
-        % Update focal / max
-        T_cur         = thermal_diff_obj.T;
-        CEM43_cur     = thermal_diff_obj.cem43;
-        CEM43_iso_cur = tmp_obj.cem43_iso;
-        cur_timepoint = cur_timepoint + 1;
-        if ndims(T_max) == 3
-            T_focal(:,:,cur_timepoint)         = squeeze(T_cur(:,tr.trans_pos(2),:));
-            CEM43_focal(:,:,cur_timepoint)     = squeeze(CEM43_cur(:,tr.trans_pos(2),:));
-            CEM43_iso_focal(:,:,cur_timepoint) = squeeze(CEM43_iso_cur(:,tr.trans_pos(2),:));
+cur_timepoint = 1;
+cur_plane = 1;
+seq_status = repmat({'off'}, 1, n_seg);
+seq_status(any(sched.active, 2)) = {'on'};
+cur_pattern = 0;
+report_every = max(1, floor(n_seg / 10));
+
+fprintf('Starting %d thermal segments (%.1f s sonication + %.1f s post)\n', ...
+    n_seg, sched.t_sonication, sched.t_end - sched.t_sonication);
+
+for seg_i = 1:n_seg
+    if mod(seg_i, report_every) == 0
+        fprintf('[thermal_simulation]   segment %d/%d (t = %.2f s)\n', seg_i, n_seg, sched.t0(seg_i));
+    end
+
+    % Heat source: the sum of the sources on during this segment
+    j = pattern_of_seg(seg_i);
+    if j ~= cur_pattern
+        if isempty(Q_pattern{j})
+            thermal_diff_obj.Q(:,:,:) = 0;
         else
             T_focal(:,:,cur_timepoint)         = T_cur;
             CEM43_focal(:,:,cur_timepoint)     = CEM43_cur;
@@ -531,29 +553,27 @@ if params_thermal.post_ptri_steps_n > 0
             figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
         end
 
-        % CEM43 iso update — see ON-phase comment for R=T_max rationale.
-        tmp_obj.cem43_iso = tmp_obj.cem43_iso + ...
-            cem43_iso_increment(thermal_diff_obj.T, T_max, 1*params_thermal.post_ptri_step_dur);
-        
-        % Record status (identical)
-        time_status_seq = [time_status_seq struct(...
-            'time', num2cell(max([time_status_seq(:).time]) + params_thermal.post_ptri_step_dur), ...
-            'step', num2cell(max([time_status_seq(:).step]) + 1), ...
-            'status', 'off', 'recorded', 1)];
-        
-        % Update focal / max
-        T_cur         = thermal_diff_obj.T;
-        CEM43_cur     = thermal_diff_obj.cem43;
-        CEM43_iso_cur = tmp_obj.cem43_iso;
-        cur_timepoint = cur_timepoint + 1;
+    % CEM43 iso update — R uses T_max so that any voxel that has previously
+    % exceeded 43 °C permanently accumulates at R=0.5, even after cooling.
+    % Irreversible damage (T>=57 ever reached) is recorded as Inf. See doc_simulations-thermal.md.
+    tmp_obj.cem43_iso = tmp_obj.cem43_iso + ...
+        cem43_iso_increment(thermal_diff_obj.T, T_max, sched.dur(seg_i));
+
+    % Update focal / max
+    T_cur         = thermal_diff_obj.T;
+    CEM43_cur     = thermal_diff_obj.cem43;
+    CEM43_iso_cur = tmp_obj.cem43_iso;
+    cur_timepoint = cur_timepoint + 1;
+    if plane_keep(cur_timepoint)
+        cur_plane = cur_plane + 1;
         if ndims(T_max) == 3
-            T_focal(:,:,cur_timepoint)         = squeeze(T_cur(:,tr.trans_pos(2),:));
-            CEM43_focal(:,:,cur_timepoint)     = squeeze(CEM43_cur(:,tr.trans_pos(2),:));
-            CEM43_iso_focal(:,:,cur_timepoint) = squeeze(CEM43_iso_cur(:,tr.trans_pos(2),:));
+            T_focal(:,:,cur_plane)         = squeeze(T_cur(:,tr.trans_pos(2),:));
+            CEM43_focal(:,:,cur_plane)     = squeeze(CEM43_cur(:,tr.trans_pos(2),:));
+            CEM43_iso_focal(:,:,cur_plane) = squeeze(CEM43_iso_cur(:,tr.trans_pos(2),:));
         else
-            T_focal(:,:,cur_timepoint)         = T_cur;
-            CEM43_focal(:,:,cur_timepoint)     = CEM43_cur;
-            CEM43_iso_focal(:,:,cur_timepoint) = CEM43_iso_cur;
+            T_focal(:,:,cur_plane)         = T_cur;
+            CEM43_focal(:,:,cur_plane)     = CEM43_cur;
+            CEM43_iso_focal(:,:,cur_plane) = CEM43_iso_cur;
         end
         T_max         = max(T_max,         T_cur);
         CEM43_max     = max(CEM43_max,     CEM43_cur);
@@ -561,12 +581,26 @@ if params_thermal.post_ptri_steps_n > 0
         timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, T_cur, CEM43_cur, CEM43_iso_cur);
 
     end
+    T_max         = max(T_max,         T_cur);
+    CEM43_max     = max(CEM43_max,     CEM43_cur);
+    CEM43_iso_max = max(CEM43_iso_max, CEM43_iso_cur);
+    timeseries = thermal_update_timeseries(parameters, ts_masks, timeseries, T_cur, CEM43_cur, CEM43_iso_cur);
 end
 
+% Protocol on/off sequence for thermal_plot_sim: the initial state, then one
+% entry per segment (time at its end, cumulative steps); 'plane' marks the
+% entries that have a focal-plane frame
+time_status_seq = struct( ...
+    'status',   [{'off'}, seq_status], ...
+    'time',     num2cell([0, (sched.t0 + sched.dur)']), ...
+    'step',     num2cell([0, cumsum(sched.n_steps)']), ...
+    'recorded', num2cell(ones(1, n_seg + 1)), ...
+    'plane',    num2cell(double(plane_keep)));
+
 % Trim unused timepoints (if too many were originally required)
-T_focal         = T_focal(:,:,1:cur_timepoint);
-CEM43_focal     = CEM43_focal(:,:,1:cur_timepoint);
-CEM43_iso_focal = CEM43_iso_focal(:,:,1:cur_timepoint);
+T_focal         = T_focal(:,:,1:cur_plane);
+CEM43_focal     = CEM43_focal(:,:,1:cur_plane);
+CEM43_iso_focal = CEM43_iso_focal(:,:,1:cur_plane);
 
 % Gather results into output struct (gathering from GPU if needed)
 results_heating.maxT                 = gather(T_max);

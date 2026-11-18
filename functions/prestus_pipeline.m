@@ -381,7 +381,19 @@ function [parameters] = prestus_pipeline(parameters, options)
     end
     log_timer('stop', 'acoustic_analysis');
 
-    if parameters.state.acoustics_available
+    % Acoustic NIfTIs (+ their sidecar and the targeting analysis that reads
+    % them) need the analysis results and modules.run_nifti_creation
+    write_acoustic_nifti = parameters.state.acoustics_available && ~isempty(results_acoustic) && ...
+        (~isfield(parameters.modules, 'run_nifti_creation') || parameters.modules.run_nifti_creation);
+    if parameters.state.acoustics_available && ~write_acoustic_nifti
+        if isempty(results_acoustic)
+            why = 'no acoustic analysis results';
+        else
+            why = 'modules.run_nifti_creation = 0';
+        end
+        fprintf('[prestus_pipeline] Acoustic NIfTIs skipped (%s).\n', why);
+    end
+    if write_acoustic_nifti
         log_timer('start', 'nifti_acoustic', parameters.io.dir_output);
         if fov_state.active
             % Back-project FOV-sized analysis volumes onto the full grid before
