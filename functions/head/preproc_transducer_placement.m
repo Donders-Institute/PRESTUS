@@ -135,6 +135,9 @@ end
     % Resolved positions for other tools, e.g. the Nexus viewer (never errors)
     write_placement_positions(parameters, mode);
 
+    % Poses for other tools: Brainsight, 3D Slicer, k-Plan (placement.export_formats; never errors)
+    export_placement(parameters);
+
     % Stand-alone placement report (never errors; see generate_placement_report)
     if ~isfield(parameters, 'placement') || ~isfield(parameters.placement, 'report') ...
             || isempty(parameters.placement.report) || logical(parameters.placement.report)

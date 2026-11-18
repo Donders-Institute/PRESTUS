@@ -17,7 +17,7 @@ import math
 import os
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -501,24 +501,31 @@ def medium_clearance(medium: np.ndarray, depth: np.ndarray, offsets: np.ndarray,
     return centre, float(np.nanmin(gaps)) if np.isfinite(gaps).any() else nan
 
 
-# ── Trajectory files (Brainsight, 3D Slicer) ─────────────────────────────
+# ── Trajectory files (Brainsight, 3D Slicer, k-Plan) ─────────────────────
 
 @dataclass
 class Trajectory:
     name: str
-    target: np.ndarray            # RAS mm (focus)
+    target: np.ndarray | None       # RAS mm (focus); None when the file holds no target
     towards_transducer: np.ndarray  # unit vector target -> transducer
     source: str
+    transducer: np.ndarray | None = None   # bowl apex, RAS mm, when the file gives it (k-Plan)
+    notes: list[str] = field(default_factory=list)
 
 
-def read_trajectory(path: str | Path) -> Trajectory:
-    """Brainsight target export (.txt) or 3D Slicer ITK transform (.tfm/.txt).
+def read_trajectory(path: str | Path, t1: Volume | None = None) -> Trajectory:
+    """Brainsight target export (.txt), 3D Slicer ITK transform (.tfm/.txt), or a
+    k-Plan plan file (.kdp device parameters, .kps transducer positions,
+    PLAN-*-RESULTS.h5; needs ``t1``, see read_kplan).
 
     Follows BabelBrain (ConvMatTransform.py / BabelDatasetPreps.py): the
     4x4 location is the target and the transducer lies along the matrix's
     +z column. Slicer transforms are converted to that convention first.
     """
     path = Path(path)
+    with open(path, "rb") as f:
+        if f.read(8) == b"\x89HDF\r\n\x1a\n":
+            return read_kplan(path, t1)
     text = path.read_text(errors="ignore")
     if "Insight Transform File" in text or "Transform: AffineTransform" in text:
         return _read_slicer(text, path)
@@ -576,6 +583,83 @@ def _read_slicer(text: str, path: Path) -> Trajectory:
     bs = np.linalg.inv(ras2lps @ itk @ ras2lps)      # itk_to_BSight
     bs[:3, :3] = np.diag([-1.0, -1, -1]) @ bs[:3, :3]
     return _to_trajectory(bs, path.stem, "3D Slicer")
+
+
+def _h5_str(v) -> str:
+    v = v.decode(errors="ignore") if isinstance(v, bytes) else v
+    return str(v[0] if isinstance(v, np.ndarray) and v.size else v).strip()
+
+
+def read_kplan(path: str | Path, t1: Volume | None) -> Trajectory:
+    """Transducer pose and target of a k-Plan plan, in the RAS of ``t1``.
+
+    Reads a .kdp (device parameters: pose, target, focal distance, transducer),
+    a .kps (transducer positions: pose only) or a PLAN-*-RESULTS.h5. k-Plan's
+    position_transform is row-vector form: rows 1-3 are the transducer axes,
+    row 4 the bowl apex [m], and the beam points along -z. k-Plan world
+    coordinates [m] count from the first voxel of the planning image along its
+    axes (world = 0-based voxel x voxel size), checked on plans 50-770 and
+    69-928. They map to ``t1`` RAS when k-Plan's planning image has t1's voxel
+    grid: a copy of t1 with the same voxels and the rotation removed from the header, or
+    t1 itself when its axes are not rotated or flipped. Only the pose and
+    target are read; k-Plan's transducer model and drive stay k-Plan's.
+    """
+    try:
+        import h5py
+    except ImportError:
+        raise ValueError("Reading k-Plan files needs h5py: conda install h5py") from None
+    if t1 is None:
+        raise ValueError("k-Plan coordinates need the subject's T1: load it first")
+    path = Path(path)
+    with h5py.File(str(path), "r") as h:
+        ftype = _h5_str(h.attrs.get("file_type", ""))
+        if "sonications/1/sonication_parameters/position_transform" in h:
+            sp = h["sonications/1/sonication_parameters"]
+            T = np.asarray(sp["position_transform"][()], float).reshape(4, 4)
+            target_w = np.asarray(sp["target_position"][()], float).ravel() * 1e3 if "target_position" in sp else None
+            focal = float(np.ravel(sp["focal_distance"][()])[0]) * 1e3 if "focal_distance" in sp else None
+            name = _h5_str(h.attrs.get("plan_label", "")) or _h5_str(h["sonications/1"].attrs.get("sonication_label", ""))
+        elif "1/position_transform" in h:
+            T = np.asarray(h["1/position_transform"][()], float).reshape(4, 4)
+            target_w, focal = None, None
+            name = _h5_str(h["1"].attrs.get("transform_label", ""))
+        else:
+            raise ValueError(f"{path.name}: not a k-Plan plan file (no position_transform)")
+        tx = h["transducer"].attrs if "transducer" in h else {}
+        tx_id = _h5_str(tx.get("transducer_id", "")) if tx else ""
+        offset = None
+        if "transducer/properties/focal_distance_surface_offset" in h:
+            offset = float(np.ravel(h["transducer/properties/focal_distance_surface_offset"][()])[0]) * 1e3
+
+    vox = t1.voxel_size
+    A = t1.affine[:3, :3] / vox                       # unit voxel axes in RAS
+    def world_to_ras(p_mm):
+        return t1.to_ras(np.asarray(p_mm) / vox)[0]
+    def world_dir_to_ras(d):
+        v = A @ np.asarray(d, float)
+        return v / np.linalg.norm(v)
+
+    apex = world_to_ras(T[3, :3] * 1e3)
+    towards_tx = world_dir_to_ras(T[2, :3])            # beam along -z: the transducer lies along +z
+    target = None if target_w is None else world_to_ras(target_w)
+    if target is not None:
+        v = t1.to_voxel(target)[0]
+        if np.any((v < -0.5) | (v > np.array(t1.shape) - 0.5)):
+            raise ValueError("k-Plan target lies outside this T1: is it the subject and image the plan was made on?")
+
+    notes = []
+    if not np.allclose(A, np.diag(np.diag(A)), atol=1e-3) or np.any(np.diag(A) < 0):
+        notes.append("This T1 is rotated or flipped: the import is right only if k-Plan received "
+                     "a copy of it with the same voxels and the rotation removed from the header.")
+    if focal is not None:
+        notes.append(f"k-Plan focal distance {focal:.2f} mm"
+                     + (f" from its exit plane ({offset:.2f} mm in front of its bowl apex)" if offset else ""))
+    if tx_id:
+        notes.append(f"k-Plan transducer {tx_id}")
+    if ftype:
+        notes.append(f"from {ftype}")
+    src = "k-Plan"
+    return Trajectory(name or path.stem, target, towards_tx, src, transducer=apex, notes=notes)
 
 
 def find_t1(anat: str, pattern: str, subject_id: int) -> Path | None:

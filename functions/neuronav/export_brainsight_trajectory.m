@@ -1,7 +1,7 @@
 function out_path = export_brainsight_trajectory(trans_pos_ras, focus_pos_ras, target_name, out_path)
 % EXPORT_BRAINSIGHT_TRAJECTORY  Write a Brainsight version-14 trajectory file.
 %
-% Exports a tab-delimited Brainsight trajectory file (version 14, NIfTI:S:Scanner
+% Exports a tab-delimited Brainsight trajectory file (version 15 as BabelBrain writes it, NIfTI:S:<sform code>
 % coordinate system) that can be imported into Brainsight for neuronavigation-guided
 % transducer verification or placement confirmation.
 %
@@ -13,12 +13,14 @@ function out_path = export_brainsight_trajectory(trans_pos_ras, focus_pos_ras, t
 %   m1 (toolY) = lateral axis 2 (cross product of toolZ and toolX)
 %
 % Coordinate system note:
-%   "NIfTI:S:Scanner" means the NIfTI qform/sform space — i.e. the same RAS mm
-%   space that PRESTUS calls *_ras (derived from the T1 NIfTI header affine).
-%   No additional coordinate conversion is needed when passing PRESTUS *_ras values.
+%   "NIfTI:S:<code>" names the T1's sform and its NIfTI code (1 Scanner,
+%   2 Aligned, 3 Talairach, 4 MNI), i.e. the RAS mm space PRESTUS calls *_ras.
+%   Pass t1_file to take the code from the image; default 'Scanner' (charm's
+%   T1). BabelBrain writes 'Aligned' for every image and does not read it back.
 %
 % Use as:
 %   out_path = export_brainsight_trajectory(trans_pos_ras, focus_pos_ras, target_name, out_path)
+%   out_path = export_brainsight_trajectory(..., t1_file=t1)
 %
 % Input:
 %   trans_pos_ras - [1×3] bowl rear-centre position in RAS space [mm]
@@ -40,6 +42,19 @@ arguments
     focus_pos_ras (1,3) double
     target_name   (1,:) char
     out_path      (1,:) char
+    opts.t1_file  (1,:) char = ''
+end
+
+% Coordinate system label from the T1's sform code (NIfTI xform codes)
+cs = 'NIfTI:S:Scanner';
+if ~isempty(opts.t1_file)
+    codes = {'Scanner', 'Aligned', 'Talairach', 'MNI'};
+    sc = niftiinfo(opts.t1_file).raw.sform_code;
+    if sc >= 1 && sc <= 4
+        cs = ['NIfTI:S:' codes{sc}];
+    else
+        warning('PRESTUS:brainsight:noSform', '%s has no sform; labelled NIfTI:S:Scanner.', opts.t1_file);
+    end
 end
 
 % Beam axis: unit vector from acoustic focus toward transducer rear centre.
@@ -76,14 +91,14 @@ if fid == -1
 end
 cleanup = onCleanup(@() fclose(fid));   %#ok<NASGU>  closed on function exit
 
-fprintf(fid, '# Version: 14\n');
-fprintf(fid, '# Coordinate system: NIfTI:S:Scanner\n');
+fprintf(fid, '# Version: 15\n');
+fprintf(fid, '# Coordinate system: %s\n', cs);
 fprintf(fid, '# Created by: PRESTUS\n');
 fprintf(fid, '# Units: millimetres, degrees, milliseconds, and microvolts\n');
 fprintf(fid, '# Encoding: UTF-8\n');
 fprintf(fid, '# Notes: Each column is delimited by a tab character.\n');
 fprintf(fid, '# Target Name\tLoc. X\tLoc. Y\tLoc. Z\tm0n0\tm0n1\tm0n2\tm1n0\tm1n1\tm1n2\tm2n0\tm2n1\tm2n2\n');
-fprintf(fid, '%s\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n', ...
+fprintf(fid, '%s\t%.9f\t%.9f\t%.9f\t%.9f\t%.9f\t%.9f\t%.9f\t%.9f\t%.9f\t%.9f\t%.9f\t%.9f\n', ...
     target_name, ...
     focus_pos_ras(1), focus_pos_ras(2), focus_pos_ras(3), ...
     toolX(1), toolX(2), toolX(3), ...

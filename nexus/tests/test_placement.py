@@ -141,6 +141,71 @@ def test_slicer_matches_babelbrain_conversion(tmp_path):
     np.testing.assert_allclose(t.towards_transducer, ref[:3, 2])
 
 
+def _kplan_file(path, apex_vox, axes, target_vox=None, vox=None, kind="kdp"):
+    """A k-Plan file in the layout of k-Plan TPM v1.2.0: world [m] = 0-based voxel x voxel size."""
+    h5py = pytest.importorskip("h5py")
+    vox = np.asarray(vox, float)
+    T = np.zeros((4, 4))
+    T[:3, :3] = axes                                   # rows: transducer x, y, z axes (beam along -z)
+    T[3, :3] = np.asarray(apex_vox, float) * vox / 1e3
+    T[3, 3] = 1
+    with h5py.File(str(path), "w") as h:
+        if kind == "kps":
+            h.attrs["file_type"] = np.bytes_("k-Plan Transducer Position")
+            g = h.create_group("1")
+            g.attrs["transform_label"] = np.bytes_("pose")
+            g["position_transform"] = T.reshape(1, 4, 4).astype(np.float32)
+        else:
+            h.attrs["file_type"] = np.bytes_("k-Plan Device Parameters")
+            h.attrs["plan_label"] = np.bytes_("plan")
+            sp = h.create_group("sonications/1/sonication_parameters")
+            sp["position_transform"] = T.reshape(1, 4, 4).astype(np.float32)
+            sp["target_position"] = (np.asarray(target_vox, float) * vox / 1e3).reshape(1, 1, 3).astype(np.float32)
+            sp["focal_distance"] = np.full((1, 1, 1), 0.05, np.float32)
+            h.create_group("transducer").attrs["transducer_id"] = np.bytes_("TX-1")
+            h["transducer/properties/focal_distance_surface_offset"] = np.full((1, 1, 1), 0.0108, np.float32)
+    return path
+
+
+def test_read_kplan_maps_world_to_t1_ras(vol, tmp_path):
+    # Oblique, flipped, anisotropic T1 (AFFINE): k-Plan received the copy with the
+    # rotation removed, so world = 0-based voxel x voxel size on the same voxels.
+    vox = vol.voxel_size
+    apex_v, target_v = np.array([2.0, 25, 30]), np.array([30.0, 26, 31])
+    d = (apex_v - target_v) * vox
+    z = d / np.linalg.norm(d)                         # k-Plan world direction target -> apex
+    x = np.cross([0, 0, 1], z); x /= np.linalg.norm(x); y = np.cross(z, x)
+    t = pl.read_trajectory(_kplan_file(tmp_path / "p.kdp", apex_v, np.vstack([x, y, z]), target_v, vox), t1=vol)
+    assert t.source == "k-Plan" and t.name == "plan"
+    np.testing.assert_allclose(t.transducer, vol.to_ras(apex_v)[0], atol=1e-3)
+    np.testing.assert_allclose(t.target, vol.to_ras(target_v)[0], atol=1e-3)
+    ref = vol.to_ras(apex_v)[0] - vol.to_ras(target_v)[0]
+    np.testing.assert_allclose(t.towards_transducer, ref / np.linalg.norm(ref), atol=1e-5)
+    assert any("rotated or flipped" in n for n in t.notes)
+    assert any("50.00 mm" in n and "10.80 mm" in n for n in t.notes)
+
+
+def test_read_kplan_positions_have_no_target(vol, tmp_path):
+    t = pl.read_trajectory(_kplan_file(tmp_path / "p.kps", [2, 25, 30], np.eye(3), vox=vol.voxel_size,
+                                       kind="kps"), t1=vol)
+    assert t.target is None and t.name == "pose"
+    np.testing.assert_allclose(t.transducer, vol.to_ras([2, 25, 30])[0], atol=1e-3)
+
+
+def test_read_kplan_checks(vol, tmp_path):
+    f = _kplan_file(tmp_path / "p.kdp", [2, 25, 30], np.eye(3), [300, 25, 30], vol.voxel_size)
+    with pytest.raises(ValueError, match="outside this T1"):
+        pl.read_trajectory(f, t1=vol)
+    with pytest.raises(ValueError, match="T1"):
+        pl.read_trajectory(f, t1=None)
+    h5py = pytest.importorskip("h5py")
+    other = tmp_path / "other.h5"
+    with h5py.File(str(other), "w") as h:
+        h["x"] = 1
+    with pytest.raises(ValueError, match="not a k-Plan"):
+        pl.read_trajectory(other, t1=vol)
+
+
 def _fake_mni2subject_coords(bin_dir, offset=(1.0, 2.0, 3.0)):
     """A stand-in for SimNIBS's CLI tool: reads the input CSV, adds `offset`, writes it back
     in the same 'Generic, x, y, z' format -- enough to test the subprocess/CSV plumbing without
