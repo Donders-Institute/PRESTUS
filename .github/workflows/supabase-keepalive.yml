@@ -1,0 +1,44 @@
+name: Telemetry backend keep-alive
+
+# The Supabase project behind telemetry (doc/doc_telemetry.md) pauses after a period
+# without requests, and events sent while it is paused are lost (track_usage.m sends
+# fire-and-forget). Every three days this reads one row of the events table, which
+# counts as activity, and checks that the ingest function answers. A failed run means
+# the project is paused or the function is missing: restore it in the Supabase dashboard.
+# The key is the public read-only (publishable) key the usage statistics page also uses
+# (doc/javascripts/usage_statistics.js).
+
+on:
+  schedule:
+    - cron: '17 6 */3 * *'        # every third day, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: https://lruelxwhkjibezkgipme.supabase.co
+      SUPABASE_KEY: sb_publishable_p18tafIOjIJuGwXb4szLSg_84vF3FL2
+    steps:
+      - name: Read one event (keeps the project active)
+        run: |
+          code=$(curl -sS -o body.json -w '%{http_code}' --max-time 30 \
+            "$SUPABASE_URL/rest/v1/events?select=received_at&order=received_at.desc&limit=1" \
+            -H "apikey: $SUPABASE_KEY" -H "Authorization: Bearer $SUPABASE_KEY")
+          echo "HTTP $code"; cat body.json; echo
+          test "$code" = "200" || { echo "::error::Supabase REST answered $code: the project may be paused"; exit 1; }
+      - name: Ingest function is deployed (OPTIONS, stores nothing)
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 -X OPTIONS \
+            "$SUPABASE_URL/functions/v1/ingest-event" \
+            -H "Origin: https://donders-institute.github.io" -H "Access-Control-Request-Method: POST")
+          echo "HTTP $code"
+          # 2xx, or 405 from a function that handles POST only, means it is deployed;
+          # 404 means it is missing, 5xx or 540 that the project is down or paused
+          case "$code" in
+            2*|405) ;;
+            *) echo "::error::ingest-event answered $code"; exit 1 ;;
+          esac
