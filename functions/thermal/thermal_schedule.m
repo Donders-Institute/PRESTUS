@@ -66,6 +66,10 @@ function sched = thermal_schedule(parameters, n_sources, opts)
 %     n_steps      [S x 1] kWaveDiffusion steps per segment
 %     step_dur     [S x 1] duration of one step [s]
 %     active       [S x n_sources] logical, source on during the segment
+%     weight       [S x n_sources] heat-source weight: 1 when on ('pulse_resolved'),
+%                  PD/PRI through each pulse train ('train_averaged')
+%     pulse_model  'train_averaged' (default) | 'pulse_resolved'; interleaved async
+%                  schedules always use 'pulse_resolved'
 %     fine         [S x 1] logical, segment inside a pulse train
 %     t_sonication end of the last pulse train (>= ptrd); with 'custom', also
 %                  >= offset_s + ptrd of every source [s]
@@ -220,8 +224,38 @@ for i = 1:n
     src(i) = s; %#ok<AGROW>
 end
 
+%% Pulse model: each pulse resolved, or each pulse train as one window
+% 'train_averaged' heats through the whole train with the source weighted by
+% PD/PRI (same energy), as k-Plan's thermal solver does; the diffusion steps
+% are then set by THERMAL_SIMULATION. Pulses (0.1-1 s cycles) are short
+% against tissue thermal time constants, so peak and end temperatures agree.
+pulse_model = 'train_averaged';
+if isfield(parameters, 'thermal') && isfield(parameters.thermal, 'pulse_model') && ...
+        ~isempty(parameters.thermal.pulse_model)
+    pulse_model = lower(char(parameters.thermal.pulse_model));
+end
+if ~ismember(pulse_model, {'pulse_resolved', 'train_averaged'})
+    error('thermal_schedule:pulseModel', ...
+        'thermal.pulse_model must be ''train_averaged'' or ''pulse_resolved'', got ''%s''.', pulse_model);
+end
+if strcmp(pulse_model, 'train_averaged') && ~ismember(mode, {'single', 'simultaneous'})
+    % interleaved transducers fire in turn within a train: resolve the pulses
+    fprintf('[thermal_schedule] async schedule ''%s'': pulses resolved (thermal.pulse_model ''train_averaged'' needs sources firing together)\n', mode);
+    pulse_model = 'pulse_resolved';
+end
+averaged = strcmp(pulse_model, 'train_averaged');
+for i = 1:n
+    if averaged
+        src(i).heat_windows = src(i).train_windows;
+        src(i).heat_weight  = src(i).pd / src(i).pri;
+    else
+        src(i).heat_windows = src(i).pulse_windows;
+        src(i).heat_weight  = 1;
+    end
+end
+
 %% Breakpoints and segments
-all_pulse = vertcat(src.pulse_windows);
+all_pulse = vertcat(src.heat_windows);
 all_train = vertcat(src.train_windows);
 t_son = max([timing.ptrd; all_train(:, 2)]);
 if strcmp(mode, 'custom')
@@ -246,7 +280,7 @@ mid = t0 + dur / 2;
 active = false(numel(t0), n);
 in_train = false(numel(t0), 1);
 for i = 1:n
-    active(:, i) = inside(mid, src(i).pulse_windows);
+    active(:, i) = inside(mid, src(i).heat_windows);
     in_train = in_train | inside(mid, src(i).train_windows);
 end
 fine = in_train & mid < t_son;
@@ -288,9 +322,10 @@ n_steps = ones(numel(t0), 1);
 if eq_steps
     n_steps(fine) = max(1, round(dur(fine) / timing.pt_timestep));
 end
-% Coarse segments: one recorded segment per post_pt_timestep step
+% Coarse segments (and train-averaged trains): one recorded segment per post_pt_timestep step
 n_rec = ones(numel(t0), 1);
-n_rec(~fine) = max(1, round(dur(~fine) / timing.post_pt_timestep));
+coarse = ~fine | averaged;
+n_rec(coarse) = max(1, round(dur(coarse) / timing.post_pt_timestep));
 idx = repelem((1:numel(t0))', n_rec);
 first = cumsum([1; n_rec(1:end-1)]);
 kk = (1:numel(idx))' - first(idx);                     % 0-based step within its segment
@@ -304,6 +339,8 @@ sched.dur          = sub_dur;
 sched.n_steps      = n_steps(idx);
 sched.step_dur     = sched.dur ./ sched.n_steps;
 sched.active       = active(idx, :);
+sched.weight       = double(sched.active) .* [src.heat_weight];   % heat-source weight per source
+sched.pulse_model  = pulse_model;
 sched.fine         = fine(idx);
 sched.t_sonication = t_son;
 sched.t_end        = t_end;

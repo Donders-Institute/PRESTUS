@@ -464,39 +464,44 @@ for f = fieldnames(ts_masks)'
     elseif on_gpu
         ts_masks.(f{1}) = gpuArray(ts_masks.(f{1}));
     end
-    
-    % === 1. Inner loop: Pulse Trains (multiple pulses) ===
-    for pulse_i = 1:n_pulses_pt
-        fprintf('  Pulse train %d/%d\n', pulse_i, n_pulses_pt);
-        
-        % PULSE ON
-        thermal_diff_obj.Q = source.Q;
-        tmp_status = 'on';
+end
+timeseries = thermal_update_timeseries(parameters, ts_masks);
 
-        if log_thermal_updates || is_first_thermal_step
-            if is_first_thermal_step
-                first_step_timer = tic;
-            end
-            thermal_diff_obj.takeTimeStep(params_thermal.pt_on_steps_n, params_thermal.pt_on_steps_dur);
-            if is_first_thermal_step
-                % k-Wave-style ETA: time a known number of steps, extrapolate
-                % linearly to the full run (analogous to kWaveDiffusion's own
-                % num_time_steps_before_simulation_time_estimate, but computed
-                % across takeTimeStep calls rather than within a single one).
-                per_step_s = toc(first_step_timer) / max(params_thermal.pt_on_steps_n, 1);
-                fprintf('[thermal_simulation]   estimated total thermal sim time: %s (%d steps @ %.3f s/step)\n', ...
-                    scaleTime(per_step_s * total_thermal_steps), total_thermal_steps, per_step_s);
-                if ~log_thermal_updates
-                    fprintf('  [Subsequent k-Wave thermal outputs suppressed. Set parameters.thermal.log_thermal_updates=1 to enable.]\n');
-                end
-            end
-            is_first_thermal_step = false;
+% Heat source for each set of source weights that is on together (computed once).
+% Weights are 1 for a source that is on; with thermal.pulse_model 'train_averaged'
+% a pulse train is one segment and its source weighs PD/PRI (THERMAL_SCHEDULE).
+[patterns, ~, pattern_of_seg] = unique(sched.weight, 'rows');
+Q_pattern = cell(size(patterns, 1), 1);
+for j = 1:size(patterns, 1)
+    w = patterns(j, :);
+    if any(w)
+        if n_src == 1 && w == 1
+            Q_pattern{j} = Q_src;       % shared copy, no extra memory
         else
-            evalc('thermal_diff_obj.takeTimeStep(params_thermal.pt_on_steps_n, params_thermal.pt_on_steps_dur)');
+            Q_pattern{j} = 0;
+            for s = find(w)
+                Q_pattern{j} = Q_pattern{j} + w(s) * Q_src(:,:,:,s);
+            end
         end
-        if parameters.simulation.interactive && ishandle(h_thermal_fig)
-            figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
-        end
+    end
+end
+clear Q_src;
+
+% Train-averaged segments last seconds: step them at the diffusion time step
+% CFL * dx^2 / max diffusivity (CFL 0.1, as k-Plan's thermal solver)
+if strcmp(sched.pulse_model, 'train_averaged')
+    D = kwave_medium.thermal_conductivity ./ (kwave_medium.density .* kwave_medium.specific_heat);
+    spacing = [kgrid.dx, kgrid.dy, kgrid.dz];
+    dx = min(spacing(1:kgrid.dim));
+    dt_max = 0.1 * dx^2 / double(gather(max(D(:))));
+    avg = sched.fine;
+    sched.n_steps(avg) = max(1, ceil(sched.dur(avg) / dt_max));
+    sched.step_dur = sched.dur ./ sched.n_steps;
+    sched.total_steps = sum(sched.n_steps);
+    total_thermal_steps = sched.total_steps;
+    fprintf('[thermal_simulation]   pulse model    : train_averaged (step %.3f s, %d steps)\n', ...
+        dt_max, sched.total_steps);
+end
 
 cur_timepoint = 1;
 cur_plane = 1;

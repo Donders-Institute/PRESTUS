@@ -137,6 +137,36 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_therma
                 'thermal_schedule:coherentOverlap');
         end
 
+        function test_train_averaged_keeps_heat_and_drops_pulses(tc)
+            % One source, 5 trains of 10 pulses: 'train_averaged' heats through each
+            % train with weight PD/PRI, so heat x time equals the resolved pulses',
+            % with one window per train instead of one per pulse
+            p = tc.base;
+            p.transducer = p.transducer(1);
+            a = thermal_schedule(p);                      % default
+            p.thermal.pulse_model = 'pulse_resolved';
+            r = thermal_schedule(p);
+            tc.verifyEqual(r.pulse_model, 'pulse_resolved');
+            tc.verifyEqual(a.pulse_model, 'train_averaged');
+            tc.verifyEqual(sum(a.weight .* a.dur), sum(r.weight .* r.dur), 'RelTol', 1e-12);
+            tc.verifyEqual(sum(r.weight .* r.dur), 5 * 10 * 0.02, 'RelTol', 1e-12);
+            tc.verifyEqual(unique(a.weight(a.weight > 0)), 0.02 / 0.1, 'AbsTol', 1e-12);
+            tc.verifyEqual(sum(a.dur(a.active)), 5 * 1.0, 'AbsTol', 1e-9);      % heats through each 1 s train
+            tc.verifyLessThan(numel(a.t0), numel(r.t0));
+            tc.verifyEqual(a.t_end, r.t_end, 'AbsTol', 1e-9);
+        end
+
+        function test_interleaved_async_resolves_pulses(tc)
+            % 'custom' with transducers in turn cannot average within a train: the
+            % default falls back to resolved pulses; an unknown model still errors
+            p = tc.base;
+            s = thermal_schedule(p, 2);
+            tc.verifyEqual(s.pulse_model, 'pulse_resolved');
+            tc.verifyEqual(unique(s.weight(s.weight > 0)), 1);
+            p.thermal.pulse_model = 'smooth';
+            tc.verifyError(@() thermal_schedule(p, 2), 'thermal_schedule:pulseModel');
+        end
+
         function test_bad_source_map_errors(tc)
             tc.verifyError(@() thermal_schedule(tc.base, 2, SourceTx=1), 'thermal_schedule:badSourceTx');
             tc.verifyError(@() thermal_schedule(tc.base, 2, SourceTx=[1 2], SourceFreq=5e5), ...

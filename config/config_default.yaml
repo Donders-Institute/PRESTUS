@@ -633,6 +633,9 @@ thermal:
     skin: 37
     skull_trabecular: 37
     skull_cortical: 37
+  pulse_model: 'train_averaged' # 'train_averaged': each pulse train heats as one segment with the source weighted by PD/PRI
+                            #   (as k-Plan; far fewer steps) | 'pulse_resolved': every pulse and gap is a segment. Interleaved
+                            #   async schedules always resolve the pulses
   log_thermal_updates: 0    # show verbose k-Wave thermal output for every time step; if 0, only the first step is shown in full and subsequent steps are silent
   max_focal_plane_gb: 2     # [GB] memory for the focal-plane time courses and heating video; above it every k-th step is kept; 0 = keep every step
 
