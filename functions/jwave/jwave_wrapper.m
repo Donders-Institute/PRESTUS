@@ -5,10 +5,11 @@ function sensor_data = jwave_wrapper(parameters, kgrid, medium, source, source_l
 % run_jwave_sim.py, and reads back the pressure field in the same
 % sensor_data format returned by acoustic_simulation.m.
 %
-% Uses the jwave Helmholtz solver: solves the heterogeneous Helmholtz equation
-% with Fourier spectral collocation and GMRES, matching the solver used in the
-% ITRUSST intercomparison benchmarks. Attenuation is applied via db2neper with
-% fixed exponent y=2.0 inside jwave's wavevector operator.
+% Uses the jwave Helmholtz solver by default (jwave.solver): GMRES solve of the
+% heterogeneous Helmholtz equation with Fourier spectral collocation, in
+% conservative density form by default (jwave.helmholtz_operator). Attenuation
+% is applied via db2neper with fixed exponent y=2.0 inside jwave's wavevector
+% operator.
 %
 % Both source paths are supported: direct geometry (use_kWaveArray == 0,
 % makeBowl/makeArc voxels) and kWaveArray (use_kWaveArray == 1, band-limited
@@ -61,7 +62,6 @@ function sensor_data = jwave_wrapper(parameters, kgrid, medium, source, source_l
 %                     the Helmholtz attenuation floor regularizes the lossless
 %                     case (see run_jwave_sim.py's _apply_helmholtz_attenuation_floor)
 %                     — it only costs more GMRES iterations/memory for no benefit.
-%   .precision      - 'single' (default) | 'double'
 %   .dry_run        - true to write inputs and exit without simulating (default false)
 %   .cleanup_cache  - true (default) to delete the HDF5 input after a successful
 %                     run; it is rewritten on every run and never reused. Kept
@@ -73,10 +73,9 @@ function sensor_data = jwave_wrapper(parameters, kgrid, medium, source, source_l
 %                     physics — it can simultaneously understate the true focal
 %                     amplitude and fabricate spurious ringing near sharp
 %                     impedance interfaces (skull/skin). The error message lists
-%                     concrete fixes (GMRES restart/precision/PML-fraction).
+%                     concrete fixes (GMRES restart, PML fraction).
 %   .ignore_convergence_threshold - false (default) | true; if true, a residual
-%                     above convergence_threshold only warns (previous behaviour)
-%                     instead of erroring, and the unconverged result is returned.
+%                     above convergence_threshold only warns instead of erroring, and the unconverged result is returned.
 %                     Only set this after having reviewed the field and diagnostics
 %                     and having decided the residual is acceptable for your use case.
 %
@@ -118,8 +117,7 @@ end
 % p_max_all/p_min_all. The Helmholtz solver's source-amplitude DFT uses the
 % same window (see run_jwave_sim.py:run_helmholtz) so all three jwave solvers
 % share one definition of "steady state". Falls back to 1 (use the whole
-% signal) for callers that don't pass sensor (e.g. water_baseline.m,
-% benchmark_jwave.m dry-run calls), preserving prior behaviour for them.
+% signal) for callers that don't pass sensor (standalone or benchmark calls).
 record_start_index = 1;
 if isfield(sensor, 'record_start_index') && ~isempty(sensor.record_start_index)
     record_start_index = sensor.record_start_index;
@@ -146,7 +144,6 @@ gmres_restart  = get_field(jw, 'gmres_restart',   10);
 gmres_maxiter  = get_field(jw, 'gmres_maxiter',   1000);
 gmres_tol      = get_field(jw, 'gmres_tol',       1e-3);
 helmholtz_operator = get_field(jw, 'helmholtz_operator', 'conservative');
-precision      = get_field(jw, 'precision',       'single');
 dry_run        = get_field(jw, 'dry_run',         false);
 cleanup_cache  = get_field(jw, 'cleanup_cache',   true);
 
@@ -165,7 +162,7 @@ end
 % result is rejected (see step 5b below for the error/warning behaviour).
 convergence_threshold = get_field(jw, 'convergence_threshold', 0.05);
 % ignore_convergence_threshold — if true, a residual above convergence_threshold
-% only warns (old behaviour) instead of erroring. Use only after having reviewed
+% only warns instead of erroring. Use only after having reviewed
 % the field and accepted the residual; see the error message in step 5b.
 ignore_convergence_threshold = get_field(jw, 'ignore_convergence_threshold', false);
 
@@ -246,7 +243,7 @@ n_src       = nnz(source.p_mask);
 freq_kHz    = parameters.transducer(1).freq_hz / 1e3;
 fprintf('[jwave_wrapper] ---- jwave simulation summary ----\n');
 fprintf('[jwave_wrapper]   solver    : %s\n', solver);
-fprintf('[jwave_wrapper]   precision : %s\n', precision);
+fprintf('[jwave_wrapper]   precision : single\n');
 fprintf('[jwave_wrapper]   backend   : %s\n', ternary(using_gpu_env, 'GPU (CUDA)', 'CPU'));
 fprintf('[jwave_wrapper]   grid      : [%s] = %dk voxels\n', num2str(grid_dims), round(n_voxels/1e3));
 fprintf('[jwave_wrapper]   grid res  : %.2f mm\n', parameters.grid.resolution_mm);
@@ -292,17 +289,6 @@ if ismember(solver, {'pseudo_spectral', 'finite_differences'})
     % derivative operator.  Apply a safety factor so the auto-reduced dt lands
     % with headroom below the boundary instead of exactly on it.  Overridable
     % via parameters.jwave.absorb_safety.
-    %
-    % History note: both solvers were previously observed to produce
-    % late-onset NaN while landing at exactly metric=0.2500 (zero margin) on
-    % small, PML-dominated pFOV domains.  That NaN was NOT actually caused by
-    % insufficient margin on this metric — the true cause was a missing
-    % negative sign in run_jwave_sim.py's _absorb_tau_from_power_law, which
-    % made the Stokes term energy-injecting instead of dissipative (fixed).
-    % This safety factor is kept as a legitimate, independent margin on a
-    % correctly-signed dissipative term (this metric bounds |tau|, so a sign
-    % flip would not have changed its value or been caught by it) — not
-    % because it was the actual fix for that bug.
     jw_absorb_target = 0.25;
     jw_absorb_safety = 0.80;   % default headroom for both time-domain solvers
     if isfield(parameters, 'jwave') && isfield(parameters.jwave, 'absorb_safety') ...
@@ -372,7 +358,7 @@ if ismember(solver, {'pseudo_spectral', 'finite_differences'})
 end
 
 fprintf('[jwave_wrapper] Writing simulation input: %s\n', input_h5);
-write_jwave_input(input_h5, kgrid, medium, source, parameters, pml_size, precision, kgrid_dt_write, kgrid_Nt_write, record_start_index);
+write_jwave_input(input_h5, kgrid, medium, source, parameters, pml_size, kgrid_dt_write, kgrid_Nt_write, record_start_index);
 
 if dry_run
     fprintf('[jwave_wrapper] Dry run — skipping simulation.\n');
@@ -424,9 +410,8 @@ fprintf('[jwave_wrapper] Launching jwave simulation...\n');
 fprintf('[jwave_wrapper] Command:\n  %s\n', strjoin(jwave_argv, ' '));
 
 % Echo=true streams the Python subprocess's stdout/stderr to the MATLAB
-% console live as it is produced (matching the cpp_cpu/cpp_gpu backends'
-% behaviour, see kspaceFirstOrder3DC.m; matches the original system(cmd,
-% '-echo')), rather than buffering it until the process exits. This is
+% console live as it is produced (as the cpp_cpu/cpp_gpu backends do, see
+% kspaceFirstOrder3DC.m), rather than buffering it until the process exits. This is
 % what makes run_jwave_sim.py's progress/ETA prints usable as real-time
 % feedback instead of a wall of text dumped after the fact.
 t_start = tic;
@@ -434,10 +419,7 @@ t_start = tic;
 elapsed = toc(t_start);
 
 % Append Python stdout+stderr to the main PRESTUS log (no separate log
-% file). Previously a shell `>> logfile 2>&1` redirect diverted the
-% subprocess's output straight to the file (silently, with no console
-% echo); now the full captured output is appended once the process
-% finishes, in addition to the live console echo above.
+% file) once the process finishes, in addition to the live console echo above.
 if isfield(parameters, 'io') && isfield(parameters.io, 'log_file') && ~isempty(parameters.io.log_file)
     log_fid = fopen(parameters.io.log_file, 'a');
     if log_fid ~= -1
@@ -462,6 +444,12 @@ end
 
 fprintf('[jwave_wrapper] Reading output: %s\n', output_h5);
 sensor_data = read_jwave_output(output_h5, parameters);
+if isfield(sensor_data, 'p_complex')
+    % Phase referred to t = 0 of the time-stepped simulation (run_jwave_sim.py);
+    % the window the time-domain solvers fitted over.
+    sensor_data.p_complex_window = struct('record_start_index', record_start_index, ...
+        'dt', kgrid_dt_write, 'n_samples', kgrid_Nt_write - record_start_index + 1);
+end
 
 sensor_data.jwave_input_h5  = input_h5;
 sensor_data.jwave_output_h5 = output_h5;
@@ -480,21 +468,19 @@ if isfield(diag, 'residual_norm') && ~isnan(diag.residual_norm)
              'p_max_all/p_min_all/p_final are unreliable and must not be used as-is.\n' ...
              'Likely causes and suggested fixes, roughly in order of how often they are the actual cause:\n' ...
              '  1. gmres_restart/gmres_maxiter set above jwave''s own defaults (restart=10, maxiter=1000).\n' ...
-             '     A larger restart in single precision can destabilize GMRES instead of helping it\n' ...
+             '     jwave runs in single precision, where a larger restart can destabilize GMRES instead of helping it\n' ...
              '     converge (loss of Krylov-basis orthogonality). Currently restart=%d, maxiter=%d —\n' ...
              '     try the defaults first, do not just increase them further.\n' ...
-             '  2. parameters.jwave.precision = ''double'' instead of ''%s'' — single precision can be\n' ...
-             '     insufficient for ill-conditioned heterogeneous (e.g. skull) media.\n' ...
-             '  3. PML consuming a large fraction of the domain (see the --debug PML-sizing print;\n' ...
+             '  2. PML consuming a large fraction of the domain (see the --debug PML-sizing print;\n' ...
              '     >25%% is a red flag). Reduce parameters.grid.pml_size, or enlarge\n' ...
              '     grid.acoustic_fov_length_mm/grid.acoustic_fov_diameter_mm so the PML is a smaller\n' ...
              '     share of the grid.\n' ...
-             '  4. Decreasing parameters.jwave.gmres_tol (currently %.1e) — only likely to help once\n' ...
-             '     1-3 have been ruled out.\n' ...
-             '  5. If you have reviewed the field and accept this residual anyway, set\n' ...
+             '  3. Decreasing parameters.jwave.gmres_tol (currently %.1e) — only likely to help once\n' ...
+             '     1-2 have been ruled out.\n' ...
+             '  4. If you have reviewed the field and accept this residual anyway, set\n' ...
              '     parameters.jwave.ignore_convergence_threshold = true to downgrade this to a warning\n' ...
              '     and proceed with the unconverged result.'], ...
-            diag.residual_norm, convergence_threshold, gmres_restart, gmres_maxiter, precision, gmres_tol);
+            diag.residual_norm, convergence_threshold, gmres_restart, gmres_maxiter, gmres_tol);
         if ignore_convergence_threshold
             warning('jwave_wrapper:helmholtzResidual', '%s', msg);
         else
@@ -541,7 +527,7 @@ end
 % Local helper: write_jwave_input
 % =========================================================================
 
-function write_jwave_input(h5_path, kgrid, medium, source, parameters, pml_size, precision, dt_override, Nt_override, record_start_index)
+function write_jwave_input(h5_path, kgrid, medium, source, parameters, pml_size, dt_override, Nt_override, record_start_index)
 % Write kgrid, medium, and source to HDF5 for run_jwave_sim.py.
 % Writes to a local temp file first to avoid HDF5 file-locking errors on
 % network/Docker filesystems where MATLAB's repeated h5create open/close
@@ -555,7 +541,7 @@ function write_jwave_input(h5_path, kgrid, medium, source, parameters, pml_size,
 % recording window (see jwave_wrapper's top-level resolution of
 % sensor.record_start_index). Defaults to 1 (whole signal) if omitted.
 
-if nargin < 10 || isempty(record_start_index)
+if nargin < 9 || isempty(record_start_index)
     record_start_index = 1;
 end
 
@@ -566,7 +552,7 @@ end
 write_path = [tempname, '.h5'];
 tmp_guard  = onCleanup(@() h5_tmp_cleanup(write_path));
 
-cast_fn = @(x) cast(gather(x), precision);
+cast_fn = @(x) single(gather(x));   % run_jwave_sim.py computes in float32
 
 % --- Grid ---
 dims = numel(parameters.grid.dims);
@@ -578,8 +564,8 @@ h5write( write_path, '/grid/dx', cast_fn(parameters.grid.resolution_mm / 1e3 * o
 % --- Time axis ---
 Nt = kgrid.Nt;
 dt = kgrid.dt;
-if nargin >= 9 && ~isempty(Nt_override), Nt = Nt_override; end
-if nargin >= 8 && ~isempty(dt_override), dt = dt_override; end
+if nargin >= 8 && ~isempty(Nt_override), Nt = Nt_override; end
+if nargin >= 7 && ~isempty(dt_override), dt = dt_override; end
 h5create(write_path, '/time/Nt', [1 1]);
 h5write( write_path, '/time/Nt', int32(Nt));
 h5create(write_path, '/time/dt', [1 1]);
@@ -641,8 +627,8 @@ h5write( write_path, '/source/record_start_index', int32(record_start_index - 1)
 
 % --- PML ---
 % Write the full per-axis PML vector so run_jwave_sim.py can apply per-axis
-% padding in auto_pad_for_pml.  getOptimalPMLSize returns a vector for 3D
-% grids; broadcast a scalar to length ndims.  The Python bridge uses max()
+% padding in auto_pad_for_pml; a scalar (resolve_jwave_pml_size 'auto') is
+% broadcast to length ndims.  The Python bridge uses max()
 % when constructing jwave's Medium (which accepts a scalar pml_size), but
 % uses the per-axis values for the source-boundary padding step.
 pml_size_vec = int32(pml_size(:)');
@@ -656,6 +642,10 @@ h5write( write_path, '/pml/size', pml_size_vec);
 h5writeatt(write_path, '/', 'prestus_version', 'PRESTUS');
 h5writeatt(write_path, '/', 'dims',            int32(dims));
 h5writeatt(write_path, '/', 'freq_hz',         parameters.transducer(1).freq_hz);
+% io.save_p_complex: the solver also writes the steady-state complex field
+% (time-domain: running least-squares sums over the window; Helmholtz: its own field)
+h5writeatt(write_path, '/', 'save_p_complex',  int32(isfield(parameters.io, 'save_p_complex') && ...
+    logical(parameters.io.save_p_complex)));
 
 movefile(write_path, h5_path);
 
@@ -732,6 +722,14 @@ for f = fields
         warning('jwave_wrapper: Could not read %s from %s:\n  %s', key, h5_path, ME.message);
         sensor_data.(f{1}) = [];
     end
+end
+
+% Complex field (io.save_p_complex), written as real and imaginary parts
+info = h5info(h5_path, '/pressure');
+names = {info.Datasets.Name};
+if all(ismember({'p_complex_re', 'p_complex_im'}, names))
+    sensor_data.p_complex = complex(h5read(h5_path, '/pressure/p_complex_re'), ...
+                                    h5read(h5_path, '/pressure/p_complex_im'));   % single
 end
 
 end

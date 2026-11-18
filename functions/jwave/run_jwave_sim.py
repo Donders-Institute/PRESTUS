@@ -31,11 +31,12 @@ Solvers:
                          than global FFT derivatives. Useful for benchmarking
                          numerical dispersion vs PSTD.
 
-    helmholtz        - Frequency-domain GMRES solver via
-                       jwave.acoustics.time_harmonic.helmholtz_solver.
-                       Solves the heterogeneous Helmholtz equation with a
-                       Fourier spectral collocation method and PML absorbing
-                       boundaries. Attenuation applied via db2neper(y=2.0).
+    helmholtz        - Frequency-domain GMRES solve of the heterogeneous
+                       Helmholtz equation, by default in conservative form
+                       rho*div((1/rho) grad p) + k^2 p (--helmholtz_operator
+                       jwave: jwave's helmholtz_solver), with Fourier spectral
+                       collocation and PML absorbing boundaries. Attenuation
+                       applied via db2neper(y=2.0).
                        Requires freq_hz in the HDF5 metadata attribute.
                        alpha_coeff is floored to 0.002 dB/(cm.MHz^2) (see
                        _apply_helmholtz_attenuation_floor) to regularize GMRES
@@ -47,9 +48,9 @@ Exit codes:
 
 Diagnostics written to /diagnostics/ in the output HDF5:
     residual_norm  — exact relative GMRES residual ||A·u - b||/||b|| (Helmholtz
-                     only), evaluated with jwave's own helmholtz operator and
-                     scale_source_helmholtz (see compute_helmholtz_residual) —
-                     not a hand-rolled approximation.
+                     only), evaluated with the operator that was solved
+                     (conservative_residual, or compute_helmholtz_residual for
+                     the jwave operator).
 """
 
 import argparse
@@ -59,7 +60,9 @@ import sys
 import numpy as np
 import h5py
 import jax
-jax.config.update("jax_compilation_cache_dir", os.path.join(os.path.expanduser("~"), ".cache", "jax_xla"))
+jax.config.update("jax_compilation_cache_dir",
+                  os.environ.get("JAX_COMPILATION_CACHE_DIR")
+                  or os.path.join(os.path.expanduser("~"), ".cache", "jax_xla"))
 
 # Suppress jaxdf deprecation warnings (e.g. shift_operator multi-output)
 logging.getLogger('jaxdf').setLevel(logging.ERROR)
@@ -114,7 +117,7 @@ def read_input(h5_path):
         def read_field(key):
             v = f[key][()]
             if v.size == 1:
-                return float(v)
+                return float(np.asarray(v).flat[0])   # NumPy 2 rejects float() of 1-element arrays
             # MATLAB writes arrays in column-major order; HDF5/h5py reverses
             # dimension order, so a MATLAB [Nx,Ny,Nz] array appears as (Nz,Ny,Nx).
             # Transpose restores the logical layout expected by jwave.
@@ -150,6 +153,7 @@ def read_input(h5_path):
         pml_size = pml_raw if pml_raw.size > 1 else pml_raw  # always ndarray
 
         freq_hz  = float(np.asarray(f['/'].attrs.get('freq_hz', 500e3)).flat[0])
+        save_p_complex = bool(np.asarray(f['/'].attrs.get('save_p_complex', 0)).flat[0])
         dims     = int(np.asarray(f['/'].attrs.get('dims', len(N))).flat[0])
 
     # Validate source dimensions immediately after read
@@ -171,11 +175,11 @@ def read_input(h5_path):
         alpha_coeff=alpha_coeff, alpha_power=alpha_power,
         mask_indices=mask_indices, source_p=source_p, source_coeffs=source_coeffs,
         record_start_index=record_start_index,
-        pml_size=pml_size, freq_hz=freq_hz, dims=dims,
+        pml_size=pml_size, freq_hz=freq_hz, dims=dims, save_p_complex=save_p_complex,
     )
 
 
-def write_output(h5_path, p_max_all, p_min_all, p_final, diagnostics=None):
+def write_output(h5_path, p_max_all, p_min_all, p_final, diagnostics=None, p_complex=None):
     """Write pressure field outputs for MATLAB to read.
 
     Arrays are transposed before writing so that MATLAB reads them with the
@@ -183,6 +187,8 @@ def write_output(h5_path, p_max_all, p_min_all, p_final, diagnostics=None):
     to MATLAB's column-major convention).
 
     diagnostics: optional dict of scalar floats/ints written to /diagnostics/.
+    p_complex:   optional complex field (steady-state amplitude at freq_hz, phase
+                 referred to t = 0), written as /pressure/p_complex_re and _im.
     """
     def to_matlab(arr):
         return np.ascontiguousarray(arr.T).astype(np.float32)
@@ -192,6 +198,9 @@ def write_output(h5_path, p_max_all, p_min_all, p_final, diagnostics=None):
         f.create_dataset('/pressure/p_max_all', data=to_matlab(p_max_all), **gz)
         f.create_dataset('/pressure/p_min_all', data=to_matlab(p_min_all), **gz)
         f.create_dataset('/pressure/p_final',   data=to_matlab(p_final),   **gz)
+        if p_complex is not None:
+            f.create_dataset('/pressure/p_complex_re', data=to_matlab(np.real(p_complex)), **gz)
+            f.create_dataset('/pressure/p_complex_im', data=to_matlab(np.imag(p_complex)), **gz)
         if diagnostics:
             for key, val in diagnostics.items():
                 f.create_dataset(f'/diagnostics/{key}', data=np.float64(val))
@@ -222,15 +231,6 @@ def auto_pad_for_pml(inp, stencil_clearance=0):
     keeps that seam and the outermost stencil taps out of the live medium.
     The added cost is only 2*stencil_clearance voxels per axis (e.g. 8 for
     accuracy=8) — negligible versus growing pml_size.
-
-    Note: this guards against a real but secondary risk (stencil taps sampling
-    across the periodic seam).  It was suspected as the primary cause of a
-    persistent late-onset NaN on small, PML-dominated pFOV domains, but that
-    NaN was actually caused by a sign error in _absorb_tau_from_power_law
-    (fixed; see that function's docstring) — the Stokes absorption term was
-    energy-injecting rather than dissipative, which no amount of PML/stencil
-    padding or dt tuning could have fixed.  This padding is kept as legitimate
-    defense-in-depth, not because it was the fix for that bug.
 
     pml_size may be a scalar int or a 1-D integer array of length ndims.
     When it is an array, each axis uses its own threshold so anisotropic
@@ -441,25 +441,12 @@ def build_medium_and_domain_fd(inp, accuracy=8):
 # Convergence diagnostics
 # ---------------------------------------------------------------------------
 #
-# History note: an earlier version of this diagnostic hand-rolled a NumPy
-# approximation — ||(bare periodic Laplacian + (ω/c)²)P - source|| / ||source||
-# — that omitted three things jwave's own solver applies internally: (1) the
-# source scaling `source *= 2/(dx*c_min)` done by
-# jwave.acoustics.operators.scale_source_helmholtz, (2) the u = P/(-iω)
-# relationship between the field GMRES actually solves for and the returned
-# pressure, and (3) the attenuation/PML terms in the real wavevector/Laplacian
-# operators. Omitting (1)+(2) alone introduces a missing multiplicative factor
-# of |−iω·2/(dx·c_min)| — ~3.35e6 for a 300 kHz / 0.75 mm / c_min=1500 m/s
-# benchmark grid — which silently dominated the reported residual. This was
-# caught because two runs with very different precision/GMRES settings
-# (single/restart=60/maxiter=600 vs double/restart=10/maxiter=1000) produced
-# near-identical bogus residuals (~3.6e6) and near-identical p_max, which is
-# what you'd expect from a diagnostic bug, not from a GMRES convergence
-# problem (a genuine non-convergence is sensitive to precision and restart).
-# compute_helmholtz_residual below instead reuses jwave's own `helmholtz`
-# operator and `scale_source_helmholtz` directly, so it evaluates exactly the
-# linear residual ||A·u - b|| / ||b|| that GMRES targets — no hand-rolled
-# approximation, no missing terms.
+# The residual must include what the solver applies internally: the source
+# scaling (scale_source_helmholtz, 2/(dx*c_min)), u = P/(-iω), and the
+# attenuation/PML terms of the operator. compute_helmholtz_residual (jwave
+# operator) and conservative_residual (conservative operator) therefore
+# evaluate the operator that was solved, giving exactly the linear residual
+# ||A·u - b|| / ||b|| that GMRES targets.
 
 def compute_helmholtz_residual(P_raw, jw_source, medium, omega, op_params):
     """Exact relative GMRES residual for the Helmholtz solve.
@@ -468,8 +455,8 @@ def compute_helmholtz_residual(P_raw, jw_source, medium, omega, op_params):
     helmholtz_solver (see run_helmholtz). Recovers u = P/(-iω) (the field
     GMRES actually solved for) and evaluates jwave's own `helmholtz` operator
     on it against the correctly-scaled source, so PML, attenuation, and the
-    internal source scaling are all handled exactly as jwave itself does —
-    unlike a hand-rolled NumPy Laplacian approximation (see history note above).
+    internal source scaling are all handled exactly as jwave itself does.
+    Used for helmholtz_operator='jwave'; see conservative_residual otherwise.
 
     Returns the relative residual norm (scalar, dimensionless, python float).
     """
@@ -503,9 +490,8 @@ def _absorb_tau_from_power_law(alpha_coeff, alpha_power, freq_hz, sound_speed):
         k ~= omega/c0 - i * omega^2 * absorb_tau / (2*c0)
     A physically decaying wave (Im(k) > 0 for exp(i(kx-wt))) therefore requires
     absorb_tau < 0 -- absorb_tau must be NEGATIVE, or the term amplifies the
-    field instead of damping it (this sign was missing in an earlier version
-    and caused persistent late-onset NaN regardless of dt/CFL margin, since
-    the instability was structural, not a matter of insufficient headroom).
+    field instead of damping it (a structural instability that no dt/CFL
+    margin removes).
 
     We want -omega^2*absorb_tau/(2*c0) to equal the target power-law
     attenuation at freq_hz:
@@ -550,16 +536,8 @@ def _check_pstd_stability(inp, dt, absorb_tau):
     Prints a WARNING when the absorption metric is between 0.30 and 0.40.
     The correct fix is to reduce dt (lower grid.source_cfl in the PRESTUS
     config); jwave_wrapper.m performs this adjustment automatically.
-
-    History note: a persistent NaN was previously chased through this metric
-    (assuming insufficient margin / dt too coarse) across several rounds of
-    tuning, but the actual cause was unrelated to this check: a missing
-    negative sign in _absorb_tau_from_power_law made the Stokes term
-    energy-injecting instead of dissipative (fixed; see that function's
-    docstring). This metric is a real, still-useful CFL-like bound for a
-    correctly-signed dissipative term — it was just never the cause of that
-    particular bug, and would not have caught it (a sign flip doesn't change
-    |tau_max|).
+    The metric uses |tau_max|, so it cannot detect a wrongly signed
+    (energy-injecting) absorb_tau.
     """
     c_max  = float(np.max(inp['sound_speed']))
     dx_min = float(np.min(inp['dx']))   # smallest spacing → tightest k_nyq
@@ -630,6 +608,44 @@ def _report_step_growth(step_absmax_all, dt, tag):
     print(f'[run_jwave_sim] [{tag}] max|p| trend over the run (sampled): {trend}')
 
 
+def _complex_projector(n_rec, freq_hz, dt):
+    """Least-squares projector [n_rec x 2] of a window onto cos/sin at freq_hz.
+
+    Summing p(n) * M[n - record_start] over the recorded window gives (a, b) of
+    the fit a*cos(w*t) + b*sin(w*t), t from the window start, as
+    STEADY_STATE_COMPLEX_AMPLITUDE does in MATLAB; exact for a steady tone.
+    """
+    w = 2 * np.pi * freq_hz * dt
+    k = np.arange(n_rec)
+    B = np.stack([np.cos(w * k), np.sin(w * k)], axis=1)
+    return (B @ np.linalg.inv(B.T @ B)).astype(np.float32)
+
+
+def _complex_from_sums(acc, freq_hz, dt, record_start):
+    """Complex amplitude from the running sums: A*cos(w*t+phi) -> A*exp(1i*phi),
+    phi referred to t = 0 of the simulation (step n at t = n*dt)."""
+    acc = np.asarray(acc, dtype=np.float64)
+    t0 = record_start * dt
+    return (acc[..., 0] - 1j * acc[..., 1]) * np.exp(-1j * 2 * np.pi * freq_hz * t0)
+
+
+def helmholtz_p_complex(P_complex, inp):
+    """Helmholtz field in the PRESTUS p_complex convention.
+
+    PRESTUS (k-Wave, the jwave time-domain solvers): A*cos(w*t + phi) ->
+    A*exp(1i*phi), phi referred to t = 0 of the time-stepped simulation.
+    run_helmholtz's P uses the opposite sign convention, takes its source
+    amplitude by a DFT over the recorded window (phase from the window start
+    t0), and has no half-step lag of the staggered time stepping. Checked
+    against run_pseudo_spectral (2D water, both helmholtz_operator options,
+    two time steps): P_prestus = -conj(P) * exp(-1i*w*t0) * exp(1i*w*dt/2)
+    agrees in phase within 3e-4 rad (IQR) and in amplitude within 0.2 %.
+    """
+    w  = 2 * np.pi * inp['freq_hz']
+    t0 = inp['record_start_index'] * inp['dt']
+    return -np.conj(np.asarray(P_complex)) * np.exp(-1j * w * t0) * np.exp(1j * w * inp['dt'] / 2)
+
+
 def run_pseudo_spectral(inp):
     """
     Run jwave pseudo-spectral time-domain (PSTD) simulation.
@@ -643,7 +659,9 @@ def run_pseudo_spectral(inp):
     Stokes attenuation matches the input power-law (alpha_coeff, alpha_power) at
     freq_hz.  Spatially varying alpha_coeff is supported.
 
-    Returns (p_max_all, p_min_all, p_final) as numpy arrays.
+    Returns (p_max_all, p_min_all, p_final, p_complex) as numpy arrays;
+    p_complex is None unless inp['save_p_complex'] (two running least-squares
+    sums over the recorded window, no time series stored).
     """
     import jax
     import jax.numpy as jnp
@@ -724,8 +742,12 @@ def run_pseudo_spectral(inp):
                 eta_s = interval_s / report_interval * remaining_steps
                 print(f'[run_jwave_sim]   estimated remaining time: {eta_s:.1f} s', flush=True)
 
+    want_complex = bool(inp.get('save_p_complex', False))
+    n_rec = Nt - record_start
+    proj = jnp.asarray(_complex_projector(n_rec, inp['freq_hz'], dt)) if want_complex else None
+
     def step(carry, n):
-        p, u, rho, p_max, p_min = carry
+        p, u, rho, p_max, p_min, acc = carry
 
         jax.debug.callback(_progress_cb, n)
 
@@ -753,10 +775,15 @@ def run_pseudo_spectral(inp):
         p_max = jnp.where(recording, jnp.maximum(p_max, p_arr), p_max)
         p_min = jnp.where(recording, jnp.minimum(p_min, p_arr), p_min)
 
-        step_absmax = jnp.max(jnp.abs(p_arr))
-        return (p, u, rho, p_max, p_min), step_absmax
+        if want_complex:
+            w_n = jnp.where(recording, proj[jnp.clip(n - record_start, 0, n_rec - 1)], 0.0)
+            acc = acc + p_arr[..., None] * w_n
 
-    init_carry = (p0, u0, rho0, neg_inf, pos_inf)
+        step_absmax = jnp.max(jnp.abs(p_arr))
+        return (p, u, rho, p_max, p_min, acc), step_absmax
+
+    acc0 = jnp.zeros(tuple(N) + (2,), dtype=jnp.float32) if want_complex else jnp.float32(0)
+    init_carry = (p0, u0, rho0, neg_inf, pos_inf, acc0)
 
     @jax.jit
     def _scan(carry, xs):
@@ -768,11 +795,12 @@ def run_pseudo_spectral(inp):
     # block_until_ready ensures the timer covers actual execution, not just dispatch
     jax.block_until_ready(result)
     print(f'[run_jwave_sim] PSTD scan done in {_time.time() - t0:.1f} s')
-    (p_final_field, _, _, p_max_all, p_min_all), step_absmax_all = result
+    (p_final_field, _, _, p_max_all, p_min_all, acc), step_absmax_all = result
     _report_step_growth(np.array(step_absmax_all), dt, 'pseudo_spectral')
 
     p_final = p_final_field.params[..., 0]
-    return np.array(p_max_all), np.array(p_min_all), np.array(p_final)
+    p_complex = _complex_from_sums(acc, inp['freq_hz'], dt, record_start) if want_complex else None
+    return np.array(p_max_all), np.array(p_min_all), np.array(p_final), p_complex
 
 
 def run_finite_differences(inp, accuracy=8):
@@ -785,7 +813,7 @@ def run_finite_differences(inp, accuracy=8):
     rather than global FFT derivatives.  Useful for benchmarking numerical
     dispersion characteristics vs pseudo_spectral.
 
-    Returns (p_max_all, p_min_all, p_final) as numpy arrays.
+    Returns (p_max_all, p_min_all, p_final, p_complex) as run_pseudo_spectral.
     """
     import jax
     import jax.numpy as jnp
@@ -861,8 +889,12 @@ def run_finite_differences(inp, accuracy=8):
                 eta_s = interval_s / report_interval * remaining_steps
                 print(f'[run_jwave_sim]   estimated remaining time: {eta_s:.1f} s', flush=True)
 
+    want_complex = bool(inp.get('save_p_complex', False))
+    n_rec = Nt - record_start
+    proj = jnp.asarray(_complex_projector(n_rec, inp['freq_hz'], dt)) if want_complex else None
+
     def step(carry, n):
-        p, u, rho, p_max, p_min = carry
+        p, u, rho, p_max, p_min, acc = carry
 
         jax.debug.callback(_progress_cb, n)
 
@@ -885,10 +917,15 @@ def run_finite_differences(inp, accuracy=8):
         p_max = jnp.where(recording, jnp.maximum(p_max, p_arr), p_max)
         p_min = jnp.where(recording, jnp.minimum(p_min, p_arr), p_min)
 
-        step_absmax = jnp.max(jnp.abs(p_arr))
-        return (p, u, rho, p_max, p_min), step_absmax
+        if want_complex:
+            w_n = jnp.where(recording, proj[jnp.clip(n - record_start, 0, n_rec - 1)], 0.0)
+            acc = acc + p_arr[..., None] * w_n
 
-    init_carry = (p0, u0, rho0, neg_inf, pos_inf)
+        step_absmax = jnp.max(jnp.abs(p_arr))
+        return (p, u, rho, p_max, p_min, acc), step_absmax
+
+    acc0 = jnp.zeros(tuple(N) + (2,), dtype=jnp.float32) if want_complex else jnp.float32(0)
+    init_carry = (p0, u0, rho0, neg_inf, pos_inf, acc0)
 
     @jax.jit
     def _scan(carry, xs):
@@ -900,11 +937,12 @@ def run_finite_differences(inp, accuracy=8):
     result = _scan(init_carry, jnp.arange(Nt))
     jax.block_until_ready(result)
     print(f'[run_jwave_sim] FD scan done in {_time.time() - t0:.1f} s')
-    (p_final_field, _, _, p_max_all, p_min_all), step_absmax_all = result
+    (p_final_field, _, _, p_max_all, p_min_all, acc), step_absmax_all = result
     _report_step_growth(np.array(step_absmax_all), dt, 'finite_differences')
 
     p_final = p_final_field.params[..., 0]
-    return np.array(p_max_all), np.array(p_min_all), np.array(p_final)
+    p_complex = _complex_from_sums(acc, inp['freq_hz'], dt, record_start) if want_complex else None
+    return np.array(p_max_all), np.array(p_min_all), np.array(p_final), p_complex
 
 
 def conservative_helmholtz_parts(inp, domain, op_params):
@@ -993,12 +1031,8 @@ def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, deb
     purely real wavenumber, making it near-singular in the bulk of the domain.
     This is regularized via _apply_helmholtz_attenuation_floor rather than by
     tightening the GMRES budget. Default restart/maxiter/tol match jwave's own
-    helmholtz_solver defaults (10/1000/1e-3): empirically, tightening these
-    (e.g. restart=40-60, maxiter=300-600, tol=1e-5, as earlier PRESTUS defaults
-    and some benchmark scripts did) produced an identical converged answer but
-    took longer once the attenuation floor properly regularizes the operator —
-    the tighter budget was compensating for the missing floor, not adding
-    accuracy. Medium parameters (alpha_coeff, c0, rho0) are used as passed from
+    helmholtz_solver defaults (10/1000/1e-3); with the attenuation floor a
+    tighter budget gives the same converged answer, only slower. Medium parameters (alpha_coeff, c0, rho0) are used as passed from
     the upstream MATLAB parameters struct without modification (besides the
     attenuation floor).
 
@@ -1013,7 +1047,7 @@ def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, deb
         P_complex              (full complex pressure field)
         source_field           (complex source array in Pa/m², for provenance)
         residual_norm          (exact relative GMRES residual, see
-                                compute_helmholtz_residual)
+                                conservative_residual / compute_helmholtz_residual)
     """
     import jax
     import jax.numpy as jnp
@@ -1084,9 +1118,9 @@ def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, deb
     flat_idx     = inp['mask_indices']
     multi_idx    = np.unravel_index(flat_idx, N, order='F')
 
-    # jwave's helmholtz_solver internally scales the source by 2/(dx*c_min)
-    # and solves (∇²+k²)φ = scaled_source, returning p = -iω·φ.
-    # Working backwards, source_in must be in Pa (pressure amplitude).
+    # source_field is in Pa (pressure amplitude). The solve scales it
+    # (scaled_source_local_c for the conservative operator; jwave's
+    # helmholtz_solver uses 2/(dx*c_min)), solves for φ and returns p = -iω·φ.
     # Multiplying by k² here would inflate the result by ~k² ≈ 10⁶.
     source_field[multi_idx] = fft_coeff
 
@@ -1104,12 +1138,10 @@ def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, deb
     # Grid size scales directly with grid.resolution_mm, so this matters most for the
     # fine (e.g. 0.5 mm) resolutions used by the free-water benchmark.
     #
-    # NOTE: checkpoint must stay at jwave's default (True). checkpoint=False was
-    # tried here and reproducibly crashes GMRES with a JAX UnexpectedTracerError
-    # ("leaked intermediate value" from laplacian_with_pml's cached fft_rho0 params)
-    # for ANY array-valued medium field (heterogeneous OR constant-valued arrays) —
-    # i.e. every real PRESTUS run, since medium_setup.m always writes full grid
-    # arrays, never bare scalars. Verified empirically before landing this change.
+    # NOTE: checkpoint must stay at jwave's default (True). checkpoint=False
+    # crashes GMRES with a JAX UnexpectedTracerError ("leaked intermediate
+    # value" from laplacian_with_pml's cached fft_rho0 params) for any
+    # array-valued medium field, i.e. every PRESTUS run.
     op_params = helmholtz.default_params(jw_source, medium, omega=omega)
 
     if helmholtz_operator == 'conservative':
@@ -1205,15 +1237,13 @@ def _debug_print_domain_pml_info(inp):
     """Print domain/PML sizing in physical + wavelength terms (--debug only).
 
     jwave's Medium.pml_size is a single scalar (unlike k-Wave, which supports
-    a per-axis PML) — see jwave.geometry.Medium. run_jwave_sim.py's max() over
-    the per-axis grid.pml_size vector (itself usually 'auto'-derived from
-    k-Wave's getOptimalPMLSize, an FFT-prime-factorization heuristic tuned for
-    k-Wave's own backend, not for GMRES cost or physical absorption) is the
-    only way to interface with that scalar API. This print exists so a
-    disproportionate PML fraction (small free-water domains are most at risk,
-    since 'auto' pulls from a fixed absolute point range regardless of how
-    large the useful interior actually is) is visible rather than silently
-    inflating every GMRES iteration's cost.
+    a per-axis PML) — see jwave.geometry.Medium; run_jwave_sim.py passes the
+    max() of the per-axis pml_size. 'auto' is resolved by jwave_wrapper
+    (resolve_jwave_pml_size: about 2.5 wavelengths at the maximum sound speed,
+    clipped to [10, 40] grid points). This print exists so a disproportionate
+    PML fraction (small free-water domains are most at risk, because of the
+    10-point minimum) is visible rather than silently inflating every GMRES
+    iteration's cost.
     """
     N = np.asarray(inp['N']).tolist()
     dx = np.asarray(inp['dx']).tolist()
@@ -1239,10 +1269,7 @@ def _debug_print_domain_pml_info(inp):
           f'PML fraction of total voxels={pml_fraction*100:.1f}%')
     if pml_fraction > 0.25:
         print(f'[run_jwave_sim] [debug] WARNING: PML consumes {pml_fraction*100:.0f}% of the '
-              'domain — grid.pml_size=\'auto\' (k-Wave\'s FFT-prime-factorization heuristic, '
-              'not tuned for GMRES cost) may be far larger than the '
-              f'{pml_wavelengths:.1f}-wavelength physical requirement for this small a domain. '
-              'Consider an explicit smaller grid.pml_size for this benchmark.')
+              'domain. Consider an explicit smaller grid.pml_size, or a larger domain.')
 
 
 def _debug_print_steady_state_margin(inp):
@@ -1312,7 +1339,7 @@ def main():
             _debug_print_steady_state_margin(inp)
 
         if args.solver == 'pseudo_spectral':
-            p_max_all, p_min_all, p_final = run_pseudo_spectral(inp)
+            p_max_all, p_min_all, p_final, p_complex = run_pseudo_spectral(inp)
             if np.any(np.isnan(np.asarray(p_max_all))):
                 raise RuntimeError(
                     '[run_jwave_sim] pseudo_spectral produced NaN output. '
@@ -1326,7 +1353,7 @@ def main():
                 )
 
         elif args.solver == 'finite_differences':
-            p_max_all, p_min_all, p_final = run_finite_differences(inp, accuracy=args.fd_accuracy)
+            p_max_all, p_min_all, p_final, p_complex = run_finite_differences(inp, accuracy=args.fd_accuracy)
             if np.any(np.isnan(np.asarray(p_max_all))):
                 raise RuntimeError(
                     '[run_jwave_sim] finite_differences produced NaN output. '
@@ -1349,6 +1376,7 @@ def main():
                 debug=args.debug,
                 helmholtz_operator=args.helmholtz_operator,
             )
+            p_complex = helmholtz_p_complex(P_complex, inp) if inp.get('save_p_complex', False) else None
             print(f'[run_jwave_sim] Helmholtz spectral residual: {residual_norm:.4e}')
             diagnostics['residual_norm'] = residual_norm
             if np.any(np.isnan(np.asarray(p_max_all))):
@@ -1367,6 +1395,8 @@ def main():
             p_max_all = p_max_all[slices]
             p_min_all = p_min_all[slices]
             p_final   = p_final[slices]
+            if p_complex is not None:
+                p_complex = p_complex[slices]
             print(f'[run_jwave_sim] Cropped padded output back to original grid {orig_N}')
 
         # Validate output shapes
@@ -1378,7 +1408,7 @@ def main():
                     'Check solver output and dimension transpositions in run_jwave_sim.py.'
                 )
         print(f'[run_jwave_sim] p_max={p_max_all.max():.1f} Pa  p_min={p_min_all.min():.1f} Pa')
-        write_output(args.output, p_max_all, p_min_all, p_final, diagnostics=diagnostics)
+        write_output(args.output, p_max_all, p_min_all, p_final, diagnostics=diagnostics, p_complex=p_complex)
 
     except Exception as e:
         import traceback

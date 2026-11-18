@@ -655,7 +655,6 @@ jwave:
   convergence_threshold: 0.05         # Relative Helmholtz residual above which the run errors
   ignore_convergence_threshold: false # true: a residual above convergence_threshold only warns and the unconverged result is returned
   helmholtz_operator: conservative  # Helmholtz density term: 'conservative' (rho*div((1/rho) grad p), local-c source scaling) | 'jwave' (jwave's built-in term; ~20 % low through skull)
-  precision: single         # Computational precision: 'single' | 'double'
   dry_run: false            # Write the HDF5 solver inputs only; the pipeline stops after the acoustic stage and caches nothing
   cleanup_cache: true       # Delete the HDF5 solver input from the cache after a successful run (rewritten every run); set false to keep it for debugging
 
@@ -681,12 +680,12 @@ babelbrain:
   do_refocusing: false      # Apply BabelBrain refocusing step
   focal_calibration: true           # Geometric-fallback steering only (no explicit element phases): choose the steer so the achieved FWHM-centre (or peak) lands at focal_distance_ep. With explicit phases this runs locate-only (reports the predicted focus, never replaces the drive). Set false to disable.
   focal_calibration_target: flhm_center  # Quantity placed at focal_distance_ep: 'flhm_center' (−3 dB axial midpoint; manufacturer convention) | 'peak'
-  profile_calibration: false        # Optional refinement (annular explicit-phase drives only): re-fit the BabelBrain drive phases so the discrete-ring Rayleigh field matches the continuous-bowl O'Neil ideal across the WHOLE axial profile (not just the FWHM centre). BabelBrain-specific (only the weights delta uses it; shared library phases for k-Wave/jwave are untouched). OFF by default: once the delta is referenced to the correct steering aim (focal_distance_ep), BabelBrain already reproduces the library phases, matching the k-Wave/jwave cluster; this fit targets the continuous-bowl ideal, which sits slightly distal of that cluster.
-  water_amp_calibration: true       # Scale BabelBrain output pressure so its free-water peak matches the analytic Rayleigh peak for the same drive (calibrates out BabelBrain's residual CFL-correction amplitude bias; requires explicit element phases)
+  profile_calibration: false        # Refit drive phases to the continuous-bowl ideal (BabelBrain only; moves it away from the k-Wave/jwave phases). Leave off for cross-backend comparison.
+  water_amp_calibration: true       # Scale BabelBrain output pressure so its free-water ISPPA (BabelBrain water-only run) equals transducer.target_isppa_wcm2; skipped without a water run or target
   use_rayleigh_for_water: false     # Water-only field solver. false: full-wave FDTD (matches k-Wave/jwave for like-for-like backend comparison; recommended). true: BabelBrain's native Rayleigh–Sommerfeld integral (faster, exact linear free-field, but focuses slightly tighter/deeper than a gridded full-wave solve → reads as a rigid axial offset + higher peak vs the other backends). Only affects water-only runs; the transcranial field always uses FDTD.
   q_correction: []                 # Bone Q-factor correction of BabelBrain's relaxation attenuation model (its QCorrection). [] = 1.0 on the non-CT path (realises the specified bone alpha_coeff), BabelBrain's 3.0 on the CT path. Realised bone attenuation scales ~1/Q; values > 0 override both paths.
-  z_beyond_focus_mm: 40     # How far beyond the focus to extend the simulation domain [mm]
-  python_env: ''            # Path to Python environment or executable; empty = system python
+  shear: 'off'                     # Bone shear: 'off' (fluid bone, shear speed 0) | 'prestus_elastic' (cortical/trabecular shear speed, shear and longitudinal attenuation from the elastic: section, as kwave_elastic, at the drive frequency; label path only, not with ct_mapping)
+  python_env: ''            # Path to the BabelBrain Python environment or executable; must be set ('' = system python, which usually lacks BabelViscoFDTD)
   ct_mapping: ''            # CT Hounsfield-to-property mapping name for CT-based skull modelling; empty = label-based path
   air_regions: false        # pseudoCT path only (ct_mapping set): internal air (sinuses, mastoid) as BabelBrain's pressure-release reflector mask
   air_hu_window: [-1200, -400] # HU range classified as air for air_regions

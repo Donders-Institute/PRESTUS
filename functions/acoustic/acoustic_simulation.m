@@ -1,4 +1,4 @@
-function [sensor_data] = acoustic_simulation(kgrid, medium, source, sensor, input_args, parameters)
+function [sensor_data] = acoustic_simulation(kgrid, medium, source, sensor, input_args, parameters, p_complex_freqs)
 % ACOUSTIC_SIMULATION  Dispatch a k-Wave acoustic simulation across supported compute backends
 %
 % Selects and calls the appropriate k-Wave solver function based on
@@ -9,8 +9,24 @@ function [sensor_data] = acoustic_simulation(kgrid, medium, source, sensor, inpu
 % thermal-only medium fields before passing to k-Wave, sets DataCast/precision
 % for GPU/C++ paths, and configures HDF5 file I/O for C++ backends.
 %
+% With p_complex_freqs (io.save_p_complex), also returns the complex
+% steady-state amplitude at those frequencies (STEADY_STATE_COMPLEX_AMPLITUDE)
+% as sensor_data.p_complex_fit [n_points x n_freq], and the recording window
+% as sensor_data.p_complex_window. The same method on every k-Wave build and
+% the elastic backend:
+%   one frequency  - the pressure time series is recorded over the last
+%                    quarter period only (memory: ~ppp/4 samples per point
+%                    instead of steady_state_num_periods periods). That window
+%                    also bounds p_max_all / p_min_all, so they are replaced
+%                    by +/- the fitted amplitude.
+%   several        - the steady-state window as configured (tones are only
+%                    separated over several periods); p_max_all / p_min_all
+%                    stay k-Wave's; stops above 8 GB of recording
+%                    (PRESTUS:pComplexTooLarge).
+%
 % Use as:
 %   sensor_data = acoustic_simulation(kgrid, medium, source, sensor, input_args, parameters)
+%   sensor_data = acoustic_simulation(kgrid, medium, source, sensor, input_args, parameters, p_complex_freqs)
 %
 % Input:
 %   kgrid      - simulation grid object
@@ -22,6 +38,7 @@ function [sensor_data] = acoustic_simulation(kgrid, medium, source, sensor, inpu
 %   input_args - additional k-Wave key-value options (PMLInside, PMLSize, etc.)
 %   parameters - PRESTUS config with simulation.code_type, simulation.interactive,
 %                grid.dims, io.dir_output, transducer, simulation.precision
+%   p_complex_freqs - optional frequencies [Hz] for sensor_data.p_complex_fit ([] = none)
 %
 % Output:
 %   sensor_data - k-Wave sensor output (p_max_all, p_final, etc.) [Pa]
@@ -36,6 +53,7 @@ arguments
     sensor     (1,1) struct
     input_args (1,1) struct
     parameters (1,1) struct
+    p_complex_freqs double = []
 end
 
 % Select which k-Wave code to run
@@ -67,10 +85,44 @@ end
 % Define scale for plotting
 input_args.PlotScale = [-1, 1] * parameters.transducer(1).(parameters.transducer(1).type).elem_p_amp(1);
 
+% Complex amplitude (io.save_p_complex): record the pressure time series
+p_window = [];
+if ~isempty(p_complex_freqs)
+    if numel(p_complex_freqs) == 1
+        % last quarter period (at least 4 samples), ending at the last step
+        ppp = 1 / (p_complex_freqs * kgrid.dt);
+        n_rec = min(kgrid.Nt, max(4, ceil(ppp / 4) + 1));
+        sensor.record_start_index = kgrid.Nt - n_rec + 1;
+        p_window = struct('method', 'quarter_period', 'record_start_index', sensor.record_start_index, ...
+            'n_samples', n_rec, 'points_per_period', ppp, 'p_max_from_fit', true);
+    else
+        record_start = 1;
+        if isfield(sensor, 'record_start_index') && ~isempty(sensor.record_start_index)
+            record_start = double(sensor.record_start_index);
+        end
+        n_rec = kgrid.Nt - record_start + 1;
+        record_gb = nnz(sensor.mask) * n_rec * 4 / 1e9;   % single precision
+        max_record_gb = 8;
+        if record_gb > max_record_gb
+            error('PRESTUS:pComplexTooLarge', ...
+                ['The complex pressure fields of a multi-frequency setup need the steady-state window of the pressure ' ...
+                 'time series in memory: %.1f GB (%d points x %d time steps); the limit is %d GB. Use a partial acoustic FOV ' ...
+                 '(grid.acoustic_fov_diameter_mm, grid.acoustic_fov_length_mm), a coarser grid or fewer periods ' ...
+                 '(grid.steady_state_num_periods).'], record_gb, nnz(sensor.mask), n_rec, max_record_gb);
+        end
+        p_window = struct('method', 'steady_state_window', 'record_start_index', record_start, ...
+            'n_samples', n_rec, 'points_per_period', 1 ./ (p_complex_freqs * kgrid.dt), 'p_max_from_fit', false);
+    end
+    if ~ismember('p', sensor.record)
+        sensor.record{end+1} = 'p';
+    end
+end
+
 % Elastic (shear-wave) skull model: pstdElastic2D/3D instead of kspaceFirstOrder*.
 % Also taken by the free-water baseline, so both runs share one forward model.
 if isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'kwave_elastic')
     sensor_data = acoustic_simulation_elastic(kgrid, medium, source, sensor, input_args, parameters);
+    sensor_data = fit_complex(sensor_data, kgrid, p_complex_freqs, p_window);
     return
 end
 
@@ -234,4 +286,47 @@ switch parameters.simulation.code_type
 
 end
 
+sensor_data = fit_complex(sensor_data, kgrid, p_complex_freqs, p_window);
+
+end
+
+function n = cpu_thread_count()
+% Threads for the k-Wave CPU builds: the cores SLURM allocated to the job
+% (hpc.cores -> --cpus-per-task). Outside SLURM, or without --cpus-per-task,
+% [] keeps k-Wave's and MATLAB's own default.
+    n = str2double(getenv('SLURM_CPUS_PER_TASK'));
+    if ~(isfinite(n) && n >= 1)
+        n = [];
+        fprintf('[acoustic_simulation] CPU threads: default\n');
+    else
+        fprintf('[acoustic_simulation] CPU threads: %d\n', n);
+    end
+end
+
+function sensor_data = fit_complex(sensor_data, kgrid, p_complex_freqs, p_window)
+% Complex amplitude from the recorded window; the time series is dropped.
+% With the quarter-period window, p_max_all / p_min_all (bounded by the same
+% window) become +/- the fitted amplitude.
+    if isempty(p_complex_freqs) || ~isstruct(sensor_data) || ~isfield(sensor_data, 'p')
+        return
+    end
+    sensor_data.p_complex_fit = steady_state_complex_amplitude(sensor_data.p, kgrid.dt, ...
+        p_complex_freqs, p_window.record_start_index);
+    sensor_data = rmfield(sensor_data, 'p');
+    if p_window.p_max_from_fit
+        amp = abs(sensor_data.p_complex_fit(:, 1));
+        for f = {'p_max_all', 'p_min_all'}
+            if ~isfield(sensor_data, f{1}); continue; end
+            if numel(sensor_data.(f{1})) ~= numel(amp)
+                error('PRESTUS:pComplexMask', ...
+                    '%s has %d values but the sensor recorded %d points: the complex field needs a whole-grid sensor mask.', ...
+                    f{1}, numel(sensor_data.(f{1})), numel(amp));
+            end
+            sgn = 1 - 2 * strcmp(f{1}, 'p_min_all');
+            sensor_data.(f{1}) = cast(sgn * reshape(amp, size(sensor_data.(f{1}))), class(sensor_data.(f{1})));
+        end
+        fprintf(['[acoustic_simulation] p_complex: fitted over the last quarter period (%d samples, %.1f per period); ' ...
+                 'p_max_all / p_min_all are +/- the fitted amplitude.\n'], p_window.n_samples, p_window.points_per_period);
+    end
+    sensor_data.p_complex_window = p_window;
 end

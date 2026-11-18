@@ -17,15 +17,15 @@ function out = superpose_complex_fields(files_in, options)
 % Partial-FOV fields are back-projected onto their full grid first
 % (p_complex_info.fov_offset_ac / full_ac_dims); voxels outside a field's
 % FOV get zero from that field, and out.coverage counts how many fields
-% cover each voxel. All fields must share one full grid (async_grid_mode
+% cover each voxel. All fields must share one full grid (grid.async_layout
 % 'shared'): complex fields are not resampled between grids, because
 % interpolating the phase of a field sampled at a few points per wavelength
 % is not accurate.
 %
 % Phases must refer to the same time origin. Files written by ACOUSTIC_WRAPPER
-% since p_complex_info was added refer to t = 0 of the simulation
-% (phase_reference 'simulation_t0'). Older files (no p_complex_info) refer to
-% the start of their own recording window; they are accepted only when all
+% refer to t = 0 of the simulation (phase_reference 'simulation_t0'). BabelBrain
+% files and files without p_complex_info refer to the start of their own
+% recording window; they are accepted only when all
 % files are of that kind, with a warning, which is valid only when every run
 % had the same time step and simulation length (same grid, no partial FOV).
 %
@@ -92,17 +92,20 @@ for k = 1:N
     end
 end
 
-% Phase reference: all t0-referenced, or all legacy (window-referenced).
+% Phase reference: all t0-referenced (k-Wave, jwave), or all referenced to
+% their own recording window (BabelBrain; files without p_complex_info).
 has_info = ~cellfun(@isempty, infos);
-if any(has_info) && ~all(has_info)
+is_t0 = cellfun(@(s) ~isempty(s) && (~isfield(s, 'phase_reference') || ...
+    strcmp(s.phase_reference, 'simulation_t0')), infos);
+if any(is_t0) && ~all(is_t0)
     error('superpose_complex_fields:mixedPhaseReference', ...
         ['Some files refer phases to t = 0 of the simulation and some to their recording ' ...
-         'window: re-run the acoustic stage of the older runs with io.save_p_complex.']);
+         'window (BabelBrain, or files without p_complex_info): combine fields of one kind only.']);
 end
-if ~any(has_info)
+if ~any(is_t0)
     warning('superpose_complex_fields:legacyPhaseReference', ...
-        ['p_complex files carry no p_complex_info: phases refer to each run''s recording ' ...
-         'window. The sum is valid only if all runs had the same time step and length.']);
+        ['The p_complex phases refer to each run''s recording window (BabelBrain, or files without ' ...
+         'p_complex_info). The sum is valid only if all runs had the same time step and length.']);
 end
 
 % Common frequency.
@@ -132,7 +135,7 @@ for k = 1:N
     elseif ~isequal(fd, full_dims)
         error('superpose_complex_fields:gridMismatch', ...
             ['File %d is on a %s grid, file 1 on %s. Complex fields are only added on one ' ...
-             'shared grid (async_grid_mode ''shared'').'], k, mat2str(fd), mat2str(full_dims));
+             'shared grid (grid.async_layout ''shared'').'], k, mat2str(fd), mat2str(full_dims));
     end
     idx = arrayfun(@(d) offset(d):offset(d) + size(p, d) - 1, 1:numel(full_dims), ...
         'UniformOutput', false);

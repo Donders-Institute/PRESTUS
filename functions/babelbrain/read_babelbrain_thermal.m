@@ -27,14 +27,22 @@ function results_heating = read_babelbrain_thermal(thermal_h5, parameters, plani
 %
 % Use as:
 %   results_heating = read_babelbrain_thermal(thermal_h5, parameters, planimg)
+%   results_heating = read_babelbrain_thermal(..., focus_pos, focal_length_mm, trans_pos)
 %
 % Input:
 %   thermal_h5   - path to BabelBrain *ThermalField*.h5
 %   parameters   - PRESTUS config (used for grid.dims and grid.resolution_mm)
 %   planimg      - planimg struct with transf (T1→grid affine) and t1_header
+%   focus_pos    - (optional) [1x3] focus voxel; anchors the depth resample on
+%                  /TargetLocation (as READ_BABELBRAIN_OUTPUT)
+%   focal_length_mm - (optional) preset FocalLength [mm]; anchor fallback
+%   trans_pos    - (optional) [1x3] transducer voxel; sets the beam direction
 %
 % Output:
-%   results_heating - struct compatible with thermal_simulation output
+%   results_heating - struct compatible with thermal_simulation output: p_amp,
+%                     maxT, heating_endT, CEM43, CEM43_end (ISO CEM43 fields
+%                     NaN, focal-plane fields empty), timeseries, MaxIsppa,
+%                     MaxIspta, Isppa, Ispta, dx_step, babelbrain_thermal_source
 %
 % See also: BABELBRAIN_THERMAL_WRAPPER, THERMAL_ANALYSIS, NIFTI_THERMAL
 
@@ -72,11 +80,9 @@ p_map      = perm321(read_field('p_map'));        % peak pressure [Pa]
 % Unlike the acoustic DataForSim.h5 (whose arrays are stored depth-flipped
 % relative to z_vec, see read_babelbrain_output), the thermal arrays are in
 % z_vec order: CalculateTemperatureEffects np.flip()s p_amp / MaterialMap on
-% load (axis 2) and saves its results without flipping back. Verified on
-% sub-602: thermal MaterialMap == flip(acoustic MaterialMap, 3) and the thermal
-% p_map peak sits at N+1-k of the acoustic p_amp peak. So z_vec is used as is.
-% (Reversing it here, as before, mirrored the heating about the focal marker:
-% skull heating landed distal of the target.) After permute([3,2,1]):
+% load (axis 2) and saves its results without flipping back (thermal
+% MaterialMap == flip(acoustic MaterialMap, 3)). So z_vec is used as is;
+% reversing it would mirror the heating about the focal marker. After permute([3,2,1]):
 %   dim 1 = BB x (lateral X), 0 at focal spot
 %   dim 2 = BB y (lateral Y), 0 at focal spot
 %   dim 3 = BB z (depth), FocalLength at focal spot
@@ -227,7 +233,7 @@ clear chk_ act exp;
 %% Assemble results struct
 % Field names match thermal_simulation output exactly so that
 % thermal_analysis and nifti_thermal work without modification.
-% Required fields (from thermal_simulation.m line 554–563):
+% Required fields (as thermal_simulation returns them):
 %   maxT, focal_planeT, heating_endT, CEM43, focal_planeCEM43,
 %   CEM43_end, timeseries, CEM43_iso, focal_planeCEM43_iso, CEM43_iso_end
 

@@ -218,6 +218,7 @@ if use_babelbrain
             acoustic_provenance = rmfield(acoustic_provenance, 'freefield_axial');
         end
     end
+    sensor_data = backend_p_complex_files(parameters, sensor_data, filename_sensor_data, 'babelbrain', acoustic_provenance);
     if save_cache
         cache_acoustic('save', filename_sensor_data, parameters, sensor_data, [], ...
             acoustic_provenance, struct('parameters', parameters, 'backend', 'babelbrain'), kwave_medium);
@@ -234,6 +235,7 @@ elseif use_jwave
     if isfield(sensor_data, 'jwave_pml_size')
         parameters.grid.pml_size_effective = sensor_data.jwave_pml_size;
     end
+    sensor_data = backend_p_complex_files(parameters, sensor_data, filename_sensor_data, 'jwave', acoustic_provenance);
     if save_cache
         jw_solver = 'helmholtz';
         if isfield(parameters, 'jwave') && isfield(parameters.jwave, 'solver')
@@ -359,4 +361,50 @@ function name = acoustic_backend_name(parameters)
     if isfield(parameters, 'acoustic_backend') && ~isempty(parameters.acoustic_backend)
         name = char(parameters.acoustic_backend);
     end
+end
+
+function sensor_data = backend_p_complex_files(parameters, sensor_data, filename_sensor_data, backend, acoustic_provenance)
+% io.save_p_complex for jwave and BabelBrain: the same p_complex file as the
+% k-Wave path (WRITE_P_COMPLEX_FILES). jwave refers phases to t = 0 of its
+% time-stepped simulation; BabelBrain to the start of its own recording window
+% (one FFT bin over its last cycles), so SUPERPOSE_COMPLEX_FIELDS combines its
+% fields only with each other.
+    if ~(isfield(parameters.io, 'save_p_complex') && parameters.io.save_p_complex) || ...
+            ~isfield(sensor_data, 'p_complex') || isempty(sensor_data.p_complex)
+        return
+    end
+    meta = struct('phase_reference', 'simulation_t0', ...
+        'freq_hz', parameters.transducer(1).freq_hz, 'field_names', {{'p_complex'}}, ...
+        'record_t0_s', NaN, 'dt_s', NaN, 'method', '', 'n_samples', NaN, 'p_max_from_fit', false, ...
+        'drive_level', 'simulated', 'grid_dims', [], 'fov_offset_ac', [], 'full_ac_dims', []);
+    switch backend
+        case 'jwave'
+            solver = 'helmholtz';
+            if isfield(parameters, 'jwave') && isfield(parameters.jwave, 'solver')
+                solver = parameters.jwave.solver;
+            end
+            if strcmp(solver, 'helmholtz')
+                meta.method = 'helmholtz';       % frequency-domain field; p_max_all is |P| as well
+                meta.p_max_from_fit = true;
+            else
+                meta.method = 'steady_state_window';   % running least-squares sums over the window
+            end
+            if isfield(sensor_data, 'p_complex_window')
+                w = sensor_data.p_complex_window;
+                meta.record_t0_s = (double(w.record_start_index) - 1) * w.dt;
+                meta.dt_s        = w.dt;
+                meta.n_samples   = w.n_samples;
+                sensor_data = rmfield(sensor_data, 'p_complex_window');
+            end
+        case 'babelbrain'
+            meta.phase_reference = 'babelbrain_window';
+            meta.method = 'babelbrain_fft';
+            meta.p_max_from_fit = true;          % p_max_all is BabelBrain's p_amp
+    end
+    if isstruct(acoustic_provenance) && isfield(acoustic_provenance, 'fov_offset_ac')
+        meta.fov_offset_ac = acoustic_provenance.fov_offset_ac;
+        meta.full_ac_dims  = acoustic_provenance.full_ac_dims;
+    end
+    sensor_data.p_complex = cast(sensor_data.p_complex, 'single');
+    sensor_data = write_p_complex_files(parameters, sensor_data, filename_sensor_data, meta);
 end

@@ -453,7 +453,6 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'standalone'}) test_
             p = tc.make_params(affix, grid_dims);
             p.acoustic_backend = 'jwave';
             p.grid.pml_size    = 20;   % jwave.pml_size is ignored by jwave_wrapper.m
-            p.jwave.precision  = 'single';
             p.jwave.dry_run    = false;
 
             % Pass resolved executable paths (not raw env-var values).

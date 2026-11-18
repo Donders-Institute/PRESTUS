@@ -8,7 +8,7 @@ function [kgrid, source, sensor, source_labels, src_weights] = source_sensor_set
 %
 % dt  is derived from two quantities:
 %   PPW  = max_sound_speed / (freq_hz * dx)   [spatial samples per wavelength]
-%   CFL  = grid.source_cfl  (default 0.15)    [Courant-Friedrichs-Lewy number]
+%   CFL  = grid.source_cfl  (default 0.15; 0.10 for jwave time-domain solvers)
 %   PPP  = ceil(PPW / CFL)                    [temporal samples per period]
 %   dt   = wave_period / PPP                   [time step, s]
 % grid.source_ppp, when set, gives PPP directly (PPW and CFL are then unused).
@@ -34,8 +34,8 @@ function [kgrid, source, sensor, source_labels, src_weights] = source_sensor_set
 % steady state at and beyond the focal peak, producing an artefactual
 % post-peak pressure drop.
 %
-% The sensor records p_max_all and p_final over the last 3 wave periods
-% to capture steady state.
+% The sensor records p_max_all, p_min_all, and p_final over the last
+% grid.steady_state_num_periods wave periods (default 3), in steady state.
 %
 % Use as:
 %   [kgrid, source, sensor, source_labels] = ...
@@ -44,6 +44,7 @@ function [kgrid, source, sensor, source_labels, src_weights] = source_sensor_set
 %       source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step)
 %   [kgrid, source, sensor, source_labels] = ...
 %       source_sensor_setup(parameters, max_sound_speed, trans_pos_final, focus_pos_final, grid_time_step, min_sound_speed)
+%   [kgrid, source, sensor, source_labels, src_weights] = source_sensor_setup(...)
 %
 % Input:
 %   parameters      - PRESTUS config; must contain grid.dims, grid.resolution_mm [mm],
@@ -71,7 +72,8 @@ function [kgrid, source, sensor, source_labels, src_weights] = source_sensor_set
 %   sensor        - struct with sensor.mask, sensor.record, sensor.record_start_index
 %   source_labels - grid of integer element labels (0 = inactive)
 %   src_weights   - per-element grid weights of the source points (SOURCE_CREATE);
-%                   rebuilt when the source is read from the cache and requested
+%                   with a cached source, rebuilt only for time reversal
+%                   (time_reversal.enabled), else []
 %
 % See also: SOURCE_CREATE, GRID_TISSUE_SETUP, GRID_TRANSDUCER_LOCATION
 
@@ -111,7 +113,7 @@ end
     
     % Check the number of input arguments
     % As a default the time step is based on the CFL number (grid.source_cfl,
-    % default 0.15). If grid_time_step is given (non-empty), the function was
+    % default 0.15, or 0.10 for jwave time-domain solvers). If grid_time_step is given (non-empty), the function was
     % called a second time with a smaller time step due to simulation instability.
     if nargin < 5 || isempty(grid_time_step)
         % Calculate the time step using an integer number of points per period

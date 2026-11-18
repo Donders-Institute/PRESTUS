@@ -353,7 +353,6 @@ fields:
   jwave.python_env: {kind: path}
   jwave.python_env_gpu: {kind: path, visible_if: {key: jwave.use_gpu, not_in: [false, 0]}}
   jwave.use_gpu: {kind: tristate}
-  jwave.precision: {choices: [single, double]}
   jwave.solver: {choices: [helmholtz, pseudo_spectral, finite_differences]}
   babelbrain: {visible_if: {key: acoustic_backend, in: [babelbrain]}}
   elastic: {visible_if: {key: acoustic_backend, in: [kwave_elastic]}}
@@ -363,8 +362,8 @@ fields:
   elastic.alpha_coeff_long: {unit: dB/(cm·MHz^y)}
   elastic.long_attenuation: {choices: [elastic, medium]}
   babelbrain.computing_backend: {choices: [auto, cuda, opencl, metal, cpu]}
+  babelbrain.shear: {choices: ['off', prestus_elastic]}
   babelbrain.focal_calibration_target: {choices: [flhm_center, peak]}
-  babelbrain.z_beyond_focus_mm: {unit: mm}
   babelbrain.python_env: {kind: path}
   # BabelBrain's CT path needs the pseudo-CT, which grid_tissue_setup.m loads only with pct.enabled
   babelbrain.ct_mapping: {choices: [Webb-Marsac, Aubry, Pichardo, McDannold, Marsac-Aubry, Pichardo-Marsac, McDannold-Marsac], visible_if: {key: pct.enabled, in: [1, true]}}
@@ -601,7 +600,7 @@ extra:
     kind: number
     default: 40
     unit: mm
-    help: Extra axial length beyond the focal depth when acoustic_fov_length_mm or default_dims is 'auto'.
+    help: Extra axial length beyond the focal depth when acoustic_fov_length_mm or default_dims is 'auto', and of BabelBrain's narrow-beam domain.
   grid.water_margin_mm:
     kind: number
     default: 5
@@ -1232,7 +1231,7 @@ display:
   babelbrain.water_amp_calibration: {label: "Free-water amplitude calibration", advanced: true}
   babelbrain.use_rayleigh_for_water: {label: "Rayleigh integral for free water", advanced: true}
   babelbrain.q_correction: {label: "Bone Q correction", advanced: true}
-  babelbrain.z_beyond_focus_mm: {label: "Axial extent beyond the focus"}
+  babelbrain.shear: {label: "Bone shear", advanced: true}
   babelbrain.python_env: {label: "Python environment"}
   babelbrain.cleanup_cache: {label: "Delete the cache after the run", advanced: true}
   babelbrain.dry_run: {label: "Prepare inputs only (dry run)", advanced: true}
@@ -1254,6 +1253,60 @@ display:
   placement.plantus.min_distance_mm: {label: "Min. distance"}
   placement.plantus.max_distance_mm: {label: "Max. distance"}
   placement.plantus.optimal_distance_mm: {label: "Optimal distance"}
+
+# ── Choice labels ──────────────────────────────────────────────────────
+# Drop-down text for choice values; the config keeps the value. Exact key
+# paths only. A labelled key labels every choice (test_choice_icons checks
+# keys, choices and completeness). Labels are short noun phrases; the
+# explanation stays in the help text, shown with the YAML value when hovering
+# an item. A key without an entry shows its raw values. Quote choices YAML
+# would read as booleans ('off'); 0/1 stay integers.
+choice_labels:
+  platform: {auto: Auto-detect, slurm: SLURM, qsub: qsub, matlab: This MATLAB session}
+  hpc.name: {default: Default, snellius: Snellius}
+  acoustic_backend: {kwave: k-Wave, kwave_elastic: k-Wave elastic (experimental), babelbrain: BabelBrain (experimental), jwave: j-Wave (experimental)}
+  thermal_backend: {kwave: k-Wave, babelbrain: BabelBrain (experimental)}
+  simulation.medium: {water: Free water, layered: Head model, phantom: Phantom}
+  simulation.code_type: {matlab_cpu: 'MATLAB, CPU', matlab_gpu: 'MATLAB, GPU', cpp_cpu: 'C++ binary, CPU', cpp_gpu: 'C++ binary, GPU (CUDA)', cpp_mlx: 'C++ binary, Apple Silicon GPU'}
+  simulation.precision: {single: Single, double: Double}
+  simulation.transducer_coupling: {coherent: Coherent, async: Asynchronous}
+  timing.async_schedule: {pulses: "Pulses take turns", trains: "Pulse trains take turns", custom: "Custom offsets and timing"}
+  grid.async_layout: {shared: Shared grid, per_transducer: One grid per transducer}
+  io.overwrite_files: {never: Reuse existing outputs, always: Recompute outputs, force: Recompute outputs and intermediate stages, ask: Ask}
+  io.cache_signature_check: {error: Stop on mismatch, warn: Warn and reuse, 'off': Do not check}
+  modules.run_water_baseline: {auto: Auto, 1: Always, 0: Only when the target differs from the calibration}
+  report.style: {instrument: Instrument, classic: Classic, compact: Compact, paper: Paper}
+  calibration.focal_reference: {peak: Intensity peak, flhm_3db: 'FLHM centre, −3 dB', flhm_6db: 'FLHM centre, −6 dB'}
+  transducer.type: {annular: Annular array, matrix: Matrix array}
+  transducer.matrix.steering: {'1D': Axial (1D), '3D': Volumetric (3D)}
+  transducer.matrix.elem_shape: {rect: Rectangle, disc: Disc, bowl: Bowl}
+  transducer.matrix.matrix_shape.type: {define_here: Define here, extract_from_file: Load from file}
+  transducer.matrix.matrix_shape.define_here.grid_shape.type: {rect: Rectangular grid, fibonacci: Fibonacci spiral, fermat: Fermat spiral}
+  timing.pulse_ramp_shape: {linear: Linear, tukey: Tukey (raised cosine)}
+  placement.mode: {manual: Manual coordinates, localite: Localite neuronavigation, heuristic: Heuristic search, mni: MNI coordinates, plantus: PlanTUS, tus_entry: TUS_entry}
+  placement.reuse: {auto: Auto, always: Always, never: Never}
+  placement.manual.coordinate_space: {voxel: Voxel indices, ras: Subject RAS (mm), mni: MNI (mm)}
+  placement.plantus.interactive: {0: Take the optimum, 1: Choose in Workbench}
+  grid.mode: {focal_axis: Focal axis, transducer_axis: Transducer axis, ras_plus: RAS+ (no rotation)}
+  grid.axisymmetric_output: {auto: Auto, '2d': 2D plane, '3d': 3D volume}
+  grid.water_baseline_grid: {beam: Beam box, full: Full grid}
+  headmodel.smooth_method: {gaussian: Gaussian, box: Box, 'off': 'Off'}
+  headmodel.skull_fill_method: {rubberwrap: Rubber wrap, imclose: Morphological closing}
+  pct.skull_mapping: {miscouridou: Miscouridou, carpino: Carpino (deprecated), wiesinger: Wiesinger, treeby: Treeby, kosciessa: Kosciessa, custom: Custom}
+  pct.mapping_density: {k-plan: k-Plan, k-wave: k-Wave, marsac: Marsac, marsac-babelbrain: Marsac (BabelBrain), aubry: Aubry, air-tissue: Air/tissue, none: None}
+  pct.mapping_soundspeed: {k-plan: k-Plan, marsac: Marsac, aubry: Aubry, webb: Webb, pichardo: Pichardo, mcdannold: McDannold, none: None}
+  pct.mapping_attenuation: {k-plan: k-Plan, mueller: Mueller, aubry: Aubry, webb: Webb, pichardo: Pichardo, mcdannold: McDannold, none: None}
+  thermal.cem43_iso: {0: k-Wave (kWaveDiffusion), 1: ISO 14708-3 / ITRUSST}
+  time_reversal.placement_search.jitter_mode: {grid: Along grid axes, scalp: Over the scalp}
+  time_reversal.pose_workflow.aim: {corrected: Aberration-corrected, geometric: Geometric target, both: Both}
+  time_reversal.pose_workflow.verify_fov: {partial: Acoustic FOV, full: Full grid, config: As configured}
+  time_reversal.pose_workflow.rank_by: {target_intensity: Target intensity, focus_error: Focus error}
+  jwave.solver: {helmholtz: Helmholtz (frequency domain), pseudo_spectral: Pseudo-spectral (time domain), finite_differences: Finite differences (time domain)}
+  elastic.shear_mapping: {pichardo: Pichardo et al. 2017, 'off': Off (fluid skull)}
+  elastic.long_attenuation: {elastic: Elastic model, medium: Fluid medium}
+  babelbrain.computing_backend: {auto: Auto, cuda: CUDA, opencl: OpenCL, metal: Metal, cpu: CPU}
+  babelbrain.shear: {'off': Off (fluid bone), prestus_elastic: k-Wave elastic skull properties}
+  babelbrain.focal_calibration_target: {flhm_center: 'FLHM centre, −3 dB', peak: Intensity peak}
 
 # ── Choice icons and figures ───────────────────────────────────────────
 # Schematics for drop-down choices, drawn in ui/choice_icons.py. Exact key
@@ -1330,10 +1383,8 @@ tuning:
   timing.pt_timestep: [speed, accuracy]
   timing.post_pt_timestep: [speed, accuracy]
   jwave.use_gpu: [speed]
-  jwave.precision: [accuracy, memory]
   jwave.gmres_maxiter: [speed, accuracy]
   babelbrain.ppw: [speed, accuracy]
-  babelbrain.z_beyond_focus_mm: [speed, memory]
   babelbrain.use_rayleigh_for_water: [speed]
   babelbrain.cleanup_cache: [disk]
   io.save_matrices: [disk]
