@@ -174,7 +174,7 @@ end
             clear medium_stats
 
             % [DEBUG] save pCT mapping overview
-            if parameters.simulation.debug == 1
+            if debug_on(parameters, 'medium', 'figures')
                 h = figure('Units', 'normalized', 'Position', [0.1, 0.1, 0.25, 1]);
                 subplot(4,1,1); 
                     hold on; histogram(pseudoCT(skull_idx)); xlabel("pseudo-HU")
@@ -197,11 +197,10 @@ end
                     xline(medium.skull_trabecular.alpha_coeff, 'r', 'LineWidth', 1);
                     xline(medium.skull_cortical.alpha_coeff, 'r', 'LineWidth', 1);
                     xline(medium.skull.alpha_coeff, 'k', 'LineWidth', 2);
-                    title(sprintf('Attention mapping: %s', pct_mapping_attenuation))
-                output_plot = fullfile(parameters.io.dir_debug_medium,...
-                    sprintf('pCT_histograms%s.png',parameters.io.output_affix));
-                exportgraphics(h, output_plot, 'Resolution', 150);
-                close(h);
+                    title(sprintf('Attenuation mapping: %s', pct_mapping_attenuation))
+                debug_save_figure(parameters, 'medium', h, ...
+                    sprintf('pCT_histograms%s', parameters.io.output_affix), ...
+                    'CT skull voxels: HU and the mapped density, sound speed and attenuation', 'Resolution', 150);
             end
 
             clear skull_idx
@@ -275,11 +274,7 @@ end
     if parameters.fit_alpha_power == 1
         alpha_power_fixed = 2;
     
-        if parameters.simulation.debug == 1
-            plot_fit = true;
-        else
-            plot_fit = false;
-        end
+        plot_fit = debug_on(parameters, 'medium', 'figures');
     
         all_freqs = [parameters.transducer.freq_hz];
         source_freq = all_freqs(1);
@@ -298,11 +293,10 @@ end
             plot_fit);
     
         % DEBUG mode: save plot of fitted attenuation values
-        if parameters.simulation.debug == 1
-            fig_path = fullfile(parameters.io.dir_debug_medium,...
-            ['attenuation_fit', char(parameters.io.output_affix), '.png']);
-            saveas(gcf, fig_path);
-            close(gcf);
+        if plot_fit
+            debug_save_figure(parameters, 'medium', gcf, ...
+                ['attenuation_fit', char(parameters.io.output_affix)], ...
+                sprintf('Attenuation refitted to a single power law (alpha_power = %g)', alpha_power_fixed));
         end
     else
         warn('Attenuation power-law is not remapped (as requested).')
@@ -344,7 +338,7 @@ end
         temp_0 = smooth_img(temp_0, fwhm_mm, grid_mm, 0, smooth_method);
     
         % [DEBUG] Plot unsmoothed and smoothed density
-        if parameters.simulation.debug == 1
+        if debug_on(parameters, 'medium', 'figures')
             h = figure('Position', [100 100 800 400]);
             if numel(size(density))==3
                 density_pre = squeeze(tmp_density(:,round(size(tmp_density,2)/2),:));
@@ -355,11 +349,10 @@ end
             end
             subplot(1,2,1); imagesc(density_pre); title('Original density')
             subplot(1,2,2); imagesc(density_post); title('Smoothed density')
-            output_plot_filename = fullfile(parameters.io.dir_debug_medium,...
-                sprintf('sub-%03d_%s_density_smoothing_changes%s.png', ...
-                parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-            saveas(h, output_plot_filename, 'png')
-            close(h);
+            debug_save_figure(parameters, 'medium', h, ...
+                sprintf('sub-%03d_%s_density_smoothing_changes%s', ...
+                parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix), ...
+                'Density before (left) and after (right) smoothing the property maps, centre y-slice');
             clear density_pre density_post;
         end; clear tmp_density;
     else
@@ -376,7 +369,26 @@ end
                           'specific_heat', specific_heat,...
                           'perfusion_coeff', perfusion_coeff,...
                           'temp_0', temp_0);
-    
+
+    % k-Wave's dispersion term is undefined at y = 1 (tan(pi*y/2)); a linear
+    % law (fit_alpha_power = 0 with alpha_power 1, e.g. BabelBrain-matched
+    % media) runs with absorption but without dispersion, as k-Wave advises.
+    % The compiled k-Wave solvers (C++/CUDA) read the power law from their input
+    % file and reject alpha_power = 1 whatever alpha_mode is set, so stop here
+    % instead of inside k-Wave.
+    if alpha_power_fixed == 1
+        backend = lower(char(string(get_field(parameters, {'acoustic_backend'}, 'kwave'))));
+        code_type = lower(char(string(get_field(parameters, {'simulation', 'code_type'}, ''))));
+        runs_acoustics = logical(get_field(parameters, {'modules', 'run_acoustic_sims'}, 1));
+        if strcmp(backend, 'kwave') && startsWith(code_type, 'cpp') && runs_acoustics
+            error('medium_setup:alphaPowerOneCpp', ['alpha_power = 1 (fit_alpha_power = 0): the k-Wave C++/CUDA ' ...
+                'solvers do not accept a linear attenuation law. Use fit_alpha_power = 1 (refit to y = 2), ' ...
+                'a common alpha_power other than 1, or a MATLAB code_type (matlab_cpu / matlab_gpu).']);
+        end
+        kwave_medium.alpha_mode = 'no_dispersion';
+        warn('alpha_power = 1: k-Wave runs with alpha_mode = ''no_dispersion'' (absorption kept, dispersion off).');
+    end
+
     fprintf('[medium_setup] ---- medium summary ----\n');
     fprintf('[medium_setup] Medium type      : %s\n', parameters.simulation.medium);
     fprintf('[medium_setup] Tissue layers    : %d (%s)\n', numel(layer_labels), strjoin(layer_labels, ', '));
@@ -413,35 +425,37 @@ end
     % interpretable alongside the grid metadata. They are NOT duplicates.
     %
     % Raw simulation-grid matrices → debug_dir/medium/ (matrix_*.nii.gz):
-    %   Written only when simulation.debug == 1. Large, anisotropic, and only
+    %   Written only with debug volumes on (DEBUG_ON). Large, anisotropic, and only
     %   interpretable with the grid metadata — not intended as pipeline outputs.
-    if parameters.simulation.debug == 1
+    if debug_on(parameters, 'medium', 'volumes')
         % [debug] save raw simulation-grid medium matrices as NIfTIs
+        mats = {
+            'matrix_density',           density,             'Density [kg/m^3], simulation grid'
+            'matrix_sound_speed',       sound_speed,         'Sound speed [m/s], simulation grid'
+            'matrix_alpha_coeff',       alpha_coeff,         'Attenuation coefficient [dB/(cm MHz^y)] before the power-law refit'
+            'matrix_alpha_power',       alpha_power,         'Attenuation power-law exponent per tissue'
+            'matrix_alpha_coeff_fixed', alpha_coeff_fixed,   'Attenuation coefficient after the power-law refit (used by k-Wave)'
+            'matrix_perfusion',         perfusion_coeff,     'Perfusion coefficient, simulation grid'
+            'matrix_absorption_np',     absorption_np,       'Absorption [Np/m], simulation grid'
+            'matrix_absorption',        absorption_fraction, 'Absorption fraction of attenuation, simulation grid'
+            };
         try
-            filename_density = fullfile(parameters.io.dir_debug_medium,'matrix_density');
-            niftiwrite(density, filename_density, 'Compressed',true); pause(0.1);
-            filename_sound_speed = fullfile(parameters.io.dir_debug_medium,'matrix_sound_speed');
-            niftiwrite(sound_speed, filename_sound_speed, 'Compressed',true); pause(0.1);
-            filename_alpha_coeff = fullfile(parameters.io.dir_debug_medium,'matrix_alpha_coeff');
-            niftiwrite(alpha_coeff, filename_alpha_coeff, 'Compressed',true); pause(0.1);
-            filename_alpha_power = fullfile(parameters.io.dir_debug_medium,'matrix_alpha_power');
-            niftiwrite(alpha_power, filename_alpha_power, 'Compressed',true); pause(0.1);
-            filename_alpha_coeff_fixed = fullfile(parameters.io.dir_debug_medium,'matrix_alpha_coeff_fixed');
-            niftiwrite(alpha_coeff_fixed, filename_alpha_coeff_fixed, 'Compressed',true); pause(0.1);
-            filename_perfusion = fullfile(parameters.io.dir_debug_medium,'matrix_perfusion');
-            niftiwrite(perfusion_coeff, filename_perfusion, 'Compressed',true); pause(0.1);
-            filename_absorption = fullfile(parameters.io.dir_debug_medium,'matrix_absorption');
-            niftiwrite(absorption_np, [filename_absorption '_np'], 'Compressed',true); pause(0.1);
-            niftiwrite(absorption_fraction, filename_absorption, 'Compressed',true); pause(0.1);
+            for mi = 1:size(mats, 1)
+                fname = fullfile(parameters.io.dir_debug_medium, mats{mi, 1});
+                niftiwrite(mats{mi, 2}, fname, 'Compressed', true); pause(0.1);
+                debug_register(parameters, 'medium', fname, mats{mi, 3}, 'volume');
+            end
         catch
             warn('medium_setup:debugNifti', ...
                 'Error saving debug grid matrices — may result from concurrent write attempts.');
         end
+        clear mats
 
         % [debug] save pCT (if used)
         if parameters.pct.enabled == 1
             filename_pct = fullfile(parameters.io.dir_debug_medium,sprintf('pct%s', parameters.io.output_affix));
             niftiwrite(pseudoCT, filename_pct, 'Compressed',true);
+            debug_register(parameters, 'medium', filename_pct, 'CT [HU], simulation grid', 'volume');
         end
     end
 

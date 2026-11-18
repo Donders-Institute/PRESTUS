@@ -52,7 +52,7 @@ end
     log_ute_corr = log(ute_corr);
     [counts, bins] = histcounts(log_ute_corr); % Compute histogram counts and bin edges
     [~, max_idx] = max(counts); % Find bin with maximum count
-    peak_value = bins(max_idx); % Peak bin in logarithmic space
+    peak_value = (bins(max_idx) + bins(max_idx + 1)) / 2; % Centre of the peak bin (log space)
 
     % Convert peak value back to raw intensity scale
     peak = exp(peak_value);

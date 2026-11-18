@@ -224,7 +224,7 @@ end
         end
         % Final guard: error if the file still does not exist after waiting
         if ~exist(pseudoCT_file, 'file')
-            error('pseudoCT generation did not produce %s — check the pct-009 job log.', pseudoCT_file);
+            error('pseudoCT generation did not produce %s — check the %s job log.', pseudoCT_file, job_name);
         end
 
     elseif strcmp(platform, 'qsub')

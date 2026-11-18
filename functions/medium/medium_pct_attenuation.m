@@ -13,8 +13,9 @@ function [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_c
 %               (requires external/BabelBrain submodule and density argument)
 %   'mcdannold' polynomial ρ model (McDannold et al., linear in frequency)
 %   'none'      fixed scalar from parameters.medium_properties.skull
-% Webb, Pichardo, and McDannold results are converted to k-Wave alpha_coeff
-% (dB/cm/MHz^alpha_power) by normalising out the frequency dependence at 1 MHz.
+% Webb, Pichardo, and McDannold give attenuation in Np/m, converted to k-Wave
+% alpha_coeff (dB/cm/MHz^alpha_power); Pichardo and McDannold assume linear
+% frequency scaling (alpha_power = 1, normalised at 1 MHz).
 %
 % Use as:
 %   [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, algorithm)
@@ -27,7 +28,8 @@ function [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_c
 %   alpha_power - full-grid attenuation power array to update
 %   pseudoCT    - pseudo-CT Hounsfield values (full grid)
 %   skull_idx   - linear indices of skull voxels into the grid
-%   algorithm   - one of 'k-plan', 'mueller', 'aubry', 'none'
+%   algorithm   - one of the seven algorithms above
+%   density     - skull density [kg/m^3] (full grid); pichardo and mcdannold only
 %
 % Output:
 %   alpha_coeff - updated alpha_coeff with skull voxels filled
@@ -84,7 +86,6 @@ switch algorithm
 
         phi(skull_idx) = 1-(pseudoCT(skull_idx)/max(pseudoCT(skull_idx)));
         alpha_coeff(skull_idx) = alpha_min + (alpha_max - alpha_min) * (phi(skull_idx).^0.5);
-        % regularize sound speed to a minimum of water
         alpha_power(skull_idx) = parameters.medium_properties.skull.alpha_power;
 
     case 'webb'
@@ -102,11 +103,11 @@ switch algorithm
         Beta    = 1.3;
         c       = -0.0016;
         if isfield(parameters, 'pct')
-            if isfield(parameters.pct, 'webb_att_alpha0'), Alpha_0 = parameters.pct.webb_att_alpha0; end
-            if isfield(parameters.pct, 'webb_att_beta'),   Beta    = parameters.pct.webb_att_beta;   end
-            if isfield(parameters.pct, 'webb_att_c'),      c       = parameters.pct.webb_att_c;      end
+            if isfield(parameters.pct, 'webb_att_alpha0') && ~isempty(parameters.pct.webb_att_alpha0), Alpha_0 = parameters.pct.webb_att_alpha0; end
+            if isfield(parameters.pct, 'webb_att_beta') && ~isempty(parameters.pct.webb_att_beta),   Beta    = parameters.pct.webb_att_beta;   end
+            if isfield(parameters.pct, 'webb_att_c') && ~isempty(parameters.pct.webb_att_c),      c       = parameters.pct.webb_att_c;      end
         end
-        % 100 Np/m per (cm/m) × 0.08686 dB/Np = 8.686 dB/cm per unit of the formula
+        % x100 (formula to Np/m) x 0.08686 (Np/m to dB/cm) = 8.686
         alpha_coeff(skull_idx) = Alpha_0 .* exp(pseudoCT(skull_idx) * c) * 8.686;
         alpha_power(skull_idx) = Beta;
 

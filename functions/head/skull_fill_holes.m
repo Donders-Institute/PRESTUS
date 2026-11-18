@@ -1,4 +1,4 @@
-function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, focus_pos_grid, segmented_img)
+function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, focus_pos_grid, segmented_img, qc_grid)
 % SKULL_FILL_HOLES  Expand skull mask and fill gaps to maintain continuity
 %
 % Expands the skull region using morphological perimeter detection and
@@ -7,18 +7,25 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
 %
 % Use as:
 %   [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, focus_pos_grid, segmented_img)
+%   [medium_masks, skull_i] = skull_fill_holes(..., qc_grid)
 %
 % Input:
 %   parameters     - (1,1) simulation configuration struct
 %   medium_masks   - [Nx x Ny x Nz] medium label array
 %   focus_pos_grid - [1x3] focus position in voxel coordinates
 %   segmented_img  - [Nx x Ny x Nz] SimNIBS tissue label volume
+%   qc_grid        - grid description for the head-model QC records (SEG_QC);
+%                    default: the placement grid
 %
 % Output:
 %   medium_masks - updated medium label array with skull gaps filled
 %   skull_i      - integer label index for skull tissue
 %
 % See also: SKULL_RUBBER_WRAP, PREPROC_MEDIUM_MASK
+
+    if nargin < 5 || isempty(qc_grid)
+        qc_grid = seg_qc('grid_note', parameters, 'placement');
+    end
 
     labels_medium = fieldnames(parameters.medium_properties);
     labels_requested = fieldnames(parameters.layers);
@@ -60,41 +67,69 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
     end
     medium_masks(skull_new) = fill_i;
 
+    if seg_qc('active')
+        if isfield(parameters.headmodel, 'skull_fill_method') && strcmp(parameters.headmodel.skull_fill_method, 'rubberwrap')
+            r_mm = 5;                                   % skull_rubber_wrap's default
+            if isfield(parameters.headmodel, 'skull_wrap_radius_mm') && ~isempty(parameters.headmodel.skull_wrap_radius_mm)
+                r_mm = parameters.headmodel.skull_wrap_radius_mm;
+            end
+            fill_desc = sprintf(['Skull holes filled by rubber wrapping (headmodel.skull_fill_method: rubberwrap, ' ...
+                'skull_wrap_radius_mm %g mm): voxels between brain and skin inside the wrapped skull become bone.'], ...
+                r_mm);
+        else
+            fill_desc = ['Skull holes filled by morphological closing (headmodel.skull_fill_method: imclose, ' ...
+                'sphere of radius 3 voxels).'];
+        end
+        if numel(skull_i) > 1
+            fill_desc = [fill_desc ' Added voxels are cortical bone.'];
+        end
+        seg_qc('add', 'skull_fill', medium_with_gaps, medium_masks, focus_pos_grid, struct( ...
+            'title', 'Skull hole filling', 'description', fill_desc, ...
+            'grid', qc_grid, 'label_space', 'medium'));
+    end
+
     % [DEBUG] Plot skull expansion at focus y-slice
-    if parameters.simulation.debug == 1
+    if debug_on(parameters, 'preproc', 'figures')
         h = figure;
         montage({1-squeeze(skull(:,focus_pos_grid(2),:)), ...
             1-squeeze(skull_new(:,focus_pos_grid(2),:)), ...
             1-squeeze(skull_continuous(:,focus_pos_grid(2),:))}, 'Size', [1 3]);
         title('Skull (left), added bone (center), continuous skull (right)');
-        output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
-            sprintf('sub-%03d_%s_skull_expansion%s.png',...
-            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-        saveas(h, output_plot_filename, 'png');
-        close(h);
+        debug_save_figure(parameters, 'preproc', h, ...
+            sprintf('sub-%03d_%s_skull_expansion%s',...
+            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix), ...
+            'Skull (left), added bone (centre) and continuous skull (right), focus y-slice');
     end
 
     % Label eye layer as water
     seg_labels = charm_seg_labels();
     if isfield(seg_labels, 'eye')
+        before_eyes = [];
+        if seg_qc('active'); before_eyes = medium_masks; end
         eye_i = seg_labels.eye;
         eye = segmented_img == eye_i;
         i_water = find(strcmp(fieldnames(parameters.medium_properties), 'water'));
         medium_masks(eye ~= 0) = i_water; % Default to water
+        if seg_qc('active')
+            seg_qc('add', 'eyes', before_eyes, medium_masks, focus_pos_grid, struct( ...
+                'title', 'Eyes to water', ...
+                'description', sprintf('Voxels labelled eye by charm (label %d) set to water.', eye_i), ...
+                'grid', qc_grid, 'label_space', 'medium'));
+        end
+        clear before_eyes
     end
 
     % [DEBUG] Plot before/after gap filling at focus y-slice
-    if parameters.simulation.debug == 1
+    if debug_on(parameters, 'preproc', 'figures')
         medium_mask_updates = double(medium_masks-medium_with_gaps);
         medium_mask_updates(medium_mask_updates ~=0) = 1; % indicate where changes occured
         h = figure;
         imshowpair(label2rgb(squeeze(medium_mask_updates(:,focus_pos_grid(2),:)), 'parula'), ...
             label2rgb(squeeze(medium_masks(:,focus_pos_grid(2),:)), 'parula'), 'montage');
         title('Updated (left) and closed off (right) segmented images');
-        output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
-            sprintf('sub-%03d_%s_segmented_img_closing_gaps_changes%s.png',...
-            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-        saveas(h, output_plot_filename, 'png');
-        close(h);
+        debug_save_figure(parameters, 'preproc', h, ...
+            sprintf('sub-%03d_%s_segmented_img_closing_gaps_changes%s',...
+            parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix), ...
+            'Changed voxels (left) and medium mask after hole filling and eyes to water (right), focus y-slice');
     end
 end

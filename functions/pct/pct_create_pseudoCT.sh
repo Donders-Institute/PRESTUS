@@ -161,7 +161,7 @@ function pct_create_pseudoCT()
     echo "Running MATLAB script pct_soft_tissue_peak.m..."
     cd "${path_fun_pct}" || { echo "Directory not found"; exit 1; }
     matlab_command="addpath(genpath('${path_fun}')); pct_soft_tissue_peak(\"$path_simnibs\",\"$path_pct\"); exit"
-    $path_matlab -nodisplay -r "$matlab_command" || { echo "MATLAB function failed"; exit 1; }
+    "$path_matlab" -nodisplay -nosplash -batch "$matlab_command" || { echo "MATLAB pct_soft_tissue_peak failed"; exit 1; }
     # Move to pCT folder
     cd "${path_pct}" || { echo "Directory not found"; exit 1; }
 

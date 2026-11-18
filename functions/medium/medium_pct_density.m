@@ -4,9 +4,10 @@ function [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx
 % Applies one of six algorithms to fill density for skull voxels indexed
 % by skull_idx. Algorithm 'k-plan' uses a piece-wise linear HU-density
 % table: k-Plan's default, or the scanner/protocol-specific table named by
-% pct.density_calibration (MEDIUM_PCT_DENSITY_CALIBRATION); 'k-wave' uses hounsfield2density with
-% a +1000 HU offset; 'marsac' uses the linear model from Marsac et al.
-% 2017; 'aubry' uses the porosity mixture model from Aubry et al. 2003;
+% pct.density_calibration (MEDIUM_PCT_DENSITY_CALIBRATION); 'k-wave' uses
+% hounsfield2density with a +1000 HU offset; 'marsac' uses the linear model from Marsac et al.
+% 2017; 'marsac-babelbrain' is BabelBrain's version of it (1000 + 1700*HU/max HU,
+% HU raised to 300); 'aubry' uses the porosity mixture model from Aubry et al. 2003;
 % 'air-tissue' uses the linear air-to-bone model (Pichardo and McDannold
 % workflows); 'none' uses the fixed scalar from parameters.medium_properties.skull.
 % 'k-plan', 'k-wave' and 'air-tissue' clamp density to at least water density;
@@ -17,11 +18,11 @@ function [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx
 %
 % Input:
 %   parameters - PRESTUS config; must contain medium_properties.water.density [kg/m^3],
-%                medium_properties.skull.density [kg/m^3], and simulation.debug
+%                medium_properties.skull.density [kg/m^3], and the debug settings (DEBUG_ON)
 %   density    - full-grid density array to update [kg/m^3]
 %   pseudoCT   - pseudo-CT Hounsfield values (full grid)
 %   skull_idx  - linear indices of skull voxels into the grid
-%   algorithm  - one of 'k-plan', 'k-wave', 'marsac', 'aubry', 'air-tissue', 'none'
+%   algorithm  - one of 'k-plan', 'k-wave', 'marsac', 'marsac-babelbrain', 'aubry', 'air-tissue', 'none'
 %
 % Output:
 %   density - updated density with skull voxels filled [kg/m^3]
@@ -33,11 +34,11 @@ arguments
     density    {mustBeNumeric}
     pseudoCT   {mustBeNumeric}
     skull_idx  {mustBeNumericOrLogical}
-    algorithm  (1,:) char {mustBeMember(algorithm, {'k-plan','k-wave','marsac','aubry','air-tissue','none'})}
+    algorithm  (1,:) char {mustBeMember(algorithm, {'k-plan','k-wave','marsac','marsac-babelbrain','aubry','air-tissue','none'})}
 end
 
 % The k-plan / k-wave fits draw a figure; only when it is saved (debug mode)
-show_fit = parameters.simulation.debug == 1;
+show_fit = debug_on(parameters, 'medium', 'figures');
 
 % A UTE->HU line returns HU on the scale of the CT it was fitted to; density needs
 % that CT's calibration (doc: Pairing a UTE->HU mapping with its CT calibration)
@@ -73,10 +74,8 @@ switch algorithm
 
         % plot the mapping
         if show_fit
-            output_plot = fullfile(parameters.io.dir_debug_medium,...
-                sprintf('pCT_hounsfield-density_kplan.png'));
-            exportgraphics(gcf, output_plot, 'Resolution', 150);
-            close(gcf);
+            debug_save_figure(parameters, 'medium', gcf, 'pCT_hounsfield-density_kplan', ...
+                'HU to density: k-Plan piecewise-linear table and the skull voxels', 'Resolution', 150);
         end
 
         % regularize minimum to density in water
@@ -99,10 +98,8 @@ switch algorithm
         
         % plot the mapping
         if show_fit
-            output_plot = fullfile(parameters.io.dir_debug_medium,...
-                sprintf('pCT_hounsfield-density_kwave.png'));
-            exportgraphics(gcf, output_plot, 'Resolution', 150);
-            close(gcf);
+            debug_save_figure(parameters, 'medium', gcf, 'pCT_hounsfield-density_kwave', ...
+                'HU to density: k-Wave hounsfield2density and the skull voxels', 'Resolution', 150);
         end
 
         % regularize minimum density to water density
@@ -133,6 +130,15 @@ switch algorithm
         % note: the original code hard-codes HU_min as 0, which may have been an error
         density(skull_idx) = rho_water + (rho_bone - rho_water) * ...
             (pseudoCT(skull_idx) - HU_min) / (HU_max - HU_min);
+
+    case 'marsac-babelbrain'
+        % BabelBrain's CT-path density (HUtoDensityMarsac in BabelBrain 0.8.8):
+        % 1000 kg/m^3 plus 1700 kg/m^3 times HU over the largest skull HU.
+        % BabelBrain applies it to voxels above its HU threshold (300 HU), so
+        % lower skull HU are raised to that threshold here.
+        HU_thr = 300;
+        hu = max(pseudoCT(skull_idx), HU_thr);
+        density(skull_idx) = 1000 + 1700 * hu / max(hu);
 
     case 'aubry'
 

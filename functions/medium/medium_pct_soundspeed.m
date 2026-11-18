@@ -10,11 +10,11 @@ function [sound_speed] = medium_pct_soundspeed(parameters, sound_speed, density,
 %               parameters.pct.webb_sos_slope and .webb_sos_intercept or uses
 %               GE 120 kVp B-kernel defaults: slope=0.75, intercept=1.32)
 %   'pichardo'  2D ρ–freq interpolation from MapPichardo.h5
-%               (Pichardo et al.); requires external/BabelBrain submodule and simulation frequency in
-%               parameters.transducer(1).freq_hz
+%               (Pichardo et al.); requires external/BabelBrain submodule and
+%               simulation frequency in parameters.transducer(1).freq_hz
 %   'mcdannold' polynomial ρ→c from McDannold et al.
 %   'none'      fixed scalar from parameters.medium_properties.skull
-% All algorithms clamp to at least water sound speed.
+% All algorithms except 'marsac' and 'none' clamp to at least water sound speed.
 %
 % Use as:
 %   [sound_speed] = medium_pct_soundspeed(parameters, sound_speed, density, pseudoCT, skull_idx, algorithm)
@@ -27,7 +27,7 @@ function [sound_speed] = medium_pct_soundspeed(parameters, sound_speed, density,
 %   density     - full-grid density array (already filled) [kg/m^3]
 %   pseudoCT    - pseudo-CT Hounsfield values (full grid)
 %   skull_idx   - linear indices of skull voxels into the grid
-%   algorithm   - one of 'k-plan', 'marsac', 'aubry', 'none'
+%   algorithm   - one of the seven algorithms above
 %
 % Output:
 %   sound_speed - updated sound speed with skull voxels filled [m/s]
@@ -83,8 +83,8 @@ switch algorithm
         slope     = 0.75;
         intercept = 1.32;
         if isfield(parameters, 'pct')
-            if isfield(parameters.pct, 'webb_sos_slope'),     slope     = parameters.pct.webb_sos_slope;     end
-            if isfield(parameters.pct, 'webb_sos_intercept'), intercept = parameters.pct.webb_sos_intercept; end
+            if isfield(parameters.pct, 'webb_sos_slope') && ~isempty(parameters.pct.webb_sos_slope),     slope     = parameters.pct.webb_sos_slope;     end
+            if isfield(parameters.pct, 'webb_sos_intercept') && ~isempty(parameters.pct.webb_sos_intercept), intercept = parameters.pct.webb_sos_intercept; end
         end
         sound_speed(skull_idx) = slope * pseudoCT(skull_idx) + intercept * 1000;
         sound_speed(skull_idx) = max(parameters.medium_properties.water.sound_speed, sound_speed(skull_idx));

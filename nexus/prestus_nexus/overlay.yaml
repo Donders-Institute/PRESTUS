@@ -99,6 +99,12 @@ fields:
   simulation.precision: {choices: [single, double]}
   simulation.interactive: {kind: flag}
   simulation.debug: {kind: flag}
+  simulation.debug_stages:
+    kind: strlist
+    visible_if: {key: simulation.debug, in: [1, true]}
+    help: "Stages that write debug outputs: all, or some of preproc; medium; source; babelbrain."
+  simulation.debug_figures: {kind: flag, visible_if: {key: simulation.debug, in: [1, true]}}
+  simulation.debug_volumes: {kind: flag, visible_if: {key: simulation.debug, in: [1, true]}}
   simulation.transducer_coupling: {choices: [coherent, async], visible_if: {key: __n_transducers, not_in: [0, 1]}}
   simulation.uncertainty_temp_high: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
   simulation.uncertainty_temp_low: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
@@ -302,7 +308,7 @@ fields:
   pct.debug: {kind: flag, visible_if: [{key: pct.enabled, in: [1, true]}, {key: path.ct_pattern, in: ['', null]}]}
   pct.skull_mapping: {choices: [miscouridou, carpino, wiesinger, treeby, kosciessa, custom], visible_if: [{key: pct.enabled, in: [1, true]}, {key: path.ct_pattern, in: ['', null]}]}
   pct.custom_*: {visible_if: [{key: pct.enabled, in: [1, true]}, {key: path.ct_pattern, in: ['', null]}, {key: pct.skull_mapping, in: [custom]}]}
-  pct.mapping_density: {choices: [k-plan, k-wave, marsac, aubry, air-tissue, none], visible_if: {key: pct.enabled, in: [1, true]}}
+  pct.mapping_density: {choices: [k-plan, k-wave, marsac, marsac-babelbrain, aubry, air-tissue, none], visible_if: {key: pct.enabled, in: [1, true]}}
   pct.density_calibration: {visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.mapping_density, in: [k-plan]}]}
   pct.mapping_soundspeed: {choices: [k-plan, marsac, aubry, webb, pichardo, mcdannold, none], visible_if: {key: pct.enabled, in: [1, true]}}
   pct.mapping_attenuation: {choices: [k-plan, mueller, aubry, webb, pichardo, mcdannold, none], visible_if: {key: pct.enabled, in: [1, true]}}
@@ -746,6 +752,35 @@ extra:
     unit: cm
     visible_if: {key: placement.mode, in: [tus_entry]}
     help: Spatial decimation step of the candidate search.
+  # Scanner-specific coefficients of the 'webb' skull mappings (medium_pct_soundspeed / _attenuation);
+  # empty = the GE 120 kVp, B-kernel values of Webb et al.
+  pct.webb_sos_slope:
+    kind: number
+    default: []
+    visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.mapping_soundspeed, in: [webb]}]
+    help: "Slope of the 'webb' sound-speed line [m/s per HU] (Webb et al. 2018, Tables I and II). Empty = 0.75."
+  pct.webb_sos_intercept:
+    kind: number
+    default: []
+    unit: km/s
+    visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.mapping_soundspeed, in: [webb]}]
+    help: "Intercept of the 'webb' sound-speed line [km/s]: c = slope × HU + 1000 × intercept [m/s]. Empty = 1.32."
+  pct.webb_att_alpha0:
+    kind: number
+    default: []
+    visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.mapping_attenuation, in: [webb]}]
+    help: "α₀ of the 'webb' attenuation model α₀ · exp(c · HU) (Webb et al. 2021, Table IV). Empty = 26."
+  pct.webb_att_beta:
+    kind: number
+    default: []
+    visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.mapping_attenuation, in: [webb]}]
+    help: "Frequency exponent β of the 'webb' attenuation model; becomes the skull alpha_power. Empty = 1.3."
+  pct.webb_att_c:
+    kind: number
+    default: []
+    unit: 1/HU
+    visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.mapping_attenuation, in: [webb]}]
+    help: "Exponent coefficient c of the 'webb' attenuation model [1/HU]. Empty = -0.0016."
 
 # ── Tabs of the main window ────────────────────────────────────────────
 # Each tab shows its sections as collapsible groups. Sections marked
@@ -848,8 +883,18 @@ display:
   simulation.precision: {label: Numerical precision, advanced: true}
   simulation.interactive: {label: Interactive mode, advanced: true}
   simulation.debug: {label: Debug outputs, advanced: false, group: modules}
-  simulation.transducer_coupling: {label: Coupling, group: coupling, choice_labels: {coherent: "coherent: fire together, fields interfere", async: "async: fire in separate windows, intensities add"}}
-  simulation.async_grid_mode: {label: "Grid for async runs", advanced: true, group: coupling}
+  simulation.debug_stages: {label: Debug stages, advanced: true, group: modules}
+  simulation.debug_figures: {label: Debug figures, advanced: true, group: modules}
+  simulation.debug_volumes: {label: Debug volumes (large), advanced: true, group: modules}
+  simulation.transducer_coupling: {label: Coupling, group: coupling}
+  grid.async_layout: {label: "Grid for async runs", advanced: true, group: coupling}
+  timing.async_schedule: {label: Firing schedule, group: coupling}
+  transducer.timing_offset_s: {label: "Start delay", group: coupling, advanced: true}
+  transducer.timing.pd: {label: "Pulse duration, this transducer", group: coupling, advanced: true}
+  transducer.timing.pri: {label: "Pulse repetition interval, this transducer", group: coupling, advanced: true}
+  transducer.timing.ptd: {label: "Pulse train duration, this transducer", group: coupling, advanced: true}
+  transducer.timing.ptri: {label: "Pulse train repetition interval, this transducer", group: coupling, advanced: true}
+  transducer.timing.ptrd: {label: "Sonication duration, this transducer", group: coupling, advanced: true}
   simulation.uncertainty: {label: Uncertainty analysis, group: uncertainty, group_first: true}
   simulation.uncertainty_temp_high: {group: uncertainty, label: Temp-H medium file (max. heating), help: "Medium properties of the Temp-H variant, the ITRUSST bounds that maximise brain heating: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_temp_high.yaml. Tissues and properties the file does not list keep the default medium properties."}
   simulation.uncertainty_temp_low: {group: uncertainty, label: Temp-L medium file (min. heating), help: "Medium properties of the Temp-L variant, the ITRUSST bounds that minimise brain heating: a YAML file with a medium_properties block (absolute path, or a file name in config/uncertainty/). Empty = the shipped config_medium_temp_low.yaml. Tissues and properties the file does not list keep the default medium properties."}

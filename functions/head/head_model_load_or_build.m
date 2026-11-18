@@ -30,7 +30,8 @@ function hm = head_model_load_or_build(parameters, tissues_mask_image, tissues_m
 % Output:
 %   hm - struct: medium_masks, segmentation, bone_mask, pseudoCT ([] without
 %        pCT), M (4x4: T1 voxel -> head-model voxel, row-vector convention as
-%        the PREPROC_* transforms), resolution_mm, signature
+%        the PREPROC_* transforms), resolution_mm, signature, qc (SEG_QC records of
+%        the smoothing and hole filling; empty when report.segmentation was off)
 %
 % See also: HEAD_MODEL_PLACE, PREPROC_HEAD, PREPROC_RESCALE_ONLY, CACHE_SIGNATURE
 
@@ -53,6 +54,9 @@ end
             if isequaln(stored.signature, sig)
                 fprintf('[head_model] loading the head model: %s\n', file);
                 hm = load(file);
+                if isfield(hm, 'qc')
+                    seg_qc('import', hm.qc);   % its postprocessing records (SEG_QC)
+                end
                 return
             end
             fprintf('[head_model] head model settings changed; rebuilding %s\n', file);
@@ -89,12 +93,18 @@ end
     log_timer('start', 'preproc_medium_mask', parameters.io.dir_output);
     medium_masks = preproc_medium_mask(segmentation, parameters);
     log_timer('stop', 'preproc_medium_mask');
+    qc_grid = seg_qc('grid_note', parameters, 'headmodel');
+    centre = round(size(medium_masks) / 2);
+    seg_qc('add_mapping', parameters, segmentation, medium_masks, centre, qc_grid);
     if any(contains(fieldnames(parameters.layers), 'skull'))
-        medium_masks = skull_fill_holes(parameters, medium_masks, round(size(medium_masks) / 2), segmentation);
+        medium_masks = skull_fill_holes(parameters, medium_masks, centre, segmentation, qc_grid);
     end
 
     hm = struct('medium_masks', medium_masks, 'segmentation', segmentation, 'bone_mask', bone_mask, ...
         'pseudoCT', pseudoCT, 'M', M, 'resolution_mm', res, 'signature', sig);
+    % Postprocessing records (SEG_QC), kept with the model so placements that
+    % load it can show them in the segmentation report
+    hm.qc = seg_qc('steps');
     tmp = [file(1:end-4) '_' char(java.util.UUID.randomUUID) '.mat'];
     try
         save(tmp, '-struct', 'hm', '-v7.3');

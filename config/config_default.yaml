@@ -28,6 +28,9 @@ simulation:
   precision: 'single' # Computational precision for both acoustic and thermal simulations
   interactive: 0      # Run in interactive mode (ask for user input when necessary, plot evolving figures)
   debug: 0            # Activate debug mode with additional intermediate outputs?
+  debug_stages: all   # With debug: stages that write debug outputs: all, or a list of preproc, medium, source, babelbrain
+  debug_figures: 1    # With debug: write diagnostic figures (PNG)?
+  debug_volumes: 1    # With debug: write intermediate volumes (NIfTI; each about the size of the head volume)?
   transducer_coupling: coherent # How multiple transducers interact acoustically:
                                 #   'coherent'  — pressure fields are superposed in a single k-Wave run
                                 #                 (models interference; current default behaviour)
@@ -549,7 +552,7 @@ segmentation:
 
 headmodel:
   head_pad_mm: 0      # Symmetric padding of the rotated head volume before CSF expansion and cropping [mm]; bowls outside the volume are auto-padded
-  csf_expansion: 40   # Dilation of the CSF brain mask into surrounding head regions [mm]; converted to voxels at grid.resolution_mm
+  csf_expansion: 20   # Dilation of the CSF brain mask into surrounding head regions, along each axis [mm]; converted to voxels at grid.resolution_mm
   # Thresholds for smoothing masks (and acoustic properties)
   smooth_method: 'gaussian' # Filter type ['gaussian' (default)|'box'|'off' (no smoothing or binarisation)]
   smooth_threshold_skull: 0.5 # (higher threshold -> thinner mask)
@@ -569,14 +572,14 @@ pct:
   skull_mapping: 'kosciessa'    # Pseudo-CT only: UTE→HU linear mapping algorithm: miscouridou/wiesinger/treeby/kosciessa/custom (carpino: deprecated)
   custom_slope: []              # skull_mapping 'custom': HU = custom_slope * normalised UTE + custom_intercept
   custom_intercept: []          # (skull voxels; soft tissue 42 HU, air -1000 HU as for the other mappings)
-  debug: 1                      # Keep intermediate images in pseudoCT/ subfolder (0 to delete)
-  mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/aubry/air-tissue
+  debug: 1                      # Keep intermediate images in the debug_pct/ subfolder of the pseudo-CT folder (0 to delete)
+  mapping_density: 'k-plan'     # pCT mapping algorithm for density: k-plan/k-wave/marsac/marsac-babelbrain/aubry/air-tissue/none
   density_calibration: ''       # HU->density table for mapping_density 'k-plan'. HU depend on scanner, kVp and kernel, so use the
                                 #   table of the measured CT, or of the CT the UTE->HU line was fitted to: '' = k-Plan default (kplan_default),
                                 #   a table in config/ct_calibration/ by name ('ucl_lowdose_80kvp' for treeby, 'cph2025'),
                                 #   or a CSV path (two columns: HU, density [kg/m^3]; # comments)
-  mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry/webb/pichardo/mcdannold
-  mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller/aubry/webb/pichardo/mcdannold
+  mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry/webb/pichardo/mcdannold/none
+  mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller/aubry/webb/pichardo/mcdannold/none
 
 #------------ Simulation layers
 # Assign tissue compartments to model, with their SimNIBS segmentation label indices.

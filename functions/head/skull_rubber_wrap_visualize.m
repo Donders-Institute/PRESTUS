@@ -158,6 +158,10 @@ function skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON, downsam
     drawnow limitrate;
     fr = getframe(fig);
     imwrite(fr.cdata, output_png, 'png', 'Compression','none');
+    if debug_on(parameters, 'preproc')
+        debug_register(parameters, 'preproc', output_png, ...
+            'Rubber wrap: skull surface and added balloon voxels (headmodel.skull_wrap_visualize)', 'figure');
+    end
 
     close(fig);
 end

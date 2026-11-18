@@ -1,7 +1,6 @@
 function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_pos_final, ...
     focus_pos_final, t1_image, t1_header, final_transformation_matrix, inv_final_transformation_matrix, ...
     transducer] = preproc_head(parameters)
-
 % PREPROC_HEAD  Preprocess structural MRI for k-Wave simulation
 %
 % Combines SimNIBS segmentation, focal-axis alignment, and grid cropping
@@ -167,11 +166,11 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 
     % If the segmentation process was not successful, it will stop preprocessing
     assert(exist(filename_segmented,'file') > 0, ...
-        'Head segmentation is not completed (%s does not exist), see logs in the batch_logs folder and in %s folder',...
+        'Head segmentation is not completed (%s does not exist), see logs in the log_hpc folder of path.seg and in %s folder',...
             filename_segmented, segmentation_folder)
 
     % Defines output file location and name.
-    % Use io.preproc_affix when set (uncertainty pipeline stages 2–4 point
+    % Use io.preproc_affix when set (uncertainty pipeline stages 2–6 point
     % this at stage 1's cached files with affix ''), otherwise io.output_affix.
     if isfield(parameters.io, 'preproc_affix')
         preproc_affix = parameters.io.preproc_affix;
@@ -204,6 +203,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             parameters.subject_id, parameters.simulation.medium, preproc_affix));
         if ~reuse_upstream_cache(filename_cropped_smoothed_skull_data, parameters, 'head') && ...
                 confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
+            seg_qc('begin', parameters);   % postprocessing records for the segmentation report
+            qc_cleanup = onCleanup(@() seg_qc('end'));
             if parameters.pct.enabled == 1
                 hm = head_model_load_or_build(parameters, tissues_mask_image, tissues_mask_header, ...
                     pseudoCT_image, pseudoCT_header);
@@ -219,6 +220,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             save(filename_cropped_smoothed_skull_data, 'medium_masks', 'segmentation_crop', 'bone_mask_crop', ...
                 'pseudoCT_crop', 'trans_pos_final', 'focus_pos_final', 'crop_translation_matrix', ...
                 'final_transformation_matrix', 'inv_final_transformation_matrix')
+            seg_qc('save', parameters);
+            clear qc_cleanup
             log_timer('stop', 'preproc_placement');
         else
             fprintf('[preproc_head] %s\n', 'Loading the placed head model (file exists).')
@@ -253,15 +256,13 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
                 parameters);
 
             % [DEBUG] visualize original and rotated planning image
-            if parameters.simulation.debug == 1
+            if debug_on(parameters, 'preproc', 'figures')
                 h = figure;
                 imshow(t1_rr_img_montage)
                 title('Original (left) and rotated (right) planning image');
-                output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
-                    sprintf('sub-%03d_t1w_rotated_scaled%s.png',...
-                    parameters.subject_id, parameters.io.output_affix));
-                saveas(h, output_plot_filename, 'png');
-                close(h);
+                debug_save_figure(parameters, 'preproc', h, ...
+                    sprintf('sub-%03d_t1w_rotated_scaled%s', parameters.subject_id, parameters.io.output_affix), ...
+                    'Planning T1: original (left) and rotated and rescaled to the grid (right)');
             end; clear t1_rr_img_montage;
 
         else
@@ -282,15 +283,13 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             parameters);
         
         % [DEBUG] visualize original and rotated segmentation image
-        if parameters.simulation.debug == 1
+        if debug_on(parameters, 'preproc', 'figures')
             h = figure;
             imshow(segm_img_montage)
             title('Original (left) and rotated (right) tissue segmentation');
-            output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
-                sprintf('sub-%03d_segmented_rotated_scaled%s.png',...
-                parameters.subject_id, parameters.io.output_affix));
-            saveas(h, output_plot_filename, 'png');
-            close(h);
+            debug_save_figure(parameters, 'preproc', h, ...
+                sprintf('sub-%03d_segmented_rotated_scaled%s', parameters.subject_id, parameters.io.output_affix), ...
+                'Segmentation: original (left) and rotated and rescaled to the grid (right)');
         end;  clear segm_img_montage;
         
         %% [bone mask and pseudoCT]
@@ -322,24 +321,20 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         end
 
         % [DEBUG] visualize original and rotated bone mask
-        if parameters.simulation.debug == 1
+        if debug_on(parameters, 'preproc', 'figures')
             h = figure;
             imshow(bone_mask_montage)
             title('Original (left) and rotated (right) bone mask');
-            output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
-                sprintf('sub-%03d_rotated_scaled_orig%s.png',...
-                parameters.subject_id, parameters.io.output_affix));
-            saveas(h, output_plot_filename, 'png')
-            close(h);
+            debug_save_figure(parameters, 'preproc', h, ...
+                sprintf('sub-%03d_rotated_scaled_orig%s', parameters.subject_id, parameters.io.output_affix), ...
+                'Bone mask: original (left) and rotated and rescaled to the grid (right)');
             if parameters.pct.enabled == 1
                 h = figure;
                 imshow(pseudoCT_montage)
                 title('Original (left) and rotated (right) pseudoCT');
-                output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
-                    sprintf('sub-%03d_rotated_scaled_pseudoCT%s.png',...
-                    parameters.subject_id, parameters.io.output_affix));
-                saveas(h, output_plot_filename, 'png')
-                close(h);
+                debug_save_figure(parameters, 'preproc', h, ...
+                    sprintf('sub-%03d_rotated_scaled_pseudoCT%s', parameters.subject_id, parameters.io.output_affix), ...
+                    'CT: original (left) and rotated and rescaled to the grid (right)');
             end
         end; clear bone_mask_montage pseudoCT_montage;
 
@@ -416,11 +411,11 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 
     %% [DEBUG] Plot the skin & skull from the segmented image and an overlay for comparison
 
-    if parameters.simulation.debug == 1 && volumes_available
+    if debug_on(parameters, 'preproc', 'figures') && volumes_available
         % Create a T1 slice for comparison to SimNIBS segmented data
         t1_slice = repmat(mat2gray(squeeze(t1_img_rr(:,trans_pos_rescaled(2),:))), [1 1 3]);
         % Create slices of segmented SimNIBS data
-        % Segmentation labels can be different for the pseudoCT mask. See create_pseudoCT.sh.
+        % Segmentation labels can be different for the pseudoCT mask. See pct_create_pseudoCT.sh.
         skullidx = getidx(parameters.layers,'skull'); % Includes all "skull_" segmentations
         skinidx = getidx(parameters.layers,'skin');
         % Unsmoothed skull & skin masks
@@ -434,16 +429,15 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         montage(cat(4,t1_slice*255 ,skin_skull_img*255 ,...
             imfuse(mat2gray(t1_slice), skin_skull_img,'blend')) ,'size',[1 NaN]);
         title('T1 and SimNIBS skin (green) and skull (blue) masks');
-        output_plot_filename = fullfile(parameters.io.dir_debug_preproc,...
-            sprintf('sub-%03d_t1w_skin_skull%s.png',parameters.subject_id, parameters.io.output_affix));
-        saveas(h ,output_plot_filename ,'png')
-        close(h);
+        debug_save_figure(parameters, 'preproc', h, ...
+            sprintf('sub-%03d_t1w_skin_skull%s', parameters.subject_id, parameters.io.output_affix), ...
+            'T1, SimNIBS skin (green) and skull (blue) masks, and their overlay, transducer y-slice');
 
         clear t1_slice skullidx skinidx skull_mask_unsmoothed skin_mask_unsmoothed skin_slice skull_slice skin_skull_img;
     end
     
     %% SEG-> MEDIUM, SMOOTH & CROP LAYERED
-    % see preproc_smooth_and_crop
+    % see HEAD_SMOOTH_AND_CROP
     
     fprintf('[preproc_head] %s\n', 'Creating layered medium by smoothing and cropping the head segmentation...')
 
@@ -455,6 +449,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
    if ~reuse_upstream_cache(filename_cropped_smoothed_skull_data, parameters, 'head') && ...
             confirm_overwriting(filename_cropped_smoothed_skull_data, parameters)
         log_timer('start','preproc_skullsmooth', parameters.io.dir_output);
+        seg_qc('begin', parameters);   % postprocessing records for the segmentation report
+        qc_cleanup = onCleanup(@() seg_qc('end'));
 
         % Transform all transducer positions to the rotated/rescaled grid space so
         % preproc_crop_grid can include every transducer bowl in the crop mask.
@@ -481,9 +477,9 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         inv_final_transformation_matrix = inv(final_transformation_matrix);
 
         % Diagnostic NIfTIs: medium_masks, segmentation, and skull_mask
-        % back-projected to T1 space. Written to debug_dir/preproc/ only
-        % when simulation.debug == 1 — not intended as pipeline outputs.
-        if parameters.simulation.debug == 1
+        % back-projected to T1 space. Written to io.dir_debug_preproc only
+        % with debug volumes on (DEBUG_ON) — not intended as pipeline outputs.
+        if debug_on(parameters, 'preproc', 'volumes')
             % save medium mask
             orig_hdr = t1_header; % header is based on original T1w (always present)
             orig_hdr.Datatype = 'single';
@@ -494,6 +490,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             if ~isfile(segmented_file)
                 try
                     niftiwrite(plotdata, segmented_file, orig_hdr, 'Compressed',true);
+                    debug_register(parameters, 'preproc', segmented_file, 'Medium masks back-projected to T1 space', 'volume');
                 catch ME
                     warn(ME)
                 end
@@ -510,6 +507,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             if ~isfile(segmentation_file)
                 try
                     niftiwrite(plotdata, segmentation_file, orig_hdr, 'Compressed',true);
+                    debug_register(parameters, 'preproc', segmentation_file, 'Segmentation (cropped) back-projected to T1 space', 'volume');
                 catch ME
                     warn(ME)
                 end
@@ -526,6 +524,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             if ~isfile(skull_mask_file)
                 try
                     niftiwrite(plotdata, skull_mask_file, orig_hdr, 'Compressed',true);
+                    debug_register(parameters, 'preproc', skull_mask_file, 'Binary skull mask back-projected to T1 space', 'volume');
                 catch ME
                     warn(ME)
                 end
@@ -542,6 +541,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
                 if ~isfile(pseudoCT_file)
                     try
                         niftiwrite(plotdata, pseudoCT_file, orig_hdr, 'Compressed',true);
+                        debug_register(parameters, 'preproc', pseudoCT_file, 'CT (cropped) back-projected to T1 space', 'volume');
                     catch ME
                         warn(ME)
                     end
@@ -562,6 +562,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             'crop_translation_matrix',...
             'final_transformation_matrix',...
             'inv_final_transformation_matrix')
+        seg_qc('save', parameters);
+        clear qc_cleanup
         log_timer('stop','preproc_skullsmooth');
     else
         fprintf('[preproc_head] %s\n', 'Skipping head smoothing and cropping, the file already exists, loading it instead.')
@@ -605,7 +607,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 
     %% Plot placement of up to 2 Transducers
 
-    % Update the parameters (for plottign below only)  
+    % Update the parameters (for plotting below only)  
     parameters.grid.dims = size(medium_masks);
 
     max_plots = min(2, numel(parameters.transducer));
@@ -632,7 +634,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             fpos_sim = pts_sim(2,:);
         end
 
-        if parameters.simulation.debug == 1
+        if debug_on(parameters, 'preproc', 'figures')
             % [DEBUG] Plot brain segmentation
             [seg_with_trans_img, ~] = plot_t1_with_transducer(...
                 medium_masks, parameters.grid.resolution_mm, tpos_sim, fpos_sim, parameters);
@@ -641,11 +643,10 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
             imshow(seg_with_trans_img);
             title('Segmentation with transducer');
             seg_trans_suffix = trans_suffix(ti, max_plots);
-            output_plot_filename = fullfile(parameters.io.dir_debug_preproc, ...
-                sprintf('sub-%03d_%s_segmented_brain_final%s%s.png',...
-                parameters.subject_id, parameters.simulation.medium, seg_trans_suffix, parameters.io.output_affix));
-            saveas(h, output_plot_filename, 'png')
-            close(h);
+            debug_save_figure(parameters, 'preproc', h, ...
+                sprintf('sub-%03d_%s_segmented_brain_final%s%s',...
+                parameters.subject_id, parameters.simulation.medium, seg_trans_suffix, parameters.io.output_affix), ...
+                sprintf('Final medium mask with transducer%s', seg_trans_suffix));
         end
 
         % Plot positioning of transducer on segmentation

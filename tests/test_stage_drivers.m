@@ -107,6 +107,71 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
             tc.verifyEqual(r_coeff.maxT, r_frac.maxT, 'AbsTol', 1e-9);
         end
 
+        function test_thermal_kplan_skull_density_on_skull_labels_only(tc)
+            % Pseudo-CT with k-Plan density mapping: every skull label gets
+            % 1850 kg/m^3, no other label does. Label values index
+            % medium_properties, so the result must not depend on the order
+            % or subset of p.layers.
+            p = stage_params(tc.Dir);
+            skull_names = {'skull', 'skull_cortical', 'skull_trabecular'};
+            for n = skull_names
+                p.medium_properties.(n{1}).density = 1500;   % so the override is visible
+            end
+            labels = fieldnames(p.medium_properties);
+            idx = @(name) find(strcmp(labels, name));
+            masks = idx('brain') * ones(p.grid.dims);
+            masks(:, :, 8)  = idx('skin');
+            masks(:, :, 9)  = idx('skull');
+            masks(:, :, 10) = idx('skull_cortical');
+            masks(:, :, 11) = idx('skull_trabecular');
+            kwave_medium = medium_setup(p, masks, struct());
+            d = p.grid.resolution_mm * 1e-3;
+            kgrid = kWaveGrid(p.grid.dims(1), d, p.grid.dims(2), d, p.grid.dims(3), d);
+            pr = gaussian_p(p, 1e6);
+
+            % Reference: density 1850 set by hand on the skull labels, no pseudo-CT
+            expected = kwave_medium;
+            expected.density(ismember(masks, cellfun(idx, skull_names))) = 1850;
+            [~, ~, ref] = run_thermal(p, pr, kgrid, expected, masks);
+            % Negative control: without the override the result differs
+            [~, ~, plain] = run_thermal(p, pr, kgrid, kwave_medium, masks);
+            tc.verifyGreaterThan(max(abs(plain.maxT(:) - ref.maxT(:))), 1e-6);
+
+            q = p;
+            q.pct.enabled = 1;
+            q.pct.mapping_density = 'k-plan';
+            layer_names = fieldnames(p.layers);
+            layer_sets = {layer_names, flip(layer_names), setdiff(layer_names, {'skin'}, 'stable')};
+            for k = 1:numel(layer_sets)
+                q.layers = struct();
+                for n = layer_sets{k}'
+                    q.layers.(n{1}) = p.layers.(n{1});
+                end
+                [~, ~, res] = run_thermal(p, pr, kgrid, kwave_medium, masks, q);
+                tc.verifyEqual(res.maxT, ref.maxT, 'AbsTol', 1e-12, ...
+                    sprintf('layers: %s', strjoin(layer_sets{k}', ', ')));
+            end
+        end
+
+        function test_thermal_plot_sim_video_multi_transducer(tc)
+            % With N > 1 transducers, the heating video takes its slice from
+            % the trans_pos argument (parameters.transducer is a struct array).
+            tc.assumeTrue(license('test', 'image_toolbox') == 1, ...
+                'imshowpair needs the Image Processing Toolbox');
+            p = stage_params(tc.Dir);
+            [kgrid, med, masks] = brain_medium(p);
+            [~, tss, res] = run_thermal(p, gaussian_p(p, 1e6), kgrid, med, masks);
+            q = p;
+            q.transducer(2) = q.transducer(1);
+            q.transducer(2).trans_pos = [8 8 16];
+            q.io.save_heatingvideo = 1;
+            evalc(['thermal_plot_sim(res.focal_planeT, tss, q, q.transducer(1).trans_pos, masks, ' ...
+                   'res.focal_planeCEM43, res.timeseries, res.focal_planeCEM43_iso)']);
+            avi = fullfile(q.io.dir_output, sprintf('sub-%03d_%s_heating_animation%s.avi', ...
+                q.subject_id, q.simulation.medium, q.io.output_affix));
+            tc.verifyTrue(isfile(avi));
+        end
+
     end
 
     % ------------------------------------------------------------------ %

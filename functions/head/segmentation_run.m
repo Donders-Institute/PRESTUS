@@ -33,7 +33,7 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
     % Check if the last file produced in the charm pipeline exists. If
     % other files are missing charm will produce the '--forcerun has to
     % be set' error. Setting 'overwrite_simnibs' to 1 will resolve this.
-    result_simnibs = sprintf('%sm2m_sub-%03d/final_tissues.nii.gz', parameters.path.seg, subject_id);
+    result_simnibs = fullfile(parameters.path.seg, ['m2m_' subj_id_string], 'final_tissues.nii.gz');
     if ~exist(result_simnibs, 'file')
         parameters.io.overwrite_simnibs = 1;
     end

@@ -296,11 +296,32 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_head_p
 
         function test_binary_mask_touching_border_survives_threshold(tc)
             % A slab filling the lower half of the volume touches the border;
-            % zero padding used to erode it at the faces after thresholding.
+            % thresholding after smoothing must not erode it at the faces.
             img = zeros(16, 16, 16);
             img(:, :, 1:8) = 1;
             out = smooth_img(img, 3, 1, 0.5, "gaussian");
             tc.verifyTrue(all(out(:, :, 1:6) == 1, 'all'));
+        end
+
+        function test_box_kernel_below_one_voxel_returns_input(tc)
+            % FWHM rounding to a zero-voxel kernel skips smoothing; the output
+            % is still assigned and thresholded, in 2D and 3D.
+            for sz = {[8 8], [8 8 8]}
+                img = zeros(sz{1});
+                img(3:5, 3:5, :) = 0.8;
+                out = smooth_img(img, 0.4, 1, 0, "box");
+                tc.verifyEqual(out, img);
+                out = smooth_img(img, 0.4, 1, 0.5, "box");
+                tc.verifyEqual(out, img > 0.5);
+            end
+        end
+
+        function test_box_anisotropic_2d_keeps_size(tc)
+            % Per-dimension kernel sizes (3 x 5 voxels) keep the image size.
+            img = ones(12, 14);
+            out = smooth_img(img, [3 5], 1, 0, "box");
+            tc.verifyEqual(size(out), size(img));
+            tc.verifyEqual(out, img, 'AbsTol', 1e-10);
         end
 
     end

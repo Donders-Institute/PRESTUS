@@ -61,7 +61,39 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_pct_pa
             p = base_params(tc.TmpDir);
             tc.verifyEqual(find_pseudoct_dir(p), '');
         end
+
+        function test_missing_output_names_this_job(tc)
+            % SLURM job that produces no pseudoCT.nii.gz: the error names
+            % this subject's job. sbatch, the wait, and the signature are
+            % stubbed; nothing is submitted.
+            stubs = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            write_function(stubs, 'run_command', ...
+                'function [status, out] = run_command(varargin)', 'status = 0; out = sprintf(''4242\n'');');
+            write_function(stubs, 'hpc_wait_for_completion', 'function hpc_wait_for_completion(varargin)', '');
+            write_function(stubs, 'pct_signature', 'function [sig, m] = pct_signature(varargin)', ...
+                'sig = struct(); m = ''kosciessa'';');
+            tc.applyFixture(matlab.unittest.fixtures.PathFixture(stubs));
+            rehash;
+            for sid = [9 12]
+                p = base_params(tc.TmpDir);
+                p.subject_id = sid;
+                p.platform = 'slurm';
+                p.startup.matlab_bin_path = '/opt/matlab/bin/matlab';
+                try
+                    evalc('pct_create_pCT_run(p)');
+                    tc.verifyFail('no error although pseudoCT.nii.gz is missing');
+                catch ME
+                    tc.verifySubstring(ME.message, sprintf('check the pct-%03d job log', sid));
+                end
+            end
+        end
     end
+end
+
+function write_function(folder, name, signature, body)
+    fid = fopen(fullfile(folder, [name '.m']), 'w');
+    fprintf(fid, '%s\n', signature, body, 'end');
+    fclose(fid);
 end
 
 function p = base_params(root)

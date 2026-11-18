@@ -56,7 +56,6 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
 
     if any(fwhm_voxels > 0)
 
-
         if ndims_img == 2
             sig = sigma_voxels(1:2);
 
@@ -75,14 +74,14 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
                     ksz = round(fwhm_voxels(1:2));
                     if any(ksz == 0)
                         smoothed_img = img;  % No smoothing
-                        return;
+                    else
+                        % Force odd kernel size
+                        ksz = ksz + mod(ksz+1,2);
+                        kernel = ones(ksz) / prod(ksz);
+                        pad = floor(ksz/2);
+                        ip = padarray_replicate(img, pad);
+                        smoothed_img = conv2(ip, kernel, 'valid');
                     end
-                    % Force odd kernel size
-                    ksz = ksz + mod(ksz+1,2);
-                    kernel = ones(ksz) / prod(ksz);
-                    pad = floor(ksz(1)/2);
-                    ip = padarray_replicate(img, [pad pad]);
-                    smoothed_img = conv2(ip, kernel, 'valid');
             end
 
         elseif ndims_img == 3
@@ -103,14 +102,14 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
                     ksz = round(fwhm_voxels(1:3));
                     if any(ksz == 0)
                         smoothed_img = img;  % No smoothing
-                        return;
+                    else
+                        ksz = ksz + mod(ksz+1,2);
+                        kernel = ones(ksz) / prod(ksz);
+                        pad = floor(ksz/2);
+                        ip = padarray_replicate_3d(img, pad);
+                        smoothed_img = convn(ip, kernel, 'same');
+                        smoothed_img = smoothed_img(pad(1)+1:end-pad(1), pad(2)+1:end-pad(2), pad(3)+1:end-pad(3));
                     end
-                    ksz = ksz + mod(ksz+1,2);
-                    kernel = ones(ksz) / prod(ksz);
-                    pad = floor(ksz/2);
-                    ip = padarray_replicate_3d(img, pad);
-                    smoothed_img = convn(ip, kernel, 'same');
-                    smoothed_img = smoothed_img(pad(1)+1:end-pad(1), pad(2)+1:end-pad(2), pad(3)+1:end-pad(3));
             end
         else
             error('Supports 2D/3D only (ndims=%d)', ndims_img);

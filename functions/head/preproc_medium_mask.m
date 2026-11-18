@@ -14,7 +14,8 @@ function medium_masks = preproc_medium_mask(segmented_img, parameters)
 %   parameters    - (1,1) simulation configuration struct with .layers and .medium_properties
 %
 % Output:
-%   medium_masks - [Nx x Ny x Nz] integer medium label array
+%   medium_masks - [Nx x Ny x Nz] integer medium label array; voxels no
+%                  smoothed layer claims are water
 %
 % See also: HEAD_SMOOTH_AND_CROP, PREPROC_HEAD
 
@@ -96,6 +97,13 @@ end
                                              parameters.headmodel.smooth_threshold_skull, parameters.headmodel.smooth_method);
         trabecular_final = (trabecular_mask_smoothed ~= 0) & (combined_smoothed ~= 0);
         medium_masks(trabecular_final) = trabecular_i;
+    end
+
+    % Voxels no smoothed layer claims (e.g. where layers meet) are water,
+    % as in MEDIUM_SETUP
+    i_water = find(strcmp(medium_labels, 'water'), 1);
+    if ~isempty(i_water)
+        medium_masks(medium_masks == 0) = i_water;
     end
 
     medium_masks = single(medium_masks);

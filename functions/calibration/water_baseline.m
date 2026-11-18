@@ -53,12 +53,25 @@ end
     fprintf('========================================\n\n');
 
     %% Build homogeneous water medium
+    % Same power law as the head medium (MEDIUM_SETUP): with fit_alpha_power = 1
+    % (default) the water absorption is refitted to alpha_power 2 at the source
+    % frequency, so a water entry with alpha_power 1 (e.g. BabelBrain-matched,
+    % lossless) runs in every k-Wave build; with fit_alpha_power = 0 and
+    % alpha_power 1, dispersion is switched off as in MEDIUM_SETUP.
     wp = parameters.medium_properties.water;
     water_medium = struct( ...
         'sound_speed',          wp.sound_speed, ...
         'density',              wp.density, ...
         'alpha_coeff',          wp.alpha_coeff, ...
         'alpha_power',          wp.alpha_power);
+    fit_power = ~isfield(parameters, 'fit_alpha_power') || parameters.fit_alpha_power == 1;
+    if fit_power && wp.alpha_power ~= 2
+        water_medium.alpha_coeff = fitPowerLawParamsMulti(wp.alpha_coeff, wp.alpha_power, ...
+            wp.sound_speed, parameters.transducer(1).freq_hz, 2);
+        water_medium.alpha_power = 2;
+    elseif ~fit_power && wp.alpha_power == 1
+        water_medium.alpha_mode = 'no_dispersion';
+    end
 
     %% Shared baseline parameters (no interactive display, distinct output affix)
     bp = parameters;

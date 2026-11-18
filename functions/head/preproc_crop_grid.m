@@ -19,6 +19,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, parame
 %   [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, parameters, trans_pos_final, ...
 %    focus_pos_final, translation_matrix] = preproc_crop_grid( ...
 %       parameters, medium_masks, segmentation, bone_mask_img, trans_pos_grid, focus_pos_grid, pseudoCT_img)
+%   [...] = preproc_crop_grid(..., pseudoCT_img, all_trans_pos_grid, all_focus_pos_grid)
 %
 % Input:
 %   parameters     - (1,1) simulation configuration struct
@@ -28,6 +29,9 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, parame
 %   trans_pos_grid - [1x3] transducer position in voxel coordinates
 %   focus_pos_grid - [1x3] focus position in voxel coordinates
 %   pseudoCT_img   - [Nx x Ny x Nz] Hounsfield-unit skull image (optional, [] if unused)
+%   all_trans_pos_grid - [N x 3] positions of all transducers, kept inside the
+%                        crop (optional, default: zeros(0,3))
+%   all_focus_pos_grid - [N x 3] focus positions of all transducers (optional)
 %
 % Output:
 %   medium_masks       - cropped medium label array
@@ -74,7 +78,12 @@ if any(pad_pre_post > 0)
 end
 
 % Expand CSF mask to crop the layered medium
-[medium_masks] = preproc_crop_eCSF(parameters, medium_masks, segmentation, trans_pos_grid);
+[medium_masks] = preproc_crop_eCSF(parameters, medium_masks, segmentation, trans_pos_grid, focus_pos_grid);
+
+% Unlabelled voxels (padding, resampling fill) are water, as in MEDIUM_SETUP,
+% so they do not widen the crop
+i_water = find(strcmp(fieldnames(parameters.medium_properties), 'water'));
+medium_masks(medium_masks == 0) = i_water;
 
 % Minimal fixed crop margin — PML is added outside the grid by k-Wave (PMLInside=false)
 crop_margin = 1;
@@ -83,7 +92,6 @@ crop_margin = 1;
 % For multi-transducer setups, using only transducer(1) leaves the contralateral
 % side over-extended: the CSF-expanded head tissue reaches the far scalp + 40 mm,
 % while the opposite transducer bowl is never included in the crop mask.
-i_water = find(strcmp(fieldnames(parameters.medium_properties), 'water'));
 
 % Use all_trans_pos_grid when provided (Nt×3), otherwise fall back to trans(1) only.
 if ~isempty(all_trans_pos_grid)
@@ -221,6 +229,13 @@ focus_pos_final = focus_pos_grid - min_dims + 1;
 % Maps: original_world → final_cropped_world
 % Offset = total_pre_padding + crop_offset
 translation_matrix = makehgtform('translate', total_pre_offset + (1-min_dims));
+
+seg_qc('add', 'grid_crop', [], medium_masks, focus_pos_final, struct( ...
+    'title', 'Grid crop', ...
+    'description', sprintf(['Cropped from [%d %d %d] to [%d %d %d] voxels around the head and all ' ...
+    'transducers (padding %g mm, then enlarged to FFT-efficient sizes). This is the medium the ' ...
+    'simulation uses.'], orig_dims, parameters.grid.dims, parameters.headmodel.head_pad_mm), ...
+    'grid', seg_qc('grid_note', parameters, 'cropped'), 'label_space', 'medium'));
 
 % Display summary
 fprintf('Grid: [%dx%dx%d] → [%dx%dx%d]\n', orig_dims, parameters.grid.dims);
