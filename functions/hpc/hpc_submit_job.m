@@ -106,6 +106,10 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
     end
 
     fprintf(fid, '#SBATCH --mem=%iG\n', parameters.hpc.memorylimit);
+    % Node-local disk for the k-Wave .h5 files (HPC_SCRATCH_SETUP)
+    if isfield(parameters.hpc, 'tmp_gb') && ~isempty(parameters.hpc.tmp_gb) && parameters.hpc.tmp_gb > 0
+        fprintf(fid, '#SBATCH --tmp=%iG\n', ceil(parameters.hpc.tmp_gb));
+    end
     fprintf(fid, '#SBATCH --time=%s\n', parameters.hpc.timelimit);
     fprintf(fid, '#SBATCH --output=%s_slurm_output_%%j.log\n', subj_id_string);
     fprintf(fid, '#SBATCH --error=%s_slurm_error_%%j.log\n', subj_id_string);
@@ -288,13 +292,14 @@ function tf = job_needs_gpu(parameters)
 end
 
 function v = field_or(s, path, default)
-% Nested field s.(path{1}).(path{2})..., or default when absent or empty.
+% Nested field s.(path{1}).(path{2})..., or default when absent, empty, or a
+% YAML null ('~' loads as a yaml.Null object, which isempty does not catch).
     v = default;
     for k = 1:numel(path)
         if ~isstruct(s) || ~isfield(s, path{k}), return; end
         s = s.(path{k});
     end
-    if ~isempty(s), v = s; end
+    if ~isempty(s) && ~isa(s, 'yaml.Null'), v = s; end
 end
 
 function dep_type = dependency_type(parameters)

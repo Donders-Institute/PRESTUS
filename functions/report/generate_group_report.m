@@ -671,7 +671,7 @@ function cols = get_intensity_plot_cols(is_layered)
     end
 end
 function cols = get_mi_plot_cols()
-    cols = {'MI_tc', 'MI_brain', 'MI_skull', 'MI_skin'};
+    cols = {'MI_tc', 'MI_brain'};
 end
 function cols = get_maxT_plot_cols()
     cols = {'maxT', 'maxT_brain', 'maxT_skull', 'maxT_skin'};
@@ -854,7 +854,7 @@ function html = build_analysis_section(subjects_meta, limits)
     html = [html sprintf('<div class="an-ctrls" id="an-c-dist"><label>Metric <select id="an-dist">%s</select></label></div>', opts)];
     html = [html sprintf('<div class="an-ctrls" id="an-c-corr" style="display:none"><label>X <select id="an-x">%s</select></label><label>Y <select id="an-y">%s</select></label></div>', opts, opts)];
     html = [html sprintf('<div class="an-ctrls" id="an-c-cond" style="display:none"><label>Metric <select id="an-cond">%s</select></label><label>Group by <select id="an-by">%s</select></label></div>', opts, by_opts)];
-    html = [html '<div class="an-plot"><svg id="an-plot" viewBox="0 0 760 320" preserveAspectRatio="xMidYMid meet"></svg></div>'];
+    html = [html '<div class="an-plot"><svg id="an-plot" class="chart" viewBox="0 0 760 320" preserveAspectRatio="xMidYMid meet"></svg></div>'];
     html = [html '<div class="an-legend" id="an-legend"></div>'];
     html = [html '<script>window.PRESTUS_SUBJECTS=' subjects_json ';window.PRESTUS_METRICS=' metrics_json ';</script>'];
     html = [html '</section>'];
@@ -957,8 +957,8 @@ function html = build_group_dashboard(subjects_meta, limits, is_layered)
             case 'mechanical'
                 % Group Safety board reports one top-line MI tile per medium
                 % (MI free-water or MI_tc transcranial) —
-                % per-tissue MI_brain/MI_skull/MI_skin are intentionally
-                % excluded here (still available in the CSV / box plots).
+                % per-tissue MI_brain is intentionally excluded here (still
+                % in the CSV and box plots; MI_skull/MI_skin are not reported).
                 if strcmp(name, 'MI_tc') || strcmp(name, 'MI')
                     mech_keys{end+1} = name; %#ok<AGROW>
                 end
@@ -1294,13 +1294,14 @@ function html = build_subject_cards(subjects_meta, report_dir, is_layered)
         body = [body '<div class="image-grid">']; %#ok<AGROW>
         body = [body try_embed(fullfile(img_dir, ...
             sprintf('sub-%03d_positioning%s.png', id, affix)), 'Positioning', 'Transducer positioning')]; %#ok<AGROW>
+        % intensity / maxT: 3D runs write _x/_y/_z slices, 2D runs a single file
+        body = [body try_embed_dims(img_dir, sprintf('sub-%03d_%s_intensity', id, medium), affix, ...
+            'Intensity', 'Intensity overlay (segmentation)')]; %#ok<AGROW>
         body = [body try_embed(fullfile(img_dir, ...
-            sprintf('sub-%03d_%s_intensity%s.png', id, medium, affix)), 'Intensity', 'Intensity overlay (segmentation)')]; %#ok<AGROW>
-        body = [body try_embed(fullfile(img_dir, ...
-            sprintf('sub-%03d_%s_intensity_t1%s.png', id, medium, affix)), 'Intensity T1', 'Intensity overlay (T1)')]; %#ok<AGROW>
+            sprintf('sub-%03d_%s_intensity_t1w%s.png', id, medium, affix)), 'Intensity T1', 'Intensity overlay (T1)')]; %#ok<AGROW>
         if is_layered
-            body = [body try_embed(fullfile(img_dir, ...
-                sprintf('sub-%03d_%s_maxT%s.png', id, medium, affix)), 'maxT', 'Max temperature overlay')]; %#ok<AGROW>
+            body = [body try_embed_dims(img_dir, sprintf('sub-%03d_%s_maxT', id, medium), affix, ...
+                'maxT', 'Max temperature overlay')]; %#ok<AGROW>
         end
         body = [body '</div>']; %#ok<AGROW>
 
@@ -1329,6 +1330,12 @@ function s = try_embed(path, alt, cap)
     if isempty(s)
         s = sprintf('<figure><div class="placeholder-img">%s<br><small>(missing)</small></div><figcaption>%s</figcaption></figure>', ...
             html_utils.escape(alt), html_utils.escape(cap));
+    end
+end
+function s = try_embed_dims(img_dir, base, affix, alt, cap)
+    s = html_utils.embed_image_dims(img_dir, base, affix, alt, cap);
+    if isempty(s)
+        s = try_embed('', alt, cap);   % placeholder
     end
 end
 function html = build_group_config_summary(parameters)

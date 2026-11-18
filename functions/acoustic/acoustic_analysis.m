@@ -286,7 +286,11 @@ end
 
     % [3b] cranial Thermal Index (IEC 62359), informational. The emitted-power
     % derivation is an explicit assumption isolated in compute_tic.m.
-    results.TIC = compute_tic(parameters, tr, results.Isppa);
+    tic_scale_p = 1;   % ISPPA targeting scaled the field, not elem_p_amp (APPLY_ISPPA_SCALING)
+    if isfield(sensor_data, 'isppa_scale_p') && isfinite(double(sensor_data.isppa_scale_p))
+        tic_scale_p = double(sensor_data.isppa_scale_p);
+    end
+    results.TIC = compute_tic(parameters, tr, results.Isppa, tic_scale_p);
 
     % Layer-specific outcomes (in case a layered simulation)
     if contains(parameters.simulation.medium, {'layered'; 'phantom'})

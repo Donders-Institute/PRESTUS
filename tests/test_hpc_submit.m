@@ -84,6 +84,57 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_hpc_su
             tc.verifySubstring(txt, '#SBATCH --error=sub-001_slurm_error_%j.log');
         end
 
+        function test_tmp_request_follows_tmp_gb(tc)
+            % --tmp only with hpc.tmp_gb > 0; 0, empty, or no key requests nothing
+            tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            cases = {50, '#SBATCH --tmp=50G'; 12.5, '#SBATCH --tmp=13G'; 0, ''; [], ''; 'absent', ''};
+            for k = 1:size(cases, 1)
+                p = hpc_params();
+                if ~strcmp(cases{k, 1}, 'absent'), p.hpc.tmp_gb = cases{k, 1}; end
+                delete(fullfile(tmp, 'temp_*.sh'));
+                try %#ok<TRYNC>
+                    hpc_submit_job('slurm', 'job_m', p, tmp);
+                end
+                txt = fileread(only_file(tc, tmp, 'temp_slurm_*.sh'));
+                if isempty(cases{k, 2})
+                    tc.verifyEmpty(strfind(txt, '--tmp'), sprintf('case %d', k));
+                else
+                    tc.verifySubstring(txt, cases{k, 2}, sprintf('case %d', k));
+                end
+            end
+        end
+
+        function test_job_inherits_run_type(tc)
+            % A run type set in this session reaches both job scripts
+            % (sbatch/qsub start from MATLAB's launch environment), before
+            % MATLAB starts; deployment and invalid values write nothing.
+            tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            orig = getenv('PRESTUS_RUN_TYPE');
+            restore = onCleanup(@() setenv('PRESTUS_RUN_TYPE', orig)); %#ok<NASGU>
+            p = hpc_params();
+            cases = {'development', 'export PRESTUS_RUN_TYPE=development'; ...
+                     'technical',   'export PRESTUS_RUN_TYPE=technical'; ...
+                     '',            ''; ...
+                     'rm -rf x',    ''};
+            for k = 1:size(cases, 1)
+                setenv('PRESTUS_RUN_TYPE', cases{k, 1});
+                for sched = {'slurm', 'qsub'}
+                    delete(fullfile(tmp, 'temp_*.sh'));
+                    try %#ok<TRYNC>
+                        hpc_submit_job(sched{1}, 'job_m', p, tmp);
+                    end
+                    txt = fileread(only_file(tc, tmp, ['temp_' sched{1} '_*.sh']));
+                    label = sprintf('%s, PRESTUS_RUN_TYPE=''%s''', sched{1}, cases{k, 1});
+                    if isempty(cases{k, 2})
+                        tc.verifyEmpty(strfind(txt, 'PRESTUS_RUN_TYPE'), label);
+                    else
+                        tc.verifySubstring(txt, cases{k, 2}, label);
+                        tc.verifyLessThan(strfind(txt, cases{k, 2}), strfind(txt, 'matlab -batch'), label);
+                    end
+                end
+            end
+        end
+
         function test_snellius_timelimit_check(tc)
             tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
             p = hpc_params();
@@ -126,6 +177,36 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_hpc_su
                 txt = fileread(only_file(tc, tmp, 'temp_slurm_*.sh'));
                 tc.verifyEqual(contains(txt, '--partition=gpu'), cases{k, 7}, ...
                     sprintf('case %d: %s/%s, code_type %s', k, cases{k, 1}, cases{k, 2}, cases{k, 4}));
+            end
+        end
+
+        function test_gpu_request_with_yaml_nulls(tc)
+            % A YAML '~' loads as a yaml.Null object, which isempty does not
+            % catch; every field the GPU decision reads must treat it as unset
+            % (jwave.use_gpu: ~ is the toolbox default and stopped submission).
+            cases = { ...
+                % acoustic, thermal, null field, GPU?
+                'jwave',      'kwave',      {'jwave', 'use_gpu'},                 true; ...   % auto-detect
+                'babelbrain', 'babelbrain', {'babelbrain', 'computing_backend'},  true; ...   % default 'auto'
+                'kwave',      'kwave',      {'modules', 'run_heating_sims'},      true; ...   % k-Wave acoustic on GPU
+                'kwave',      'kwave',      {'time_reversal', 'enabled'},         true; ...
+                'jwave',      'kwave',      {'simulation', 'code_type'},          true};      % jwave still auto-detects
+            for k = 1:size(cases, 1)
+                tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+                p = hpc_params();
+                [p.acoustic_backend, p.thermal_backend] = cases{k, 1:2};
+                p.simulation.code_type = 'matlab_gpu';
+                p.modules.run_heating_sims = 1;
+                p.jwave.use_gpu = [];
+                p.babelbrain.computing_backend = 'auto';
+                f = cases{k, 3};
+                p.(f{1}).(f{2}) = yaml.Null;
+                try %#ok<TRYNC>
+                    hpc_submit_job('slurm', 'job_m', p, tmp);
+                end
+                txt = fileread(only_file(tc, tmp, 'temp_slurm_*.sh'));
+                tc.verifyEqual(contains(txt, '--partition=gpu'), cases{k, 4}, ...
+                    sprintf('case %d: %s.%s = yaml.Null', k, f{1}, f{2}));
             end
         end
 

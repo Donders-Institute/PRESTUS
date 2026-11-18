@@ -22,6 +22,11 @@ function report_path = generate_sequential_report(run_params_list, run_labels, r
 %   run_params_list          - (1×N) cell array of PRESTUS parameters structs
 %                              for the DEFAULT variant, one per run
 %   run_labels               - (optional) (1×N) cell array of short string labels
+%   run_affixes              - (optional) (1×N) cell array of structs, each with
+%                              fields .output_affix and .thermal_cache_affix.
+%                              Built by sequential_pipeline and used for all file
+%                              lookups. When absent, affixes are inferred from
+%                              the params structs.
 %   uncertainty_variant_params - (optional) struct with fields:
 %                              .high_params_list — (1×N) cell of params structs
 %                              .low_params_list  — (1×N) cell of params structs
@@ -29,11 +34,6 @@ function report_path = generate_sequential_report(run_params_list, run_labels, r
 %                              (default 'High', 'Low')
 %                              When present, timeseries plots show shaded
 %                              high–low bands around the default line.
-%   run_affixes              - (optional) (1×N) cell array of structs, each with
-%                              fields .output_affix and .thermal_cache_affix.
-%                              Built by sequential_pipeline and used for all file
-%                              lookups.  When absent, affixes are inferred from
-%                              the params structs (backward-compatible fallback).
 %
 % Output:
 %   report_path - path to the generated HTML file
@@ -100,8 +100,8 @@ try
         % them from path.sim without creating directories or logging.
         p = resolve_io_dirs(p);
 
-        % Resolve affixes from the explicit registry when available; fall back
-        % to params struct fields for backward compatibility.
+        % Resolve affixes from the explicit registry when available, else from
+        % the params struct fields.
         if has_affix_registry
             o_affix = run_affixes{ri}.output_affix;
             t_affix = run_affixes{ri}.thermal_cache_affix;
@@ -239,6 +239,7 @@ try
         datestr(now, 'yyyy-mm-dd HH:MM:SS'), n_runs);
     html_parts{end+1} = '</footer>';
     html_parts{end+1} = html_utils.lightbox();
+    html_parts{end+1} = report_scripts.common();
     html_parts{end+1} = '</body>';
     html_parts{end+1} = '</html>';
 
@@ -825,14 +826,18 @@ end
 
 function html = build_per_run_details(run_data, run_labels, subject_id, medium)
     html = '';
-    thermal_image_types = {'maxT', 'thermal_max', 'CEM_max', 'CEM_iso_max'};
+    thermal_image_types = {'thermal_max', 'CEM_max', 'CEM_iso_max'};
 
     for ri = 1:numel(run_data)
         p     = run_data{ri}.params;
         affix = run_data{ri}.affix;
         html  = [html sprintf('<h3>%s</h3>', html_utils.escape(run_labels{ri}))];
         html  = [html '<div class="image-grid">'];
-        found = false;
+        % maxT is written per slice (_x/_y/_z) for 3D grids
+        maxT_html = html_utils.embed_image_dims(p.io.dir_img, ...
+            sprintf('sub-%03d_%s_maxT', subject_id, medium), affix, 'maxT', 'maxT');
+        html  = [html maxT_html];
+        found = ~isempty(maxT_html);
         for ti = 1:numel(thermal_image_types)
             img = fullfile(p.io.dir_img, ...
                 sprintf('sub-%03d_%s_%s%s.png', subject_id, medium, thermal_image_types{ti}, affix));
@@ -939,7 +944,7 @@ function svg_html = build_ts_svg_with_band(def_layers, lib_layers, con_layers, l
     y_range = max(y_max_v * 1.05, y_min + 0.01) - y_min;
     y_scale = plot_h / y_range;
 
-    svg = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' num2str(W) ' ' num2str(H) '" ' ...
+    svg = ['<svg class="chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' num2str(W) ' ' num2str(H) '" ' ...
            'style="width:100%;max-width:' num2str(W) 'px;height:auto;display:block;margin:0 auto 16px;">'];
     svg = [svg sprintf('<rect width="%d" height="%d" fill="white" rx="4" ry="4"/>', W, H)];
 
@@ -1086,7 +1091,7 @@ function svg_html = build_ts_svg(layers, layer_names, time_axis, run_boundaries,
     y_range = max(y_max_v * 1.05, y_min + 0.01) - y_min;
     y_scale = plot_h / y_range;
 
-    svg = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' num2str(W) ' ' num2str(H) '" ' ...
+    svg = ['<svg class="chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' num2str(W) ' ' num2str(H) '" ' ...
            'style="width:100%;max-width:' num2str(W) 'px;height:auto;display:block;margin:0 auto 16px;">'];
     svg = [svg sprintf('<rect width="%d" height="%d" fill="white" rx="4" ry="4"/>', W, H)];
 

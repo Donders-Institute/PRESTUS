@@ -192,6 +192,7 @@ try
         datestr(now, 'yyyy-mm-dd HH:MM:SS'));
     html_parts{end+1} = '</footer>';
     html_parts{end+1} = html_utils.lightbox();
+    html_parts{end+1} = report_scripts.common();
     html_parts{end+1} = '</body>';
     html_parts{end+1} = '</html>';
 
@@ -441,7 +442,7 @@ function html = build_acoustic_section(tables, variants, variant_affixes, parame
     % Summary range table
     if is_layered
         key_metrics = {'Isppa', 'Isppa_brain', 'Isppa_skull', 'Isppa_skin', ...
-                       'real_focal_distance_bowl_mm', 'MI_brain', 'MI_skull', 'MI_skin', 'MI_tc', ...
+                       'real_focal_distance_bowl_mm', 'MI_brain', 'MI_tc', ...
                        'Ipa_target', 'halfmax_ISPPA_volume_brain_mm3'};
     else
         key_metrics = {'Isppa', 'Isppa_after_exitplane', 'Psptp', 'Ptp_target', ...
@@ -572,9 +573,10 @@ function html = build_images_section(variants, variant_affixes, parameters, subj
 
     image_specs = {};
     if is_layered
-        image_specs{end+1} = {fullfile(parameters.io.dir_img,  sprintf('sub-%03d_%s%%s_maxT_y.png',   subject_id, medium)), 'Max Temperature (y-slice)'};
-        image_specs{end+1} = {fullfile(parameters.io.dir_img,  sprintf('sub-%03d_%s%%s_thermal.png', subject_id, medium)), 'Temperature vs. Time'};
-        image_specs{end+1} = {fullfile(parameters.io.dir_img,  sprintf('sub-%03d_%s%%s_CEM.png',     subject_id, medium)), 'CEM43 vs. Time'};
+        % Affix goes after the metric, matching thermal_analysis/thermal_plot_sim naming
+        image_specs{end+1} = {fullfile(parameters.io.dir_img,  sprintf('sub-%03d_%s_maxT_y%%s.png',  subject_id, medium)), 'Max Temperature (y-slice)'};
+        image_specs{end+1} = {fullfile(parameters.io.dir_img,  sprintf('sub-%03d_%s_thermal%%s.png', subject_id, medium)), 'Temperature vs. Time'};
+        image_specs{end+1} = {fullfile(parameters.io.dir_img,  sprintf('sub-%03d_%s_CEM%%s.png',     subject_id, medium)), 'CEM43 vs. Time'};
     end
 
     for k = 1:numel(image_specs)
@@ -912,7 +914,7 @@ function html = build_metric_uncertainty_svg(heating, metric, y_floor, y_label, 
                 xp, H-pad_b+14, idx)];
     end
 
-    svg = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' num2str(W) ' ' num2str(H) '" ' ...
+    svg = ['<svg class="chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' num2str(W) ' ' num2str(H) '" ' ...
            'style="width:100%;max-width:' num2str(W) 'px;height:auto;display:block;margin:0 auto 12px;">'];
     svg = [svg sprintf('<rect width="%d" height="%d" fill="white" rx="4" ry="4"/>', W, H)];
     svg = [svg tick_svg xtick_svg];

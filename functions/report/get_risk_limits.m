@@ -43,8 +43,8 @@ function limits = get_risk_limits(is_layered)
     % — i.e. MI (free water) is effectively grayed out whenever MItc is available.
     limits.MI       = struct('label', 'MI (free water)',   'limit', 1.9, 'unit', '');
     limits.MI_brain = struct('label', 'MI (brain)',        'limit', 1.9, 'unit', '');
-    limits.MI_skull = struct('label', 'MI (skull)',        'limit', 1.9, 'unit', '');
-    limits.MI_skin  = struct('label', 'MI (skin)',         'limit', 1.9, 'unit', '');
+    % MI_skull / MI_skin are written to the CSV but not reported
+    % (REPORT_HIDDEN_COLUMNS): the ITRUSST mechanical criterion is MI_tc.
 
     % Cranial Thermal Index (IEC 62359) — informational, no hard ITRUSST limit
     limits.TIC      = struct('label', 'Cranial TI (TIC)',  'limit', Inf, 'unit', '');

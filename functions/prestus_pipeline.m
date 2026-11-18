@@ -59,6 +59,10 @@ function [parameters] = prestus_pipeline(parameters, options)
     safe_addpath(fullfile(currentLoc, '..', 'functions'));
     [parameters] = path_log_setup(parameters, get_prestus_path);
 
+    % k-Wave .h5 files on node-local scratch (hpc.tmp_gb > 0 inside a SLURM
+    % job); scratch_cleanup removes the folder when this function exits.
+    [parameters, scratch_cleanup] = hpc_scratch_setup(parameters); %#ok<ASGLU>
+
     % Stop before any computation if a tool a requested stage needs is missing
     % (SimNIBS binaries, k-Wave binary, GPU, JVM).
     check_tool_availability(parameters);

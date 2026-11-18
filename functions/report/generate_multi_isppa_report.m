@@ -105,6 +105,7 @@ try
         datestr(now, 'yyyy-mm-dd HH:MM:SS'));
     html_parts{end+1} = '</footer>';
     html_parts{end+1} = html_utils.lightbox();
+    html_parts{end+1} = report_scripts.common();
     html_parts{end+1} = '</body>';
     html_parts{end+1} = '</html>';
 
@@ -231,7 +232,7 @@ end
 function html = build_acoustic_section(tables, targets, affixes, parameters, subject_id, medium, is_layered)
     if is_layered
         key_metrics = {'Isppa', 'Isppa_brain', 'Isppa_skull', 'Isppa_skin', ...
-                       'real_focal_distance_bowl_mm', 'MI_brain', 'MI_skull', 'MI_skin', 'MI_tc', ...
+                       'real_focal_distance_bowl_mm', 'MI_brain', 'MI_tc', ...
                        'Ipa_target', 'halfmax_ISPPA_volume_brain_mm3'};
     else
         key_metrics = {'Isppa', 'Isppa_after_exitplane', 'Psptp', 'Ptp_target', ...

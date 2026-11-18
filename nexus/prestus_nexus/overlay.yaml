@@ -59,7 +59,8 @@ sections:
   io:                 {label: Input and output, icon: io, sub: 'Output naming, the optional outputs that are saved, and how existing outputs are reused.', doc: doc_outputs_reuse.md#overwrite-behaviour}
   calibration:        {label: Calibration conventions, icon: chart, sub: How the focal depth is referenced when calibration data are matched., advanced: true, doc: doc_calibration.md#focal-depth-convention-flhm}
   modules:            {label: Pipeline stages, icon: stages, sub: Which stages of the pipeline run., doc: doc_modules.md#pipeline-stages}
-  study:              {label: Study, icon: people, sub: 'Several subjects or conditions, run from one table.', doc: doc_group.md#study-setup}
+  report:             {label: Report, icon: report, sub: How the HTML report looks., advanced: true, doc: doc_parameters_run.md#report-report}
+  study:              {label: Study, icon: people, sub: 'Several subjects or conditions, run from one table.', doc: doc_group_study-setup.md#study-setup}
   hpc:                {label: Where to run, icon: server, sub: Where the run executes and the cluster resources it requests., doc: doc_hpc.md#where-a-run-executes}
   snellius:           {label: Snellius partitions, icon: server, sub: GPU partitions on the Snellius cluster., advanced: true, doc: doc_parameters.md#snellius-gpu-partitions-snellius}
   analysis:           {label: Targeting analysis, icon: target, sub: Targeting accuracy against an intended MNI target or ROI., doc: doc_group.md#targeting-accuracy}
@@ -154,7 +155,9 @@ fields:
 
   # ── Modules ──────────────────────────────────────────────────────────
   modules.*: {kind: flag}
-  modules.report_style: {kind: str, choices: [instrument, classic, compact, paper]}
+  report.style: {kind: str, choices: [instrument, classic, compact, paper]}
+  report.segmentation: {kind: flag, visible_if: {key: simulation.medium, in: [layered]}}
+  report.debug: {kind: flag, visible_if: {key: simulation.debug, in: [1, true]}}
 
   # ── HPC ──────────────────────────────────────────────────────────────
   hpc.name: {choices: [default, snellius]}
@@ -829,7 +832,7 @@ tabs:
   - key: run
     label: Run
     intro: Pipeline stages, where to run (this computer or HPC), and the run log.
-    sections: [modules, hpc, snellius]
+    sections: [modules, report, hpc, snellius]
     doc: doc_nexus_tabs.md#run-tab
     subtab_docs: {Where to run: doc_hpc.md#where-a-run-executes, Stages: doc_modules.md}
   - key: results
@@ -964,8 +967,10 @@ display:
   modules.run_posthoc_water_sims: {label: Free-water comparison after the head simulation, advanced: false}
   modules.run_targeting_analysis: {label: Targeting accuracy, advanced: false}
   modules.generate_report: {label: HTML report, advanced: false}
-  modules.report_style: {label: Report style}
-  modules.report_style_switcher: {label: Embed report style switcher}
+  report.style: {label: Report style}
+  report.style_switcher: {label: Embed report style switcher}
+  report.segmentation: {label: Segmentation report}
+  report.debug: {label: Debug report}
   modules.generate_group_report: {label: Update group report after each subject, advanced: false}
   modules.segmentation_only: {label: Stop after segmentation}
 

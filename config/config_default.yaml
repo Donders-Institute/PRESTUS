@@ -152,11 +152,17 @@ modules:
   run_nifti_creation: 1       # Run nifti creation?
   run_posthoc_water_sims: 1   # Run simulations in free water with identical setup?
   generate_report: 1          # Generate a self-contained HTML simulation report at the end of the pipeline?
-  report_style: 'instrument'  # Report skin: instrument (default) | classic (pre-v0.6.1 look) | compact (dense) | paper (print). Presentation only.
-  report_style_switcher: 0    # Embed all skins plus a style dropdown in the report? 1=yes, 0=no. Test styles on existing outputs: preview_report_styles(<subject dir>)
   run_targeting_analysis: 1   # Measure targeting accuracy from the focal-mask NIfTIs (simulated focus vs planned focus, MNI target / ROI)? Writes sub-XXX_<medium><affix>_targeting.csv. Layered or phantom media; needs run_nifti_creation.
   generate_group_report: 1    # Auto-generate the group HTML report after each per-subject run? 0=manual (call prestus_group_report_start), 1=auto. Off for runs started by prestus_study_start (the study report is built once at the end).
   segmentation_only: 0        # Stop after segmentation (skip grid setup and all simulations)? 1=yes, 0=no
+
+#------------ Report
+
+report:
+  style: 'instrument'   # Report skin: instrument (default) | classic (flat cards) | compact (dense) | paper (print). Presentation only.
+  style_switcher: 0     # Embed all skins plus a style dropdown in the report? 1=yes, 0=no. Test styles on existing outputs: preview_report_styles(<subject dir>)
+  segmentation: 1       # Layered media: write sub-XXX_layered_segmentation_report<affix>.html, showing each step from the SimNIBS segmentation to the simulation medium? 1=yes, 0=no
+  debug: 1              # With simulation.debug: write sub-XXX_<medium>_debug_report<affix>.html, indexing all debug outputs of the run (also after an error)? 1=yes, 0=no
 
 #------------ Study (multi-subject setup; see doc_group.md)
 
@@ -182,6 +188,9 @@ hpc:
   ld_library_path: '' # Prefixed to LD_LIBRARY_PATH for SimNIBS tools; '' = the libraries of the install in startup.simnibs_bin_path (<simnibs package>/external/lib/linux). Set only to override, e.g. [qsub] /opt/gcc/7.2.0/lib64
   job_prefix: 'PS' # Prefix for HPC job names (keep short; total name capped at 20 chars)
   max_wait_checks: 540  # Maximum number of status checks when waiting for a job (1 check/20s ≈ 3 hours)
+  tmp_gb: 0             # Node-local disk per SLURM job [GB] (#SBATCH --tmp); 0 = off. Inside the job, the k-Wave C++ .h5 files go to scratch_dir
+  scratch_dir: 'auto'   # Scratch root with tmp_gb > 0: 'auto' = first existing of $PRESTUS_SCRATCH, $SLURM_TMPDIR, /scratch/$USER/$SLURM_JOB_NAME,
+                        # /scratch/$USER/$SLURM_JOB_ID (else created under an existing /scratch/$USER), then $TMPDIR; or a path ($VAR expanded, created)
 
 # Smallest possible allocation (https://servicedesk.surf.nl/wiki/spaces/WIKI/pages/30660209/Snellius+partitions+and+accounting)
 snellius:

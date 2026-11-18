@@ -56,7 +56,6 @@ function [trans_ras_seg, ...
     warp_info  = niftiinfo(warp_file);     % Contains the affine
 
     plan_affine = t1plan_info.Transform.T;
-    seg_affine = t1seg_info.Transform.T;
     warp_affine = warp_info.Transform.T;
 
     % --- Min/max voxel for the target MNI image (used for the side_order clamp below) ---
@@ -110,7 +109,8 @@ function [trans_ras_seg, ...
         % depends on optional input side_order
 
         % individual image is RAS (standard): smaller values are left
-        % important: MNI is LAS (smaller values are right)
+        % important: the MNI template's voxel ARRAY is stored LAS (smaller
+        % voxel index = right); MNI world mm is RAS-like (negative x = left)
         if exist('side_order')
             if strcmp(side_order{i}, 'left')
                 trans_mni_pos(i,1) = max_voxel_mni(1);

@@ -503,12 +503,14 @@ function parameters = run_mni_placement(parameters)
             'placement.mni sub-struct is missing. See config_default.yaml for required fields.');
     end
     mni = parameters.placement.mni;
-    if ~isfield(mni, 'trans_pos_mm') || numel(mni.trans_pos_mm) ~= 3 || isempty(mni.trans_pos_mm)
-        error(['placement.mni.trans_pos_mm must be a [1x3] MNI coordinate in mm ' ...
+    is_mni_xyz = @(f) isfield(mni, f) && isnumeric(mni.(f)) && numel(mni.(f)) == 3 ...
+        && all(isfinite(mni.(f)));
+    if ~is_mni_xyz('trans_pos_mm')
+        error(['placement.mni.trans_pos_mm must be a finite [1x3] MNI coordinate in mm ' ...
                'for mode=''mni''.']);
     end
-    if ~isfield(mni, 'focus_pos_mm') || numel(mni.focus_pos_mm) ~= 3 || isempty(mni.focus_pos_mm)
-        error(['placement.mni.focus_pos_mm must be a [1x3] MNI coordinate in mm ' ...
+    if ~is_mni_xyz('focus_pos_mm')
+        error(['placement.mni.focus_pos_mm must be a finite [1x3] MNI coordinate in mm ' ...
                'for mode=''mni''.']);
     end
     skin_gap_mm = 5;
@@ -541,14 +543,30 @@ function parameters = run_mni_placement(parameters)
 
     % ── Snap transducer to scalp, then apply standoff geometry ────────────
     scalp  = tp_scalp_boundary(img);                 % [N x 3] outer-boundary voxels
-    [~, j] = min(pdist2(scalp, trans_vox));          % nearest scalp voxel
+    [~, j] = min(vecnorm(scalp - trans_vox, 2, 2));  % nearest scalp voxel
     trans_pos = transducer_scalp_geometry(scalp(j,:), focus_pos, ...
                     parameters.transducer(1), pixel_size, skin_gap_mm);
     trans_pos = round(trans_pos);
 
+    % Bowl-to-focus distance this placement asks for. A user-picked MNI
+    % scalp/focus pair can land far from the transducer's configured focal
+    % distance, which would otherwise go unnoticed.
+    bowl_focus_mm = norm(trans_pos - focus_pos) * pixel_size;
+
     fprintf('MNI placement resolved (skin_gap_mm = %.1f):\n', skin_gap_mm);
     fprintf('  trans_pos = [%d %d %d]\n', trans_pos);
     fprintf('  focus_pos = [%d %d %d]\n', focus_pos);
+    fprintf('  bowl-to-focus distance = %.1f mm\n', bowl_focus_mm);
+    if isfield(parameters.transducer(1), 'focal_distance_bowl') ...
+            && isnumeric(parameters.transducer(1).focal_distance_bowl) ...
+            && isscalar(parameters.transducer(1).focal_distance_bowl)
+        fd_bowl = parameters.transducer(1).focal_distance_bowl;
+        if abs(bowl_focus_mm - fd_bowl) > 5
+            warn(['MNI placement: bowl-to-focus distance %.1f mm differs from ' ...
+                  'transducer.focal_distance_bowl %.1f mm by more than 5 mm.'], ...
+                  bowl_focus_mm, fd_bowl);
+        end
+    end
 
     for ti = 1:numel(parameters.transducer)
         parameters.transducer(ti).trans_pos = trans_pos;

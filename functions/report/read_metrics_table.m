@@ -9,6 +9,9 @@ function t = read_metrics_table(csv_path)
 %   real_focal_distance_mm     -> real_focal_distance_bowl_mm   (bowl apex)
 %   focal_centroid_3dB_dist_mm -> focal_centroid_3dB_bowl_mm    (bowl apex)
 %
+% It also drops the columns the HTML reports never show (MI_skull, MI_skin;
+% REPORT_HIDDEN_COLUMNS). They stay in the CSV.
+%
 % Use as:
 %   t = read_metrics_table(csv_path)
 %
@@ -16,7 +19,8 @@ function t = read_metrics_table(csv_path)
 %   csv_path - path to the metrics CSV written by acoustic_analysis
 %
 % Output:
-%   t        - table, column names preserved as written
+%   t        - table, column names preserved as written, without the
+%              report-hidden columns
 %
 % See also: ACOUSTIC_ANALYSIS, GENERATE_GROUP_REPORT
 
@@ -30,4 +34,5 @@ function t = read_metrics_table(csv_path)
             t = renamevars(t, renames{r, 1}, renames{r, 2});
         end
     end
+    t = removevars(t, intersect(report_hidden_columns(), t.Properties.VariableNames));
 end

@@ -131,10 +131,14 @@ end
 % (subject + medium + output_affix), so two jobs sharing an affix — e.g. a
 % re-launched run while a prior one is still in flight — would otherwise fight
 % over the same file and fail with an HDF5 "cannot create file" iostream error.
-% Prefer per-job node-local scratch ($TMPDIR, set by SLURM/qsub): it is unique
-% per job and keeps the 100s-of-MB I/O off the shared (network) project mount.
-% Falls back to the cache dir for local runs where $TMPDIR is unset.
-kwave_scratch_dir = getenv('TMPDIR');
+% Prefer per-job node-local scratch: io.dir_scratch (HPC_SCRATCH_SETUP, with
+% hpc.tmp_gb > 0), else $TMPDIR (set by SLURM/qsub). Both are unique per job
+% and keep the 100s-of-MB I/O off the shared (network) project mount. Falls
+% back to the cache dir for local runs where neither is set.
+kwave_scratch_dir = char(get_nonempty_field(parameters, {'io', 'dir_scratch'}, ''));
+if isempty(kwave_scratch_dir) || ~isfolder(kwave_scratch_dir)
+    kwave_scratch_dir = getenv('TMPDIR');
+end
 if isempty(kwave_scratch_dir) || ~isfolder(kwave_scratch_dir)
     kwave_scratch_dir = char(parameters.io.dir_cache);
 end

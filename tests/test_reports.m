@@ -56,6 +56,68 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_report
             tc.verifyTrue(isnan(v), 'TIC should be NaN when aperture is unavailable');
         end
 
+        function test_compute_tic_source_power(tc)
+            % W0 from the source: sum over rings of (scale_p*elem_p_amp)^2/(2 rho c) * ring area
+            % * duty cycle; ISPPA scaling enters squared; pulse-train duty multiplies in
+            tr = local_transducer();
+            tr.annular = rmfield(tr.annular, 'elem_amp');
+            tr.annular.elem_p_amp = 1e5;
+            water = struct('density', 1000, 'sound_speed', 1500);
+            p = struct('timing', struct('pd', 0.02, 'pri', 0.1), ...
+                'medium_properties', struct('water', water));
+            od = tr.annular.elem_od_mm(:); id = tr.annular.elem_id_mm(:);
+            P_W = sum((1e5)^2 / (2 * 1000 * 1500) * pi/4 * (od.^2 - id.^2) * 1e-6);
+            [~, info] = compute_tic(p, tr, 20);
+            tc.verifyEqual(info.W0_mW, P_W * 0.2 * 1000, 'RelTol', 1e-12);
+            tc.verifySubstring(info.note, 'source intensity');
+            [~, info2] = compute_tic(p, tr, 20, 2);
+            tc.verifyEqual(info2.W0_mW, 4 * info.W0_mW, 'RelTol', 1e-12);
+            p.timing.ptd = 20; p.timing.ptri = 40;
+            [~, info3] = compute_tic(p, tr, 20);
+            tc.verifyEqual(info3.duty_cycle, 0.1, 'AbsTol', 1e-12);
+        end
+
+        function test_compute_tic_ramp_only_on_source_power(tc)
+            % elem_p_amp is a peak amplitude: the ramp factor lowers W0; the Isppa
+            % fallback is already a pulse average and is not scaled again
+            tr = local_transducer();
+            tr.annular = rmfield(tr.annular, 'elem_amp');
+            tr.annular.elem_p_amp = 1e5;
+            p = struct('timing', struct('pd', 0.02, 'pri', 0.1));
+            [~, flat] = compute_tic(p, tr, 20);
+            p.timing.pulse_ramp_dur = 0.004;
+            [~, ramped] = compute_tic(p, tr, 20);
+            tc.verifyEqual(ramped.W0_mW, flat.W0_mW * compute_ramp_factor(0.02, 0.004, 'linear'), 'RelTol', 1e-12);
+            tr.annular = rmfield(tr.annular, 'elem_p_amp');
+            [~, fb_flat] = compute_tic(rmfield(p, 'timing'), tr, 20);
+            [~, fb_ramp] = compute_tic(p, tr, 20);
+            tc.verifyEqual(fb_ramp.W0_mW, fb_flat.W0_mW * 0.2, 'RelTol', 1e-12);   % only the duty cycle
+        end
+
+        function test_compute_tic_fallback_without_amplitude(tc)
+            tr = local_transducer();
+            tr.annular = rmfield(tr.annular, 'elem_amp');
+            p = struct('timing', struct('pd', 0.02, 'pri', 0.1));
+            [v, info] = compute_tic(p, tr, 20);
+            tc.verifyTrue(isfinite(v));
+            tc.verifySubstring(info.note, 'fallback');
+            Deq_cm = max(tr.annular.elem_od_mm) / 10;
+            tc.verifyEqual(info.W0_mW, 20 * pi * (Deq_cm / 2)^2 * 0.2 * 1000, 'RelTol', 1e-12);
+        end
+
+        function test_skull_and_skin_mi_not_reported(tc)
+            % kept in the CSV, dropped by the reader and absent from the verdict limits
+            f = fullfile(tc.tmp, 'sub-001_layered.csv');
+            writetable(table(1, 0.7, 0.9, 0.4, 0.6, 'VariableNames', ...
+                {'subject_id', 'MI_tc', 'MI_skull', 'MI_skin', 'MI_brain'}), f);
+            t = read_metrics_table(f);
+            tc.verifyEmpty(intersect({'MI_skull', 'MI_skin'}, t.Properties.VariableNames));
+            tc.verifyTrue(all(ismember({'MI_tc', 'MI_brain'}, t.Properties.VariableNames)));
+            L = get_risk_limits(true);
+            tc.verifyFalse(any(isfield(L, {'MI_skull', 'MI_skin'})));
+            tc.verifyTrue(all(isfield(L, {'MI_tc', 'MI_brain'})));
+        end
+
         function test_embed_image_dims_finds_slices(tc)
             base = 'sub-001_layered_maxT';
             suffix = '_test';
