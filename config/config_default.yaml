@@ -91,6 +91,7 @@ io:
   output_affix: ''          # Optional affix for output file names; differentiates outputs for the same subject/transducer
   overwrite_files: always   # 'never' reuse existing files; 'always' overwrite (chained pipelines: re-run output stages, reuse intermediate caches); 'force' also re-run chained intermediate stages; any other value asks for confirmation. See doc_outputs_reuse.md#overwrite-behaviour
   cache_signature_check: error # Reused grid/medium/acoustic caches (overwrite_files: never) must match this run's settings: 'error' | 'warn' (reuse anyway) | 'off'
+  acoustic_cache_remap: 0  # A reused acoustic cache written on a different grid: 0 = re-simulate (or stop without a source); 1 = map the field onto this grid through world space (pressures resampled as p^2). See doc_outputs_reuse.md#cache-reuse-checks
   overwrite_simnibs: 0      # By default, SimNIBS segmentation results are not overwritten, unless enabled here
   # Intermediate matrix saving
   # save_matrices sets all intermediate matrix saves at once: 1 = save all, 0 = save none.

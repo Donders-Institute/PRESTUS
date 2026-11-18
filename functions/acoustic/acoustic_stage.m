@@ -132,13 +132,19 @@ elseif exist(filename_sensor_data, 'file')
             expand_axisymmetric_inputs(parameters, sensor_data, kgrid, kgrid_cached, kwave_medium, ...
                                        medium_masks, segmentation, source, source_labels, filename_sensor_data);
     catch ME
-        if strcmp(ME.identifier, 'cache_acoustic:staleGrid') && isempty(source)
+        if strcmp(ME.identifier, 'cache_acoustic:staleGrid') && cache_remap_enabled(parameters)
+            % io.acoustic_cache_remap: map the cached field onto this run's grid
+            % through world space instead of re-simulating or stopping.
+            [sensor_data, kgrid, acoustic_provenance] = remap_stale_cache( ...
+                filename_sensor_data, parameters, planimg, kgrid, live_provenance);
+            acoustic_provenance.input_signature = input_signature;
+        elseif strcmp(ME.identifier, 'cache_acoustic:staleGrid') && isempty(source)
             % No source to re-simulate with (e.g. a job that only reads a
             % combined field): the grid settings differ from the cache's run.
+            differing = stale_cache_setting_diffs(filename_sensor_data, input_signature, parameters);
             error('acoustic_stage:staleCacheNoSource', ...
                 ['%s\nThis run sets up no source (modules.run_source_setup = 0), so it cannot ' ...
-                 're-simulate. Check that its grid settings (e.g. grid.acoustic_fov_*) match ' ...
-                 'the run that wrote the cache.'], ME.message);
+                 're-simulate. %s'], ME.message, differing);
         elseif strcmp(ME.identifier, 'cache_acoustic:staleGrid')
             % Re-run with the configured backend (not unconditionally k-Wave),
             % scaled exactly like a fresh run.
@@ -268,6 +274,103 @@ end
 end
 
 %% ------------------------------------------------------------------------
+function tf = cache_remap_enabled(parameters)
+% io.acoustic_cache_remap on, for a 3-D (not axisymmetric) run
+tf = isfield(parameters.io, 'acoustic_cache_remap') && ~isempty(parameters.io.acoustic_cache_remap) && ...
+     logical(parameters.io.acoustic_cache_remap) && ...
+     ~(isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric);
+end
+
+function [sensor_data, kgrid, prov] = remap_stale_cache(filename, parameters, planimg, kgrid_live, live_provenance)
+% REMAP_STALE_CACHE  Load an acoustic cache written on another grid and map its
+% field onto this run's grid (io.acoustic_cache_remap). Both grids are placed
+% in world space by their planning images (GRID_WORLD_AFFINE: the cache run's
+% planimg sidecar, this run's planimg); FOV boxes by their offsets. Pressures
+% are resampled as p^2 (REMAP_ACOUSTIC_FIELD). The mapping, its scale and the
+% fraction of this grid the cached field covers are recorded in
+% acoustic_provenance.cache_remap and reported as a warning: the field was
+% computed through the cache run's head model, which may differ from this
+% run's near tissue boundaries.
+p_load = parameters;
+p_load.state.acoustic_cache_remap_load = true;
+[sensor_data, kgrid_cached, prov, info_cached] = ...
+    cache_acoustic('load', filename, p_load, struct(), [], live_provenance);
+
+A_src = grid_world_affine(info_cached);
+A_dst = grid_world_affine(planimg);
+if isempty(A_src) || isempty(A_dst)
+    error('acoustic_stage:remapNoAffine', ...
+        ['io.acoustic_cache_remap: cannot place both grids in world space (the cache run''s planimg ' ...
+         'sidecar or this run''s T1 header is missing):\n  %s'], filename);
+end
+[M, minfo] = grid_remap_affine(A_src, A_dst, fov_offset_of(prov), fov_offset_of(live_provenance));
+
+src_dims = size(sensor_data.p_max_all);
+src_dims = [src_dims ones(1, 3 - numel(src_dims))];
+dst_dims = double(parameters.grid.dims(:)');
+coverage = NaN;
+for f = fieldnames(sensor_data)'
+    v = sensor_data.(f{1});
+    if ~(isnumeric(v) || islogical(v)) || ndims(v) < 3 || ~isequal(size(v, [1 2 3]), src_dims)
+        continue
+    end
+    [sensor_data.(f{1}), rinfo] = remap_acoustic_field(v, M, dst_dims, field_quantity(f{1}, v));
+    coverage = rinfo.coverage;
+end
+
+% k-Wave grid of this run: the cached one has the cache run's size (with the
+% same PML padding, if it was stored padded); BabelBrain caches store none.
+kgrid = kgrid_live;
+if ~isempty(kgrid_cached) && isobject(kgrid_cached)
+    pad = [kgrid_cached.Nx kgrid_cached.Ny kgrid_cached.Nz] - src_dims;
+    N   = dst_dims + pad;
+    dx  = parameters.grid.resolution_mm * 1e-3;
+    kgrid = kWaveGrid(N(1), dx, N(2), dx, N(3), dx);
+    try
+        kgrid.setTime(kgrid_cached.Nt, kgrid_cached.dt);
+    catch
+    end
+end
+
+for fn = {'fov_offset_ac', 'full_ac_dims'}
+    if isfield(live_provenance, fn{1})
+        prov.(fn{1}) = live_provenance.(fn{1});
+    elseif isfield(prov, fn{1})
+        prov = rmfield(prov, fn{1});
+    end
+end
+prov.cache_remap = struct('source_file', filename, 'M', M, 'scale', minfo.scale, ...
+    'rigid', minfo.rigid, 'shift_vox', minfo.shift_vox, 'coverage', coverage, ...
+    'source_dims', src_dims, 'dims', dst_dims);
+warning('acoustic_stage:cacheRemapped', ...
+    ['Acoustic cache from grid [%s] remapped onto this grid [%s] (io.acoustic_cache_remap): ' ...
+     'shift [%s] voxels, scale [%s], %.1f %% of this grid covered. The field was computed ' ...
+     'through the cache run''s head model:\n  %s'], num2str(src_dims), num2str(dst_dims), ...
+    num2str(minfo.shift_vox, '%.2f '), num2str(minfo.scale, '%.4f '), 100 * coverage, filename);
+end
+
+function off = fov_offset_of(prov)
+off = [1 1 1];
+if isstruct(prov) && isfield(prov, 'fov_offset_ac') && ~isempty(prov.fov_offset_ac)
+    off = double(prov.fov_offset_ac(:)');
+end
+end
+
+function q = field_quantity(name, v)
+% How REMAP_ACOUSTIC_FIELD resamples a sensor_data field
+if islogical(v)
+    q = 'mask';
+elseif ~isreal(v)
+    q = 'complex';
+elseif startsWith(name, 'p_min')
+    q = 'negative';
+elseif startsWith(name, {'p_max', 'p_rms', 'p_amp', 'p_intensity_equiv', 'p_async'})
+    q = 'pressure';                       % peaks and amplitudes (>= 0)
+else
+    q = 'linear';                         % e.g. p_final: a signed snapshot
+end
+end
+
 function [parameters, kgrid, kwave_medium, medium_masks, segmentation, source, source_labels] = ...
         expand_axisymmetric_inputs(parameters, sensor_data, kgrid, kgrid_cached, kwave_medium, ...
                                    medium_masks, segmentation, source, source_labels, filename)
@@ -343,6 +446,33 @@ if ~isequal(size(sensor_data.p_max_all), parameters.grid.dims)
         ['Acoustic cache was built on a different grid [%s] than the expanded axisymmetric ' ...
          'grid [%s] of this run:\n  %s'], ...
         num2str(size(sensor_data.p_max_all)), num2str(parameters.grid.dims), filename);
+end
+end
+
+%% ------------------------------------------------------------------------
+function msg = stale_cache_setting_diffs(filename, current_sig, parameters)
+% Names the settings in which this run differs from the run that wrote the
+% acoustic cache (e.g. headmodel.csf_expansion changes the head crop).
+msg = ['Check that its grid and head-model settings (e.g. grid.acoustic_fov_*, ' ...
+       'headmodel.*) match the run that wrote the cache.'];
+try
+    s = load(filename, 'acoustic_provenance');
+    stored = [];
+    if isfield(s, 'acoustic_provenance') && isfield(s.acoustic_provenance, 'input_signature')
+        stored = s.acoustic_provenance.input_signature;
+    end
+    if isempty(stored); return; end
+    p = parameters;
+    p.io.cache_signature_check = 'warn';
+    ws = warning('off', 'prestus:cache:signatureMismatch');
+    restore = onCleanup(@() warning(ws));
+    [~, diffs] = check_cache_signature(filename, stored, current_sig, p);
+    if ~isempty(diffs)
+        msg = sprintf('Settings that differ from the run that wrote the cache: %s.', ...
+            strjoin(diffs(1:min(end, 10)), ', '));
+    end
+catch
+    % keep the generic advice: the cache's signature could not be read
 end
 end
 

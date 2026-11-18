@@ -156,7 +156,11 @@ end
 % The cache file is NOT deleted: combine_async_intensity can remap fields
 % from different grids onto a common reference.  The mismatch is signalled
 % via a named error so callers can decide whether to re-run or proceed.
-if isfield(cached, 'acoustic_grid_dims') && numel(parameters.grid.dims) == 3
+% ACOUSTIC_STAGE sets state.acoustic_cache_remap_load to load such a cache
+% anyway when it remaps the field (io.acoustic_cache_remap).
+allow_mismatch = isfield(parameters, 'state') && isfield(parameters.state, 'acoustic_cache_remap_load') && ...
+    parameters.state.acoustic_cache_remap_load;
+if isfield(cached, 'acoustic_grid_dims') && numel(parameters.grid.dims) == 3 && ~allow_mismatch
     if ~isequal(cached.acoustic_grid_dims(:)', parameters.grid.dims(:)')
         fprintf(['[cache_acoustic] Acoustic cache grid [%s] does not match current ' ...
                  'grid [%s].\n  Cache retained for potential grid remapping: %s\n'], ...

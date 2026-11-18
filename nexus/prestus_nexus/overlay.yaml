@@ -826,6 +826,7 @@ docs:
   simulation.medium: doc_medium.md#choosing-the-medium
   io.overwrite_files: doc_outputs_reuse.md#overwrite-behaviour
   io.cache_signature_check: doc_outputs_reuse.md#cache-reuse-checks
+  io.acoustic_cache_remap: doc_outputs_reuse.md#cache-reuse-checks
 
 # ── Display: labels, advanced flags, placement in the forms ───────────
 # Same pattern rules as 'fields' (applied after them). 'label' replaces the
@@ -887,6 +888,7 @@ display:
   io.output_affix: {label: Output name affix}
   io.overwrite_files: {label: Overwrite existing outputs, advanced: true, help: "What to do when outputs already exist: 'never' reuses them; 'always' recomputes the outputs (chained pipelines reuse intermediate caches); 'force' also recomputes intermediate stages; any other value asks. See doc_outputs_reuse.md#overwrite-behaviour."}
   io.cache_signature_check: {label: Check reused caches, advanced: true, help: "When a grid or medium cache is reused (overwrite 'never', or intermediate stages of chained pipelines) but was built with different settings: 'error' stops, 'warn' reuses it anyway, 'off' skips the check. See doc_outputs_reuse.md#cache-reuse-checks."}
+  io.acoustic_cache_remap: {label: Remap acoustic cache to this grid, advanced: true, help: "A reused acoustic cache written on a different grid (e.g. after a head-model change): off re-simulates; on maps the field onto this grid through world space, pressures as p^2, and records the mapping. The field keeps the cache run's head model. See doc_outputs_reuse.md#cache-reuse-checks."}
   io.overwrite_simnibs: {label: Re-run SimNIBS segmentation, advanced: true}
   io.save_*: {advanced: true}
   io.save_MNI: {label: Also save MNI-space NIfTIs, advanced: false}
