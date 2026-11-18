@@ -494,6 +494,8 @@ deprecated:
   calibration.opt_amp_validation: {use: [], kind: removed, since: v0.7-pre, note: "the drive scales with sqrt(ISPPA); kwave_drive_calibration calibrates each depth once"}
   thermal.sensor_xy_halfsize: {use: [], kind: removed, since: v0.7-pre, note: "the thermal simulation records no sensor; heating results come from the full temperature field"}
   thermal.record_t_at_every_step: {use: [], kind: removed, since: v0.7-pre, note: "the thermal simulation records no sensor; heating results come from the full temperature field"}
+  modules.report_style: {use: report.style, kind: rename, since: v0.7.0}
+  modules.report_style_switcher: {use: report.style_switcher, kind: rename, since: v0.7.0}
   # Converted where they are read (source):
   transducer.annular.elem_amp: {use: transducer.annular.elem_p_amp, source: validate_annular_transducer.m}
   transducer.matrix.elem_amp: {use: transducer.matrix.elem_p_amp, source: validate_matrix_transducer.m}
