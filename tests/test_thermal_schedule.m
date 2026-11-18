@@ -32,6 +32,27 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_therma
 
     methods (Test)
 
+        function test_ramp_factor_per_source_pd(tc)
+            % custom schedule, transducer 2 with its own PD: each source gets the ramp
+            % factor of its own PD; without a ramp all factors are 1; a ramp longer
+            % than half of one source's PD stops the run
+            p = tc.base;
+            p.transducer(2).timing = struct('pd', 0.05);
+            p.timing.pulse_ramp_dur = 0.004;
+            s = thermal_schedule(p, 2);
+            pt = thermal_parameters(p, true);
+            eta = thermal_ramp_factors(pt, s);
+            tc.verifyEqual(eta, [compute_ramp_factor(0.02, 0.004, 'linear'), ...
+                                 compute_ramp_factor(0.05, 0.004, 'linear')], 'AbsTol', 1e-12);
+            tc.verifyNotEqual(eta(1), eta(2));
+            p0 = tc.base;
+            tc.verifyEqual(thermal_ramp_factors(thermal_parameters(p0, true), thermal_schedule(p0, 2)), [1 1]);
+            p.timing.pulse_ramp_dur = 0.009;              % fits the global 20 ms PD
+            p.transducer(2).timing = struct('pd', 0.015); % but not 2 x 9 ms in 15 ms
+            tc.verifyError(@() thermal_ramp_factors(thermal_parameters(p, true), thermal_schedule(p, 2)), ...
+                'PRESTUS:thermal:ramp');
+        end
+
         function test_single_source_ends_at_ptrd(tc)
             p = tc.base;
             p.transducer = p.transducer(1);

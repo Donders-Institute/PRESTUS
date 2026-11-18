@@ -77,4 +77,47 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_therma
 
     end
 
+    methods (Test, TestTags = {'ramp'})
+
+        function test_ramp_factor_matches_ipa(tc)
+            % the heat factor equals the Ipa factor of COMPUTE_RAMP_FACTOR, for both
+            % shapes; the envelope is 0 at the edges and 1 on the plateau
+            for shape = {'linear', 'tukey'}
+                b = tc.base;
+                b.timing.pulse_ramp_dur = 0.004;
+                b.timing.pulse_ramp_shape = shape{1};
+                p = thermal_parameters(b, true);
+                tc.verifyEqual(p.ramp_eta, compute_ramp_factor(0.02, 0.004, shape{1}), 'AbsTol', 1e-12, shape{1});
+                tc.verifyEqual(p.dc_eff, p.dc * p.ramp_eta, 'AbsTol', 1e-12);
+                tc.verifyEqual(p.ramp_env([0 0.01 0.02]), [0 1 0], 'AbsTol', 1e-12, shape{1});
+            end
+        end
+
+        function test_no_ramp_is_rectangular(tc)
+            p = thermal_parameters(tc.base, true);
+            tc.verifyEqual(p.ramp_eta, 1);
+            tc.verifyEqual(p.dc_eff, p.dc);
+            b = tc.base;
+            b.timing.pulse_ramp_dur = 0;
+            tc.verifyEqual(thermal_parameters(b, true).ramp_eta, 1);
+        end
+
+        function test_ramp_and_timing_errors(tc)
+            b = tc.base;
+            b.timing.pulse_ramp_dur = 0.011;          % 2 x 11 ms > 20 ms PD
+            tc.verifyError(@() thermal_parameters(b, true), 'PRESTUS:thermal:ramp');
+            b = tc.base;
+            b.timing.pulse_ramp_dur = 0.002;
+            b.timing.pulse_ramp_shape = 'sigmoid';
+            tc.verifyError(@() thermal_parameters(b, true), 'PRESTUS:thermal:ramp');
+            b = tc.base;
+            b.timing.pd = 0.2;                        % PD > PRI
+            tc.verifyError(@() thermal_parameters(b, true), 'PRESTUS:thermal:timing');
+            b = tc.base;
+            b.timing.ptd = 3;                         % PTD > PTRI
+            tc.verifyError(@() thermal_parameters(b, true), 'PRESTUS:thermal:timing');
+        end
+
+    end
+
 end

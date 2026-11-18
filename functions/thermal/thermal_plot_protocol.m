@@ -21,11 +21,10 @@ function thermal_plot_protocol(params_thermal, parameters, varargin)
 %                    n_pulses_per_pt, n_ptri_reps,
 %                    pt_on_steps_n, pt_on_steps_dur [s],
 %                    pt_off_steps_n, pt_off_steps_dur [s],
-%                    n_pulses_per_pt, n_ptri_reps, ptri_off_step_dur [s],
-%                    ptri_off_steps_n, post_ptri_step_dur [s],
-%                    post_ptri_steps_n, pd [s], pri [s], ptd [s],
-%                    ptri [s], ptrd [s], dc, prf [Hz]
-%   parameters     - PRESTUS config; must contain io.dir_output, io.output_affix,
+%                    ptri_off_steps_n, ptri_off_step_dur [s],
+%                    post_ptri_steps_n, post_ptri_step_dur [s];
+%                    optional ramp_dur [s], ramp_shape, ramp_env, ramp_eta
+%   parameters     - PRESTUS config; must contain io.dir_img, io.output_affix,
 %                    subject_id, simulation.medium
 %
 % Optional name-value pairs:
@@ -124,46 +123,44 @@ end
 title(ax, sprintf('One pulse train: %s in %s (PTD)%s; repeats every %s (PTRI)', ...
       what, fmt_t(pt.ptd), off_note, fmt_t(pt.ptri)), 'FontWeight', 'normal');
 
-if total_ptri_reps <= MAX_PATCHES
-    % All patches
-    step_reps = 1;
-    n_ptri_to_plot = total_ptri_reps;
+%% Row 3: one pulse repetition interval, with the simulation steps
+ax = nexttile(tl);
+[sc, unit] = time_unit(pt.pri);
+shade(ax, 0, pt.pri * sc, off_col);
+ramped = isfield(pt, 'ramp_dur') && pt.ramp_dur > 0;
+if ramped
+    % ramped envelope (THERMAL_PARAMETERS ramp_env); the heat follows its square
+    tt = linspace(0, pt.pd, 400);
+    patch(ax, [tt fliplr(tt)] * sc, [pt.ramp_env(tt) zeros(size(tt))], on_col, 'EdgeColor', 'none');
 else
-    % Equi-distant: select MAX_PATCHES evenly spaced
-    step_reps = round(total_ptri_reps / MAX_PATCHES);
-    n_ptri_to_plot = MAX_PATCHES;
+    blocks(ax, 0, pt.pd * sc, on_col);
 end
-
-t_on_patches = [];
-t_current = 0;
-
-for rep_i = 1:step_reps:total_ptri_reps
-    if rep_i > total_ptri_reps, break; end
-    t_on_start = (rep_i-1) * params_thermal.ptri;
-    t_on_end = t_on_start + params_thermal.ptd;
-    t_on_patches = [t_on_patches; t_on_start t_on_end];
+style_row(ax, [0 pt.pri * sc], unit);
+edges = [(0:pt.pt_on_steps_n) * pt.pt_on_steps_dur, ...
+         pt.pd + (1:pt.pt_off_steps_n) * pt.pt_off_steps_dur];
+if numel(edges) <= 400
+    step_ticks(ax, edges(2:end-1) * sc);
 end
+if pt.pt_off_steps_n > 0
+    steps = sprintf('%d on + %d off simulation steps', pt.pt_on_steps_n, pt.pt_off_steps_n);
+else
+    steps = sprintf('%d simulation %s', pt.pt_on_steps_n, ternary(pt.pt_on_steps_n == 1, 'step', 'steps'));
+end
+if ramped
+    steps = sprintf('%s; %s ramp %s per edge (heat x %.3f)', steps, pt.ramp_shape, fmt_t(pt.ramp_dur), pt.ramp_eta);
+end
+title(ax, sprintf('One pulse: %s on (PD) every %s (PRI); %s', fmt_t(pt.pd), fmt_t(pt.pri), steps), ...
+      'FontWeight', 'normal');
 
-% Full x-axis span
-t_total_end = total_ptri_reps * params_thermal.ptri + params_thermal.post_ptri_dur;
-
-%% Plot the thermal protocol
-
-h = figure('Position', [100 100 fig_size(1)*100 fig_size(2)*100], 'Color', 'w');
-% PLOT 1: First pulse (sine ON + flat OFF)
-subplot(2,1,1);
-    h1 = plot(t_first_pulse, signal_first_pulse, pulse_color, 'LineWidth', 2.5); hold on;
-    
-    % Shade pulse OFF only
-    off_mask = abs(signal_first_pulse) < 1e-10;
-    if any(off_mask)
-        off_starts = find(diff([false; off_mask]) > 0);
-        off_ends = find(diff([off_mask; false]) < 0);
-        for i = 1:min(length(off_starts), length(off_ends))
-            ts = t_first_pulse(off_starts(i):off_ends(i));
-            fill(ts([1 end end 1]), [-1.2 -1.2 1.2 1.2], off_color, ...
-                 'FaceAlpha', 0.4, 'EdgeColor', 'none');
-        end
+%% Row 4 (async): one row of on-blocks per transducer over one cycle
+if multi_source
+    ax = nexttile(tl);
+    hold(ax, 'on');
+    src = sched.source;
+    switch sched.mode
+        case 'pulses', t_win = 2 * src(1).pri;
+        case 'trains', t_win = src(1).ptri;
+        otherwise,     t_win = max([src.offset_s] + [src.ptri]);
     end
     t_win = min(t_win, sched.t_sonication);
     [sc, unit] = time_unit(t_win);

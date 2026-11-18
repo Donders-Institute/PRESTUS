@@ -18,8 +18,10 @@ function params_thermal = thermal_parameters(parameters, silent)
 %                timing.pd [s], timing.pri [s], timing.ptd [s],
 %                timing.pt_timestep [s], timing.ptri [s], timing.ptrd [s],
 %                timing.post_pt_timestep [s], timing.post_ptri_dur [s],
-%                timing.equal_step_duration
-%   silent     - suppress console summary printout (optional, default: false)
+%                timing.equal_step_duration; optional pulse ramp:
+%                timing.pulse_ramp_dur [s] per edge, inside PD (default 0),
+%                timing.pulse_ramp_shape ('linear' | 'tukey')
+%   silent    - suppress console summary printout (optional, default: false)
 %
 % Output:
 %   params_thermal - struct with fields:
@@ -27,7 +29,10 @@ function params_thermal = thermal_parameters(parameters, silent)
 %                    pt_on_steps_n, pt_on_steps_dur [s],
 %                    pt_off_steps_n, pt_off_steps_dur [s],
 %                    n_pulses_per_pt, ptri_off [s], ptri_off_steps_n,
-%                    n_ptri_reps, post_ptri_steps_n, post_ptri_step_dur [s]
+%                    n_ptri_reps, post_ptri_steps_n, post_ptri_step_dur [s],
+%                    ramp_shape, ramp_dur [s], ramp_env (handle, t in [0,pd]),
+%                    ramp_eta (integral(env^2)/pd; 1 without a ramp),
+%                    dc_eff (dc*ramp_eta)
 %
 % See also: THERMAL_SIMULATION, THERMAL_PLOT_PROTOCOL
 
@@ -40,7 +45,6 @@ if ~silent
     disp('Implementing thermal protocol...');
 end
 
-thermal = parameters.thermal;
 timing  = parameters.timing;
 
 % === Pulse / Pulse Train (fine timestep: pt_timestep) ===
@@ -49,6 +53,17 @@ pri = timing.pri;
 pd  = timing.pd;
 ptd = timing.ptd;
 pt_dt = timing.pt_timestep;
+
+if ~(pd > 0)
+    error('PRESTUS:thermal:timing', 'timing.pd must be > 0 for thermal simulations (got %g s).', pd);
+end
+if pd > pri*(1+1e-9)
+    error('PRESTUS:thermal:timing', 'timing.pd (%g s) must not exceed timing.pri (%g s).', pd, pri);
+end
+if timing.ptri > 0 && ptd > timing.ptri*(1+1e-9)
+    error('PRESTUS:thermal:timing', 'timing.ptd (%g s) must not exceed timing.ptri (%g s).', ptd, timing.ptri);
+end
+
 dc = pd / pri;  % Duty cycle (computed)
 
 % encode the above in params_thermal
@@ -72,6 +87,38 @@ else
     params_thermal.pt_on_steps_n  = round_if_integer(pd  / pt_dt, 'ON steps must be integer');
     params_thermal.pt_off_steps_n = round_if_integer((pri-pd) / pt_dt, 'OFF steps must be integer');
 end
+
+% === Pulse envelope ramp (inside PD) ===
+% The heat source scales with pressure^2, i.e. with envelope^2. A ramp scales
+% the heat of every pulse by ramp_eta = integral(env^2)/pd, so the energy per
+% pulse is exact; THERMAL_SIMULATION applies it to Q. Thermal time constants
+% (seconds) are far longer than a ramp (milliseconds), so the temperature
+% course within a pulse is not resolved.
+
+ramp_dur   = 0;
+ramp_shape = 'linear';
+if isfield(timing, 'pulse_ramp_dur') && ~isempty(timing.pulse_ramp_dur), ramp_dur = timing.pulse_ramp_dur; end
+if isfield(timing, 'pulse_ramp_shape') && ~isempty(timing.pulse_ramp_shape), ramp_shape = lower(char(timing.pulse_ramp_shape)); end
+
+if ~isscalar(ramp_dur) || ~isnumeric(ramp_dur) || ramp_dur < 0
+    error('PRESTUS:thermal:ramp', 'timing.pulse_ramp_dur must be a non-negative scalar [s].');
+end
+if 2*ramp_dur > pd*(1+1e-9)
+    error('PRESTUS:thermal:ramp', 'timing.pulse_ramp_dur (%g s) must satisfy 2*pulse_ramp_dur <= pd (%g s).', ramp_dur, pd);
+end
+
+params_thermal.ramp_shape = ramp_shape;
+params_thermal.ramp_dur   = ramp_dur;
+if ramp_dur == 0
+    params_thermal.ramp_env = @(t) ones(size(t));
+    params_thermal.ramp_eta = 1;
+else
+    env_edge = ramp_edge(ramp_shape);
+    params_thermal.ramp_env = @(t) env_edge(max(0, min(1, min(t, pd - t) ./ ramp_dur)));
+    % the same factor that scales Ipa (ACOUSTIC_ANALYSIS)
+    params_thermal.ramp_eta = compute_ramp_factor(pd, ramp_dur, ramp_shape);
+end
+params_thermal.dc_eff = dc * params_thermal.ramp_eta;
 
 % Pulses per PT
 params_thermal.n_pulses_per_pt = round_if_integer(ptd / pri, 'Pulses per PT must be integer');
@@ -129,6 +176,11 @@ if ~silent
         params_thermal.ptd, params_thermal.n_pulses_per_pt, ...
         params_thermal.pt_on_steps_n, params_thermal.pt_off_steps_n, params_thermal.pt_dt);
     
+    if params_thermal.ramp_dur > 0
+        fprintf('Ramp:         %s, %.3gs per edge (energy factor %.3f, effective DC=%.1f%%)\n', ...
+            params_thermal.ramp_shape, params_thermal.ramp_dur, params_thermal.ramp_eta, params_thermal.dc_eff*100);
+    end
+
     fprintf('PTRI:         PTRI=%.1fs (%d reps/PTD, PTRI-OFF=%.1fs = %d coarse steps @ %.2fs)\n', ...
         params_thermal.ptri, params_thermal.n_ptri_reps, params_thermal.ptri_off, ...
         params_thermal.ptri_off_steps_n, params_thermal.post_pt_timestep);
@@ -148,5 +200,18 @@ if ~silent
     
     fprintf('Simulation steps:  %d fine + %d coarse = %d total\n', total_fine_steps, total_coarse_steps, total_fine_steps + total_coarse_steps);
     fprintf('========================================\n\n');
+end
+end
+
+function f = ramp_edge(shape)
+% Rising edge of the ramp envelope (amplitude) on u in [0,1], f(0)=0, f(1)=1;
+% the shapes of COMPUTE_RAMP_FACTOR.
+switch shape
+    case 'linear'
+        f = @(u) u;
+    case 'tukey'
+        f = @(u) (1 - cos(pi*u)) / 2;
+    otherwise
+        error('PRESTUS:thermal:ramp', 'Unknown timing.pulse_ramp_shape ''%s'' (use linear or tukey).', shape);
 end
 end

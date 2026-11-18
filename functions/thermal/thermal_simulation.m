@@ -359,6 +359,26 @@ CEM43_iso_max = tmp_obj.cem43_iso;
 % Convert the thermal parameters for the simulation (validates the timing block)
 params_thermal = thermal_parameters(parameters);
 
+
+% Firing schedule: segments in which a fixed set of sources is on. Firing groups
+% (FIRING_GROUPS): each field follows its group's windows (p_async_source_tx).
+src_opts = {};
+if isstruct(sensor_data) && isfield(sensor_data, 'p_async_source_tx') && ...
+        numel(sensor_data.p_async_source_tx) == n_src
+    src_opts = {'SourceTx', double(sensor_data.p_async_source_tx(:)'), ...
+                'SourceFreq', double(sensor_data.p_async_freqs_hz(:)')};
+end
+sched = thermal_schedule(parameters, n_src, src_opts{:});
+
+% Ramped pulses (timing.pulse_ramp_dur > 0): each source's heat times its ramp
+% factor, from the pd of the transducer whose windows it follows (THERMAL_RAMP_FACTORS)
+ramp_eta = thermal_ramp_factors(params_thermal, sched);
+for i = find(ramp_eta ~= 1)
+    Q_src(:,:,:,i) = Q_src(:,:,:,i) * ramp_eta(i);
+    fprintf('[thermal_simulation] Pulse ramp (%s, %.3g ms per edge, PD %.3g ms): heat source %d x %.3f\n', ...
+        params_thermal.ramp_shape, params_thermal.ramp_dur * 1e3, sched.source(i).pd * 1e3, i, ramp_eta(i));
+end
+
 % Visualize the thermal parameters
 thermal_plot_protocol(params_thermal, parameters, 'Schedule', sched);
 

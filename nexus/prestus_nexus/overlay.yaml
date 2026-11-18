@@ -598,7 +598,7 @@ extra:
     kind: number
     default: 0
     unit: s
-    help: "Rise (= fall) duration of the amplitude ramp at the start and end of each pulse [s]; 0 = rectangular pulse. Used for the pulse-average intensity (Ipa = factor × Itp)."
+    help: "Rise (= fall) duration of the amplitude ramp at the start and end of each pulse [s]; 0 = rectangular pulse. Scales the pulse-average intensity (Ipa = factor × Itp), the heat of every pulse, and the emitted power behind TIC by the same factor; needs 2 × ramp ≤ PD."
   timing.pulse_ramp_shape:
     kind: str
     default: linear
