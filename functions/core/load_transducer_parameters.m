@@ -4,8 +4,8 @@ function parameters = load_transducer_parameters(parameters)
 % Iterates over all entries in parameters.transducer, dispatching to
 % validate_matrix_transducer or validate_annular_transducer depending on
 % tr.type. Derived scalar fields (elem_n, elem_phase_rad, focal distances)
-% are computed and stored back into each transducer struct. Warns when
-% multiple transducers have mismatched frequencies. A legacy top-level
+% are computed and stored back into each transducer struct. Warns when a
+% single transducer lists several frequencies. A legacy top-level
 % expected_focal_distance_mm is an error (its reference point was ambiguous).
 %
 % Use as:
@@ -134,8 +134,9 @@ end
                     tr = validate_annular_transducer(tr, t_i);
 
                 otherwise
-                    error('Transducer %i; Element shape option "%s" is not implemented.', ...
-                        tr.type);
+                    error('prestus:transducer:unknownType', ...
+                        'Transducer %i; Element shape option "%s" is not implemented.', ...
+                        t_i, tr.type);
             end
 
             if t_i == 1
@@ -147,21 +148,15 @@ end
 
         parameters.transducer = new_transducers;
 
-        % Multi-transducer + multi-frequency is not supported: coherent k-Wave
-        % superposition with different CW frequencies produces physically invalid
-        % interference patterns, and the acoustic analysis assumes a single frequency
-        % for MI and intensity calculations.  Error rather than warn to prevent
-        % silently wrong results.  Use separate single-transducer runs and combine
-        % intensities incoherently (transducer_coupling: async) if different
-        % frequencies are required.
+        % Transducers at different frequencies run as separate single-frequency
+        % simulations (ASYNC_TRANSDUCER_PIPELINE), each on its own medium:
+        %   async    - separate firing windows (intensities alternate)
+        %   coherent - firing together (IS_SIMULTANEOUS_MULTIFREQ): complex fields
+        %              summed per frequency (transducers at one frequency
+        %              interfere), intensities summed across frequencies.
+        % A single transducer with several frequencies gets a warning.
         all_freqs = [parameters.transducer.freq_hz];
-        if numel(unique(all_freqs)) > 1 && numel(parameters.transducer) > 1
-            error('prestus:multiFreqMultiTransducer', ...
-                ['Multiple transducers with different frequencies are not supported ' ...
-                 '(%s Hz). Use separate single-transducer runs and combine intensities ' ...
-                 'incoherently (simulation.transducer_coupling: async).'], ...
-                num2str(unique(all_freqs)));
-        elseif numel(unique(all_freqs)) > 1
+        if numel(unique(all_freqs)) > 1 && numel(parameters.transducer) == 1
             warn('prestus:multiFreq', ...
                 'Transducer has multiple drive frequencies (%s Hz). Verify MI uses the intended frequency.', ...
                 num2str(unique(all_freqs)));

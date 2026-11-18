@@ -4,20 +4,19 @@ function [thermal_diff_obj, time_status_seq, results_heating] = thermal_simulati
 %
 % Converts the acoustic pressure field (p_max_all from sensor_data) into a
 % volumetric heat source Q via Q = alpha_np * p^2 / (rho * c). Runs
-% kWaveDiffusion over the pulse protocol defined by thermal_parameters,
-% looping through PT ON, PT OFF, PTRI-OFF, and post-PTRD cool-off phases.
+% kWaveDiffusion over the segments of thermal_schedule: PT ON, PT OFF,
+% PTRI-OFF and post-PTRD cool-off. An async combined cache carries one scaled
+% field per transducer (sensor_data.p_async_tx, [Nx Ny Nz N]); each gives its
+% own Q_i, and a segment heats with the sum of the Q_i of the transducers on
+% (timing.async_schedule).
 % At each recorded step, temperature (T) and two CEM43 variants (k-Wave
-% native; ISO 13 threshold) are accumulated into focal-plane snapshots,
-% running maxima, and per-layer timeseries. GPU arrays are used when
+% native; ISO 14708-3, see CEM43_ISO_INCREMENT) are accumulated into
+% focal-plane snapshots, running maxima, and per-layer timeseries. GPU arrays are used when
 % simulation.code_type is 'matlab_gpu' or 'cpp_gpu'.
 %
 % Use as:
 %   [thermal_diff_obj, time_status_seq, results_heating] = ...
 %       thermal_simulation(parameters, sensor_data, kgrid, kwave_medium, sensor, source, transf, medium_masks)
-%
-% results_heating fields: maxT, focal_planeT, heating_endT,
-%   CEM43, focal_planeCEM43, CEM43_end, timeseries,
-%   CEM43_iso, focal_planeCEM43_iso, CEM43_iso_end
 %
 % Input:
 %   parameters   - PRESTUS config; must contain thermal, timing, grid.dims,
@@ -29,7 +28,8 @@ function [thermal_diff_obj, time_status_seq, results_heating] = thermal_simulati
 %                  has grid.dims and transducer(1).trans_pos updated to
 %                  thermal grid coordinates.
 %   sensor_data  - EITHER a struct from acoustic simulation containing
-%                  p_max_all [Pa] (standard path), OR a char/string path
+%                  p_max_all [Pa] (standard path; an async combined cache
+%                  also holds p_async_tx [Pa], used instead), OR a char/string path
 %                  to a NIfTI file (.nii or .nii.gz) whose volume will be
 %                  read as p_max_all [Pa] and resampled to kgrid size via
 %                  affine_resample_3d with transf.  The NIfTI must be in
@@ -69,16 +69,17 @@ function [thermal_diff_obj, time_status_seq, results_heating] = thermal_simulati
 % Output:
 %   thermal_diff_obj  - kWaveDiffusion object after simulation
 %   time_status_seq   - struct array with fields time [s], step, status, recorded
-%   T_max             - maximum temperature over all time steps [°C]
-%   T_focal           - temperature in focal plane [x, z, time] [°C]
-%   T_cur             - temperature at the final recorded step [°C]
-%   CEM43_max         - running max CEM43 (k-Wave method) [min]
-%   CEM43_focal       - CEM43 in focal plane [x, z, time] [min]
-%   CEM43_cur         - CEM43 at the final recorded step [min]
-%   timeseries        - struct from THERMAL_UPDATE_TIMESERIES
-%   CEM43_iso_max     - running max ISO CEM43 [min]
-%   CEM43_iso_focal   - ISO CEM43 in focal plane [x, z, time] [min]
-%   CEM43_iso_cur     - ISO CEM43 at the final recorded step [min]
+%   results_heating   - struct with fields:
+%     maxT                 - maximum temperature over all time steps [°C]
+%     focal_planeT         - temperature in focal plane [x, z, time] [°C]
+%     heating_endT         - temperature at the final recorded step [°C]
+%     CEM43                - running max CEM43 (k-Wave method) [min]
+%     focal_planeCEM43     - CEM43 in focal plane [x, z, time] [min]
+%     CEM43_end            - CEM43 at the final recorded step [min]
+%     timeseries           - struct from THERMAL_UPDATE_TIMESERIES
+%     CEM43_iso            - running max ISO CEM43 [min]
+%     focal_planeCEM43_iso - ISO CEM43 in focal plane [x, z, time] [min]
+%     CEM43_iso_end        - ISO CEM43 at the final recorded step [min]
 %
 % See also: THERMAL_PARAMETERS, THERMAL_PLOT_PROTOCOL, THERMAL_UPDATE_TIMESERIES,
 %   THERMAL_ANALYSIS, MEDIUM_SETUP
@@ -97,16 +98,14 @@ end
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 % Notes:                                                            %
 %                                                                   %
-% Instead of modelling each oscillation for measuring heating       %
-% effects, k-wave divides each duty cycle up into segments called   %
-% 'sim_time_steps' with the total of one duty cycle being           %
-% represented as the 'on_off_step_duration'.                        %
-% The stable state of the acoustic simulations (what is seen in the %
-% figures and nifti files) is used as the input for the temperature %
-% simulations.                                                      %
+% Instead of modelling each oscillation, heating is simulated over  %
+% time segments (THERMAL_SCHEDULE): ON and OFF steps within each    %
+% pulse, then coarser steps between pulse trains and after PTRD.    %
+% The steady-state acoustic field (what is seen in the figures and  %
+% NIfTI files) is the heat source.                                  %
 %                                                                   %
 % For a detailed explanation on how to correctly configure your     %
-% thermal parameters, see doc_thermal_simulations.                  %
+% thermal parameters, see doc_simulations-thermal.md.               %
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
 % Transducer position in grid coordinates
@@ -118,7 +117,7 @@ tr = parameters.transducer(1);
 % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
 if pct_skull_mapped(parameters) && ...
     (~isfield(parameters, 'pct') || ~isfield(parameters.pct, 'mapping_density') || strcmp(parameters.pct.mapping_density, 'k-plan'))
-    skull_i = find(ismember(fieldnames(parameters.layers), {'skull', 'skull_cortical', 'skull_trabecular'}));
+    skull_i = find(ismember(fieldnames(parameters.medium_properties), {'skull', 'skull_cortical', 'skull_trabecular'}));
     % [k-Plan] use fixed density for thermal simulation
     kwave_medium.density(ismember(medium_masks,skull_i)) = 1850;
     clear skull_i;
@@ -146,7 +145,7 @@ if isfield(parameters.io, 'adopted_heatmap') && ~isempty(parameters.io.adopted_h
     heatmap_image = niftiread(parameters.io.adopted_heatmap);
     fprintf('\nAdopting heatmap %s from previous simulation\n', parameters.io.adopted_heatmap)
     kwave_medium.temp_0 = double(affine_resample_3d(heatmap_image, transf, ...
-        size(medium_masks), 'linear', parameters.thermal.temp_0.water));
+        size(medium_masks), 'cubic', parameters.thermal.temp_0.water));
 end
 
 if strcmp(absorption_field, 'absorption_np')
@@ -169,10 +168,13 @@ end
 % alpha_np = (100 * kwave_medium.alpha_coeff .* (tr.freq_hz/10^6)^kwave_medium.alpha_power)/8.686;
 
 % save absorption coefficient [Np] for debugging
-if contains(parameters.simulation.medium, {'layered', 'phantom'}) && parameters.simulation.debug == 1
+% (own name: medium_setup writes matrix_absorption_np before the acoustic FOV crop)
+if contains(parameters.simulation.medium, {'layered', 'phantom'}) && debug_on(parameters, 'medium', 'volumes')
     try
-        filename_absorption = fullfile(parameters.io.dir_debug_medium, 'matrix_absorption_np');
+        filename_absorption = fullfile(parameters.io.dir_debug_medium, 'matrix_absorption_np_thermal');
         niftiwrite(alpha_np, filename_absorption, 'Compressed',true);
+        debug_register(parameters, 'medium', filename_absorption, ...
+            'Absorption [Np/m] the thermal simulation uses, thermal grid', 'volume');
     catch
         warn("Error with saving absorption debug image...")
     end
@@ -189,18 +191,77 @@ if ischar(sensor_data) || isstring(sensor_data)
     fprintf('[thermal_simulation] Loading p_max_all from NIfTI: %s\n', nii_path);
     nii_vol  = single(niftiread(nii_path));   % [Pa], T1 space
     th_dims  = parameters.grid.dims;
-    p = gather(abs(single(affine_resample_3d(nii_vol, transf, th_dims, 'linear', 0))));
+    p = gather(max(single(affine_resample_3d(nii_vol, transf, th_dims, 'cubic', 0)), 0));
     clear nii_vol
+elseif isfield(sensor_data, 'p_async_tx') && size(sensor_data.p_async_tx, 4) > 1
+    % Async combined cache: one scaled field per transducer, each switched on
+    % its own schedule (thermal_schedule).
+    p = gather(abs(sensor_data.p_async_tx));     % stored as single
+    if strcmp(char(parameters.simulation.precision), 'double')
+        p = double(p);
+    end
+    if ~isequal(size(p, 1:3), size(alpha_np, 1:3))
+        error('thermal_simulation:asyncGridMismatch', ...
+            ['Per-transducer fields [%s] are not on the thermal grid [%s]. Async heating ' ...
+             'needs the thermal grid to equal the acoustic grid (no thermal_resolution_mm / thermal_fov_mm).'], ...
+            num2str(size(p, 1:3)), num2str(size(alpha_np, 1:3)));
+    end
 else
     p = gather(abs(sensor_data.p_max_all));
+    if ~isscalar(alpha_np) && ~isequal(size(p), size(alpha_np))
+        error('thermal_simulation:gridMismatch', ...
+            ['p_max_all [%s] is not on the thermal grid [%s]: resample it with the medium ' ...
+             '(thermal_stage does this for grid.thermal_resolution_mm / thermal_fov_mm).'], ...
+            num2str(size(p)), num2str(size(alpha_np)));
+    end
 end
-source.Q = (alpha_np .* p.^2) ./ (kwave_medium.density .* kwave_medium.sound_speed); % Heat delivered to the system (W/m3)
+% Transducers at different frequencies: each field heats with the absorption
+% at its own frequency, alpha(f_i) = alpha(f_1) * (f_i / f_1)^y with the tissue
+% power-law exponent y (alpha_np above is at transducer(1)'s f_1). Async: one
+% field per transducer; firing together: one per frequency
+% (sensor_data.p_async_freqs_hz, COMBINE_ASYNC_INTENSITY).
+freqs_tx = [parameters.transducer.freq_hz];
+if isstruct(sensor_data) && isfield(sensor_data, 'p_async_freqs_hz') && ~isempty(sensor_data.p_async_freqs_hz)
+    freqs_tx = double(sensor_data.p_async_freqs_hz(:)');
+    % Firing groups: a source whose cache did not record its frequency takes its transducer's
+    if isfield(sensor_data, 'p_async_source_tx') && numel(sensor_data.p_async_source_tx) == numel(freqs_tx)
+        unknown = find(isnan(freqs_tx));
+        for i_src = unknown
+            freqs_tx(i_src) = double(parameters.transducer(sensor_data.p_async_source_tx(i_src)).freq_hz);
+        end
+        sensor_data.p_async_freqs_hz = freqs_tx;   % the schedule below uses the same values
+    end
+end
+if size(p, 4) > 1 && numel(unique(freqs_tx)) > 1
+    if size(p, 4) ~= numel(freqs_tx)
+        error('thermal_simulation:asyncFrequencyCount', ...
+            '%d heat-source fields but %d frequencies.', size(p, 4), numel(freqs_tx));
+    end
+    if ~isfield(kwave_medium, 'absorption_power')
+        error('thermal_simulation:noAbsorptionPower', ...
+            ['Transducers at different frequencies need the tissue absorption power law of the medium ' ...
+             '(medium_plus.absorption_power): re-run the medium stage.']);
+    end
+    y = double(kwave_medium.absorption_power);
+    alpha_tx = zeros(size(p), 'like', p);
+    for i_tx = 1:numel(freqs_tx)
+        alpha_tx(:, :, :, i_tx) = alpha_np .* (freqs_tx(i_tx) / tr.freq_hz) .^ y;
+    end
+    fprintf('[thermal_simulation] Absorption per field at its frequency (%s kHz).\n', ...
+        num2str(freqs_tx / 1e3));
+    alpha_np = alpha_tx;
+    clear alpha_tx y
+end
+% Heat delivered to the system per source [W/m3]: Q_src(:,:,:,i)
+Q_src = (alpha_np .* p.^2) ./ (kwave_medium.density .* kwave_medium.sound_speed);
+n_src = size(Q_src, 4);
+source.Q = sum(Q_src, 4);
 source.T0 = kwave_medium.temp_0; %parameters.thermal.temp_0; % Initial temperature distribution
 clear alpha_np p;
 
 % remove unexpected fields from kWave_medium
 kwave_medium = rmfield(kwave_medium, 'temp_0');
-kwave_medium = rmfield(kwave_medium, intersect(fieldnames(kwave_medium), {'absorption_fraction', 'absorption_np'}));
+kwave_medium = rmfield(kwave_medium, intersect(fieldnames(kwave_medium), {'absorption_fraction', 'absorption_np', 'absorption_power'}));
 
 % if perfusion was specified, implement it by specifying blood temperature
 if ~all(isnan(kwave_medium.perfusion_coeff))
@@ -252,6 +313,7 @@ thermal_diff_obj = kWaveDiffusion(...
     source, ...
     sensor, ...
     thermal_args{:});
+source.Q = [];      % the schedule loop sets thermal_diff_obj.Q from Q_src
 
 % In interactive mode, open a single figure that will be reused for all thermal updates
 if parameters.simulation.interactive
@@ -294,12 +356,13 @@ if strcmp(parameters.simulation.code_type, 'matlab_gpu') || strcmp(parameters.si
 end
 CEM43_iso_max = tmp_obj.cem43_iso;
 
-% Convert the thermal parameters for the simulation
+% Convert the thermal parameters for the simulation (validates the timing block)
 params_thermal = thermal_parameters(parameters);
 
 % Visualize the thermal parameters
-thermal_plot_protocol(params_thermal, parameters);
+thermal_plot_protocol(params_thermal, parameters, 'Schedule', sched);
 
+n_seg = numel(sched.t0);
 fprintf('[thermal_simulation] ---- thermal simulation summary ----\n');
 % 2D or 3D: print as many dimensions as the grid has
 grid_spacing_mm = [kgrid.dx, kgrid.dy, kgrid.dz] * 1e3;
@@ -322,12 +385,8 @@ end
 fprintf('[thermal_simulation]   medium type    : %s\n', parameters.simulation.medium);
 fprintf('[thermal_simulation] ------------------------------------\n');
 
-% Total timepoints estimation
-% Records: 1 per ON, 1 per OFF (inside PT), 1 per PTRI-off block, 1 per post-PTRI step
-n_ptri_reps = params_thermal.n_ptri_reps;
-n_pulses_pt = params_thermal.n_pulses_per_pt;
-snapshots_per_ptri = n_pulses_pt * 2 + (params_thermal.ptri_off_steps_n > 0);
-total_timepoints = 1 + n_ptri_reps * snapshots_per_ptri + params_thermal.post_ptri_steps_n;
+% One recorded timepoint per segment, plus the initial state
+total_timepoints = 1 + n_seg;
 
 % Total kWaveDiffusion.takeTimeStep steps across the whole run (used for the
 % ETA below). kWaveDiffusion's own built-in estimate (external/k-wave)
@@ -440,118 +499,37 @@ for seg_i = 1:n_seg
         if isempty(Q_pattern{j})
             thermal_diff_obj.Q(:,:,:) = 0;
         else
-            T_focal(:,:,cur_timepoint)         = T_cur;
-            CEM43_focal(:,:,cur_timepoint)     = CEM43_cur;
-            CEM43_iso_focal(:,:,cur_timepoint) = CEM43_iso_cur;
+            thermal_diff_obj.Q = Q_pattern{j};
         end
-        T_max         = max(T_max,         T_cur);
-        CEM43_max     = max(CEM43_max,     CEM43_cur);
-        CEM43_iso_max = max(CEM43_iso_max, CEM43_iso_cur);
-        timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, T_cur, CEM43_cur, CEM43_iso_cur);
-        
-        % PULSE OFF (within PT)
-        if params_thermal.pt_off_steps_n > 0
-            thermal_diff_obj.Q(:,:,:) = 0;
-            if log_thermal_updates
-                thermal_diff_obj.takeTimeStep(params_thermal.pt_off_steps_n, params_thermal.pt_off_steps_dur);
-            else
-                evalc('thermal_diff_obj.takeTimeStep(params_thermal.pt_off_steps_n, params_thermal.pt_off_steps_dur)');
-            end
-            if parameters.simulation.interactive && ishandle(h_thermal_fig)
-                figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
-            end
-
-            % CEM43 iso update — see ON-phase comment above for R=T_max rationale.
-            tmp_obj.cem43_iso = tmp_obj.cem43_iso + ...
-                cem43_iso_increment(thermal_diff_obj.T, T_max, params_thermal.pt_off_steps_n*params_thermal.pt_off_steps_dur);
-            
-            % Record status
-            time_status_seq = [time_status_seq, struct(...
-                'time', num2cell(max([time_status_seq(:).time]) + params_thermal.pt_off_steps_n*params_thermal.pt_off_steps_dur), ...
-                'step', num2cell(max([time_status_seq(:).step]) + params_thermal.pt_off_steps_n), ...
-                'status', 'off', 'recorded', 1)];
-            
-            % Update focal / max
-            T_cur         = thermal_diff_obj.T;
-            CEM43_cur     = thermal_diff_obj.cem43;
-            CEM43_iso_cur = tmp_obj.cem43_iso;
-            cur_timepoint = cur_timepoint + 1;
-            if ndims(T_max) == 3
-                T_focal(:,:,cur_timepoint)         = squeeze(T_cur(:,tr.trans_pos(2),:));
-                CEM43_focal(:,:,cur_timepoint)     = squeeze(CEM43_cur(:,tr.trans_pos(2),:));
-                CEM43_iso_focal(:,:,cur_timepoint) = squeeze(CEM43_iso_cur(:,tr.trans_pos(2),:));
-            else
-                T_focal(:,:,cur_timepoint)         = T_cur;
-                CEM43_focal(:,:,cur_timepoint)     = CEM43_cur;
-                CEM43_iso_focal(:,:,cur_timepoint) = CEM43_iso_cur;
-            end
-            T_max         = max(T_max,         T_cur);
-            CEM43_max     = max(CEM43_max,     CEM43_cur);
-            CEM43_iso_max = max(CEM43_iso_max, CEM43_iso_cur);
-            timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, T_cur, CEM43_cur, CEM43_iso_cur);
-
-        end  % end pulse OFF
-    end  % end pulse loop
-    
-    % === 2. PTRI-OFF period (coarse timestep) ===
-    if params_thermal.ptri_off_steps_n > 0
-        thermal_diff_obj.Q(:,:,:) = 0;
-        for i_step = 1:params_thermal.ptri_off_steps_n
-            if log_thermal_updates
-                thermal_diff_obj.takeTimeStep(1, params_thermal.ptri_off_step_dur);
-            else
-                evalc('thermal_diff_obj.takeTimeStep(1, params_thermal.ptri_off_step_dur)');
-            end
-            if parameters.simulation.interactive && ishandle(h_thermal_fig)
-                figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
-            end
-
-            % CEM43 iso — see ON-phase comment for R=T_max rationale.
-            tmp_obj.cem43_iso = tmp_obj.cem43_iso + ...
-                cem43_iso_increment(thermal_diff_obj.T, T_max, 1*params_thermal.ptri_off_step_dur);
-            
-            % Record time parameters
-            time_status_seq = [time_status_seq struct(...
-                'time', num2cell(max([time_status_seq(:).time]) + params_thermal.ptri_off_step_dur), ...
-                'step', num2cell(max([time_status_seq(:).step]) + 1), ...
-                'status', 'off', 'recorded', 1)];
-            
-            % Update output matrices
-            T_cur         = thermal_diff_obj.T;
-            CEM43_cur     = thermal_diff_obj.cem43;
-            CEM43_iso_cur = tmp_obj.cem43_iso;
-            cur_timepoint = cur_timepoint + 1;
-            if ndims(T_max) == 3
-                T_focal(:,:,cur_timepoint)         = squeeze(T_cur(:,tr.trans_pos(2),:));
-                CEM43_focal(:,:,cur_timepoint)     = squeeze(CEM43_cur(:,tr.trans_pos(2),:));
-                CEM43_iso_focal(:,:,cur_timepoint) = squeeze(CEM43_iso_cur(:,tr.trans_pos(2),:));
-            else
-                T_focal(:,:,cur_timepoint)         = T_cur;
-                CEM43_focal(:,:,cur_timepoint)     = CEM43_cur;
-                CEM43_iso_focal(:,:,cur_timepoint) = CEM43_iso_cur;
-            end
-            T_max         = max(T_max,         T_cur);
-            CEM43_max     = max(CEM43_max,     CEM43_cur);
-            CEM43_iso_max = max(CEM43_iso_max, CEM43_iso_cur);
-            timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, T_cur, CEM43_cur, CEM43_iso_cur);
-
-        end
+        cur_pattern = j;
     end
-end  % end PTRI rep loop
 
-% === 3. Post whole-PTRD cooloff (coarse timestep) ===
-if params_thermal.post_ptri_steps_n > 0
-    fprintf('Post-PTRD cooloff: %d steps\n', params_thermal.post_ptri_steps_n);
-    thermal_diff_obj.Q(:,:,:) = 0;
-    for i_step = 1:params_thermal.post_ptri_steps_n
-        if log_thermal_updates
-            thermal_diff_obj.takeTimeStep(1, params_thermal.post_ptri_step_dur);
-        else
-            evalc('thermal_diff_obj.takeTimeStep(1, params_thermal.post_ptri_step_dur)');
+    n_steps_i = sched.n_steps(seg_i);
+    step_dur_i = sched.step_dur(seg_i); %#ok<NASGU> (used in evalc)
+    if log_thermal_updates || is_first_thermal_step
+        if is_first_thermal_step
+            first_step_timer = tic;
         end
-        if parameters.simulation.interactive && ishandle(h_thermal_fig)
-            figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
+        thermal_diff_obj.takeTimeStep(n_steps_i, sched.step_dur(seg_i));
+        if is_first_thermal_step
+            % k-Wave-style ETA: time a known number of steps, extrapolate
+            % linearly to the full run (analogous to kWaveDiffusion's own
+            % num_time_steps_before_simulation_time_estimate, but computed
+            % across takeTimeStep calls rather than within a single one).
+            per_step_s = toc(first_step_timer) / max(n_steps_i, 1);
+            fprintf('[thermal_simulation]   estimated total thermal sim time: %s (%d steps @ %.3f s/step)\n', ...
+                scaleTime(per_step_s * total_thermal_steps), total_thermal_steps, per_step_s);
+            if ~log_thermal_updates
+                fprintf('  [Subsequent k-Wave thermal outputs suppressed. Set parameters.thermal.log_thermal_updates=1 to enable.]\n');
+            end
         end
+        is_first_thermal_step = false;
+    else
+        evalc('thermal_diff_obj.takeTimeStep(n_steps_i, step_dur_i)');
+    end
+    if parameters.simulation.interactive && ishandle(h_thermal_fig)
+        figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
+    end
 
     % CEM43 iso update — R uses T_max so that any voxel that has previously
     % exceeded 43 °C permanently accumulates at R=0.5, even after cooling.
@@ -575,11 +553,6 @@ if params_thermal.post_ptri_steps_n > 0
             CEM43_focal(:,:,cur_plane)     = CEM43_cur;
             CEM43_iso_focal(:,:,cur_plane) = CEM43_iso_cur;
         end
-        T_max         = max(T_max,         T_cur);
-        CEM43_max     = max(CEM43_max,     CEM43_cur);
-        CEM43_iso_max = max(CEM43_iso_max, CEM43_iso_cur);
-        timeseries = thermal_update_timeseries(parameters, medium_masks, timeseries, T_cur, CEM43_cur, CEM43_iso_cur);
-
     end
     T_max         = max(T_max,         T_cur);
     CEM43_max     = max(CEM43_max,     CEM43_cur);

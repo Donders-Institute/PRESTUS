@@ -152,9 +152,11 @@ switch mode
     case 'async'
         N = numel(parameters.transducer);
         n_points = async_sweep_points(parameters);
+        rep = shared_fields(parameters);
+        fields = find(rep == 1:N);
         run_water = get_flag(parameters, 'modules', 'run_posthoc_water_sims', true);
         if run_water
-            for ti = 1:N
+            for ti = fields
                 artifacts(end+1) = art(sprintf('sub-%03d_water%s.csv', subject_id, ...
                     [base_affix, trans_suffix(ti, N)]), sprintf('free-water validation — transducer %d', ti));
             end
@@ -180,9 +182,16 @@ switch mode
             jobs{end+1} = ['1 shared preprocessing stage — grid.async_layout=''shared'', one grid ' ...
                 'for all transducers'];
         end
-        jobs{end+1} = sprintf('%d acoustic jobs — one per transducer', N);
+        if numel(fields) < N
+            jobs{end+1} = sprintf(['%d acoustic jobs — one per distinct field (%d transducers; ' ...
+                'transducers with the same stance and settings share one)'], numel(fields), N);
+        else
+            jobs{end+1} = sprintf('%d acoustic jobs — one per transducer', N);
+        end
+        jobs{end+1} = ['fields kept in this output folder by earlier runs with the same settings are ' ...
+            'reused, not simulated again'];
         if run_water
-            jobs{end+1} = sprintf('%d free-water validation jobs — one per transducer', N);
+            jobs{end+1} = sprintf('%d free-water validation jobs — one per distinct field', numel(fields));
         end
         if n_points > 1
             jobs{end+1} = sprintf('%d combine job(s) — one per sweep point', n_points);
@@ -354,5 +363,37 @@ switch mode
     case 'multi_isppa';  name = 'multi_isppa_pipeline';
     case 'uncertainty';  name = 'uncertainty_pipeline';
     otherwise;           name = 'prestus_pipeline';
+end
+end
+
+function rep = shared_fields(parameters)
+% For each transducer, the first transducer with the same acoustic field
+% (ACOUSTIC_STORE_KEY): with explicit positions, entries that differ only in
+% timing, start, name, and target share one acoustic simulation.
+N = numel(parameters.transducer);
+rep = 1:N;
+mode = '';
+if isfield(parameters, 'placement') && isfield(parameters.placement, 'mode')
+    mode = char(parameters.placement.mode);
+end
+if get_flag(parameters, 'modules', 'run_transducer_placement', true) && ...
+        ~isempty(mode) && ~strcmp(mode, 'manual')
+    return
+end
+stance = cell(1, N);
+for ti = 1:N
+    t = parameters.transducer(ti);
+    for f = {'timing_offset_s', 'timing', 'name', 'target_isppa_wcm2', 'tx_calibration'}
+        if isfield(t, f{1}), t = rmfield(t, f{1}); end
+    end
+    stance{ti} = t;
+end
+for ti = 2:N
+    for j = 1:ti-1
+        if isequaln(stance{j}, stance{ti})
+            rep(ti) = rep(j);
+            break
+        end
+    end
 end
 end

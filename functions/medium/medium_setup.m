@@ -202,6 +202,9 @@ end
     attenuation_np = alpha_coeff .* db2np_f;
     absorption_np = absorption_fraction .* attenuation_np;
     absorption_np(uses_absorption_coeff) = absorption_coeff(uses_absorption_coeff) .* db2np_f(uses_absorption_coeff);
+    % the tissue power law, kept for heat sources at other frequencies (async
+    % transducers at different frequencies: absorption x (f / f1)^absorption_power)
+    absorption_power = alpha_power;
     % fraction of a coefficient tissue; without attenuation it is 0 when nothing
     % is absorbed and 1 otherwise (the warning below flags that case), so the
     % map stays finite for smoothing and the NIfTI outputs
@@ -450,6 +453,7 @@ end
     medium_plus.absorption_np = absorption_np;
     medium_plus.absorption_fraction = absorption_fraction;
     medium_plus.absorption_from_coeff = absorption_from_coeff;
+    medium_plus.absorption_power = single(absorption_power);   % exponent y of the tissue power law
     medium_plus.skull_stats = skull_stats;   % SKULL_PROPERTY_STATS, kept with the medium cache
     kwave_medium = rmfield(kwave_medium, 'temp_0');
 

@@ -1,4 +1,4 @@
-# Study config for a head simulation of SimNIBS' Ernie (doc/doc_getting-started.md, "3. A head simulation").
+# Study config for a head simulation of SimNIBS' Ernie (doc/doc_first-simulation.md, "3. A head simulation").
 # Only the values that differ from config/config_default.yaml are listed.
 # Replace the four paths before running.
 
@@ -27,10 +27,10 @@ transducer:
 
 placement:
   mode: mni
+  skin_gap_mm: 5                 # scalp to exit plane [mm]
   mni:
     trans_pos_mm: [-52, -8, 58]  # transducer on the left scalp [MNI mm]
     focus_pos_mm: [-29, -6, 7]   # target [MNI mm]
-    skin_gap_mm: 5
 
 timing:                          # 20 s of 20 ms pulses at 5 Hz (10 % duty cycle)
   pd: 0.02
@@ -39,5 +39,5 @@ timing:                          # 20 s of 20 ms pulses at 5 Hz (10 % duty cycle
   pt_timestep: 0.02
   ptri: 20
   ptrd: 20
-  post_ptri_dur: 20              # 20 s of cooling after the protocol
+  post_ptri_dur: 20              # 20 s steady-state after the protocol
   post_pt_timestep: 1

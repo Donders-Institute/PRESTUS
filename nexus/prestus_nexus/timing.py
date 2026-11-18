@@ -312,3 +312,215 @@ def parse_duration(text: str, hz: bool = False) -> float | None:
         return 1.0 / f if f > 0 else None
     scale = _UNITS.get(unit or "s")
     return None if scale is None else float(f"{v * scale:.12g}")     # 700 ms -> 0.7, not 0.7000000000000001
+
+
+# ── Async firing schedule (timing.async_schedule, thermal_schedule.m) ─
+
+ASYNC_MODES = ("pulses", "trains", "custom")
+TIMING_OVERRIDES = ("pd", "pri", "ptd", "ptri", "ptrd")  # transducer.timing.<field>, read in 'custom'
+_MAX_WINDOWS = 200_000                               # per transducer, for the overlap check
+
+
+@dataclass
+class SourceTiming:
+    """One transducer's protocol and start delay [s]."""
+    protocol: Protocol
+    offset: float = 0.0
+    freq_hz: float = 0.0
+    overridden: tuple[str, ...] = ()
+
+    def pulse_windows(self, t_max: float = math.inf, limit: int = _MAX_WINDOWS) -> list[tuple[float, float]]:
+        """(start, end) of each pulse starting before t_max, as thermal_schedule.m lays them out."""
+        p = self.protocol
+        if not p.has_pulse:
+            return []
+        n_pulses = p.pulses_per_train if p.has_train else 1
+        n_trains = p.trains if p.has_repetition else 1
+        out = []
+        for r in range(n_trains):
+            for k in range(n_pulses):
+                s = self.offset + r * (p.ptri if p.has_repetition else 0.0) + k * (p.pri if p.has_train else 0.0)
+                if s >= t_max or len(out) >= limit:
+                    return out
+                out.append((s, s + p.pd))
+        return out
+
+    def train_windows(self, t_max: float = math.inf) -> list[tuple[float, float]]:
+        p = self.protocol
+        if not p.has_train:
+            return [(self.offset, self.offset + p.pd)] if p.has_pulse else []
+        n_trains = p.trains if p.has_repetition else 1
+        out = []
+        for r in range(n_trains):
+            s = self.offset + r * (p.ptri if p.has_repetition else 0.0)
+            if s >= t_max:
+                break
+            out.append((s, s + p.ptd))
+        return out
+
+    @property
+    def overall_duty_cycle(self) -> float:
+        return self.protocol.overall_duty_cycle
+
+
+@dataclass
+class AsyncSchedule:
+    """How several transducers take turns firing (async coupling)."""
+    mode: str
+    sources: list[SourceTiming]
+
+    @classmethod
+    def build(cls, base: Protocol, mode: str, n: int, offsets: list | None = None,
+              overrides: list[dict] | None = None, freqs: list | None = None) -> "AsyncSchedule":
+        """Offsets as thermal_schedule.m: 'pulses' (i-1)·PRI/N, 'trains' (i-1)·PTRI/N,
+        'custom' the given offsets and per-transducer overrides of pd/pri/ptd/ptri/ptrd."""
+        mode = mode if mode in ASYNC_MODES else "pulses"
+        offsets = list(offsets or [])
+        overrides = list(overrides or [])
+        freqs = list(freqs or [])
+        sources = []
+        for i in range(n):
+            ov = {k: v for k, v in (overrides[i] if i < len(overrides) and overrides[i] else {}).items()
+                  if k in TIMING_OVERRIDES and _num(v) > 0}
+            p = base
+            if mode == "custom" and ov:
+                p = Protocol(**{**base.__dict__, **{k: _num(v) for k, v in ov.items()}})
+            if mode == "pulses":
+                off = i * base.pri / n if base.has_train else 0.0
+            elif mode == "trains":
+                off = i * base.ptri / n if base.has_repetition else 0.0
+            else:
+                off = _num(offsets[i]) if i < len(offsets) else 0.0
+            sources.append(SourceTiming(p, max(0.0, off), _num(freqs[i]) if i < len(freqs) else 0.0,
+                                        tuple(sorted(ov))))
+        return cls(mode, sources)
+
+    @classmethod
+    def from_model(cls, model) -> "AsyncSchedule | None":
+        """The schedule of a config model with async coupling and several transducers, else None."""
+        n = model.n_transducers
+        if n < 2 or model.get("simulation.transducer_coupling") != "async":
+            return None
+        get = model.get
+        base = Protocol.from_model(get)
+        mode = str(get("timing.async_schedule") or "pulses")
+        offsets = [get("transducer.timing_offset_s", i) for i in range(n)]
+        overrides = [{k: get(f"transducer.timing.{k}", i) for k in TIMING_OVERRIDES} for i in range(n)]
+        freqs = [get("transducer.freq_hz", i) for i in range(n)]
+        return cls.build(base, mode, n, offsets, overrides, freqs)
+
+    @property
+    def n(self) -> int:
+        return len(self.sources)
+
+    def cycle(self) -> float:
+        """Time span the diagram shows: two PRIs ('pulses'), one PTRI ('trains'), or until
+        every transducer has started a full cycle ('custom')."""
+        p = self.sources[0].protocol
+        if self.mode == "pulses":
+            span = 2 * p.pri if p.has_train else p.pd
+        elif self.mode == "trains":
+            span = p.ptri if p.has_repetition else p.ptd
+        else:
+            span = max(s.offset + (s.protocol.ptri if s.protocol.has_repetition else
+                                   s.protocol.pri if s.protocol.has_train else s.protocol.pd)
+                       for s in self.sources)
+        total = max((s.offset + s.protocol.total_duration_s for s in self.sources), default=span)
+        return min(span, total) if total > 0 else span
+
+    def blocks(self, i: int, t_win: float, max_blocks: int = 60) -> tuple[list[tuple[float, float]], str]:
+        """On-blocks of transducer i within [0, t_win]: its pulses, or its trains when more
+        pulses than max_blocks would be drawn."""
+        s = self.sources[i]
+        w = s.pulse_windows(t_win, max_blocks + 1)
+        if len(w) <= max_blocks:
+            return [(a, min(b, t_win)) for a, b in w], "pulses"
+        return [(a, min(b, t_win)) for a, b in s.train_windows(t_win)], "trains"
+
+    def problems(self, chained: bool = False) -> list[str]:
+        """The checks of thermal_schedule.m that would stop the run. ``chained``: the
+        sequence is run as a chain of runs (sequence.py), where transducers that start
+        together form one coherent run, so their overlap is not an error."""
+        out = []
+        base = self.sources[0].protocol
+        if not base.has_pulse:
+            return out
+        n = self.n
+        tight = lambda a, b: a > b * (1 + 1e-9) + 1e-15        # noqa: E731
+        if self.mode != "custom":
+            over = [i + 1 for i, s in enumerate(self.sources) if s.overridden]
+            if over:
+                out.append(f"Transducer{'s' if len(over) > 1 else ''} {', '.join(map(str, over))} "
+                           f"override{'' if len(over) > 1 else 's'} the timing, which only the "
+                           "'custom' schedule reads.")
+        if self.mode == "pulses" and base.has_train and tight(n * base.pd, base.pri):
+            out.append(f"'pulses' fires the {n} transducers in turn within each PRI: needs "
+                       f"{n} × PD ≤ PRI ({n} × {base.pd * 1e3:.4g} ms > {base.pri * 1e3:.4g} ms). "
+                       "Use 'trains', a shorter PD, or 'custom'.")
+        if self.mode == "trains":
+            if not base.has_repetition:
+                out.append("'trains' needs a train repetition interval (PTRI and PTRD).")
+            elif tight(n * base.ptd, base.ptri):
+                out.append(f"'trains' fires the {n} transducers in turn within each PTRI: needs "
+                           f"{n} × PTD ≤ PTRI ({n} × {base.ptd:.4g} s > {base.ptri:.4g} s). "
+                           "Use 'pulses', a shorter PTD, or 'custom'.")
+        same, _ = self._overlap_pairs()
+        if same and not chained:
+            out.append(f"{', '.join(f'T{i + 1}/T{j + 1}' for i, j in same)} overlap at the same "
+                       "frequency: their fields interfere, which async coupling does not model. "
+                       "Give them the same start and timing to fire them together, change the "
+                       "offsets, or use coherent coupling.")
+        return out
+
+    def notes(self) -> list[str]:
+        """What thermal_schedule.m warns about without stopping the run."""
+        _, other = self._overlap_pairs()
+        if not other:
+            return []
+        return [f"{', '.join(f'T{i + 1}/T{j + 1}' for i, j in other)} overlap at different "
+                "frequencies: their intensities are summed (valid when a pulse is long against "
+                "1/|f1 − f2|)."]
+
+    def groups(self) -> list[int]:
+        """Firing group of each transducer (0-based), as firing_groups.m: on the 'custom'
+        schedule, transducers with the same offset and the same timing fire together (their
+        fields are summed coherently); otherwise every transducer is its own group."""
+        if self.mode != "custom":
+            return list(range(self.n))
+        out: list[int] = []
+        for i, s in enumerate(self.sources):
+            for j in range(i):
+                t = self.sources[j]
+                if abs(s.offset - t.offset) <= 1e-6 and all(
+                        abs(getattr(s.protocol, f) - getattr(t.protocol, f))
+                        <= 1e-9 * max(1.0, abs(getattr(t.protocol, f))) for f in TIMING_OVERRIDES):
+                    out.append(out[j])
+                    break
+            else:
+                out.append(max(out, default=-1) + 1)
+        return out
+
+    def _overlap_pairs(self) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+        """Overlapping pairs ('custom' only) at the same frequency, and at different ones. As
+        thermal_schedule.m: equal known frequencies, or none known, count as the same.
+        Transducers of one firing group (groups()) fire together by design: not a pair."""
+        if self.mode != "custom" or not self.sources[0].protocol.has_pulse:
+            return [], []
+        grp = self.groups()
+        clash = [(i, j) for i, j in self.overlaps() if grp[i] != grp[j]]
+        same = [(i, j) for i, j in clash if self.sources[i].freq_hz == self.sources[j].freq_hz]
+        return same, [pq for pq in clash if pq not in same]
+
+    def overlaps(self) -> list[tuple[int, int]]:
+        """Pairs of transducers whose pulses overlap in time."""
+        events = sorted((a, b, i) for i, s in enumerate(self.sources) for a, b in s.pulse_windows())
+        tol = 1e-9 * max((b for _, b, _ in events), default=1.0)
+        pairs: set[tuple[int, int]] = set()
+        active: list[tuple[float, int]] = []          # (end, source) of pulses still on
+        for a, b, i in events:
+            active = [(e, j) for e, j in active if e > a + tol]
+            for _, j in active:
+                if j != i:
+                    pairs.add((min(i, j), max(i, j)))
+            active.append((b, i))
+        return sorted(pairs)

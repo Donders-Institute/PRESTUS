@@ -1,15 +1,20 @@
 function jobs = async_transducer_pipeline(parameters, options)
-% ASYNC_TRANSDUCER_PIPELINE  Simulate N asynchronously firing transducers
-%                            with independent acoustic fields and a joint
-%                            thermal model.
+% ASYNC_TRANSDUCER_PIPELINE  Simulate N asynchronously firing transducers with independent acoustic fields and a joint thermal model
 %
 % Asynchronously firing transducers (e.g., alternating pulses, non-overlapping
 % duty cycles) do not produce coherent acoustic interference. Each transducer
-% is first scaled to its own target free-water ISPPA, then heat deposition
-% is the incoherent sum of the scaled intensity fields:
+% is first scaled to its own target free-water ISPPA. Heat deposition at
+% time t is the sum over the transducers on at t (THERMAL_SCHEDULE,
+% timing.async_schedule: 'pulses', 'trains' or 'custom'):
 %
 %   p_i_scaled = p_i · sqrt(target_i / baseline_i)
-%   Q_total   ∝ Σ  p_i_scaled² / (2·ρ·c)
+%   Q(t)      ∝ Σ_{i on at t}  p_i_scaled² / (2·ρ·c)
+%
+% Firing groups (FIRING_GROUPS): with timing.async_schedule 'custom',
+% transducers with the same timing_offset_s and timing fire together. Each
+% still runs on its own (with io.save_p_complex) and is scaled to its own
+% target; the combine stage sums their complex fields, so they interfere, and
+% the group heats in its own windows. Groups need grid.async_layout 'shared'.
 %
 % Multi-ISPPA sweep: when any transducer carries a vector target
 % (transducer(i).target_isppa_wcm2 with more than one value), one
@@ -63,7 +68,7 @@ function jobs = async_transducer_pipeline(parameters, options)
 %                Each transducer may carry a scalar or vector
 %                target_isppa_wcm2.  io.output_affix, if set, prefixes every
 %                stage's affix (e.g. _desc-run1_trans-01, _desc-run1_desc-asyncJoint).
-%                simulation.async_grid_mode (optional): 'shared' (default) —
+%                grid.async_layout (optional): 'shared' (default) —
 %                one grid sized to fit every transducer and oriented by
 %                grid.mode (default 'focal_axis': mean beam axis); or
 %                'per_transducer' — each transducer gets its own optimally
@@ -109,6 +114,17 @@ end
 if (isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'babelbrain')) || ...
         (isfield(parameters, 'thermal_backend') && strcmpi(parameters.thermal_backend, 'babelbrain'))
     babelbrain_check_geometry(parameters);
+end
+% Firing groups (FIRING_GROUPS): transducers with the same start and timing
+% fire together; their complex fields are summed in the combine stage.
+fg = firing_groups(parameters);
+% The firing schedule (timing.async_schedule) errors on overlapping or
+% inconsistent timing: check it before any job is submitted.
+if isfield(parameters, 'modules') && isfield(parameters.modules, 'run_heating_sims') && ...
+        parameters.modules.run_heating_sims && isfield(parameters, 'timing') && ...
+        isfield(parameters.timing, 'pd') && parameters.timing.pd > 0
+    thermal_schedule(parameters, numel(fg.source_tx), ...
+        SourceTx=fg.source_tx, SourceFreq=fg.source_freq);
 end
 
 % =========================================================================
@@ -196,17 +212,40 @@ end
 % each transducer its own optimally-aligned, minimally-cropped grid (matching
 % solo/sequential mode) and resamples onto transducer(1)'s grid at combine
 % time. See doc_multitransducer.md.
-async_grid_mode = 'shared';
-if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'async_grid_mode') && ...
-        ~isempty(parameters.simulation.async_grid_mode)
-    async_grid_mode = parameters.simulation.async_grid_mode;
+async_layout = 'shared';
+if isfield(parameters, 'grid') && isfield(parameters.grid, 'async_layout') && ...
+        ~isempty(parameters.grid.async_layout)
+    async_layout = parameters.grid.async_layout;
 end
-if ~ismember(async_grid_mode, {'shared', 'per_transducer'})
+if ~ismember(async_layout, {'shared', 'per_transducer'})
     error('async_transducer_pipeline:unknownGridMode', ...
-        'simulation.async_grid_mode must be ''shared'' or ''per_transducer'', got ''%s''.', ...
-        async_grid_mode);
+        'grid.async_layout must be ''shared'' or ''per_transducer'', got ''%s''.', ...
+        async_layout);
 end
-per_transducer_grid = strcmp(async_grid_mode, 'per_transducer');
+per_transducer_grid = strcmp(async_layout, 'per_transducer');
+if per_transducer_grid && is_simultaneous_multifreq(parameters)
+    error('async_transducer_pipeline:simultaneousNeedsSharedGrid', ...
+        ['Coherent transducers at different frequencies combine complex fields, which are not ' ...
+         'interpolated between grids: use grid.async_layout: shared.']);
+end
+if per_transducer_grid && any(fg.coherent)
+    g = find(fg.coherent, 1);
+    error('async_transducer_pipeline:groupNeedsSharedGrid', ...
+        ['Transducers %s fire together (same timing_offset_s and timing), so their complex fields ' ...
+         'are summed, which are not interpolated between grids: use grid.async_layout: shared.'], ...
+        mat2str(fg.members{g}));
+end
+if is_simultaneous_multifreq(parameters)
+    fprintf(['[async] Coherent transducers at different frequencies (%s kHz): one simulation per ' ...
+             'transducer, combined as firing together.\n'], num2str([parameters.transducer.freq_hz] / 1e3));
+else
+    for g = find(fg.coherent)
+        fprintf('[async] Transducers %s fire together: one simulation each, summed coherently.\n', ...
+            mat2str(fg.members{g}));
+    end
+end
+% Transducers whose complex field the combine stage sums
+needs_complex = fg.coherent(fg.group);
 
 % Preproc affix(es): shared mode builds one grid sized to fit every
 % transducer; per_transducer mode builds N independent grids, each aligned
@@ -242,7 +281,7 @@ ow = resolve_chained_overwrite(parameters);
 p_acoustic = cell(1, N);
 for ti = 1:N
     p_acoustic{ti} = make_acoustic_params(parameters, ti, affix_per_t{ti}, ...
-        preproc_affix_for(affix_preproc, ti), ow);
+        preproc_affix_for(affix_preproc, ti), ow, needs_complex(ti));
 end
 
 % Thermal always keys off transducer(1)'s grid — matches the reference frame
@@ -273,10 +312,51 @@ else
         sprintf('sub-%03d_%s_grid_cache%s.mat', subject_id, medium, affix_preproc))};
 end
 
-files_acoustic = cell(1, N);
+% Shared acoustic fields (ACOUSTIC_STORE_KEY): entries with the same key (one
+% stance used in several steps) are simulated once; a shareable field is kept
+% under its key (affix _ac-<key>), so later runs in this output folder reuse it.
+ac_key   = cell(1, N);
+ac_share = false(1, N);
 for ti = 1:N
+    [ac_key{ti}, ac_share(ti)] = acoustic_store_key(parameters, ti, p_acoustic{ti});
+end
+[~, first_of, key_class] = unique(ac_key, 'stable');
+ac_rep    = reshape(first_of(key_class), 1, []);   % the entry that simulates transducer ti's field
+is_ac_rep = ac_rep == 1:N;
+ac_complex = false(1, N);                         % the field's complex part is needed
+files_acoustic = cell(1, N);
+for ti = find(is_ac_rep)
+    ac_complex(ti) = any(needs_complex(ac_rep == ti));
+    if ac_complex(ti)
+        p_acoustic{ti}.io.save_p_complex = 1;
+    end
+    ac_affix = affix_per_t{ti};
+    if ac_share(ti)
+        ac_affix = ['_ac-', ac_key{ti}];
+        p_acoustic{ti}.io.acoustic_cache_affix = ac_affix;
+    end
     files_acoustic{ti} = fullfile(cache_dir, ...
-        sprintf('sub-%03d_%s_results%s.mat', subject_id, medium, affix_per_t{ti}));
+        sprintf('sub-%03d_%s_results%s.mat', subject_id, medium, ac_affix));
+    % A kept field without the complex part this run needs is simulated again
+    if ac_complex(ti) && isfile(files_acoustic{ti}) && ~isfile(complex_file(files_acoustic{ti}))
+        p_acoustic{ti}.io.overwrite_files = 'always';
+    end
+end
+for ti = find(~is_ac_rep)
+    files_acoustic{ti} = files_acoustic{ac_rep(ti)};
+    fprintf('[async] Transducer %d has the acoustic field of transducer %d (same stance and settings).\n', ...
+        ti, ac_rep(ti));
+end
+% Pulse duration of each transducer: the peak pressure of a group firing together
+% at several frequencies is sampled over it (COMBINE_ASYNC_INTENSITY).
+pd_tx = NaN(1, N);
+for ti = 1:N
+    if isfield(parameters.transducer(ti), 'timing') && isstruct(parameters.transducer(ti).timing) && ...
+            isfield(parameters.transducer(ti).timing, 'pd') && ~isempty(parameters.transducer(ti).timing.pd)
+        pd_tx(ti) = double(parameters.transducer(ti).timing.pd);
+    elseif isfield(parameters, 'timing') && isfield(parameters.timing, 'pd') && ~isempty(parameters.timing.pd)
+        pd_tx(ti) = double(parameters.timing.pd);
+    end
 end
 files_combined = cell(1, n_points);
 files_thermal  = cell(1, n_points);
@@ -341,7 +421,12 @@ switch platform
                       @() prestus_pipeline(make_preproc_params(parameters, affix_preproc, [], ow)));
         end
 
-        for ti = 1:N
+        for ti = find(is_ac_rep)
+            if ac_share(ti) && ~ow.rerun_intermediates && field_complete(files_acoustic{ti}, ac_complex(ti))
+                fprintf('[Stage %d] Acoustic — transducer %d/%d: kept field reused (%s)\n', ...
+                        ti, ti, N, files_acoustic{ti});
+                continue
+            end
             run_stage(ti, sprintf('Acoustic — transducer %d/%d', ti, N), ...
                       @() prestus_pipeline(p_acoustic{ti}));
         end
@@ -351,7 +436,7 @@ switch platform
             if n_points > 1; label = [label, sprintf(' — sweep %d/%d', j, n_points)]; end %#ok<AGROW>
             run_stage(N + j, label, ...
                 @() combine_async_intensity(files_acoustic, files_combined{j}, ...
-                                            targets_matrix(:, j)'));
+                                            targets_matrix(:, j)', combine_mode(parameters), fg.group, pd_tx));
         end
 
         for j = 1:n_points
@@ -362,7 +447,7 @@ switch platform
         end
 
         if run_water
-            for ti = 1:N
+            for ti = find(is_ac_rep)       % one free-water run per distinct field
                 run_stage(N + 2*n_points + ti, ...
                     sprintf('Water validation — transducer %d/%d', ti, N), ...
                     @() prestus_pipeline(make_water_params(parameters, ti, affix_per_t{ti}, ow)));
@@ -419,28 +504,48 @@ switch platform
         job_ids_acoustic   = zeros(1, N);
         acoustic_submitted = false(1, N);
 
+        job_ids_elsewhere  = [];           % jobs of other runs computing a kept field
         for ti = 1:N
             fprintf('[Stage %d/%d] Acoustic — transducer %d\n', ti, N, ti);
-            if isfile(files_acoustic{ti}) && ~ow.rerun_intermediates
-                fprintf('             Cache exists — skipping.\n');
-            else
-                pa = p_acoustic{ti};
-                pa.hpc.timelimit = options.acoustic_timelimit;
-                pa.hpc.job_name  = sprintf('PRESTUS-%sat%02d-ac_%s', options.job_name_prefix, ti, subj);
-                pa = apply_memorylimit(pa, options.acoustic_memorylimit);
-                pa = apply_partition(pa, options.acoustic_partition);
-                if preproc_submitted(ti)
-                    pa = hpc_add_dependency(pa, job_ids_preproc(ti));
-                end
-                pa = hpc_add_dependency(pa, options.depend_job_ids);
-                job_ids_acoustic(ti)   = prestus_pipeline_start(pa);
-                acoustic_submitted(ti) = true;
-                fprintf('             → job %s\n', num2str(job_ids_acoustic(ti)));
+            if ~is_ac_rep(ti)
+                fprintf('             Same field as transducer %d — not simulated again.\n', ac_rep(ti));
+                continue
             end
+            if field_complete(files_acoustic{ti}, ac_complex(ti)) && ~ow.rerun_intermediates
+                fprintf('             Cache exists — skipping.\n');
+                continue
+            end
+            other = '';
+            if ac_share(ti) && ~ow.rerun_intermediates
+                other = pending_job(files_acoustic{ti}, platform);
+            end
+            other_id = sscanf(other, '%d', 1);        % qsub: '123.server' -> 123
+            if ~isempty(other_id)
+                % Another run already submitted this field: wait for it instead of
+                % simulating it twice
+                job_ids_elsewhere(end+1) = other_id; %#ok<AGROW>
+                fprintf('             Being simulated by job %s (another run) — waiting for it.\n', other);
+                continue
+            end
+            pa = p_acoustic{ti};
+            pa.hpc.timelimit = options.acoustic_timelimit;
+            pa.hpc.job_name  = sprintf('PRESTUS-%sat%02d-ac_%s', options.job_name_prefix, ti, subj);
+            pa = apply_memorylimit(pa, options.acoustic_memorylimit);
+            pa = apply_partition(pa, options.acoustic_partition);
+            if preproc_submitted(ti)
+                pa = hpc_add_dependency(pa, job_ids_preproc(ti));
+            end
+            pa = hpc_add_dependency(pa, options.depend_job_ids);
+            job_ids_acoustic(ti)   = prestus_pipeline_start(pa);
+            acoustic_submitted(ti) = true;
+            if ac_share(ti)
+                mark_pending(files_acoustic{ti}, job_ids_acoustic(ti));
+            end
+            fprintf('             → job %s\n', num2str(job_ids_acoustic(ti)));
         end
         fprintf('\n');
 
-        pending_acoustic = job_ids_acoustic(acoustic_submitted);
+        pending_acoustic = [job_ids_acoustic(acoustic_submitted), job_ids_elsewhere];
         jobs.preproc  = unique(job_ids_preproc(preproc_submitted));
         jobs.acoustic = pending_acoustic;
 
@@ -455,11 +560,13 @@ switch platform
             else
                 fprintf('[%s] Combine\n', stage_label);
             end
-            if isfile(files_combined{j}) && ~ow.rerun_intermediates
+            if isfile(files_combined{j}) && ~ow.rerun_intermediates && ...
+                    has_per_transducer_fields(files_combined{j}) && ...
+                    has_same_groups(files_combined{j}, fg)
                 fprintf('           Cache exists — skipping.\n');
             else
                 p_comb = make_combine_params(parameters, files_acoustic, ...
-                                             files_combined{j}, targets_matrix(:,j)');
+                                             files_combined{j}, targets_matrix(:,j)', fg.group, pd_tx);
                 p_comb.hpc.timelimit = options.combine_timelimit;
                 p_comb.hpc.job_name  = sprintf('PRESTUS-%sat-cb%02d_%s', options.job_name_prefix, j, subj);
                 p_comb = apply_memorylimit(p_comb, options.combine_memorylimit);
@@ -508,7 +615,7 @@ switch platform
             % Water jobs depend on the acoustic jobs (need source/preproc cache).
             pending_for_water = job_ids_acoustic(acoustic_submitted);
 
-            for ti = 1:N
+            for ti = find(is_ac_rep)       % one free-water run per distinct field
                 stage_label = sprintf('Stage %d', N + 2*n_points + ti);
                 fprintf('[%s] Water validation — transducer %d/%d\n', stage_label, ti, N);
                 if isfile(files_water{ti}) && ~ow.rerun_outputs
@@ -544,6 +651,82 @@ end % async_transducer_pipeline
 % =========================================================================
 %% Stage runner
 % =========================================================================
+
+function tf = has_per_transducer_fields(file)
+% A combined cache written before per-transducer fields (sensor_data.p_async_tx)
+% cannot drive the scheduled heat source: combine again.
+    tf = false;
+    try
+        s = load(file, 'acoustic_provenance');
+        tf = isfield(s.acoustic_provenance, 'combination_per_transducer') && ...
+             s.acoustic_provenance.combination_per_transducer;
+    catch
+    end
+    if ~tf
+        fprintf('           Cache lacks per-transducer fields — combining again.\n');
+    end
+end
+
+function f = complex_file(results_file)
+% The complex field written next to an acoustic results file (WRITE_P_COMPLEX_FILES)
+    [d, n, e] = fileparts(results_file);
+    f = fullfile(d, [regexprep(n, '_results', '_p_complex', 'once'), e]);
+end
+
+function tf = field_complete(results_file, need_complex)
+% A field is there, with its complex part when the combine stage needs it
+    tf = isfile(results_file) && (~need_complex || isfile(complex_file(results_file)));
+end
+
+function id = pending_job(results_file, platform)
+% Job ID of another run still simulating this kept field ('' if none). The
+% marker sits next to the field (MARK_PENDING); a job that is no longer queued
+% or running does not count (it finished or failed, and the field is missing).
+    id = '';
+    marker = [results_file(1:end-4), '.pending'];
+    if ~isfile(marker)
+        return
+    end
+    try
+        candidate = strtrim(fileread(marker));
+    catch
+        return
+    end
+    if hpc_job_active(platform, candidate)
+        id = candidate;
+    end
+end
+
+function mark_pending(results_file, job_id)
+% Record the job simulating a kept field, so runs planned meanwhile wait for it
+    marker = [results_file(1:end-4), '.pending'];
+    fid = fopen(marker, 'w');
+    if fid < 0
+        warning('async_transducer_pipeline:pendingMarker', 'Cannot write %s.', marker);
+        return
+    end
+    fprintf(fid, '%s\n', num2str(job_id));
+    fclose(fid);
+end
+
+function tf = has_same_groups(file, fg)
+% A combined cache made with other firing groups (combination_groups; absent
+% when every transducer fired on its own) is combined again.
+    tf = false;
+    try
+        s = load(file, 'acoustic_provenance');
+        if isfield(s.acoustic_provenance, 'combination_groups')
+            [~, ~, cached] = unique(s.acoustic_provenance.combination_groups, 'stable');
+            tf = isequal(cached(:)', fg.group);
+        else
+            tf = ~any(fg.coherent);
+        end
+    catch
+    end
+    if ~tf
+        fprintf('           Cache was combined with other firing groups — combining again.\n');
+    end
+end
 
 function run_stage(n, label, fn)
     fprintf('────────────────────────────────────────\n');
@@ -587,9 +770,10 @@ function p = make_preproc_params(base, affix_preproc, transducer_idx, ow)
     p.io.save_medium_cache           = 1;  % cache medium too for acoustic sub-runs
     p.simulation.interactive         = 0;
     p.simulation.transducer_coupling = 'coherent';  % prevent re-entry
+    p.state.async_subjob             = true;        % (also for transducers at different frequencies)
 end
 
-function p = make_acoustic_params(base, transducer_idx, affix, affix_preproc, ow)
+function p = make_acoustic_params(base, transducer_idx, affix, affix_preproc, ow, needs_complex)
     p = base;
     p.transducer                     = base.transducer(transducer_idx);
     % Clear target so the acoustic stage does not trigger multi-ISPPA mode.
@@ -608,6 +792,18 @@ function p = make_acoustic_params(base, transducer_idx, affix, affix_preproc, ow
     p.io.output_affix                = affix;
     p.io.preproc_affix               = affix_preproc;  % load shared grid sized for all transducers
     p                                = own_preproc_caches(p);
+    % At a frequency other than transducer(1)'s, the shared medium does not fit:
+    % its attenuation is refitted around transducer(1)'s frequency
+    % (fit_alpha_power) and its absorption evaluated there. Map an own medium on
+    % the shared grid (MEDIUM_STAGE builds it when the cache is missing).
+    if p.transducer.freq_hz ~= base.transducer(1).freq_hz
+        p.io.medium_affix = sprintf('%s_t%02d_f%gkHz', affix_preproc, transducer_idx, p.transducer.freq_hz / 1e3);
+    end
+    % Firing together (a firing group, or different frequencies): the combine
+    % stage sums the complex fields (COMBINE_ASYNC_INTENSITY).
+    if needs_complex
+        p.io.save_p_complex = 1;
+    end
     % Tell load_grid_cache_file which transducer this sub-job is, so that on a
     % cache hit it copies this transducer's grid-space trans_pos/focus_pos
     % (set by grid_transducer_location during Stage 0) instead of leaving the
@@ -621,9 +817,10 @@ function p = make_acoustic_params(base, transducer_idx, affix, affix_preproc, ow
     p.io.save_thermal_matrices       = 0;
     p.simulation.interactive         = 0;
     p.simulation.transducer_coupling = 'coherent';  % prevent re-entry
+    p.state.async_subjob             = true;        % (also for transducers at different frequencies)
 end
 
-function p = make_combine_params(base, files_in, file_out, targets_wcm2)
+function p = make_combine_params(base, files_in, file_out, targets_wcm2, groups, pd_s)
     p = base;
     % Targets travel in async_combine.targets_wcm2; clear the sweep vectors so
     % this job does not route into multi_isppa_pipeline.
@@ -641,14 +838,21 @@ function p = make_combine_params(base, files_in, file_out, targets_wcm2)
     p.async_combine.files_in         = files_in;
     p.async_combine.file_out         = file_out;
     p.async_combine.targets_wcm2     = targets_wcm2;
+    p.async_combine.mode             = combine_mode(base);
+    p.async_combine.groups           = groups;
+    p.async_combine.pd_s             = pd_s;
     p.io.output_affix                = '';
     p.io.overwrite_files             = 'never';
     p.simulation.interactive         = 0;
-    p.simulation.transducer_coupling = 'coherent';
+    p.simulation.transducer_coupling = 'coherent';  % prevent re-entry
+    p.state.async_subjob             = true;        % (also for transducers at different frequencies)
 end
 
 function p = make_thermal_params(base, affix_combined, affix_thermal, affix_preproc, ow)
     p = base;
+    if is_simultaneous_multifreq(base)
+        p.timing.async_schedule = 'simultaneous';   % every transducer on together
+    end
     % Clear all per-transducer targets — scaling was already done in combine.
     for ti = 1:numel(p.transducer)
         p.transducer(ti).target_isppa_wcm2 = NaN;
@@ -678,7 +882,8 @@ function p = make_thermal_params(base, affix_combined, affix_thermal, affix_prep
     p.io.save_acoustic_matrices      = 0;
     p.io.save_thermal_matrices       = heating;
     p.simulation.interactive         = 0;
-    p.simulation.transducer_coupling = 'coherent';
+    p.simulation.transducer_coupling = 'coherent';  % prevent re-entry
+    p.state.async_subjob             = true;        % (also for transducers at different frequencies)
 end
 
 function p = make_water_params(base, transducer_idx, affix, ow)
@@ -738,5 +943,15 @@ function p = apply_partition(p, partition)
         p.hpc.partition = partition;
     elseif isfield(p, 'hpc') && isfield(p.hpc, 'partition')
         p.hpc = rmfield(p.hpc, 'partition');
+    end
+end
+
+function mode = combine_mode(parameters)
+% COMBINE_ASYNC_INTENSITY mode: transducers at different frequencies firing
+% together ('simultaneous') or in separate windows ('async').
+    if is_simultaneous_multifreq(parameters)
+        mode = 'simultaneous';
+    else
+        mode = 'async';
     end
 end

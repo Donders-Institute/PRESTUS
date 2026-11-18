@@ -1,6 +1,5 @@
-function combine_async_intensity(files_in, file_out, targets_wcm2)
-% COMBINE_ASYNC_INTENSITY  Scale and combine N independent acoustic results
-%                          for async (non-simultaneous) transducer firing.
+function combine_async_intensity(files_in, file_out, targets_wcm2, mode, groups, pd_s)
+% COMBINE_ASYNC_INTENSITY  Scale and combine N independent acoustic results for async (non-simultaneous) transducer firing
 %
 % For asynchronously firing transducers the pressure fields are independent.
 % Two combined fields are produced from the per-transducer scaled pressures:
@@ -16,14 +15,43 @@ function combine_async_intensity(files_in, file_out, targets_wcm2)
 %     instantaneous peak when only one transducer is active at a time:
 %     p_safety = max_i( p_i_scaled )            → sensor_data.p_max_async
 %
+%   Per-transducer fields  — p_i_scaled for each transducer on the full
+%     reference grid                           → sensor_data.p_async_tx
+%     [Nx Ny Nz N]. THERMAL_SIMULATION heats with these, each switched on its
+%     own schedule (THERMAL_SCHEDULE, timing.async_schedule).
+%
 % Rationale: in async mode the instantaneous peak intensity at any voxel
 % equals the maximum over individual transducer fields, not their sum.
-% Summing is correct only for the time-averaged heat deposition used in
-% thermal modelling, assuming each transducer fires with the timing block's
-% duty cycle in its own non-overlapping window; if the transducers share that
-% on-time, the sum overestimates heating by up to N.  Acoustic safety metrics
-% (ISPPA, MI, peak pressure) must therefore be derived from p_max_async,
+% p_max_all, the intensity sum, is the heat source of all transducers on at
+% once; the thermal stage uses p_async_tx and the schedule instead. Acoustic
+% safety metrics (ISPPA, MI, peak pressure) must be derived from p_max_async,
 % not from p_max_all.
+%
+% Firing groups (groups argument, FIRING_GROUPS)
+% ----------------------------------------------
+% Transducers with the same group index fire together. Acoustics is linear,
+% so a group's pressure is p(t) = Re(Σ_f P_f·exp(1i·ω_f·t)), with P_f the
+% coherent sum of the scaled complex fields of its transducers at frequency f
+% (they interfere; each is scaled to its own target first). The cross terms
+% between frequencies average out over their common period. Per group:
+%   time-averaged intensity  Σ_f |P_f|² / (2·ρ·c)
+%   heat sources             one field |P_f| per frequency, all in the group's
+%                            windows (p_async_tx, with p_async_freqs_hz and
+%                            p_async_source_tx: the group's first transducer)
+%   peak pressure            |P_f| at one frequency; at several, max / min over
+%                            t of p(t) (SIMULTANEOUS_PEAKS), t over the pulse or
+%                            over the common period 1/gcd(f), whichever is shorter
+% Groups then combine like async transducers: p_max_async / p_min_async are
+% the per-voxel extremes over groups, p_max_all the intensity sum of every
+% source, and sensor_data.p_intensity_equiv the largest time-averaged
+% intensity of any group (ACOUSTIC_ANALYSIS takes Ipa/Ita from it). Group
+% members need their complex fields (io.save_p_complex of the acoustic runs,
+% phases referred to t = 0) and one shared grid (async_layout 'shared').
+%
+% Simultaneous mode (mode = 'simultaneous') is one group of all transducers:
+% transducers at more than one frequency firing at the same time
+% (IS_SIMULTANEOUS_MULTIFREQ). When the common period needs more than 20000
+% time samples, the peaks are the upper bounds ±Σ_f|P_f|.
 %
 % Partial-FOV support
 % -------------------
@@ -39,7 +67,7 @@ function combine_async_intensity(files_in, file_out, targets_wcm2)
 % Grid remapping
 % --------------
 % When a cache (after any FOV back-projection) is on a different grid than the reference
-% (file 1) — e.g. simulation.async_grid_mode = 'per_transducer', where each
+% (file 1) — e.g. grid.async_layout = 'per_transducer', where each
 % transducer is simulated on its own aligned/cropped grid — the field is
 % resampled onto the reference physical space (transducer 1's grid). Two
 % remap strategies are used, in order of preference:
@@ -61,7 +89,8 @@ function combine_async_intensity(files_in, file_out, targets_wcm2)
 %      spacing/extent, not rotation.
 % Regions of the source field that fall outside the reference extent are
 % zero-padded.  This avoids forcing a re-run when the grid change is
-% recoverable by interpolation.
+% recoverable by interpolation. Complex fields of group members are not
+% remapped (a group needs one shared grid).
 %
 % The target for each transducer is resolved in this order:
 %   1. targets_wcm2(i) argument (if supplied and finite)
@@ -69,14 +98,18 @@ function combine_async_intensity(files_in, file_out, targets_wcm2)
 %   3. No scaling (use the simulated drive level as-is)
 %
 % The baseline (free-water ISPPA at the simulated drive level) is read from
-% acoustic_provenance.freefield_isppa_wcm2 in each cache file.  If absent,
-% scaling is skipped for that transducer with a warning.
+% each cache's acoustic_provenance (ISPPA_SCALE_FACTOR: freefield_isppa_wcm2,
+% else the library calibration value). Without a baseline, a target that
+% needs scaling is an error.
 %
 % Grid/medium metadata for the combined cache are taken from files_in{1}.
 %
 % Use as:
 %   combine_async_intensity(files_in, file_out)
 %   combine_async_intensity(files_in, file_out, targets_wcm2)
+%   combine_async_intensity(files_in, file_out, targets_wcm2, mode)
+%   combine_async_intensity(files_in, file_out, targets_wcm2, 'async', groups)
+%   combine_async_intensity(files_in, file_out, targets_wcm2, 'async', groups, pd_s)
 %
 % Input:
 %   files_in     - cell array of paths to acoustic cache .mat files {N×1}
@@ -84,21 +117,33 @@ function combine_async_intensity(files_in, file_out, targets_wcm2)
 %   targets_wcm2 - (optional) 1×N vector of target ISPPAs [W/cm²], one per
 %                  transducer.  NaN or [] entries fall back to the cached
 %                  transducer config.
+%   mode         - (optional) 'async' (default): separate firing windows;
+%                  'simultaneous': all transducers fire together (above)
+%   groups       - (optional) 1×N firing group of each transducer
+%                  (FIRING_GROUPS.group); default 1:N ('async') or all ones
+%                  ('simultaneous')
+%   pd_s         - (optional) 1×N pulse duration of each transducer [s], over
+%                  which a group's peak pressure is sampled; NaN or [] = read
+%                  from the cache's parameters. files_in may name one file
+%                  several times (transducers with the same field).
 %
 % Notes:
 %   - Axisymmetric (2-D) results are not supported.
 %   - All inputs must share the same full acoustic grid (full_ac_dims for
 %     FOV runs, size(p_max_all) for non-FOV runs).
 %   - acoustic_provenance in the combined file records combined_from,
-%     combination_mode, per-transducer targets, baselines, and FOV offsets.
+%     combination_mode, per-transducer targets, baselines, groups, and FOV offsets.
 %
-% See also: ASYNC_TRANSDUCER_PIPELINE, ASSEMBLE_LIMITED_FOV_FIELDS,
+% See also: ASYNC_TRANSDUCER_PIPELINE, FIRING_GROUPS, ASSEMBLE_LIMITED_FOV_FIELDS,
 %           APPLY_ISPPA_SCALING, ACOUSTIC_WRAPPER
 
 arguments
     files_in
     file_out     (1,:) char
     targets_wcm2 (1,:) double = []
+    mode         (1,:) char {mustBeMember(mode, {'async', 'simultaneous'})} = 'async'
+    groups       (1,:) double = []
+    pd_s         (1,:) double = []
 end
 
 if ischar(files_in) || isstring(files_in)
@@ -118,6 +163,24 @@ for k = 1:N
     end
 end
 
+% Firing groups: renumber in order of first appearance (group of file 1 = 1)
+if isempty(groups)
+    if strcmp(mode, 'simultaneous')
+        groups = ones(1, N);
+    else
+        groups = 1:N;
+    end
+elseif numel(groups) ~= N
+    error('combine_async_intensity:badGroups', ...
+        'groups must hold one group index per acoustic cache (%d), got %d.', N, numel(groups));
+end
+[~, ~, groups] = unique(groups, 'stable');
+groups   = groups(:)';
+G        = max(groups);
+n_in_g   = accumarray(groups(:), 1)';
+coherent = n_in_g > 1;                       % group of several transducers: complex sum
+any_coherent = any(coherent);
+
 % Pad or trim the external targets vector to length N.
 if numel(targets_wcm2) < N
     targets_wcm2(end+1:N) = NaN;
@@ -130,54 +193,52 @@ end
 fprintf('Loading acoustic result 1/%d:\n  %s\n', N, files_in{1});
 data_ref = load(files_in{1}, 'sensor_data', 'kgrid', 'kwave_medium', ...
                 'acoustic_provenance', 'acoustic_info', 'acoustic_grid_dims');
-
-p_ref = double(abs(data_ref.sensor_data.p_max_all));
-
-if ndims(p_ref) < 3 %#ok<ISMAT>
+p_size_ref = size(data_ref.sensor_data.p_max_all);
+if numel(p_size_ref) < 3
     error('combine_async_intensity:axisymmetricNotSupported', ...
         ['Axisymmetric (2-D) results cannot be combined in async mode. ' ...
          'Re-run acoustic simulations with a 3-D grid.']);
 end
+% The full grid of file 1 is the reference grid. For non-FOV runs the full
+% grid IS the sensor_data grid and the offset is [1,1,1].
+[full_ac_dims, ~, has_fov_ref] = resolve_grid(data_ref.acoustic_provenance, p_size_ref, 1);
 
-% Determine the full grid dimensions and the FOV offset for the first file.
-% For non-FOV runs the full grid IS the sensor_data grid and offset is [1,1,1].
-[full_ac_dims, fov_offset_ref, has_fov_ref] = ...
-    resolve_grid(data_ref.acoustic_provenance, size(p_ref), 1);
+p_sq_sum     = zeros(full_ac_dims);      % Σ over sources of field²: intensity sum
+p_max_safety = zeros(full_ac_dims);      % per-voxel maximum over groups
+p_min_safety = zeros(full_ac_dims);      % per-voxel minimum over groups
+p_ieq_sq     = zeros(full_ac_dims);      % largest time-averaged intensity of any group (× 2ρc)
+src_field = cell(1, 0);  src_freq = zeros(1, 0);  src_tx = zeros(1, 0);  src_group = zeros(1, 0);
+P_acc = cell(1, G);  F_acc = cell(1, G);  pd_grp = NaN(1, G);  first_tx = zeros(1, G);
+for g = 1:G
+    P_acc{g} = cell(1, 0);
+    F_acc{g} = zeros(1, 0);
+    first_tx(g) = find(groups == g, 1);
+end
 
-[p_ref_scaled, target_used, baseline_used] = scale_pressure( ...
-    p_ref, data_ref.acoustic_provenance, data_ref.acoustic_info, targets_wcm2(1), 1);
-
-scale_ref  = p_ref_scaled ./ max(p_ref, eps('double'));
-clear p_ref;
-p_min_ref  = double(data_ref.sensor_data.p_min_all) .* scale_ref;
-clear scale_ref;
-
-% Accumulate into full-grid arrays.
-% p_sq_sum accumulates Σ p_i_scaled² for the incoherent intensity sum.
-% The thermal field is p_thermal = sqrt(p_sq_sum)  (ρ·c cancels in the
-% round-trip I = p²/(2ρc) → p = sqrt(2Iρc) = sqrt(Σp_i²)).
-p_sq_sum     = backproject_sq(p_ref_scaled, fov_offset_ref, full_ac_dims);
-p_max_safety = backproject(p_ref_scaled,    fov_offset_ref, full_ac_dims);
-p_min_safety = backproject(p_min_ref,       fov_offset_ref, full_ac_dims);
-
-targets_log    = target_used;
-baselines_log  = baseline_used;
-fov_offsets_log = {fov_offset_ref};
-
-% Per-transducer ISPPA diagnostics (W/cm²).
-isppa_per_t    = zeros(1, N);
-isppa_per_t(1) = max(p_ref_scaled(:).^2, [], 'all') / (2 * 1000 * 1500) * 1e-4;
-clear p_ref_scaled p_min_ref;
+targets_log     = zeros(1, N);
+baselines_log   = zeros(1, N);
+fov_offsets_log = cell(1, N);
+isppa_per_t     = zeros(1, N);   % per-transducer ISPPA diagnostics (W/cm²)
 
 % =========================================================================
-%% Accumulate remaining transducers
+%% Scale each transducer and put it on the reference grid
 % =========================================================================
 
-for k = 2:N
-    fprintf('Loading acoustic result %d/%d:\n  %s\n', k, N, files_in{k});
-    data_k = load(files_in{k}, 'sensor_data', 'kgrid', 'acoustic_provenance', 'acoustic_info', ...
-                  'acoustic_grid_dims');
-    p_k    = double(abs(data_k.sensor_data.p_max_all));
+for k = 1:N
+    if k == 1
+        data_k = data_ref;
+    else
+        fprintf('Loading acoustic result %d/%d:\n  %s\n', k, N, files_in{k});
+        data_k = load(files_in{k}, 'sensor_data', 'kgrid', 'acoustic_provenance', 'acoustic_info', ...
+                      'acoustic_grid_dims');
+    end
+    g   = groups(k);
+    p_k = double(abs(data_k.sensor_data.p_max_all));
+    if ndims(p_k) < 3 %#ok<ISMAT>
+        error('combine_async_intensity:axisymmetricNotSupported', ...
+            ['Axisymmetric (2-D) results cannot be combined in async mode. ' ...
+             'Re-run acoustic simulations with a 3-D grid.']);
+    end
 
     [full_ac_dims_k, fov_offset_k, has_fov_k] = ...
         resolve_grid(data_k.acoustic_provenance, size(p_k), k);
@@ -185,9 +246,36 @@ for k = 2:N
     [p_k_scaled, target_used, baseline_used] = scale_pressure( ...
         p_k, data_k.acoustic_provenance, data_k.acoustic_info, targets_wcm2(k), k);
 
-    scale_k  = p_k_scaled ./ max(p_k, eps('double'));
+    scale_k = p_k_scaled ./ max(p_k, eps('double'));
+    s_k     = max(p_k_scaled(:)) / max(max(p_k(:)), eps('double'));   % uniform scale
     clear p_k;
-    p_min_k  = double(data_k.sensor_data.p_min_all) .* scale_k;
+    if coherent(g)
+        if ~isequal(full_ac_dims_k, full_ac_dims)
+            error('combine_async_intensity:simultaneousGridMismatch', ...
+                ['File %d is on another grid; transducers firing together need one shared grid ' ...
+                 '(grid.async_layout: shared).'], k);
+        end
+        [P_k, f_k] = load_complex_field(files_in{k});
+        P_k = backproject_complex(P_k * s_k, fov_offset_k, full_ac_dims);
+        i_f = find(abs(F_acc{g} - f_k) <= 1e-6 * f_k, 1);
+        if isempty(i_f)
+            P_acc{g}{end+1} = P_k;
+            F_acc{g}(end+1) = f_k;
+        else
+            P_acc{g}{i_f} = P_acc{g}{i_f} + P_k;
+        end
+        clear P_k;
+        if isnan(pd_grp(g))
+            % The caller's value: a field shared by several entries
+            % (ACOUSTIC_STORE_KEY) carries the timing of the entry that simulated it
+            if k <= numel(pd_s) && isfinite(pd_s(k))
+                pd_grp(g) = pd_s(k);
+            else
+                pd_grp(g) = pulse_duration(data_k.acoustic_info);
+            end
+        end
+    end
+    p_min_k = double(data_k.sensor_data.p_min_all) .* scale_k;
     clear scale_k;
 
     % A partial-FOV field is first put back onto its own full grid (the
@@ -199,20 +287,17 @@ for k = 2:N
         p_min_k    = backproject(p_min_k,    fov_offset_k, full_ac_dims_k);
         fov_offset_k = [1, 1, 1];
     end
-    if ~isequal(full_ac_dims_k, full_ac_dims)
-        fprintf(['[combine_async_intensity] File %d grid [%s] differs from ' ...
-                 'reference [%s] — remapping via interpolation.\n'], ...
-            k, num2str(full_ac_dims_k), num2str(full_ac_dims));
-    end
-
     % Grid remapping: if this file was simulated on a different grid than the
-    % reference (e.g. simulation.async_grid_mode = 'per_transducer', where
+    % reference (e.g. grid.async_layout = 'per_transducer', where
     % each transducer has its own aligned/cropped grid), resample it onto the
     % reference physical space. Prefer the true world-space affine (handles
     % rotation + translation between grids, e.g. per_transducer mode);
     % fall back to the legacy origin-centred spacing-only remap when the
     % affine cannot be recovered (e.g. deleted planimg sidecar, legacy cache).
     if ~isequal(full_ac_dims_k, full_ac_dims)
+        fprintf(['[combine_async_intensity] File %d grid [%s] differs from ' ...
+                 'reference [%s] — remapping via interpolation.\n'], ...
+            k, num2str(full_ac_dims_k), num2str(full_ac_dims));
         [M_k2ref, have_affine] = resolve_affine_remap(data_k.acoustic_info, data_ref.acoustic_info, ...
                                                        data_k.kgrid);
         if have_affine
@@ -238,21 +323,69 @@ for k = 2:N
             p_min_k    = remap_field_to_ref(p_min_k, data_k.kgrid, full_ac_dims_k, ...
                                             data_ref.kgrid, full_ac_dims);
         end
-        fov_offset_k   = [1, 1, 1];
-        full_ac_dims_k = full_ac_dims; %#ok<NASGU>
+        fov_offset_k = [1, 1, 1];
     end
-    clear data_k;
+    p_k_full = backproject(p_k_scaled, fov_offset_k, full_ac_dims);
 
-    p_sq_sum     = p_sq_sum + backproject_sq(p_k_scaled, fov_offset_k, full_ac_dims);
-    p_max_safety = max(p_max_safety, backproject(p_k_scaled, fov_offset_k, full_ac_dims));
-    p_min_safety = min(p_min_safety, backproject(p_min_k,   fov_offset_k, full_ac_dims));
+    if ~coherent(g)
+        % A transducer firing on its own is one heat source and one safety field
+        p_sq_sum     = p_sq_sum + p_k_full .^ 2;
+        p_ieq_sq     = max(p_ieq_sq, p_k_full .^ 2);
+        p_max_safety = max(p_max_safety, p_k_full);
+        p_min_safety = min(p_min_safety, backproject(p_min_k, fov_offset_k, full_ac_dims));
+        src_field{end+1} = single(p_k_full);                    %#ok<AGROW>
+        src_freq(end+1)  = transducer_freq(data_k.acoustic_info); %#ok<AGROW>
+        src_tx(end+1)    = k;                                   %#ok<AGROW>
+        src_group(end+1) = g;                                   %#ok<AGROW>
+    end
 
-    isppa_per_t(k)   = max(p_k_scaled(:).^2, [], 'all') / (2 * 1000 * 1500) * 1e-4;
-    targets_log      = [targets_log,  target_used];   %#ok<AGROW>
-    baselines_log    = [baselines_log, baseline_used]; %#ok<AGROW>
-    fov_offsets_log{k} = fov_offset_k;                %#ok<AGROW>
-    clear p_k_scaled p_min_k;
+    isppa_per_t(k)     = max(p_k_full(:).^2, [], 'all') / (2 * 1000 * 1500) * 1e-4;
+    targets_log(k)     = target_used;
+    baselines_log(k)   = baseline_used;
+    fov_offsets_log{k} = fov_offset_k;
+    clear data_k p_k_scaled p_min_k p_k_full;
 end
+
+% =========================================================================
+%% Firing groups: coherent sum per frequency
+% =========================================================================
+peak_info = struct('group', {}, 'info', {});
+for g = find(coherent)
+    [F_acc{g}, order] = sort(F_acc{g});
+    P_g = P_acc{g}(order);
+    P_acc{g} = [];
+    I_g = zeros(full_ac_dims);
+    for i_f = 1:numel(P_g)
+        I_g = I_g + abs(P_g{i_f}) .^ 2;
+        src_field{end+1} = single(abs(P_g{i_f}));   %#ok<AGROW>
+        src_freq(end+1)  = F_acc{g}(i_f);          %#ok<AGROW>
+        src_tx(end+1)    = first_tx(g);            %#ok<AGROW>
+        src_group(end+1) = g;                      %#ok<AGROW>
+    end
+    if numel(P_g) == 1
+        pk_pos = abs(P_g{1});                      % one tone: the peak is its amplitude
+        pk_neg = -pk_pos;
+    else
+        [pk_pos, pk_neg, info_g] = simultaneous_peaks(P_g, F_acc{g}, pd_grp(g));
+        peak_info(end+1) = struct('group', g, 'info', info_g); %#ok<AGROW>
+    end
+    clear P_g;
+    p_sq_sum     = p_sq_sum + I_g;
+    p_ieq_sq     = max(p_ieq_sq, I_g);
+    p_max_safety = max(p_max_safety, pk_pos);
+    p_min_safety = min(p_min_safety, pk_neg);
+    fprintf('  Group %d: transducers %s fire together (%s kHz), summed coherently\n', ...
+        g, mat2str(find(groups == g)), num2str(F_acc{g} / 1e3));
+    clear I_g pk_pos pk_neg;
+end
+
+% Heat sources ordered by group, then frequency (FIRING_GROUPS)
+[~, order]  = sortrows([src_group(:), src_freq(:)]);
+src_field   = src_field(order);
+src_freq    = src_freq(order);
+src_tx      = src_tx(order);
+p_async_tx  = cat(4, src_field{:});
+clear src_field;
 
 % =========================================================================
 %% Per-transducer ISPPA summary
@@ -261,7 +394,12 @@ fprintf('Per-transducer ISPPAs at the combined (target) scale:\n');
 for ti = 1:N
     fprintf('  Transducer %d: %.4f W/cm²\n', ti, isppa_per_t(ti));
 end
-fprintf('  Expected joint ISPPA (= max of above): %.4f W/cm²\n', max(isppa_per_t));
+if any_coherent
+    fprintf('  Joint ISPPA (largest time-averaged intensity of any group): %.4f W/cm²\n', ...
+        max(p_ieq_sq(:)) / (2 * 1000 * 1500) * 1e-4);
+else
+    fprintf('  Expected joint ISPPA (= max of above): %.4f W/cm²\n', max(isppa_per_t));
+end
 
 % =========================================================================
 %% Thermal field
@@ -279,14 +417,32 @@ sensor_data              = data_ref.sensor_data;
 sensor_data.p_max_all    = p_thermal;    % thermal heat source (intensity sum)
 sensor_data.p_max_async  = p_max_safety; % acoustic safety: peak positive
 sensor_data.p_min_async  = p_min_safety; % acoustic safety: peak negative
-clear p_thermal p_max_safety p_min_safety;
+sensor_data.p_async_tx   = p_async_tx;   % scaled field per heat source [Nx Ny Nz S]: scheduled heat source
+if any_coherent
+    % time-averaged intensity of the transducers firing together (ACOUSTIC_ANALYSIS: Ipa, Ita)
+    sensor_data.p_intensity_equiv = single(sqrt(p_ieq_sq));
+    sensor_data.p_async_freqs_hz  = src_freq;  % frequency of each heat source
+    sensor_data.p_async_source_tx = src_tx;    % its windows: those of this transducer (THERMAL_SCHEDULE)
+end
+clear p_thermal p_max_safety p_min_safety p_async_tx p_ieq_sq;
 
 acoustic_provenance                                        = data_ref.acoustic_provenance;
 acoustic_provenance.combined_from                          = files_in;
 acoustic_provenance.combination_mode                       = 'async_dual_field';
+if any_coherent
+    if G == 1
+        acoustic_provenance.combination_mode               = 'async_dual_field_simultaneous';
+    else
+        acoustic_provenance.combination_mode               = 'async_dual_field_grouped';
+    end
+    acoustic_provenance.combination_groups                 = groups;   % per transducer
+    acoustic_provenance.combination_frequency_groups_hz    = src_freq; % fields of p_async_tx
+    acoustic_provenance.combination_peak                   = peak_info;
+end
 acoustic_provenance.combination_targets                    = targets_log;
 acoustic_provenance.combination_baselines                  = baselines_log;
 acoustic_provenance.combination_isppa_per_transducer_wcm2  = isppa_per_t;
+acoustic_provenance.combination_per_transducer             = true;   % sensor_data.p_async_tx present
 acoustic_provenance.combination_time                       = datestr(now); %#ok<TNOW1,DATST>
 % The reference file's free-water axial profile describes that single run at
 % its own drive level; it does not match the combined, per-source scaled field.
@@ -296,7 +452,7 @@ end
 if has_fov_ref
     % Combined output is on the full grid — clear per-file FOV crop metadata
     % so the downstream thermal pipeline does not attempt a second back-projection.
-    acoustic_provenance.combination_mode       = 'async_dual_field_fov_backprojected';
+    acoustic_provenance.combination_mode       = [acoustic_provenance.combination_mode, '_fov_backprojected'];
     acoustic_provenance.combination_fov_offsets = fov_offsets_log;
     acoustic_provenance.combination_full_ac_dims = full_ac_dims;
     acoustic_provenance.fov_offset_ac          = [];
@@ -334,6 +490,33 @@ end
 % =========================================================================
 %% Local helpers
 % =========================================================================
+
+function f = transducer_freq(acoustic_info)
+% Frequency of a single-transducer run [Hz], NaN when the cache does not record it
+f = NaN;
+if isstruct(acoustic_info) && isfield(acoustic_info, 'parameters') && ...
+        isfield(acoustic_info.parameters, 'transducer') && ~isempty(acoustic_info.parameters.transducer) && ...
+        isfield(acoustic_info.parameters.transducer(1), 'freq_hz') && ...
+        ~isempty(acoustic_info.parameters.transducer(1).freq_hz)
+    f = double(acoustic_info.parameters.transducer(1).freq_hz);
+end
+end
+
+function pd = pulse_duration(acoustic_info)
+% Pulse duration of a run [s]: transducer(1).timing.pd, else timing.pd; NaN if unknown
+pd = NaN;
+if ~isstruct(acoustic_info) || ~isfield(acoustic_info, 'parameters')
+    return
+end
+p = acoustic_info.parameters;
+if isfield(p, 'transducer') && ~isempty(p.transducer) && isfield(p.transducer(1), 'timing') && ...
+        isstruct(p.transducer(1).timing) && isfield(p.transducer(1).timing, 'pd') && ...
+        ~isempty(p.transducer(1).timing.pd)
+    pd = double(p.transducer(1).timing.pd);
+elseif isfield(p, 'timing') && isfield(p.timing, 'pd') && ~isempty(p.timing.pd)
+    pd = double(p.timing.pd);
+end
+end
 
 function [full_dims, fov_offset, has_fov] = resolve_grid(prov, sensor_size, file_idx)
 % Return the full acoustic grid dimensions and the FOV start offset for one
@@ -375,17 +558,6 @@ fov_end = fov_offset + size(p_fov) - 1;
 vol(fov_offset(1):fov_end(1), fov_offset(2):fov_end(2), fov_offset(3):fov_end(3)) = p_fov;
 end
 
-function vol = backproject_sq(p_fov, fov_offset, full_dims)
-% Zero-pad p_fov.^2 into a full_dims volume starting at fov_offset.
-if isequal(fov_offset, [1,1,1]) && isequal(size(p_fov), full_dims)
-    vol = p_fov .^ 2;
-    return;
-end
-vol = zeros(full_dims, 'like', p_fov);
-fov_end = fov_offset + size(p_fov) - 1;
-vol(fov_offset(1):fov_end(1), fov_offset(2):fov_end(2), fov_offset(3):fov_end(3)) = p_fov .^ 2;
-end
-
 function [M, ok] = resolve_affine_remap(info_k, info_ref, kgrid_k)
 % Compose the forward affine (row-vector convention: [out 1] = [in 1] * M)
 % mapping file k's sim voxel grid onto the reference (file 1) sim voxel grid,
@@ -396,8 +568,8 @@ function [M, ok] = resolve_affine_remap(info_k, info_ref, kgrid_k)
 % -wrong affine.
     M  = eye(4);
     ok = false;
-    A_k   = load_grid_to_world_affine(info_k);
-    A_ref = load_grid_to_world_affine(info_ref);
+    A_k   = grid_world_affine(info_k);
+    A_ref = grid_world_affine(info_ref);
     if isempty(A_k) || isempty(A_ref)
         return;
     end
@@ -463,42 +635,6 @@ function [ok, residual_mm, d_native_mm] = check_rigid_distance(info_k, M, dx_mm)
     ok = residual_mm < max(2 * dx_mm, 0.05 * d_native_mm);  % ~2 voxels or 5% tolerance
 end
 
-function A = load_grid_to_world_affine(acoustic_info)
-% Recover the sim-voxel -> world(RAS mm) affine for one acoustic run from its
-% planimg sidecar (written for every preproc run by grid_stage.m):
-%   sim_voxel -> world_RAS = planimg.inv_transf * planimg.t1_header.Transform.T
-% Returns [] if the sidecar is missing/unreadable or lacks the needed fields
-% (e.g. a phantom/water-only run with no T1 header).
-    A = [];
-    if ~isstruct(acoustic_info) || ~isfield(acoustic_info, 'parameters')
-        return;
-    end
-    p = acoustic_info.parameters;
-    if ~isfield(p, 'io') || ~isfield(p, 'subject_id') || ~isfield(p, 'simulation') || ...
-            ~isfield(p.io, 'dir_cache')
-        return;
-    end
-    if isfield(p.io, 'preproc_affix') && ~isempty(p.io.preproc_affix)
-        affix = p.io.preproc_affix;
-    elseif isfield(p.io, 'output_affix')
-        affix = p.io.output_affix;
-    else
-        return;
-    end
-    sidecar = fullfile(p.io.dir_cache, ...
-        sprintf('sub-%03d_%s_planimg%s.mat', p.subject_id, p.simulation.medium, affix));
-    if ~isfile(sidecar)
-        return;
-    end
-    s = load(sidecar, 'planimg');
-    if ~isfield(s, 'planimg') || ~isfield(s.planimg, 'inv_transf') || ...
-            isempty(s.planimg.inv_transf) || ~isfield(s.planimg, 't1_header') || ...
-            isempty(s.planimg.t1_header) || ~isfield(s.planimg.t1_header, 'Transform')
-        return;
-    end
-    A = s.planimg.inv_transf * s.planimg.t1_header.Transform.T;
-end
-
 function p_out = remap_field_to_ref(p_src, kgrid_src, dims_src, kgrid_ref, dims_ref)
 % Resample p_src (size dims_src, physical spacing from kgrid_src) onto the
 % reference physical space (size dims_ref, spacing from kgrid_ref) via
@@ -561,4 +697,27 @@ function [p_scaled, target_used, baseline_used] = scale_pressure( ...
     fprintf('  Transducer %d: %.2f → %.2f W/cm² (scale_p = %.4f, baseline source: %s)\n', ...
         transducer_idx, baseline, target, scale_p, baseline_src);
     p_scaled = p * scale_p;
+end
+
+function [P, f] = load_complex_field(results_file)
+% Complex field written next to an acoustic results file (io.save_p_complex).
+    [d, n, e] = fileparts(results_file);
+    pc_file = fullfile(d, [regexprep(n, '_results', '_p_complex', 'once'), e]);
+    if ~isfile(pc_file)
+        error('combine_async_intensity:noComplexField', ...
+            ['Transducers firing together at different frequencies need each run''s complex field: ' ...
+             '%s is missing (acoustic runs with io.save_p_complex).'], pc_file);
+    end
+    s = load(pc_file, 'p_complex', 'p_complex_info');
+    if ~isfield(s, 'p_complex_info') || ~strcmp(s.p_complex_info.phase_reference, 'simulation_t0')
+        error('combine_async_intensity:phaseReference', ...
+            '%s: phases must refer to t = 0 of the simulation (k-Wave or jwave runs).', pc_file);
+    end
+    P = double(s.p_complex);
+    f = double(s.p_complex_info.freq_hz);
+end
+
+function vol = backproject_complex(P_fov, fov_offset, full_dims)
+    vol = complex(backproject(real(P_fov), fov_offset, full_dims), ...
+                  backproject(imag(P_fov), fov_offset, full_dims));
 end

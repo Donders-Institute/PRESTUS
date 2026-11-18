@@ -113,7 +113,17 @@ end
         end
         acoustic_Ipa = acoustic_Itp * ramp_f;
     else
+        ramp_f = 1;
         acoustic_Ipa = acoustic_Itp;  % fallback for analysis; not saved as a separate map
+    end
+    % Transducers at different frequencies firing together: the temporal peak
+    % (acoustic_pressure, sum of the tones) exceeds the pulse-average intensity,
+    % which is the sum of the tones' intensities (COMBINE_ASYNC_INTENSITY).
+    if isfield(sensor_data, 'p_intensity_equiv') && ~isempty(sensor_data.p_intensity_equiv)
+        p_i_eq = gather(double(sensor_data.p_intensity_equiv));
+        acoustic_Ipa = p_i_eq.^2 ./ (2 * (kwave_medium.sound_speed .* kwave_medium.density)) .* 1e-4 * ramp_f;
+        clear p_i_eq
+        fprintf('[acoustic_analysis] Ipa from the summed intensities of the transducers firing together.\n');
     end
 
     results.Isppa = max(acoustic_Ipa(:)); % spatial-peak pulse-average intensity [W/cm²]

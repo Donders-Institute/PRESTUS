@@ -197,6 +197,26 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_load_p
     end
 
 
+    % load_transducer_parameters
+    methods (Test, TestTags = {'transducer'})
+
+        function test_unknown_transducer_type_errors_with_id(tc)
+            % The error names the transducer index and the type.
+            p = load_parameters(tc.quiet());
+            for t = {'circular', 'MATRIX'}
+                p.transducer = struct('type', t{1});
+                try
+                    load_transducer_parameters(p);
+                    tc.verifyFail(sprintf('no error for type "%s"', t{1}));
+                catch ME
+                    tc.verifyEqual(ME.identifier, 'prestus:transducer:unknownType');
+                    tc.verifySubstring(ME.message, sprintf('Transducer 1; Element shape option "%s"', t{1}));
+                end
+            end
+        end
+
+    end
+
     % sanitize_output_affix
     methods (Test, TestTags = {'sanitization'})
 

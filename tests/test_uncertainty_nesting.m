@@ -109,6 +109,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_uncert
         function asyncHpcGraph(tc)
             p = base_parameters(tc.TmpDir, 'slurm');
             p.transducer(2) = p.transducer(1);
+            p.transducer(2).trans_pos = p.transducer(1).trans_pos + [4 0 0];   % a second stance
             p.simulation.transducer_coupling = 'async';
             p.transducer(1).target_isppa_wcm2 = [10 20];
             p.transducer(2).target_isppa_wcm2 = [10 20];
@@ -151,6 +152,49 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_uncert
                 tc.verifyEqual(sort(reports{k}.depend), sort(variant_ids));
                 tc.verifyEqual(reports{k}.coupling, 'coherent');
             end
+        end
+
+        function asyncRepeatedStanceSimulatedOnce(tc)
+            % T3 returns to T1's stance (other target): one acoustic job for both,
+            % and the combine job reads that field twice (acoustic_store_key.m); in
+            % every uncertainty variant on its own. Variants run no free-water
+            % validation (uncertainty_pipeline.m); a plain async run runs one per field.
+            p = base_parameters(tc.TmpDir, 'slurm');
+            p.transducer(2) = p.transducer(1);
+            p.transducer(2).trans_pos = p.transducer(1).trans_pos + [4 0 0];
+            p.transducer(3) = p.transducer(1);
+            p.transducer(3).target_isppa_wcm2 = 20;
+            p.simulation.transducer_coupling = 'async';
+            p.modules.run_heating_sims = 0;
+            p.modules.run_posthoc_water_sims = 1;
+            uncertainty_pipeline(p);
+            jobs = recorded();
+            [name, ~, ~] = variant_list(p.io.output_affix);
+            for v = 1:numel(name)
+                vj = find_jobs(jobs, sprintf('u%d-%s-at', v + 1, name{v}));
+                tc.verifyNumElements(find_jobs(vj, '-ac_'), 2, name{v});
+                tc.verifyEmpty(find_jobs(vj, '-wv_'), name{v});
+                cb = find_jobs(vj, '-cb');
+                files = cb{1}.p.async_combine.files_in;
+                tc.verifyNumElements(files, 3);
+                tc.verifyEqual(files{3}, files{1}, name{v});
+                tc.verifyNotEqual(files{2}, files{1}, name{v});
+            end
+            % plain async run: one acoustic and one free-water job per distinct field
+            setappdata(0, 'prestus_test_jobs', {});
+            q = p;
+            q.simulation.uncertainty = false;
+            async_transducer_pipeline(q);
+            jobs = recorded();
+            tc.verifyNumElements(find_jobs(jobs, '-ac_'), 2);
+            tc.verifyNumElements(find_jobs(jobs, '-wv_'), 2);
+            % negative control: positions resolved per index are never shared
+            setappdata(0, 'prestus_test_jobs', {});
+            p.placement.mode = 'heuristic';
+            p.modules.run_transducer_placement = 1;
+            uncertainty_pipeline(p);
+            vj = find_jobs(recorded(), sprintf('u2-%s-at', name{1}));
+            tc.verifyNumElements(find_jobs(vj, '-ac_'), 3);
         end
 
         function sweepMatlabOrder(tc)

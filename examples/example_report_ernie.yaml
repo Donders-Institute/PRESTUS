@@ -1,0 +1,20 @@
+# Overlay on tutorial_ernie.yaml: the tutorial's head simulation with the outputs the ITRUSST
+# consensus asks TUS studies to report (Aubry et al., 2025, doi:10.1016/j.brs.2025.10.007).
+# Only the keys that differ from tutorial_ernie.yaml are listed; load both, tutorial first:
+#
+#   parameters = load_parameters('tutorial_ernie.yaml', dir, 'example_report_ernie.yaml', dir);
+#
+# Your own image: change path.* (and subject_id) in tutorial_ernie.yaml; this file sets no paths.
+# Run with example_report_ernie.m.
+
+io:
+  output_affix: report           # outputs named ..._desc-report, next to the tutorial's
+
+modules:
+  run_heating_sims: 1            # temperature rise, maximum temperature, and CEM43
+  run_posthoc_water_sims: 1      # default; free-water run with the same setup (free-field values)
+  run_targeting_analysis: 1      # default; simulated focus against the planned target
+  generate_report: 1             # default; HTML report with the ITRUSST safety dashboard
+
+thermal:
+  cem43_iso: 1                   # report CEM43 in the ISO 14708-3 / ITRUSST form (default 0: k-Wave form)

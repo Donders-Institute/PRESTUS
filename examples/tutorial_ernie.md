@@ -3,7 +3,7 @@
 !!! warning "Draft"
     This tutorial has not yet been run end to end on the current PRESTUS version. Runtimes and the values under *What you should see* are placeholders (marked **TODO**) until a test run fills them in. It stays in `examples/` until then; move it to `doc/` and add it to the nav in `mkdocs.yaml` once it has been run.
 
-This tutorial runs a complete head simulation on *Ernie*, the example head that comes with SimNIBS: segmentation, placement from MNI coordinates, the acoustic simulation, the thermal simulation, and the report. It builds on [Your first simulation](doc_getting-started.md); terms are explained in the [Glossary](doc_glossary.md).
+This tutorial runs a complete head simulation on *Ernie*, the example head that comes with SimNIBS: segmentation, placement from MNI coordinates, the acoustic simulation, the thermal simulation, and the report. It builds on [Your first simulation](doc_first-simulation.md); terms are explained in the [Glossary](doc_glossary.md).
 
 !!! note "At a glance"
     - **What:** one subject, one target, a transducer from the library, acoustic and thermal simulation.
@@ -31,7 +31,7 @@ The rest of the file describes the study:
 
 - **Transducer:** a Sonic Concepts CTX-500 with its driving system, from the [transducer library](doc_transducer_library.md), set to focus 50 mm from its exit plane. Results are scaled to a free-water intensity of 30 W/cm².
 - **Placement:** `mode: mni`. The transducer is placed on the left side of the head and aimed at a target given in MNI coordinates ([MNI placement](doc_placement_mni.md)). PRESTUS converts both points to Ernie's head and moves the transducer onto the scalp.
-- **Protocol:** 20 ms pulses at 5 Hz for 20 s, followed by 20 s of cooling ([Thermal](doc_simulations-thermal.md)).
+- **Protocol:** 20 ms pulses at 5 Hz for 20 s, followed by a 20 s steady-state ([Thermal](doc_simulations-thermal.md)).
 
 ## 1. Segmentation
 

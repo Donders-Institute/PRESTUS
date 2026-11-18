@@ -1,0 +1,81 @@
+# Overlay on tutorial_ernie.yaml: a mixed sonication protocol with uncertainty mode
+# (doc/doc_multitransducer_async.md, "Example Protocols"). Not yet run end to end.
+#
+#   step 1   0 s   T1 alone, left stance (the tutorial's), 20 s          then 30 s pause
+#   step 2  50 s   T2 + T3 together on a deep left target, 20 s           then 30 s pause
+#   step 3 100 s   T4 = T1's stance again, 40 s                           then 60 s steady state
+#
+# T2 and T3 start together with the same timing, so they form a firing group: their complex
+# fields are summed (they interfere), each scaled to its own target ISPPA. T4 has T1's stance
+# and settings, so its acoustic field is T1's (simulated once). One thermal simulation covers
+# the whole protocol. simulation.uncertainty runs all of it for each of the five tissue-property
+# variants (default, Temp-H, Temp-L, Trans-H, Trans-L).
+#
+# Load both, tutorial first:
+#   parameters = load_parameters('tutorial_ernie.yaml', dir, 'example_mixed_uncertainty_ernie.yaml', dir);
+# Your own image: change path.* (and subject_id) in tutorial_ernie.yaml; this file sets no paths.
+# The stances are MNI mm and are not snapped to the scalp: check them in the Nexus Viewer first.
+
+platform: slurm                  # 5 variants x 3 acoustic simulations: run on a cluster
+
+simulation:
+  transducer_coupling: async     # one acoustic simulation per field, one joint thermal simulation
+  uncertainty: true              # the five ITRUSST tissue-property variants
+
+modules:
+  run_heating_sims: 1
+
+io:
+  output_affix: mixed
+
+grid:
+  async_layout: shared           # needed by the firing group (complex fields are summed per voxel)
+
+placement:
+  mode: manual
+  manual:
+    coordinate_space: mni        # positions in the transducer entries, MNI mm
+
+# Every entry lists the same keys (MATLAB reads the list as one struct array).
+transducer:
+  - serial: CTX_500_026          # T1: the tutorial's stance
+    combo:
+      ds_serial: SC_203_035
+    focal_distance_ep: 50
+    target_isppa_wcm2: 30
+    trans_pos: [-52, -8, 58]
+    focus_pos: [-29, -6, 7]
+    timing_offset_s: 0
+    timing: {}
+  - serial: IS_PCD15287_01001    # T2: with T3 on one deep target
+    combo:
+      ds_serial: IGT_32_ch_comb_10_ch
+    focal_distance_ep: 50
+    target_isppa_wcm2: 20
+    trans_pos: [-72, -22, 8]
+    focus_pos: [-12, -18, 6]
+    timing_offset_s: 50
+    timing: {}
+  - serial: IS_PCD15287_01002    # T3: fires together with T2 (same start, same timing)
+    combo:
+      ds_serial: IGT_32_ch_comb_10_ch
+    focal_distance_ep: 62
+    target_isppa_wcm2: 20
+    trans_pos: [-50, -60, 50]
+    focus_pos: [-12, -18, 6]
+    timing_offset_s: 50
+    timing: {}
+  - serial: CTX_500_026          # T4: T1's stance and settings again, sonicating 40 s
+    combo:
+      ds_serial: SC_203_035
+    focal_distance_ep: 50
+    target_isppa_wcm2: 30
+    trans_pos: [-52, -8, 58]
+    focus_pos: [-29, -6, 7]
+    timing_offset_s: 100
+    timing:
+      ptrd: 40                   # two 20 s pulse trains back to back
+
+timing:
+  post_ptri_dur: 60              # 60 s steady state after the last step
+  async_schedule: custom         # each transducer starts at its timing_offset_s

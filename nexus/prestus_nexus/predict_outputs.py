@@ -83,6 +83,23 @@ def _async_sweep_points(model: ConfigModel) -> int:
     return n_points
 
 
+_STANCE_FREE = ("timing_offset_s", "timing", "name", "target_isppa_wcm2", "tx_calibration")
+
+
+def shared_fields(model: ConfigModel) -> list[int]:
+    """For each transducer (0-based), the first transducer with the same acoustic field,
+    as acoustic_store_key.m: with explicit positions (placement.mode 'manual', or no
+    placement stage), entries that differ only in timing, start, name, and target share
+    one acoustic simulation. Other placement modes resolve each entry on its own."""
+    tx = model.effective_transducers()
+    mode = model.get("placement.mode")
+    placement_on = model.get("modules.run_transducer_placement") not in (0, False)
+    if placement_on and mode not in (None, "", "manual"):
+        return list(range(len(tx)))
+    stance = [{k: v for k, v in t.items() if k not in _STANCE_FREE} for t in tx]
+    return [next(j for j in range(i + 1) if stance[j] == stance[i]) for i in range(len(tx))]
+
+
 def _async_affix_thermal(base_affix: str, j: int, n_points: int) -> str:
     if n_points == 1:
         return f"{base_affix}_desc-asyncJoint"
@@ -154,9 +171,11 @@ def predict(model: ConfigModel) -> Plan:
     elif mode == "async":
         n_trans = len(model.tx)
         n_points = _async_sweep_points(model)
+        rep = shared_fields(model)
+        fields = [ti for ti in range(n_trans) if rep[ti] == ti]
         run_water = bool(model.get("modules.run_posthoc_water_sims"))
         if run_water:
-            for ti in range(1, n_trans + 1):
+            for ti in (i + 1 for i in fields):
                 artifacts.append(Artifact(f"{tag}_water{base_affix}{_trans_suffix(ti, n_trans)}.csv",
                                            f"free-water validation — transducer {ti}"))
         for j in range(1, n_points + 1):
@@ -168,12 +187,18 @@ def predict(model: ConfigModel) -> Plan:
             artifacts.append(Artifact(f"{tag}_{medium}_report{affix}.html", label))
         grid_mode = model.get("simulation.async_grid_mode") or "shared"
         if grid_mode == "per_transducer":
-            jobs.append(f"{n_trans} preprocessing jobs — async_grid_mode='per_transducer', one grid each")
+            jobs.append(f"{n_trans} preprocessing jobs — grid.async_layout='per_transducer', one grid each")
         else:
-            jobs.append("1 shared preprocessing stage — async_grid_mode='shared', one grid for all transducers")
-        jobs.append(f"{n_trans} acoustic jobs — one per transducer")
+            jobs.append("1 shared preprocessing stage — grid.async_layout='shared', one grid for all transducers")
+        if len(fields) < n_trans:
+            jobs.append(f"{len(fields)} acoustic jobs — one per distinct field ({n_trans} transducers; "
+                        "transducers with the same stance and settings share one)")
+        else:
+            jobs.append(f"{n_trans} acoustic jobs — one per transducer")
+        jobs.append("fields kept in this output folder by earlier runs with the same settings are "
+                    "reused, not simulated again")
         if run_water:
-            jobs.append(f"{n_trans} free-water validation jobs — one per transducer")
+            jobs.append(f"{len(fields)} free-water validation jobs — one per distinct field")
         jobs.append(f"{n_points} combine job(s)" + (" — one per sweep point" if n_points > 1 else ""))
         jobs.append(f"{n_points} joint thermal + report job(s)" + (" — one per sweep point" if n_points > 1 else ""))
 

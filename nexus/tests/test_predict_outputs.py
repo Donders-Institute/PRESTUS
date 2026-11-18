@@ -43,6 +43,7 @@ def test_async_mode(schema):
     m = _base(schema)
     m.set("simulation.transducer_coupling", "async")
     m.add_transducer()
+    m.set("transducer.trans_pos", [52, -8, 58], 1)       # a second stance
     m.set("modules.run_posthoc_water_sims", 1)
     plan = predict(m)
     assert plan.mode == "async"
@@ -53,6 +54,26 @@ def test_async_mode(schema):
     assert "sub-003_layered_report_desc-asyncJoint.html" in names
     assert any("2 acoustic jobs" in j for j in plan.jobs)
     assert any("2 free-water validation jobs" in j for j in plan.jobs)
+
+
+def test_async_repeated_stance_is_simulated_once(schema):
+    # T3 returns to T1's stance with other timing and target: one field for both
+    # (acoustic_store_key.m); other placement modes resolve every entry on its own
+    m = _base(schema)
+    m.set("simulation.transducer_coupling", "async")
+    m.add_transducer()
+    m.add_transducer()
+    m.set("transducer.trans_pos", [52, -8, 58], 1)
+    m.set("transducer.timing_offset_s", 100.0, 2)
+    m.set("transducer.target_isppa_wcm2", 20.0, 2)
+    m.set("modules.run_posthoc_water_sims", 1)
+    plan = predict(m)
+    names = [a.name for a in plan.artifacts]
+    assert "sub-003_water_trans-03.csv" not in names
+    assert any(j.startswith("2 acoustic jobs — one per distinct field (3 transducers") for j in plan.jobs)
+    assert any("2 free-water validation jobs" in j for j in plan.jobs)
+    m.set("placement.mode", "heuristic")                 # negative control
+    assert any(j.startswith("3 acoustic jobs — one per transducer") for j in predict(m).jobs)
 
 
 def test_async_sweep(schema):

@@ -464,7 +464,7 @@ end
     if parameters.io.save_heatingvideo == 1 && ~isempty(focal_planeT)
         color_limits = [min(focal_planeT(:)), max(focal_planeT(:))];
         if ndims(medium_masks) == 3
-            brain_slice = mat2gray(squeeze(medium_masks(:,parameters.transducer.trans_pos(2),:)));
+            brain_slice = mat2gray(squeeze(medium_masks(:,trans_pos(2),:)));
         elseif ndims(medium_masks) == 2
             brain_slice = mat2gray(squeeze(medium_masks));
         end

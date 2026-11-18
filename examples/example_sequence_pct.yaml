@@ -1,0 +1,89 @@
+# PRESTUS study config: example_sequence_pct
+# Written by the PRESTUS Nexus; only values that differ from config_default.yaml.
+# Load with: parameters = load_parameters('example_sequence_pct.yaml', '/Volumes/2425122.01/PRESTUS_dev/tools/PRESTUS/examples');
+
+subject_id: 1
+platform: 'slurm'
+simulation:
+  medium: 'layered'
+  code_type: 'matlab_gpu'
+  transducer_coupling: 'async'
+path:
+  anat: '/path/to/study/anat'
+  sim: '/path/to/study/sim'
+  seg: '/path/to/study/simnibs'
+  t1_pattern: 'sub-%1$03d/sub-%1$03d_T1w.nii.gz'
+  t2_pattern: 'sub-%1$03d/sub-%1$03d_UTE.nii.gz'
+startup:
+  simnibs_bin_path: '/path/to/conda/envs/simnibs_v4.6.0/bin'
+io:
+  output_affix: 'demo'
+  save_MNI: 1
+modules:
+  run_heating_sims: 1
+  run_posthoc_water_sims: 1
+  run_targeting_analysis: 1
+transducer:
+  - target_isppa_wcm2: 30
+    trans_pos: [-52, -8, 58]
+    focus_pos: [-29, -6, 7]
+    focal_distance_ep: 45
+    timing_offset_s: 0
+    timing: {}
+    serial: 'CTX_500_026'
+    combo:
+      ds_serial: 'SC_203_035'
+  - target_isppa_wcm2: 20
+    trans_pos: [-72, -22, 8]
+    focus_pos: [-12, -18, 6]
+    focal_distance_ep: 50
+    timing_offset_s: 80
+    timing: {}
+    serial: 'IS_PCD15287_01001'
+    combo:
+      ds_serial: 'IGT_32_ch_comb_10_ch'
+  - target_isppa_wcm2: 20
+    trans_pos: [-50, -60, 50]
+    focus_pos: [-12, -18, 6]
+    focal_distance_ep: 62
+    timing_offset_s: 80
+    timing: {}
+    serial: 'IS_PCD15287_01002'
+    combo:
+      ds_serial: 'IGT_32_ch_comb_10_ch'
+  - target_isppa_wcm2: 30
+    trans_pos: [52, -8, 58]
+    focus_pos: [29, -6, 7]
+    focal_distance_ep: 45
+    timing_offset_s: 160
+    timing:
+      pd: 0.03
+      ptrd: 40
+    serial: 'CTX_500_026'
+    combo:
+      ds_serial: 'SC_203_035'
+placement:
+  mode: 'manual'
+  manual:
+    coordinate_space: 'mni'
+grid:
+  resolution_mm: 0.5
+  acoustic_fov_diameter_mm: 'auto'
+  acoustic_fov_length_mm: 'auto'
+headmodel:
+  reuse_across_placements: true
+pct:
+  enabled: 1
+  skull_mapping: 'kosciessa'
+timing:
+  pd: 0.02
+  pri: 0.2
+  ptd: 20
+  pt_timestep: 0.02
+  ptri: 20
+  ptrd: 20
+  post_ptri_dur: 60
+  post_pt_timestep: 1
+  async_schedule: 'custom'
+thermal:
+  cem43_iso: 1

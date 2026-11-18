@@ -107,10 +107,13 @@ fields:
   simulation.debug_figures: {kind: flag, visible_if: {key: simulation.debug, in: [1, true]}}
   simulation.debug_volumes: {kind: flag, visible_if: {key: simulation.debug, in: [1, true]}}
   simulation.transducer_coupling: {choices: [coherent, async], visible_if: {key: __n_transducers, not_in: [0, 1]}}
-  simulation.uncertainty_temp_high: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
-  simulation.uncertainty_temp_low: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
-  simulation.uncertainty_trans_high: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
-  simulation.uncertainty_trans_low: {kind: file, visible_if: {key: simulation.uncertainty, in: [true]}}
+  grid.async_layout:
+    choices: [shared, per_transducer]
+    visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}]
+  timing.async_schedule:
+    choices: [pulses, trains, custom]
+    visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}]
+    help: "Async coupling: when each transducer fires; heating follows each one's own on-time. 'pulses': all use the timing block and take turns within each PRI (needs N × PD ≤ PRI). 'trains': take turns within each PTRI (needs N × PTD ≤ PTRI). 'custom': each transducer's start delay and timing overrides."
 
   # ── Paths & environment ──────────────────────────────────────────────
   path.sim: {kind: dir}
@@ -542,12 +545,42 @@ extra:
     kind: bool
     default: []
     help: BabelBrain narrow-beam domain (saves compute; the pre-focal field is not emitted). Ignored when grid.acoustic_fov_length_mm is set.
-  simulation.async_grid_mode:
-    kind: str
-    default: shared
-    choices: [shared, per_transducer]
-    visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}]
-    help: "Async coupling: 'shared' preprocesses one grid for all transducers; 'per_transducer' builds one grid each (parallel on HPC)."
+  transducer.timing_offset_s:
+    kind: number
+    default: []
+    unit: s
+    visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}, {key: timing.async_schedule, in: [custom]}]
+    help: "Async 'custom' schedule: delay of this transducer's first pulse [s]. Empty = 0."
+  transducer.timing.pd:
+    kind: number
+    default: []
+    unit: s
+    visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}, {key: timing.async_schedule, in: [custom]}]
+    help: "Async 'custom' schedule: this transducer's pulse duration [s], replacing timing.pd. Empty = the timing block's."
+  transducer.timing.pri:
+    kind: number
+    default: []
+    unit: s
+    visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}, {key: timing.async_schedule, in: [custom]}]
+    help: "Async 'custom' schedule: this transducer's pulse repetition interval [s], replacing timing.pri. Empty = the timing block's."
+  transducer.timing.ptd:
+    kind: number
+    default: []
+    unit: s
+    visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}, {key: timing.async_schedule, in: [custom]}]
+    help: "Async 'custom' schedule: this transducer's pulse train duration [s], replacing timing.ptd. Empty = the timing block's."
+  transducer.timing.ptri:
+    kind: number
+    default: []
+    unit: s
+    visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}, {key: timing.async_schedule, in: [custom]}]
+    help: "Async 'custom' schedule: this transducer's pulse train repetition interval [s], replacing timing.ptri. Empty = the timing block's."
+  transducer.timing.ptrd:
+    kind: number
+    default: []
+    unit: s
+    visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}, {key: timing.async_schedule, in: [custom]}]
+    help: "Async 'custom' schedule: how long this transducer sonicates [s] (its pulse train repetition duration), replacing timing.ptrd. Empty = the timing block's."
   simulation.uncertainty:
     kind: bool
     default: false
@@ -1372,7 +1405,7 @@ choice_labels:
 # booleans ('off'). test_schema checks keys, choices and names.
 choice_icons:
   simulation.transducer_coupling: {coherent: coupling_coherent, async: coupling_async}
-  simulation.async_grid_mode: {shared: asyncgrid_shared, per_transducer: asyncgrid_per_transducer}
+  grid.async_layout: {shared: asyncgrid_shared, per_transducer: asyncgrid_per_transducer}
   simulation.medium: {water: medium_water, layered: medium_layered, phantom: medium_phantom}
   transducer.type: {annular: tx_annular, matrix: tx_matrix}
   transducer.matrix.steering: {'1D': steer_1d, '3D': steer_3d}
@@ -1398,7 +1431,7 @@ choice_figures:
     focal_axis: [gridmode_focal_axis_fig]
     transducer_axis: [gridmode_transducer_axis_fig]
     ras_plus: [gridmode_ras_plus_fig]
-  simulation.async_grid_mode:
+  grid.async_layout:
     shared: [asyncgrid_shared_fig]
     per_transducer: [asyncgrid_per_transducer_fig]
 

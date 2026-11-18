@@ -33,18 +33,13 @@ simulation:
   debug_volumes: 1    # With debug: write intermediate volumes (NIfTI; each about the size of the head volume)?
   transducer_coupling: coherent # How multiple transducers interact acoustically:
                                 #   'coherent'  — pressure fields are superposed in a single k-Wave run
-                                #                 (models interference; current default behaviour)
-                                #   'async'     — each transducer is simulated independently and
-                                #                 intensities are summed incoherently before thermal
-                                #                 simulation (models asynchronous / non-overlapping firing)
-  uncertainty_temp_high: ''     # Medium properties of the Temp-H variant of simulation.uncertainty (bounds that maximise brain
-                                #   heating): a YAML file with a medium_properties block, merged onto this config (absolute
-                                #   path, or a file name in config/uncertainty/). '' = config/uncertainty/config_medium_temp_high.yaml
-  uncertainty_temp_low: ''      # Temp-L variant (bounds that minimise brain heating), as above. '' = config_medium_temp_low.yaml
-  uncertainty_trans_high: ''    # Trans-H variant (bounds that maximise brain intensity; acoustic only), as above.
-                                #   '' = config_medium_trans_high.yaml
-  uncertainty_trans_low: ''     # Trans-L variant (bounds that minimise brain intensity; acoustic only), as above.
-                                #   '' = config_medium_trans_low.yaml
+                                #                 (models interference; default)
+                                #   'async'     — each transducer is simulated independently; safety metrics
+                                #                 take the per-voxel maximum and heating follows each
+                                #                 transducer's firing schedule (models non-overlapping firing)
+  uncertainty_overrides: []     # Edited bound values of the simulation.uncertainty variants, per variant, tissue and property,
+                                #   e.g. {temp_high: {brain: {sound_speed: 1560}}}, merged onto the shipped ITRUSST bounds in
+                                #   config/uncertainty/. [] = the ITRUSST bounds unchanged. Edited variants no longer bracket them.
 
 #------------ Paths
 
@@ -241,6 +236,8 @@ transducer:
   # library_path: ''      # Folder with your own library entries (refine_transducer_library / calibration_gui); used when it holds this combo. Equipment entries there (*_transducer.yaml) add or replace transducers
   # max_elem_p_amp: []    # Largest drive your driving system delivers [Pa, as elem_p_amp]; [] = the combo's drive_limit in the equipment entry, if any
   # condition: ''        # EXPERIMENTAL, not validated: dephased library condition (lib.conditions.<label>) instead of focal_distance_ep
+  # timing_offset_s: []   # Async 'custom' schedule: delay of this transducer's first pulse [s]; [] = 0
+  # timing: {pd: [], pri: [], ptd: [], ptri: [], ptrd: []}  # Async 'custom' schedule: this transducer's pd/pri/ptd/ptri/ptrd [s], replacing the timing block's; [] = the timing block's
 
   trans_pos: []              # Transducer position (bowl apex) [T1 voxels by default; see placement.manual.coordinate_space]
   focus_pos: []              # Stimulation target position [T1 voxels by default; see placement.manual.coordinate_space]
@@ -548,6 +545,9 @@ grid:
                            #   shorter than this, the beams are too spread to average and z follows
                            #   transducer(1)'s axis. Only reachable with 3+ transducers (two beams
                            #   always give >= 0.71).
+  async_layout: shared     # Async coupling (simulation.transducer_coupling: async): 'shared' preprocesses one grid
+                           #   for all transducers, oriented by grid.mode; 'per_transducer' builds one grid each,
+                           #   as a solo run would (parallel on HPC)
 
 #------------ Segmentation
 
@@ -615,6 +615,10 @@ timing:
   post_ptri_dur: 0 # Steady-state period after the PTRD [s]
   post_pt_timestep: 1 # Modelling time step between pulse trains and after the PTRD [s]
   equal_step_duration: 0 # Equal step durations for on and off cycles? 1=yes, 0=no
+  async_schedule: pulses # Async coupling (simulation.transducer_coupling: async): when each transducer fires:
+                         #   'pulses' — all use this block, taking turns within each PRI (N x PD <= PRI)
+                         #   'trains' — all use this block, taking turns within each PTRI (N x PTD <= PTRI)
+                         #   'custom' — transducer(i).timing_offset_s and transducer(i).timing set each one's timing
 
 #------------ Thermal parameters
 

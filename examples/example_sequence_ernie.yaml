@@ -1,0 +1,85 @@
+# Hypothetical sonication sequence on SimNIBS' Ernie (doc/doc_sequential.md, "Planning a Sequence
+# in the Nexus"): three stances sonicated one after another, with pauses between them.
+# Built on examples/tutorial_ernie.yaml (same paths, transducer, and pulse timing); not yet run.
+# Replace the four paths before running, and run the tutorial's segmentation step first.
+#
+#   stance 1  left,  20 s   then 30 s pause
+#   stance 2  right, 20 s   (the mirror image of stance 1)   then 30 s pause
+#   stance 3  left,  40 s   (stance 1 again, twice as long)  then 60 s steady-state
+#
+# Stored as an async run with the 'custom' schedule: each stance is a transducer entry whose
+# timing_offset_s is when it starts; a stance's timing differs from the timing block only where
+# it sets transducer(i).timing. Open this file in the Nexus to see and edit the sequence
+# (Sonication tab, Sonication sequence card); its Run tab can also run it as a chain of runs.
+
+subject_id: 1                    # Ernie, as in tutorial_ernie
+platform: matlab                 # run in this MATLAB session; 'slurm' or 'qsub' on a cluster
+
+path:
+  anat: /path/to/simnibs4_examples/org   # folder with ernie_T1.nii.gz and ernie_T2.nii.gz
+  t1_pattern: ernie_T1.nii.gz
+  t2_pattern: ernie_T2.nii.gz
+  seg: /path/to/tutorial/simnibs         # SimNIBS writes m2m_sub-001/ here
+  sim: /path/to/tutorial/sim             # PRESTUS outputs
+
+startup:
+  simnibs_bin_path: /path/to/conda/envs/simnibs_v4.6.0/bin
+
+simulation:
+  medium: layered
+  code_type: matlab_gpu          # 'matlab_cpu' without a GPU (much slower)
+  transducer_coupling: async     # one acoustic simulation per stance, one joint thermal simulation
+
+modules:
+  run_heating_sims: 1            # the pauses and durations matter only for heating
+
+io:
+  output_affix: sequence
+
+placement:
+  mode: manual
+  manual:
+    coordinate_space: mni        # MNI mm, converted per stance; NOT snapped to the scalp:
+                                 # check the stances in the Nexus Viewer and move them there
+
+# Every entry lists the same keys (MATLAB reads the list as one struct array). Entries 2 and 3
+# take the device, focal depth, and target ISPPA from entry 1.
+transducer:
+  - serial: CTX_500_026          # Sonic Concepts CTX-500, from the shipped library
+    combo:
+      ds_serial: SC_203_035      # driving system
+    focal_distance_ep: 50        # focal depth setting [mm from the exit plane]
+    target_isppa_wcm2: 30        # free-water ISPPA the results are scaled to [W/cm2]
+    trans_pos: [-52, -8, 58]     # stance 1: left (the tutorial's stance) [MNI mm]
+    focus_pos: [-29, -6, 7]
+    timing_offset_s: 0           # starts at 0 s
+    timing: {}                   # the timing block: 20 s
+  - serial: CTX_500_026
+    combo: {}
+    focal_distance_ep: 50
+    target_isppa_wcm2: 30
+    trans_pos: [52, -8, 58]      # stance 2: right, mirror image of stance 1 [MNI mm]
+    focus_pos: [29, -6, 7]
+    timing_offset_s: 50          # 20 s + 30 s pause
+    timing: {}
+  - serial: CTX_500_026
+    combo: {}
+    focal_distance_ep: 50
+    target_isppa_wcm2: 30
+    trans_pos: [-52, -8, 58]     # stance 3: stance 1 again [MNI mm]
+    focus_pos: [-29, -6, 7]
+    timing_offset_s: 100         # 50 s + 20 s + 30 s pause
+    timing:
+      ptrd: 40                   # 40 s: two 20 s pulse trains back to back
+
+timing:                          # stance 1's protocol: 20 ms pulses at 5 Hz for 20 s
+  pd: 0.02
+  pri: 0.2
+  ptd: 20
+  pt_timestep: 0.02
+  ptri: 20
+  ptrd: 20
+  post_ptri_dur: 60              # 60 s steady-state after the last stance
+  post_pt_timestep: 1            # thermal step in pauses [s]; pauses are whole multiples, so the
+                                 # sequence can also run as a chain of runs
+  async_schedule: custom         # each stance starts at its timing_offset_s

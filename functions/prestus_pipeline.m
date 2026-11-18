@@ -110,10 +110,18 @@ function [parameters] = prestus_pipeline(parameters, options)
         if isfield(parameters.async_combine, 'mode') && ~isempty(parameters.async_combine.mode)
             mode = parameters.async_combine.mode;
         end
+        groups = [];
+        if isfield(parameters.async_combine, 'groups')
+            groups = parameters.async_combine.groups;
+        end
+        pd_s = [];
+        if isfield(parameters.async_combine, 'pd_s')
+            pd_s = parameters.async_combine.pd_s;
+        end
         combine_async_intensity( ...
             parameters.async_combine.files_in, ...
             parameters.async_combine.file_out, ...
-            targets, mode);
+            targets, mode, groups, pd_s);
         return;
     end
 

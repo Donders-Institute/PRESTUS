@@ -169,6 +169,76 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_multit
             tc.verifySize(s.sensor_data.p_max_async, [10 10 10]);
             tc.verifyGreaterThan(nnz(s.sensor_data.p_max_async), 0);
         end
+
+        function test_combine_firing_group(tc)
+            % Transducers 1 and 2 fire together (complex sum), transducer 3 on its own
+            d = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            full = [6 6 6];
+            for phase = [1, -1]                      % constructive, destructive
+                f1 = write_cache(fullfile(d, 'a_results.mat'), ones(full), [], []);
+                write_pc(fullfile(d, 'a_p_complex.mat'), ones(full), [], [], 3e5);
+                f2 = write_cache(fullfile(d, 'b_results.mat'), ones(full), [], []);
+                write_pc(fullfile(d, 'b_p_complex.mat'), phase * ones(full), [], [], 3e5);
+                f3 = write_cache(fullfile(d, 'c_results.mat'), 1.5 * ones(full), [], []);
+                out = fullfile(d, 'g.mat');
+                evalc('combine_async_intensity({f1, f2, f3}, out, [], ''async'', [1 1 2]);');
+                s = load(out, 'sensor_data', 'acoustic_provenance');
+                group_amp = abs(1 + phase);          % 2 or 0
+                tc.verifyEqual(s.sensor_data.p_max_async(3, 3, 3), max(group_amp, 1.5), 'AbsTol', 1e-12);
+                tc.verifyEqual(s.sensor_data.p_min_async(3, 3, 3), -max(group_amp, 1.5), 'AbsTol', 1e-12);
+                tc.verifyEqual(s.sensor_data.p_max_all(3, 3, 3), sqrt(group_amp^2 + 1.5^2), 'AbsTol', 1e-12);
+                tc.verifyEqual(double(s.sensor_data.p_intensity_equiv(3, 3, 3)), max(group_amp, 1.5), ...
+                    'AbsTol', 1e-6);
+                tc.verifySize(s.sensor_data.p_async_tx, [full, 2]);   % one source per group
+                tc.verifyEqual(double(s.sensor_data.p_async_tx(3, 3, 3, 1)), group_amp, 'AbsTol', 1e-6);
+                tc.verifyEqual(double(s.sensor_data.p_async_tx(3, 3, 3, 2)), 1.5, 'AbsTol', 1e-6);
+                tc.verifyEqual(s.sensor_data.p_async_source_tx, [1 3]);
+                tc.verifyEqual(s.acoustic_provenance.combination_mode, 'async_dual_field_grouped');
+                tc.verifyEqual(s.acoustic_provenance.combination_groups, [1 1 2]);
+            end
+        end
+
+        function test_combine_shared_field(tc)
+            % A stance used twice (T1 and T3) reads one field; each entry stays its own
+            % heat source, scaled to its own target
+            d = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            full = [6 6 6];
+            f1 = write_cache(fullfile(d, 'a_results.mat'), ones(full), [], []);
+            f2 = write_cache(fullfile(d, 'b_results.mat'), 2 * ones(full), [], []);
+            out = fullfile(d, 'c.mat');
+            evalc('combine_async_intensity({f1, f2, f1}, out, [], ''async'', [], [0.02 0.02 0.03]);');
+            s = load(out, 'sensor_data', 'acoustic_provenance');
+            tc.verifySize(s.sensor_data.p_async_tx, [full, 3]);
+            tc.verifyEqual(s.sensor_data.p_async_tx(:, :, :, 3), s.sensor_data.p_async_tx(:, :, :, 1));
+            tc.verifyEqual(s.sensor_data.p_max_all(3, 3, 3), sqrt(1 + 4 + 1), 'AbsTol', 1e-12);
+            tc.verifyEqual(s.acoustic_provenance.combined_from, {f1; f2; f1});
+        end
+
+        function test_combine_without_groups_unchanged(tc)
+            % Negative control: no groups writes no group fields and keeps one source per transducer
+            d = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            full = [6 6 6];
+            f1 = write_cache(fullfile(d, 'a_results.mat'), ones(full), [], []);
+            f2 = write_cache(fullfile(d, 'b_results.mat'), 2 * ones(full), [], []);
+            out = fullfile(d, 'c.mat');
+            evalc('combine_async_intensity({f1, f2}, out);');
+            s = load(out, 'sensor_data', 'acoustic_provenance');
+            tc.verifySize(s.sensor_data.p_async_tx, [full, 2]);
+            tc.verifyFalse(isfield(s.sensor_data, 'p_async_source_tx'));
+            tc.verifyFalse(isfield(s.sensor_data, 'p_intensity_equiv'));
+            tc.verifyEqual(s.acoustic_provenance.combination_mode, 'async_dual_field');
+        end
+
+        function test_combine_group_needs_shared_grid(tc)
+            d = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            f1 = write_cache(fullfile(d, 'a_results.mat'), ones(6, 6, 6), [], []);
+            write_pc(fullfile(d, 'a_p_complex.mat'), ones(6, 6, 6), [], [], 3e5);
+            f2 = write_cache(fullfile(d, 'b_results.mat'), ones(8, 8, 8), [], []);
+            write_pc(fullfile(d, 'b_p_complex.mat'), ones(8, 8, 8), [], [], 3e5);
+            out = fullfile(d, 'g.mat');
+            tc.verifyError(@() combine_async_intensity({f1, f2}, out, [], 'async', [1 1]), ...
+                'combine_async_intensity:simultaneousGridMismatch');
+        end
     end
 
     methods (Test, TestTags = {'p_complex'})

@@ -1,0 +1,19 @@
+# Overlay on tutorial_ernie.yaml: the tutorial's head simulation on a partial acoustic field of
+# view (doc/doc_partial-fov.md). The acoustic run is cropped to a beam-aligned box around the
+# transducer and focus; the results are written back onto the full grid. Only the keys that differ
+# from tutorial_ernie.yaml are listed; load both, tutorial first:
+#
+#   parameters = load_parameters('tutorial_ernie.yaml', dir, 'example_fov_ernie.yaml', dir);
+#
+# Your own image: change path.* (and subject_id) in tutorial_ernie.yaml; this file sets no paths.
+# Run with example_fov_ernie.m, which compares this run with a full-grid run of the tutorial.
+
+io:
+  output_affix: fov              # outputs named ..._desc-fov, next to the full-grid run's
+
+grid:
+  acoustic_fov_diameter_mm: auto # outer element diameter of transducer 1, plus a margin
+  acoustic_fov_length_mm: auto   # bowl apex to focus, plus grid.z_beyond_focus_mm (default 40 mm)
+  # thermal_use_acoustic_fov: 0  # default: the thermal run uses the full grid (heat leaves the box)
+  # steady_state_transits: 1     # default; a compact box with strong skull reflections may need more
+                                 # if ISPPA or focal depth still change when this is raised

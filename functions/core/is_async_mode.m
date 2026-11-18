@@ -4,6 +4,9 @@ function result = is_async_mode(parameters)
 % Async mode is active when ALL of the following hold:
 %   1. parameters.simulation.transducer_coupling equals 'async'
 %   2. parameters.transducer contains more than one entry
+% or for coherent transducers at different frequencies
+% (IS_SIMULTANEOUS_MULTIFREQ), which run through the same pipeline and are
+% combined as firing together.
 %
 % Use as:
 %   tf = is_async_mode(parameters)
@@ -15,4 +18,5 @@ result = isfield(parameters, 'simulation') && ...
          strcmp(parameters.simulation.transducer_coupling, 'async') && ...
          isfield(parameters, 'transducer') && ...
          numel(parameters.transducer) > 1;
+result = result || is_simultaneous_multifreq(parameters);
 end
