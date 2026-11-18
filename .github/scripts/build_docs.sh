@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Build the docs site of one PRESTUS checkout for the versioned site.
 #
-#   build_docs.sh <checkout> <out_dir> [banner]
+#   build_docs.sh <checkout> <out_dir> <version> [banner]
 #
+# <version> is the folder the build goes to (main, development, v0.6.1): it is
+# appended to site_url, so each version's sitemap lists its own pages.
 # A checkout whose requirements-docs.txt lists zensical is built with Zensical,
 # any other (main, release tags up to v0.6.x) with MkDocs + Material. Both read
 # versions.json for the version selector (extra.version, added here when the
@@ -15,7 +17,8 @@ set -euo pipefail
 
 src=$1
 out=$2
-banner=${3:-}
+version=$3
+banner=${4:-}
 here=$(cd "$(dirname "$0")" && pwd)
 
 cd "$src"
@@ -25,7 +28,7 @@ else echo "no mkdocs.yaml in $src" >&2; exit 1; fi
 
 mkdir -p _version_overrides
 cp "$here/version_banner.html" _version_overrides/main.html
-python3 "$here/docs_version_config.py" "$cfg" "$banner"
+python3 "$here/docs_version_config.py" "$cfg" "$version" "$banner"
 
 if grep -qi zensical requirements-docs.txt 2>/dev/null; then
   zensical build --clean -f "$cfg"       # writes site/ inside the checkout
