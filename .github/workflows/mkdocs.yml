@@ -1,8 +1,26 @@
 name: Deploy PRESTUS Docs
+
+# Versioned documentation site (https://donders-institute.github.io/PRESTUS/):
+#   main/          the main branch; the default, and where the site root and the
+#                  old unversioned page URLs redirect
+#   development/   the development branch (unreleased changes)
+#   vX.Y.Z/        release tags, frozen as tagged
+# Each run builds one version with that checkout's own toolchain
+# (.github/scripts/build_docs.sh), places it on the gh-pages branch
+# (.github/scripts/deploy_docs_version.py, which also writes versions.json for the
+# version selector), keeps gh-pages as a single commit, and publishes the tree.
+# Run it by hand with a release tag (e.g. v0.6.1) to add or rebuild that version.
+
 on:
   push:
     branches: [ development, main ]
+    tags: [ 'v*' ]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or release tag to build (empty = the branch this runs on)
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -26,48 +44,89 @@ jobs:
 
     - uses: actions/setup-python@v5
       with:
-        python-version: '3.x'
+        python-version: '3.12'
 
-    - uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+    - name: Which version
+      id: which
+      env:
+        INPUT_REF: ${{ inputs.ref }}
+      run: |
+        ref="${INPUT_REF:-$GITHUB_REF_NAME}"
+        if git rev-parse -q --verify "refs/tags/$ref" >/dev/null; then
+          sha=$(git rev-parse "refs/tags/$ref^{commit}")
+        elif git rev-parse -q --verify "refs/remotes/origin/$ref" >/dev/null; then
+          sha=$(git rev-parse "refs/remotes/origin/$ref")
+        else
+          echo "::error::no branch or tag '$ref'"; exit 1
+        fi
+        git worktree add --detach src "$sha"
+        banner=""
+        case "$ref" in
+          main)
+            name=main
+            ver=$(tr -d '[:space:]' < src/VERSION 2>/dev/null || true)
+            tag=$(git -C src describe --tags --exact-match 2>/dev/null || true)
+            if [ -n "$ver" ] && [ "$tag" = "$ver" ]; then title="main ($ver)"
+            elif [ -n "$ver" ]; then title="main ($ver + later changes)"
+            else title="main"; fi ;;
+          development)
+            name=development; title="development (unreleased)" ;;
+          v[0-9]*)
+            name="$ref"; title="$ref"
+            banner="This is the documentation of release $ref, as tagged." ;;
+          *)
+            echo "::error::'$ref' is not main, development, or a release tag"; exit 1 ;;
+        esac
+        { echo "name=$name"; echo "title=$title"; echo "banner=$banner"; echo "sha=$sha"; } >> "$GITHUB_OUTPUT"
+        echo "Building $name ('$title') from $sha"
 
-    - name: Install dependencies
+    - name: Install docs tools
       run: |
         pip install -U pip
-        pip install mkdocs mkdocs-material pymdown-extensions mike
+        pip install "zensical==0.1.1" "mkdocs<2" mkdocs-material mkdocs-redirects pymdown-extensions pyyaml
+        if [ -f src/requirements-docs.txt ]; then pip install -r src/requirements-docs.txt; fi
 
-    # --- CURRENT (live) publishing path: unversioned, single-site build via
-    # the native GitHub Pages "Actions" source. This is what visitors
-    # actually see today and keeps working unchanged. ---
     - name: Build
-      run: mkdocs build --clean
+      env:
+        BANNER: ${{ steps.which.outputs.banner }}
+        NAME: ${{ steps.which.outputs.name }}
+      run: bash .github/scripts/build_docs.sh src "$RUNNER_TEMP/site" "$NAME" "$BANNER"
 
-    - uses: actions/upload-pages-artifact@v3
-      with:
-        path: ./site
-
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
-
-    # --- NEW (shadow) publishing path: populates the versioned gh-pages
-    # branch via mike, in parallel, without affecting the live site above.
-    # Once the repo's Pages source is switched to "Deploy from a branch:
-    # gh-pages", this becomes the live path and the steps above can be
-    # removed. ---
-    - name: Configure git identity for mike
+    - name: Place this version on gh-pages
+      id: place
+      env:
+        NAME: ${{ steps.which.outputs.name }}
+        TITLE: ${{ steps.which.outputs.title }}
+        SHA: ${{ steps.which.outputs.sha }}
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
+        if git fetch origin gh-pages; then
+          git worktree add --detach pages FETCH_HEAD
+        else
+          git worktree add --detach pages
+          git -C pages rm -rq --ignore-unmatch .
+        fi
+        python .github/scripts/deploy_docs_version.py --site "$RUNNER_TEMP/site" --pages pages \
+          --version "$NAME" --title "$TITLE" --default main
+        # gh-pages holds one commit: the current site, without the history of every deploy
+        git -C pages checkout -q --orphan site
+        git -C pages add -A
+        git -C pages commit -qm "Docs site ($NAME at ${SHA::8})"
+        git -C pages push -f origin HEAD:refs/heads/gh-pages
+        # publish once the default version exists; a run started by a tag push only
+        # updates gh-pages (the github-pages environment may not allow tags), and the
+        # next run on main or development publishes it
+        if [ -f pages/main/index.html ] && [ "$GITHUB_REF_TYPE" != tag ]; then
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+        fi
 
-    - name: Shadow-deploy main docs (mike)
-      if: github.ref == 'refs/heads/main'
-      run: |
-        mike deploy --push --update-aliases main latest
-        mike set-default --push main
+    - uses: actions/upload-pages-artifact@v3
+      if: steps.place.outputs.ready == 'true'
+      with:
+        path: ./pages
 
-    - name: Shadow-deploy development docs (mike)
-      if: github.ref == 'refs/heads/development'
-      run: mike deploy --push --update-aliases development dev
+    - name: Deploy to GitHub Pages
+      if: steps.place.outputs.ready == 'true'
+      id: deployment
+      uses: actions/deploy-pages@v4

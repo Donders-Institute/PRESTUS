@@ -1,0 +1,7 @@
+{#- Theme override for docs checkouts without their own overrides (build_docs.sh):
+    the banner on every version other than the default (main). -#}
+{% extends "base.html" %}
+{% block outdated %}
+  {{ config.extra.version_banner or "This is not the default documentation." }}
+  <a href="{{ '../' ~ base_url }}"><strong>Go to the default documentation (main).</strong></a>
+{% endblock %}
