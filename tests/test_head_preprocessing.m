@@ -152,6 +152,23 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_head_p
             tc.verifyGreaterThanOrEqual(sum(filled(:) > 0), n_before);
         end
 
+        function test_skull_fill_off_keeps_mask(tc)
+            % 'off' leaves the medium masks unchanged; every filling method closes the
+            % same hole (negative control)
+            [seg, medium_masks, gap] = tc.flat_layers_with_gap(1);
+            p = tc.params;
+            p.headmodel.skull_fill_method = 'off';
+            filled = skull_fill_holes(p, medium_masks, [15 15 12], seg);
+            tc.verifyEqual(filled, medium_masks, 'skull_fill_method off changed the medium masks');
+            skull_id = find(strcmp(fieldnames(p.medium_properties), 'skull'));
+            for m = {'imclose', 'rubberwrap'}
+                p.headmodel.skull_fill_method = m{1};
+                filled = skull_fill_holes(p, medium_masks, [15 15 12], seg);
+                tc.verifyTrue(any(filled(gap) == skull_id), ...
+                    sprintf('skull_fill_method %s did not close the hole (control)', m{1}));
+            end
+        end
+
         function test_skull_fill_adds_cortical_bone(tc)
             % with a differentiated skull, filled voxels become cortical, not trabecular
             dims = [31, 31, 31];

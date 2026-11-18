@@ -256,6 +256,7 @@ GLYPHS: dict[str, str] = {
                        '<path class="a" d="M3 19C4 10 8 6.5 12 6.5S20 10 21 19"/>',
     "fill_imclose": '<path d="M4 18C6 11 8.5 10.5 10 12M14 12C15.5 10.5 18 11 20 18"/><path class="a" d="M10 12Q12 13.4 14 12"/>'
                     '<circle class="a" cx="12" cy="7" r="2.4" stroke-dasharray="1.2 1.4"/>',
+    "fill_off": '<path d="M4 18C6 11 8.5 10.5 10 12M14 12C15.5 10.5 18 11 20 18"/>',
     # timing.pulse_ramp_shape (pulse envelope)
     "ramp_linear": '<path d="M3 18L7.5 6H16.5L21 18"/>',
     "ramp_tukey": '<path d="M3 18C5.6 18 5.6 6 8.2 6H15.8C18.4 6 18.4 18 21 18"/>',

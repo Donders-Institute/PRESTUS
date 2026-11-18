@@ -304,7 +304,7 @@ fields:
   headmodel.smooth_threshold_*: {visible_if: {key: headmodel.smooth_method, not_in: ['off']}, group: head_smoothing}
   headmodel.smooth_fwhm_mm: {unit: mm, visible_if: {key: headmodel.smooth_method, not_in: ['off']}, group: head_smoothing}
   headmodel.smooth_properties: {visible_if: {key: headmodel.smooth_method, not_in: ['off']}, group: head_smoothing}
-  headmodel.skull_fill_method: {choices: [rubberwrap, imclose]}
+  headmodel.skull_fill_method: {choices: [rubberwrap, imclose, 'off']}
   headmodel.skull_wrap_radius_mm: {unit: mm, visible_if: {key: headmodel.skull_fill_method, in: [rubberwrap]}}
   headmodel.skull_wrap_visualize: {kind: flag, visible_if: {key: headmodel.skull_fill_method, in: [rubberwrap]}}
 
@@ -1378,7 +1378,7 @@ choice_labels:
   grid.axisymmetric_output: {auto: Auto, '2d': 2D plane, '3d': 3D volume}
   grid.water_baseline_grid: {beam: Beam box, full: Full grid}
   headmodel.smooth_method: {gaussian: Gaussian, box: Box, 'off': 'Off'}
-  headmodel.skull_fill_method: {rubberwrap: Rubber wrap, imclose: Morphological closing}
+  headmodel.skull_fill_method: {rubberwrap: Rubber wrap, imclose: Morphological closing, 'off': 'Off'}
   pct.skull_mapping: {miscouridou: Miscouridou, carpino: Carpino (deprecated), wiesinger: Wiesinger, treeby: Treeby, kosciessa: Kosciessa, custom: Custom}
   pct.mapping_density: {k-plan: k-Plan, k-wave: k-Wave, marsac: Marsac, marsac-babelbrain: Marsac (BabelBrain), aubry: Aubry, air-tissue: Air/tissue, none: None}
   pct.mapping_soundspeed: {k-plan: k-Plan, marsac: Marsac, aubry: Aubry, webb: Webb, pichardo: Pichardo, mcdannold: McDannold, none: None}
@@ -1415,7 +1415,7 @@ choice_icons:
   grid.water_baseline_grid: {beam: baseline_beam, full: baseline_full}
   calibration.focal_reference: {peak: focalref_peak, flhm_3db: focalref_flhm_3db, flhm_6db: focalref_flhm_6db}
   headmodel.smooth_method: {gaussian: smooth_gaussian, box: smooth_box, 'off': smooth_off}
-  headmodel.skull_fill_method: {rubberwrap: fill_rubberwrap, imclose: fill_imclose}
+  headmodel.skull_fill_method: {rubberwrap: fill_rubberwrap, imclose: fill_imclose, 'off': fill_off}
   timing.pulse_ramp_shape: {linear: ramp_linear, tukey: ramp_tukey}
   time_reversal.pose_workflow.aim: {geometric: aim_geometric, corrected: aim_corrected, both: aim_both}
   time_reversal.pose_workflow.rank_by: {target_intensity: rank_target_intensity, focus_error: rank_focus_error}

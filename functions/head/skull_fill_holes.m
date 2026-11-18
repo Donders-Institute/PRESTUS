@@ -3,7 +3,8 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
 %
 % Expands the skull region using morphological perimeter detection and
 % fills gaps between bone and skin, while preserving trabecular bone and
-% setting eye voxels to water. Debug slice figures are saved when enabled.
+% setting eye voxels to water. headmodel.skull_fill_method: 'off' keeps the
+% skull mask as segmented (eye voxels still become water). Debug slice figures are saved when enabled.
 %
 % Use as:
 %   [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, focus_pos_grid, segmented_img)
@@ -48,7 +49,14 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
 
     % Ensure continuous skull (fill small holes, connect thin regions)
     skull = ismember(medium_masks, skull_i);
-    if isfield(parameters.headmodel, 'skull_fill_method') && strcmp(parameters.headmodel.skull_fill_method, 'rubberwrap')
+    fill_method = 'rubberwrap';
+    if isfield(parameters.headmodel, 'skull_fill_method') && ~isempty(parameters.headmodel.skull_fill_method)
+        fill_method = char(parameters.headmodel.skull_fill_method);
+    end
+    if strcmp(fill_method, 'off')
+        % No filling: the skull mask is used as segmented
+        skull_continuous = skull;
+    elseif strcmp(fill_method, 'rubberwrap')
         % Local skull filling with rubber expansion
         skull_continuous = skull_rubber_wrap(parameters, skull, medium_masks, segmented_img);
     else
@@ -68,7 +76,9 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
     medium_masks(skull_new) = fill_i;
 
     if seg_qc('active')
-        if isfield(parameters.headmodel, 'skull_fill_method') && strcmp(parameters.headmodel.skull_fill_method, 'rubberwrap')
+        if strcmp(fill_method, 'off')
+            fill_desc = 'Skull holes not filled (headmodel.skull_fill_method: off).';
+        elseif strcmp(fill_method, 'rubberwrap')
             r_mm = 5;                                   % skull_rubber_wrap's default
             if isfield(parameters.headmodel, 'skull_wrap_radius_mm') && ~isempty(parameters.headmodel.skull_wrap_radius_mm)
                 r_mm = parameters.headmodel.skull_wrap_radius_mm;
@@ -80,7 +90,7 @@ function [medium_masks, skull_i] = skull_fill_holes(parameters, medium_masks, fo
             fill_desc = ['Skull holes filled by morphological closing (headmodel.skull_fill_method: imclose, ' ...
                 'sphere of radius 3 voxels).'];
         end
-        if numel(skull_i) > 1
+        if numel(skull_i) > 1 && ~strcmp(fill_method, 'off')
             fill_desc = [fill_desc ' Added voxels are cortical bone.'];
         end
         seg_qc('add', 'skull_fill', medium_with_gaps, medium_masks, focus_pos_grid, struct( ...
