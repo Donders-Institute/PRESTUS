@@ -89,7 +89,8 @@ jobs:
     - name: Build
       env:
         BANNER: ${{ steps.which.outputs.banner }}
-      run: bash .github/scripts/build_docs.sh src "$RUNNER_TEMP/site" "$BANNER"
+        NAME: ${{ steps.which.outputs.name }}
+      run: bash .github/scripts/build_docs.sh src "$RUNNER_TEMP/site" "$NAME" "$BANNER"
 
     - name: Place this version on gh-pages
       id: place
