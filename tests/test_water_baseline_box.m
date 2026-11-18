@@ -33,7 +33,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_water_
                 'debug', 0, 'medium', 'water');
             p.io = struct('output_affix', '_wbbox', 'dir_cache', tempdir);
             p.medium_properties.water = struct('sound_speed', c, 'density', 1000, 'alpha_coeff', 0, 'alpha_power', 1.43);
-            p.transducer = struct('type', 'annular', 'trans_pos', apex, 'focus_pos', focus, ...
+            p.transducer = struct('type', 'annular', 'trans_pos', apex, 'focus_pos', focus, 'freq_hz', f, ...
                 'annular', struct('curv_radius_mm', R * res, 'elem_p_amp', 1e5));
             tc.P = p; tc.Kgrid = kgrid; tc.Source = source; tc.Sensor = sensor;
         end

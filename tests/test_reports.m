@@ -125,7 +125,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_report
                 imwrite(uint8(zeros(4, 4, 3)), fullfile(tc.tmp, [base d{1} suffix '.png']));
             end
             html = html_utils.embed_image_dims(tc.tmp, base, suffix, 'alt', 'cap');
-            tc.verifyEqual(numel(strfind(html, '<figure>')), 3, 'should embed all three slice images');
+            tc.verifyEqual(numel(regexp(html, '<figure[ >]')), 3, 'should embed all three slice images');
         end
 
         function test_embed_image_dims_no_dim_file(tc)
@@ -133,7 +133,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_report
             suffix = '_test';
             imwrite(uint8(zeros(4, 4, 3)), fullfile(tc.tmp, [base suffix '.png']));
             html = html_utils.embed_image_dims(tc.tmp, base, suffix, 'alt', 'cap');
-            tc.verifyEqual(numel(strfind(html, '<figure>')), 1, '2D no-dim file should embed once');
+            tc.verifyEqual(numel(regexp(html, '<figure[ >]')), 1, '2D no-dim file should embed once');
         end
 
         function test_config_dump_prunes_large_arrays(tc)
