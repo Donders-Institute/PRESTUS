@@ -173,6 +173,7 @@ hpc:
   partition: ''
   reservation: ''
   exclude: ''      # [slurm] Nodes to avoid, comma-separated (sbatch --exclude), e.g. a node with an occupied GPU
+  cores: []        # [slurm] CPU cores per job (sbatch --cpus-per-task); also the thread count of the k-Wave CPU builds. [] = cluster default
   wait_for_job: false
   timelimit: '04:00:00'
   memorylimit: 20  # [GB]

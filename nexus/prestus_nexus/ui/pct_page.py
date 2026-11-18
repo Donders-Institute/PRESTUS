@@ -139,6 +139,8 @@ def stats_title(stats: dict, path: Path) -> str:
     if stats.get("predicted"):
         source = stats.get("source", "")
         what = f"predicted from the CT ({SOURCE_TEXT.get(source, f'{source} voxels')})"
+    elif stats.get("skull_model") == "layered":
+        what = "layered skull of the default run"
     else:
         what = "mapped skull of the default run"
     return f"In-skull properties, {what} · {path.name} (n={n} skull voxels)"

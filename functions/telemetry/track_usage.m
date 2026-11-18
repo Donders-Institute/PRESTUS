@@ -31,12 +31,13 @@ function track_usage(event, parameters, options, pipe_options)
         pipe_options (1,1) struct = struct()
     end
 
-    if ~telemetry_opted_in()
+    [opted, notice] = telemetry_opted_in();
+    if ~opted
         return
     end
 
     try
-        payload = build_payload(event, parameters, options, pipe_options);
+        payload = build_payload(event, parameters, options, pipe_options, notice);
         send_payload(payload);
     catch
         % silently drop – telemetry must never interrupt the pipeline
@@ -47,27 +48,34 @@ end
 %% Internal helpers
 % =========================================================================
 
-function opted = telemetry_opted_in()
+function [opted, notice] = telemetry_opted_in()
 % PRESTUS_TELEMETRY=off always wins; a recorded decision comes next, so a
 % recorded opt-out is never overridden; PRESTUS_TELEMETRY=on applies only
-% when no decision is recorded.
-    env   = telemetry_env_override();
-    opted = false;
+% when no decision is recorded. notice: the notice version the consent was
+% given to (TELEMETRY_NOTICE_VERSION; 1 for records without it, the current
+% version for PRESTUS_TELEMETRY=on).
+    env    = telemetry_env_override();
+    opted  = false;
+    notice = 1;
     if strcmp(env, 'off'), return, end
     cfg_file = fullfile(prefdir_prestus(), 'telemetry.json');
     if isfile(cfg_file)
         try
             cfg   = jsondecode(fileread(cfg_file));
             opted = isfield(cfg, 'opt_in') && isequal(cfg.opt_in, true);
+            if isfield(cfg, 'notice') && isnumeric(cfg.notice) && isscalar(cfg.notice)
+                notice = double(cfg.notice);
+            end
         catch
         end
         return
     end
     opted = strcmp(env, 'on');
+    notice = telemetry_notice_version();
 end
 
 % -------------------------------------------------------------------------
-function payload = build_payload(event, parameters, options, pipe_options)
+function payload = build_payload(event, parameters, options, pipe_options, notice)
 
     % --- identity (all anonymous) ---
     payload.event         = event;
@@ -75,6 +83,13 @@ function payload = build_payload(event, parameters, options, pipe_options)
     payload.timestamp_utc = posixtime(datetime('now', 'TimeZone', 'UTC'));
     payload.uuid          = get_or_create_uuid();
     [payload.prestus_hash, payload.prestus_ver] = prestus_version();
+    % development runs can be filtered out: run_type 'development'
+    % (PRESTUS_RUN_TYPE), or a checkout off main or with local changes. The
+    % provenance of this run (PATH_LOG_SETUP) is reused: no second git call.
+    info = safe_get(parameters, {'io', 'prestus_version'}, struct());
+    payload.prestus_branch = branch_class(info);
+    payload.prestus_dirty  = safe_get(info, {'dirty'}, 'unknown');
+    payload.consent_notice = notice;
     payload.matlab_ver    = version('-release');
     payload.platform      = computer('arch');
     try
@@ -96,6 +111,11 @@ function payload = build_payload(event, parameters, options, pipe_options)
     payload.precision     = safe_get(parameters, {'simulation', 'precision'}, 'unknown');
     payload.hpc_name      = safe_get(parameters, {'hpc', 'name'}, 'unknown');
     payload.use_gpu       = ~isempty(safe_get(parameters, {'hpc', 'gpu'}, ''));
+    % requested job resources (scheduler runs): headroom and the limits runs hit
+    payload.hpc_timelimit_h = timelimit_hours(safe_get(parameters, {'hpc', 'timelimit'}, ''));
+    payload.hpc_memory_gb   = safe_get(parameters, {'hpc', 'memorylimit'}, NaN);
+    payload.hpc_gpu         = char(safe_get(parameters, {'hpc', 'gpu'}, ''));
+    payload.hpc_partition   = char(safe_get(parameters, {'hpc', 'partition'}, ''));
 
     % --- simulation configuration ---
     payload.medium        = safe_get(parameters, {'simulation', 'medium'}, 'unknown');
@@ -104,6 +124,16 @@ function payload = build_payload(event, parameters, options, pipe_options)
     payload.pct_speed     = safe_get(parameters, {'pct', 'mapping_soundspeed'}, '');
     payload.pct_atten     = safe_get(parameters, {'pct', 'mapping_attenuation'}, '');
     payload.layers        = get_layer_names(parameters);
+    % solver and grid settings that change run time
+    payload.thermal_backend       = safe_get(parameters, {'thermal_backend'}, 'kwave');
+    payload.fit_alpha_power       = safe_get(parameters, {'fit_alpha_power'}, 1);
+    payload.source_cfl            = safe_get(parameters, {'grid', 'source_cfl'}, NaN);
+    payload.source_ppw            = safe_get(parameters, {'grid', 'source_ppw'}, NaN);
+    payload.steady_state_transits = safe_get(parameters, {'grid', 'steady_state_transits'}, NaN);
+    payload.sim_time_us           = safe_get(parameters, {'grid', 'sim_time_us'}, NaN);
+    payload.acoustic_fov          = ~isempty(safe_get(parameters, {'grid', 'acoustic_fov_diameter_mm'}, [])) || ...
+                                    ~isempty(safe_get(parameters, {'grid', 'acoustic_fov_length_mm'}, []));
+    payload.headmodel_reuse       = logical(safe_get(parameters, {'headmodel', 'reuse_across_placements'}, false));
 
     % --- pipeline mode ---
     payload.pipeline_mode = detect_pipeline_mode(parameters, pipe_options);
@@ -113,6 +143,8 @@ function payload = build_payload(event, parameters, options, pipe_options)
     payload.freq_hz               = safe_get(parameters, {'transducer', 'freq_hz'}, NaN);
     payload.transducer_name       = safe_get(parameters, {'transducer', 'name'}, '');
     payload.n_transducer_elements = get_elem_n(parameters);
+    payload.n_transducers         = numel(safe_get(parameters, {'transducer'}, struct([])));
+    payload.transducer_coupling   = char(safe_get(parameters, {'simulation', 'transducer_coupling'}, ''));
 
     % --- modules enabled ---
     mods = safe_get(parameters, {'modules'}, struct());
@@ -132,7 +164,7 @@ function payload = build_payload(event, parameters, options, pipe_options)
     payload.acoustic_backend = safe_get(parameters, {'acoustic_backend'}, 'kwave');
     payload.n_cpu_alloc      = str2double(getenv('SLURM_CPUS_PER_TASK'));   % NaN outside SLURM
     if isfield(options, 'sim_stats') && isstruct(options.sim_stats)
-        payload.sim_stats = sim_stats_fields(options.sim_stats);
+        payload.sim_stats = sim_stats_fields(options.sim_stats, notice);
     end
 
     % --- outcome fields (populated on run_end / run_error) ---
@@ -140,6 +172,48 @@ function payload = build_payload(event, parameters, options, pipe_options)
     if isfield(options, 'duration_s'),  payload.duration_s  = options.duration_s;  end
     if isfield(options, 'status'),      payload.status      = options.status;       end
     if isfield(options, 'error_id'),    payload.error_id    = options.error_id;     end
+    if isfield(options, 'failed_stage'), payload.failed_stage = options.failed_stage; end
+end
+
+% -------------------------------------------------------------------------
+function c = branch_class(info)
+% 'main', 'development' or 'other': the branch class, never the branch name.
+    b = char(safe_get(info, {'branch'}, ''));
+    if any(strcmp(b, {'main', 'master'}))
+        c = 'main';
+    elseif strcmp(b, 'development')
+        c = 'development';
+    elseif isempty(b) || strcmp(b, 'unknown')
+        c = 'unknown';
+    else
+        c = 'other';
+    end
+end
+
+% -------------------------------------------------------------------------
+function h = timelimit_hours(t)
+% SLURM/PBS wall time 'D-HH:MM:SS', 'HH:MM:SS', 'MM:SS' or minutes -> hours (NaN if unset).
+    h = NaN;
+    if isnumeric(t) && isscalar(t)
+        h = double(t) / 60;
+        return
+    end
+    t = strtrim(char(t));
+    if isempty(t)
+        return
+    end
+    days = 0;
+    parts = split(t, '-');
+    if numel(parts) == 2
+        days = str2double(parts{1});
+        t = parts{2};
+    end
+    v = str2double(split(t, ':'))';
+    if any(isnan(v)) || isnan(days)
+        return
+    end
+    v = [zeros(1, 3 - numel(v)), v];           % pad to [h m s]
+    h = days * 24 + v(1) + v(2) / 60 + v(3) / 3600;
 end
 
 % -------------------------------------------------------------------------
@@ -328,11 +402,16 @@ function names = get_toolbox_names()
 end
 
 % -------------------------------------------------------------------------
-function out = sim_stats_fields(rec)
+function out = sim_stats_fields(rec, notice)
 % Numeric run_stats fields only (see RUN_STATS); anything else is dropped.
+% Skull properties: the medians only, and only with consent to notice 2 or later.
     keep = {'acoustic_voxels', 'acoustic_dims', 'acoustic_pml', 'axisymmetric', ...
             'acoustic_nt', 'acoustic_s', 'thermal_voxels', 'thermal_steps', ...
-            'thermal_s', 'peak_ram_gb', 'n_cpu'};
+            'thermal_s', 'peak_ram_gb', 'n_cpu', 'gpu_mem_gb', 'queue_wait_s'};
+    if nargin > 1 && notice >= 2
+        keep = [keep, {'skull_c_median', 'skull_rho_median', 'skull_atten_median', ...
+                       'skull_path_c_median', 'skull_path_rho_median', 'skull_path_atten_median'}];
+    end
     out = struct();
     if ~isstruct(rec)
         return

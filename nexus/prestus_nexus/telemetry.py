@@ -78,9 +78,14 @@ def prestus_hash(prestus_root: Path | None) -> str:
     return out.stdout.strip() if out.returncode == 0 and out.stdout.strip() else "unknown"
 
 
+NOTICE_VERSION = 2   # telemetry_notice_version.m: 2 adds the skull property medians (2026-11-17)
+
+
 def encode_record(opt_in: bool, decided_on: str, prestus_ver: str) -> str:
-    """The file text as MATLAB's jsonencode(struct) + newline writes it."""
-    cfg = {"opt_in": bool(opt_in), "decided_on": decided_on, "prestus_ver": prestus_ver}
+    """The file text as MATLAB's jsonencode(struct) + newline writes it (with the notice
+    version the decision was made under, as telemetry_set_consent.m)."""
+    cfg = {"opt_in": bool(opt_in), "decided_on": decided_on, "prestus_ver": prestus_ver,
+           "notice": NOTICE_VERSION}
     return json.dumps(cfg, separators=(",", ":"), ensure_ascii=False) + "\n"
 
 
@@ -114,13 +119,16 @@ NOTICE = (
     "PRESTUS can optionally collect anonymous usage statistics to help the developers "
     "understand which features are used and on which platforms. One event is sent per "
     "pipeline run, from MATLAB; the Nexus itself sends nothing.\n\n"
-    "Collected (examples): PRESTUS, MATLAB and k-Wave versions, OS platform; CPU model, core "
+    "Collected (examples): PRESTUS, MATLAB, and k-Wave versions, OS platform; CPU model, core "
     "count, RAM, GPU model, installed toolboxes, HPC name; which pipeline modules are enabled; "
-    "transducer type, frequency and element count; simulation medium, layer names, whether "
-    "pCT is used; run duration, success or failure and the error type (no message text); a "
-    "random local ID.\n\n"
-    "Never collected: subject IDs, file paths, coordinates or any free text; IP addresses or "
-    "host names; pressure values, simulation results or tissue property values.")
+    "transducer type, frequency, and element count; simulation medium, layer names, whether "
+    "pCT is used; grid resolution, grid size, time steps, simulation stage durations and peak "
+    "RAM; the median sound speed, density, and attenuation of the modelled skull (all skull "
+    "voxels, and on the beam path); requested job resources, queue wait, and solver settings; "
+    "run start, duration, success or failure, the error type and failing stage (no message "
+    "text); a random local ID.\n\n"
+    "Never collected: subject IDs, file paths, coordinates, or any free text; IP addresses or "
+    "host names; pressure values, simulation results, or tissue property maps.")
 
 
 def _state_text(c: Consent, path: Path) -> str:

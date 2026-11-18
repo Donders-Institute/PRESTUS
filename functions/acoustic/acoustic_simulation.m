@@ -169,6 +169,9 @@ switch parameters.simulation.code_type
          input_args.FunctionName = 'kspaceFirstOrder2D';
       end
 
+      n_threads = cpu_thread_count();
+      if ~isempty(n_threads), input_args.NumThreads = n_threads; end
+
       input_args_cell = zip_fields(input_args);
       sensor_data = kspaceFirstOrder3DC(kgrid, medium, source, sensor, input_args_cell{:});
 
@@ -269,6 +272,8 @@ switch parameters.simulation.code_type
       
    case 'matlab_cpu'
 
+      n_threads = cpu_thread_count();
+      if ~isempty(n_threads), maxNumCompThreads(n_threads); end
       input_args.DataCast = char(parameters.simulation.precision);
       input_args_cell = zip_fields(input_args);
       

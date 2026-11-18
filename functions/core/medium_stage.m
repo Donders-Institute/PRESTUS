@@ -110,4 +110,11 @@ else
     end
 end
 
+% Modelled skull properties into the run record (RUN_STATS), also for a medium
+% loaded from cache (caches written before 2026-11-17 hold none)
+if isstruct(medium_plus) && isfield(medium_plus, 'skull_stats') && isstruct(medium_plus.skull_stats)
+    args = [fieldnames(medium_plus.skull_stats)'; struct2cell(medium_plus.skull_stats)'];
+    run_stats('set', args{:});
+end
+
 end

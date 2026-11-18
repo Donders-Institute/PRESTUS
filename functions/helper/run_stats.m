@@ -23,11 +23,14 @@ function out = run_stats(action, varargin)
 %   out - the record struct ('get', 'write'); empty otherwise
 %
 % Record fields: timestamp, platform, hpc_name, hpc_partition, host,
-% n_cpu, gpu_model, code_type, precision, acoustic_backend, medium,
+% n_cpu, gpu_model, gpu_mem_gb, code_type, precision, acoustic_backend, medium,
 % resolution_mm, acoustic_voxels, acoustic_dims, acoustic_pml, axisymmetric,
 % acoustic_nt, acoustic_s, thermal_voxels, thermal_steps, thermal_s, total_s,
 % peak_ram_gb, and stage_<label>_s per timed stage (LOG_TIMER labels, e.g.
-% stage_preproc_s, stage_freefield_baseline_s; summed over repeats). The acoustic fields describe the grid the solver ran on (the
+% stage_preproc_s, stage_freefield_baseline_s; summed over repeats), and the
+% modelled skull properties (SKULL_PROPERTY_STATS: skull_c/_rho/_atten
+% _p10/_median/_p90, skull_path_mm, skull_path_*_median), and queue_wait_s
+% (seconds the SLURM job waited; SLURM only). The acoustic fields describe the grid the solver ran on (the
 % 2D plane of an axisymmetric run; PML not included in voxels or dims).
 % n_cpu is the job's CPU allocation under SLURM, else the machine's cores.
 % A stage that did not simulate (cache reuse, dry run, stage off) leaves its
@@ -90,7 +93,7 @@ rec.n_cpu            = cpu_count();
 rec.code_type        = char(get_nonempty_field(parameters, {'simulation', 'code_type'}, ''));
 rec.gpu_model        = '';
 if contains(rec.code_type, 'gpu')
-    rec.gpu_model = gpu_name();
+    [rec.gpu_model, rec.gpu_mem_gb] = gpu_name();
 end
 rec.precision        = char(get_nonempty_field(parameters, {'simulation', 'precision'}, ''));
 rec.acoustic_backend = char(get_nonempty_field(parameters, {'acoustic_backend'}, 'kwave'));
@@ -102,6 +105,10 @@ for k = 1:numel(fn)
 end
 rec.total_s     = total_s;
 rec.peak_ram_gb = peak_ram_gb();
+qw = queue_wait_s();
+if isfinite(qw)
+    rec.queue_wait_s = qw;
+end
 end
 
 function append_record(rec, parameters)
@@ -132,12 +139,38 @@ if ~isfinite(n)
 end
 end
 
-function name = gpu_name()
+function [name, mem_gb] = gpu_name()
+name = '';
+mem_gb = NaN;
 try
     g = gpuDevice();
     name = g.Name;
+    mem_gb = double(g.TotalMemory) / 1e9;   % a MIG slice reports its own memory
 catch
-    name = '';
+end
+end
+
+function s = queue_wait_s()
+% Seconds the SLURM job waited in the queue (StartTime - SubmitTime of
+% `scontrol show job`); NaN outside SLURM or when scontrol is unavailable.
+s = NaN;
+id = getenv('SLURM_JOB_ID');
+if isempty(id)
+    return
+end
+try
+    [status, out] = run_command({'scontrol', 'show', 'job', id, '-o'});
+    if status ~= 0
+        return
+    end
+    t = regexp(out, 'SubmitTime=(\S+).*?StartTime=(\S+)', 'tokens', 'once');
+    if isempty(t)
+        return
+    end
+    fmt = 'yyyy-MM-dd''T''HH:mm:ss';
+    s = seconds(datetime(t{2}, 'InputFormat', fmt) - datetime(t{1}, 'InputFormat', fmt));
+catch
+    s = NaN;
 end
 end
 

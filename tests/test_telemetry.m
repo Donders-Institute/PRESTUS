@@ -276,6 +276,32 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_teleme
                 sort({'acoustic_dims', 'acoustic_nt', 'acoustic_s', 'stage_preproc_s', 'thermal_steps'}));
         end
 
+        function test_track_usage_skull_medians_need_current_notice(tc)
+            % Skull properties: medians only, and only with consent to notice 2 or later.
+            tc.install_webwrite_stub();
+            rec = struct('acoustic_nt', 2871, 'skull_c_median', 2550, 'skull_c_p10', 2200, ...
+                'skull_rho_median', 1850, 'skull_atten_median', 4.2, 'skull_path_mm', [6.5 7], ...
+                'skull_path_c_median', 2600, 'skull_path_rho_median', 1900, 'skull_path_atten_median', 4.5);
+            medians = {'skull_atten_median', 'skull_c_median', 'skull_path_atten_median', ...
+                'skull_path_c_median', 'skull_path_rho_median', 'skull_rho_median'};
+
+            telemetry_set_consent_quiet(true);               % records the current notice
+            tc.verifyEqual(read_json(fullfile(prefdir_prestus(), 'telemetry.json')).notice, ...
+                telemetry_notice_version());
+            track_usage('run_end', track_params(), struct('status', 'success', 'sim_stats', rec));
+            sent = last_payload(tc.WebLog).sim_stats;
+            tc.verifyEqual(sort(fieldnames(sent))', sort([{'acoustic_nt'}, medians]));
+            tc.verifyEqual(sent.skull_c_median, 2550);
+
+            % consent recorded before notice 2 (no 'notice' field): no skull fields
+            fid = fopen(fullfile(prefdir_prestus(), 'telemetry.json'), 'w');
+            fprintf(fid, '{"opt_in":true,"decided_on":"2026-01-01","prestus_ver":"x"}\n');
+            fclose(fid);
+            track_usage('run_end', track_params(), struct('status', 'success', 'sim_stats', rec));
+            sent = last_payload(tc.WebLog).sim_stats;
+            tc.verifyEqual(fieldnames(sent)', {'acoustic_nt'});
+        end
+
     end
 
     methods (Access = private)
@@ -346,6 +372,15 @@ end
 
 function telemetry_set_consent_quiet(tf)
     evalc('telemetry_set_consent(tf)');
+end
+
+function s = read_json(f)
+    s = jsondecode(fileread(f));
+end
+
+function p = last_payload(weblog)
+    lines = strsplit(strtrim(fileread(weblog)), newline);
+    p = jsondecode(lines{end});
 end
 
 function p = track_params()

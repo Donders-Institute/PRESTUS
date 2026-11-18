@@ -1,0 +1,618 @@
+# Simulation and stage times for the Nexus load prediction (workload.py).
+#
+# acoustic: seconds = t0_s + ns x 1e-9 x grid points (PML included) x time steps, per device
+#   and solver (code_type, backend, axisymmetric, precision). range: ns at the p10/p90 of
+#   observed/predicted (min/max when n < 10).
+# thermal: ns per thermal grid point per step.
+# stages: stages that do not simulate (CPU work, outputs; the same on any GPU), by medium
+#   (head, water, phantom): seconds = s_1mm x (1 mm / resolution)^(3 x exponent); ratio: p10/p90.
+# factors: a solver without its own entry = the reference solver (cpp_gpu / cpp_cpu, single) x.
+# bandwidth: GPU name, memory bandwidth [GB/s, NVIDIA spec], and generation, to scale a
+#   measured entry to a GPU without one (k-Wave is memory-bound). Entered by hand; kept by refits.
+# match: lower-case substrings of hpc.gpu / hpc.partition; the longest match wins.
+#
+# Refit (records: run_stats.jsonl lines or telemetry run_end events, JSONL or JSON):
+#   python -m prestus_nexus.workload fit [--update] <records> [...]
+
+acoustic:
+  - device: 'CPU'
+    kind: 'cpu'
+    match: []
+    code_type: 'cpp_cpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 70.681
+    t0_s: 5.0
+    range: [70.681, 70.681]
+    n: 1
+    studies: 1
+  - device: 'CPU'
+    kind: 'cpu'
+    match: []
+    code_type: 'matlab_cpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 333.122
+    t0_s: 5.0
+    range: [333.122, 333.122]
+    n: 1
+    studies: 1
+  - device: 'CPU, 1 cores'
+    kind: 'cpu'
+    match: []
+    code_type: 'cpp_cpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 91.286
+    t0_s: 5.0
+    range: [91.286, 91.286]
+    n: 1
+    studies: 1
+  - device: 'NVIDIA A100 80GB PCIe MIG 3g.40gb'
+    kind: 'gpu'
+    match: ['a100-80gb-pcie-mig-3g.40gb', 'a100-80gb-pcie-3g']
+    code_type: 'cpp_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 0.915
+    t0_s: 5.5
+    range: [0.722, 1.235]
+    n: 164
+    studies: 9
+  - device: 'NVIDIA A100 80GB PCIe MIG 3g.40gb'
+    kind: 'gpu'
+    match: ['a100-80gb-pcie-mig-3g.40gb', 'a100-80gb-pcie-3g']
+    code_type: 'matlab_gpu'
+    backend: 'jwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 2.596
+    t0_s: 5.0
+    range: [1.482, 3.644]
+    n: 4
+    studies: 2
+  - device: 'NVIDIA A100 80GB PCIe MIG 3g.40gb'
+    kind: 'gpu'
+    match: ['a100-80gb-pcie-mig-3g.40gb', 'a100-80gb-pcie-3g']
+    code_type: 'matlab_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 2.977
+    t0_s: 5.0
+    range: [2.936, 3.019]
+    n: 2
+    studies: 1
+  - device: 'NVIDIA A100 80GB PCIe'
+    kind: 'gpu'
+    match: ['a100-80gb-pcie']
+    code_type: 'cpp_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 0.668
+    t0_s: 4.5
+    range: [0.625, 0.699]
+    n: 11
+    studies: 3
+  - device: 'NVIDIA A100-PCIE-40GB'
+    kind: 'gpu'
+    match: ['a100-pcie-40gb']
+    code_type: 'cpp_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 0.54
+    t0_s: 4.5
+    range: [0.442, 0.748]
+    n: 33
+    studies: 8
+  - device: 'NVIDIA A100-PCIE-40GB'
+    kind: 'gpu'
+    match: ['a100-pcie-40gb']
+    code_type: 'matlab_gpu'
+    backend: 'jwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 1.504
+    t0_s: 5.0
+    range: [0.747, 2.087]
+    n: 4
+    studies: 3
+  - device: 'NVIDIA A100-PCIE-40GB'
+    kind: 'gpu'
+    match: ['a100-pcie-40gb']
+    code_type: 'matlab_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'double'
+    ns: 3.476
+    t0_s: 5.0
+    range: [3.476, 3.476]
+    n: 1
+    studies: 1
+  - device: 'NVIDIA A100-PCIE-40GB'
+    kind: 'gpu'
+    match: ['a100-pcie-40gb']
+    code_type: 'matlab_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 2.052
+    t0_s: 5.0
+    range: [1.717, 2.194]
+    n: 4
+    studies: 3
+  - device: 'NVIDIA A100-PCIE-40GB'
+    kind: 'gpu'
+    match: ['a100-pcie-40gb']
+    code_type: 'matlab_gpu'
+    backend: 'kwave_elastic'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 4.185
+    t0_s: 5.0
+    range: [4.185, 4.185]
+    n: 1
+    studies: 1
+  - device: 'NVIDIA A100-SXM4-40GB'
+    kind: 'gpu'
+    match: ['a100-sxm4-40gb']
+    code_type: 'cpp_gpu'
+    backend: 'jwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 1.242
+    t0_s: 5.0
+    range: [1.242, 1.242]
+    n: 1
+    studies: 1
+  - device: 'NVIDIA A100-SXM4-40GB'
+    kind: 'gpu'
+    match: ['a100-sxm4-40gb']
+    code_type: 'cpp_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 0.546
+    t0_s: 4.6
+    range: [0.452, 0.689]
+    n: 157
+    studies: 9
+  - device: 'NVIDIA A100-SXM4-40GB'
+    kind: 'gpu'
+    match: ['a100-sxm4-40gb']
+    code_type: 'matlab_gpu'
+    backend: 'jwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 1.11
+    t0_s: 5.0
+    range: [0.788, 1.968]
+    n: 3
+    studies: 1
+  - device: 'NVIDIA A100-SXM4-40GB'
+    kind: 'gpu'
+    match: ['a100-sxm4-40gb']
+    code_type: 'matlab_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 2.061
+    t0_s: 5.0
+    range: [1.847, 2.272]
+    n: 2
+    studies: 1
+  - device: 'NVIDIA A100-SXM4-40GB'
+    kind: 'gpu'
+    match: ['a100-sxm4-40gb']
+    code_type: 'matlab_gpu'
+    backend: 'kwave_elastic'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 5.902
+    t0_s: 5.0
+    range: [5.902, 5.902]
+    n: 1
+    studies: 1
+  - device: 'NVIDIA L40S'
+    kind: 'gpu'
+    match: ['l40s']
+    code_type: 'cpp_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 0.733
+    t0_s: 0.9
+    range: [0.439, 1.172]
+    n: 31
+    studies: 10
+  - device: 'NVIDIA L40S'
+    kind: 'gpu'
+    match: ['l40s']
+    code_type: 'matlab_gpu'
+    backend: 'jwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 1.887
+    t0_s: 5.0
+    range: [1.224, 3.21]
+    n: 3
+    studies: 2
+  - device: 'NVIDIA L40S'
+    kind: 'gpu'
+    match: ['l40s']
+    code_type: 'matlab_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 3.01
+    t0_s: 5.0
+    range: [2.861, 3.16]
+    n: 2
+    studies: 1
+  - device: 'Tesla P100-PCIE-16GB'
+    kind: 'gpu'
+    match: ['p100-pcie-16gb']
+    code_type: 'cpp_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 2.235
+    t0_s: 4.3
+    range: [2.11, 2.406]
+    n: 12
+    studies: 2
+  - device: 'Tesla P100-PCIE-16GB'
+    kind: 'gpu'
+    match: ['p100-pcie-16gb']
+    code_type: 'matlab_gpu'
+    backend: 'jwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 2.078
+    t0_s: 5.0
+    range: [2.073, 2.084]
+    n: 2
+    studies: 1
+  - device: 'Tesla P100-PCIE-16GB'
+    kind: 'gpu'
+    match: ['p100-pcie-16gb']
+    code_type: 'matlab_gpu'
+    backend: 'kwave'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 4.983
+    t0_s: 5.0
+    range: [4.865, 5.218]
+    n: 3
+    studies: 1
+  - device: 'Tesla P100-PCIE-16GB'
+    kind: 'gpu'
+    match: ['p100-pcie-16gb']
+    code_type: 'matlab_gpu'
+    backend: 'kwave_elastic'
+    axisymmetric: 0
+    precision: 'single'
+    ns: 20.337
+    t0_s: 5.0
+    range: [19.736, 20.938]
+    n: 2
+    studies: 1
+thermal:
+  - device: 'NVIDIA A100 80GB'
+    kind: 'gpu'
+    match: ['a100 80gb', 'a100-pcie-80gb', 'a100_80', 'mig 3g.40gb']
+    ns: 24.6
+    range: [22.3, 26.9]
+    n: 4
+  - device: 'Donders CPU node'
+    kind: 'cpu'
+    match: []
+    ns: 700
+    range: [550, 1350]
+    n: 754
+  - device: 'NVIDIA A100 80GB PCIe'
+    kind: 'gpu'
+    match: ['a100-80gb-pcie']
+    ns: 43.55
+    range: [41.24, 51.91]
+    n: 3
+  - device: 'NVIDIA A100 80GB PCIe MIG 3g.40gb'
+    kind: 'gpu'
+    match: ['a100-80gb-pcie-mig-3g.40gb', 'a100-80gb-pcie-3g']
+    ns: 45.79
+    range: [41.99, 55.39]
+    n: 24
+  - device: 'NVIDIA A100-PCIE-40GB'
+    kind: 'gpu'
+    match: ['a100-pcie-40gb']
+    ns: 45.06
+    range: [35.74, 53.23]
+    n: 15
+  - device: 'NVIDIA A100-SXM4-40GB'
+    kind: 'gpu'
+    match: ['a100-sxm4-40gb']
+    ns: 52.1
+    range: [45.21, 66.23]
+    n: 18
+  - device: 'NVIDIA L40S'
+    kind: 'gpu'
+    match: ['l40s']
+    ns: 40.88
+    range: [25.32, 72.97]
+    n: 20
+  - device: 'Tesla P100-PCIE-16GB'
+    kind: 'gpu'
+    match: ['p100-pcie-16gb']
+    ns: 68.96
+    range: [55.74, 79.43]
+    n: 14
+bandwidth:
+  - name: 'Tesla P100'
+    match: ['p100']
+    gbs: 732
+    arch: 'pascal'
+  - name: 'Tesla V100'
+    match: ['v100']
+    gbs: 900
+    arch: 'volta'
+  - name: 'Tesla T4'
+    match: ['t4']
+    gbs: 320
+    arch: 'turing'
+  - name: 'GeForce RTX 2080 Ti'
+    match: ['rtx-2080-ti']
+    gbs: 616
+    arch: 'turing'
+  - name: 'A100 PCIe 40GB'
+    match: ['a100-pcie-40gb', 'a100-40gb']
+    gbs: 1555
+    arch: 'ampere'
+  - name: 'A100 SXM4 40GB'
+    match: ['a100-sxm4-40gb']
+    gbs: 1555
+    arch: 'ampere'
+  - name: 'A100 PCIe 80GB'
+    match: ['a100-80gb-pcie', 'a100-pcie-80gb']
+    gbs: 1935
+    arch: 'ampere'
+  - name: 'A100 SXM4 80GB'
+    match: ['a100-sxm4-80gb', 'a100-80gb-sxm']
+    gbs: 2039
+    arch: 'ampere'
+  - name: 'A100 80GB MIG 3g.40gb'
+    match: ['a100-80gb-pcie-3g', 'a100-80gb-pcie-mig-3g']
+    gbs: 968
+    arch: 'ampere'
+  - name: 'A30'
+    match: ['a30']
+    gbs: 933
+    arch: 'ampere'
+  - name: 'A40'
+    match: ['a40']
+    gbs: 696
+    arch: 'ampere'
+  - name: 'RTX A6000'
+    match: ['rtx-a6000']
+    gbs: 768
+    arch: 'ampere'
+  - name: 'GeForce RTX 3090'
+    match: ['rtx-3090']
+    gbs: 936
+    arch: 'ampere'
+  - name: 'L40S / L40'
+    match: ['l40s', 'l40']
+    gbs: 864
+    arch: 'ada'
+  - name: 'L4'
+    match: ['l4']
+    gbs: 300
+    arch: 'ada'
+  - name: 'RTX 6000 Ada'
+    match: ['rtx-6000-ada']
+    gbs: 960
+    arch: 'ada'
+  - name: 'GeForce RTX 4090'
+    match: ['rtx-4090']
+    gbs: 1008
+    arch: 'ada'
+  - name: 'H100 PCIe'
+    match: ['h100-pcie']
+    gbs: 2000
+    arch: 'hopper'
+  - name: 'H100 SXM'
+    match: ['h100-sxm', 'h100-80gb-hbm3']
+    gbs: 3350
+    arch: 'hopper'
+stages:
+  - stage: 'preproc'
+    medium: 'phantom'
+    s_1mm: 1.3
+    exponent: 0.0
+    ratio: [0.79, 9.59]
+    n: 29
+  - stage: 'preproc'
+    medium: 'water'
+    s_1mm: 3.0
+    exponent: 0.0
+    ratio: [0.63, 1.23]
+    n: 48
+  - stage: 'acoustic_analysis'
+    medium: 'head'
+    s_1mm: 8.6
+    exponent: 0.0
+    ratio: [0.68, 2.11]
+    n: 427
+  - stage: 'acoustic_analysis'
+    medium: 'phantom'
+    s_1mm: 8.7
+    exponent: 0.0
+    ratio: [0.75, 1.93]
+    n: 29
+  - stage: 'acoustic_analysis'
+    medium: 'water'
+    s_1mm: 15.1
+    exponent: 0.1
+    ratio: [0.63, 1.7]
+    n: 48
+  - stage: 'medium'
+    medium: 'head'
+    s_1mm: 3.3
+    exponent: 0.75
+    ratio: [0.69, 3.93]
+    n: 428
+  - stage: 'medium'
+    medium: 'phantom'
+    s_1mm: 0.3
+    exponent: 0.0
+    ratio: [0.86, 17.49]
+    n: 29
+  - stage: 'medium'
+    medium: 'water'
+    s_1mm: 1.5
+    exponent: 0.0
+    ratio: [0.5, 1.49]
+    n: 48
+  - stage: 'nifti_acoustic'
+    medium: 'head'
+    s_1mm: 19.9
+    exponent: 0.0
+    ratio: [0.7, 3.21]
+    n: 427
+  - stage: 'nifti_acoustic'
+    medium: 'phantom'
+    s_1mm: 1.9
+    exponent: 0.0
+    ratio: [0.9, 17.49]
+    n: 29
+  - stage: 'nifti_acoustic'
+    medium: 'water'
+    s_1mm: 0.1
+    exponent: 0.0
+    ratio: [0.64, 2.02]
+    n: 48
+  - stage: 'nifti_medium'
+    medium: 'head'
+    s_1mm: 1.4
+    exponent: 0.16
+    ratio: [0.63, 12.7]
+    n: 428
+  - stage: 'nifti_medium'
+    medium: 'phantom'
+    s_1mm: 0.3
+    exponent: 0.0
+    ratio: [0.88, 2.56]
+    n: 29
+  - stage: 'nifti_medium'
+    medium: 'water'
+    s_1mm: 0.1
+    exponent: 0.0
+    ratio: [0.6, 2.42]
+    n: 48
+  - stage: 'nifti_thermal'
+    medium: 'head'
+    s_1mm: 28.1
+    exponent: 0.0
+    ratio: [0.49, 2.01]
+    n: 97
+  - stage: 'nifti_thermal'
+    medium: 'phantom'
+    s_1mm: 45.0
+    exponent: 0.0
+    ratio: [0.05, 2.47]
+    n: 9
+  - stage: 'placement'
+    medium: 'head'
+    s_1mm: 31.5
+    exponent: 0.0
+    ratio: [0.04, 1.41]
+    n: 428
+  - stage: 'placement'
+    medium: 'phantom'
+    s_1mm: 0.2
+    exponent: 0.05
+    ratio: [0.72, 1.34]
+    n: 29
+  - stage: 'placement'
+    medium: 'water'
+    s_1mm: 0.2
+    exponent: 0.0
+    ratio: [0.55, 14.35]
+    n: 48
+  - stage: 'preproc'
+    medium: 'head'
+    s_1mm: 86.5
+    exponent: 1.13
+    ratio: [0.83, 2.05]
+    n: 137
+  - stage: 'preproc_cached'
+    medium: 'head'
+    s_1mm: 1.5
+    exponent: 0.42
+    ratio: [0.53, 11.91]
+    n: 78
+  - stage: 'preproc_cached'
+    medium: 'phantom'
+    s_1mm: 1.3
+    exponent: 0.0
+    ratio: [0.79, 9.59]
+    n: 29
+  - stage: 'preproc_cached'
+    medium: 'water'
+    s_1mm: 3.0
+    exponent: 0.0
+    ratio: [0.63, 1.23]
+    n: 48
+  - stage: 'preproc_shared'
+    medium: 'head'
+    s_1mm: 548.1
+    exponent: 0.0
+    ratio: [0.24, 1.16]
+    n: 213
+  - stage: 'source'
+    medium: 'head'
+    s_1mm: 3.6
+    exponent: 0.65
+    ratio: [0.02, 2.13]
+    n: 428
+  - stage: 'source'
+    medium: 'phantom'
+    s_1mm: 0.8
+    exponent: 0.0
+    ratio: [0.54, 68.09]
+    n: 29
+  - stage: 'source'
+    medium: 'water'
+    s_1mm: 0.1
+    exponent: 0.0
+    ratio: [0.33, 219.32]
+    n: 48
+  - stage: 'thermal_analysis'
+    medium: 'head'
+    s_1mm: 21.1
+    exponent: 0.0
+    ratio: [0.53, 1.98]
+    n: 100
+  - stage: 'thermal_analysis'
+    medium: 'phantom'
+    s_1mm: 8.6
+    exponent: 0.33
+    ratio: [0.63, 1.36]
+    n: 9
+factors:
+  code_type:
+    matlab_cpu:
+      x: 4.71
+      n: 1
+    matlab_gpu:
+      x: 3.52
+      n: 6
+  precision:
+    double:
+      x: 1.69
+      n: 1

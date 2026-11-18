@@ -9,7 +9,7 @@ def test_record_matches_matlab_jsonencode(tmp_path):
     f = tmp_path / ".prestus" / "telemetry.json"
     telemetry.set_consent(True, None, f, today="2026-11-14")
     assert f.read_text(encoding="utf-8") == \
-        '{"opt_in":true,"decided_on":"2026-11-14","prestus_ver":"unknown"}\n'
+        '{"opt_in":true,"decided_on":"2026-11-14","prestus_ver":"unknown","notice":2}\n'
     c = telemetry.read_consent(f)
     assert c.opted_in and c.decided_on == "2026-11-14" and c.prestus_ver == "unknown"
 

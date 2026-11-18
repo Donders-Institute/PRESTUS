@@ -10,9 +10,10 @@ function varargout = log_timer(action, label, varargin)
 %   log_timer('start', 'label', '/path/to/monitor')
 %   log_timer('stop', 'label')
 %   log_timer('set_monitor', '/path/to/monitor')
+%   labels = log_timer('open')       % started, not stopped; most recent first
 %
 % Input:
-%   action   - 'start' | 'stop' | 'set_monitor'
+%   action   - 'start' | 'stop' | 'set_monitor' | 'open'
 %   label    - string identifier for the timed block; must match between
 %              start/stop. For 'set_monitor': the default path to monitor.
 %   varargin - (start only) optional path to monitor for disk usage
@@ -90,6 +91,17 @@ switch action
         TIMER_STATES.remove(label);
         
     case 'set_monitor', MONITOR_PATH = label;
+    case 'open'
+        % Labels started and not stopped, most recently started first (the
+        % stage a failed run was in: TRACK_USAGE failed_stage).
+        keys = TIMER_STATES.keys();
+        t = zeros(1, numel(keys), 'uint64');
+        for k = 1:numel(keys)
+            st = TIMER_STATES(keys{k});
+            t(k) = st.start_time;
+        end
+        [~, order] = sort(t, 'descend');
+        varargout{1} = keys(order);
     otherwise, error('Invalid action');
 end
 

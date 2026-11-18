@@ -201,6 +201,10 @@ parameters.state.acoustic_dry_run = is_acoustic_dry_run(parameters);
 parameters.state.recomputed.acoustic = true;
 save_cache = should_save_output(parameters.io, 'save_acoustic_matrices') && ...
     ~parameters.state.acoustic_dry_run;
+% The grid the solver runs on. acoustic_wrapper returns a new, expanded grid
+% without a time array after an axisymmetric run, so run_stats reads this one.
+kgrid_sim = kgrid;
+axisym_sim = isfield(parameters.grid, 'axisymmetric') && isequal(parameters.grid.axisymmetric, 1);
 t_backend = tic;
 
 if use_babelbrain
@@ -266,8 +270,17 @@ end
 % simulates on its own grid, so only its duration is recorded.
 if ~parameters.state.acoustic_dry_run
     run_stats('add', 'acoustic_s', toc(t_backend));
-    if ~use_babelbrain && isa(kgrid, 'kWaveGrid')
-        run_stats('set', 'acoustic_voxels', kgrid.total_grid_points, 'acoustic_nt', kgrid.Nt);
+    if ~use_babelbrain && isa(kgrid_sim, 'kWaveGrid')
+        dims = [kgrid_sim.Nx, kgrid_sim.Ny, kgrid_sim.Nz];
+        nt = kgrid_sim.Nt;
+        if ~isnumeric(nt), nt = NaN; end   % no time array (frequency-domain jwave)
+        pml = NaN;
+        if isfield(parameters.grid, 'pml_size_effective')
+            pml = max(double(parameters.grid.pml_size_effective(:)));
+        end
+        run_stats('set', 'acoustic_voxels', kgrid_sim.total_grid_points, 'acoustic_nt', nt, ...
+            'acoustic_dims', dims(1:kgrid_sim.dim), 'acoustic_pml', pml, ...
+            'axisymmetric', double(axisym_sim));
     end
 end
 

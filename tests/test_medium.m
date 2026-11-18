@@ -80,7 +80,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_medium
             tc.verifyFalse(isfield(km, 'temp_0'));
             tc.verifyFalse(isfield(km, 'absorption_fraction'));
             tc.verifyEqual(sort(fieldnames(plus)), ...
-                sort({'temp_0'; 'absorption_np'; 'absorption_fraction'; 'absorption_from_coeff'}));
+                sort({'temp_0'; 'absorption_np'; 'absorption_fraction'; 'absorption_from_coeff'; ...
+                      'absorption_power'; 'skull_stats'}));
             tc.verifyFalse(plus.absorption_from_coeff);
             tc.verifySize(km.sound_speed, p.grid.dims);
         end

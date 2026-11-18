@@ -8,12 +8,12 @@ function [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, pl
 % coefficients are remapped via fitPowerLawParamsMulti to correct for the
 % fractional Laplacian second-order dispersion at the source frequency. For
 % layered simulations, property maps are also smoothed if
-% headmodel.smooth_properties is set. Medium property NIfTIs (in T1 space)
-% are saved unconditionally for layered simulations; raw grid matrices are
-% saved only in debug mode. When pCT is enabled, empirical in-skull property
-% distributions (pseudoCT HU, density, sound speed, attenuation) are cached
-% unconditionally as JSON in io.dir_cache (sub-XXX_<medium>_medium_stats<affix>.json)
-% for use by downstream tools (e.g. the Nexus GUI).
+% headmodel.smooth_properties is set. Raw grid matrices are saved only in
+% debug mode (T1-space property maps: NIFTI_MEDIUM_PROPERTIES). For every model
+% with a skull layer, the in-skull property distributions (all skull voxels and the
+% beam path; for a CT-mapped skull also the pseudo-HU) are cached as JSON in
+% io.dir_cache (sub-XXX_<medium>_medium_stats<affix>.json) for the Nexus Skull CT tab,
+% and their summary goes to medium_plus.skull_stats (SKULL_PROPERTY_STATS, RUN_STATS).
 %
 % Use as:
 %   kwave_medium = medium_setup(parameters, medium_masks, planimg)
@@ -43,6 +43,7 @@ function [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, pl
 %                  uses absorption_np, otherwise absorption_fraction)
 %                  (kept separate because k-Wave rejects these fields in
 %                  kwave_medium during acoustic simulation)
+%                  skull_stats: modelled skull properties (SKULL_PROPERTY_STATS)
 %
 % See also: MEDIUM_PCT_DENSITY, MEDIUM_PCT_SOUNDSPEED, MEDIUM_PCT_ATTENUATION,
 %   FITPOWERLAWPARAMSMULTI, NIFTI_MEDIUM_PROPERTIES
@@ -77,6 +78,8 @@ end
     % Get layer and medium labels
     layer_labels = fieldnames(parameters.layers);
     medium_labels = fieldnames(parameters.medium_properties);
+
+    pct_info = struct();   % pseudo-CT mapping and HU distribution, for WRITE_MEDIUM_STATS
 
     % Iterate through each layer & assign medium ID to create medium mask
     for label_i = 1:length(layer_labels)
@@ -129,49 +132,14 @@ end
             end
             [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, pct_mapping_attenuation, density);
 
-            % [CACHE] save empirical in-skull property distributions (pseudoCT HU, density,
-            % sound speed, attenuation) so downstream tools (e.g. the Nexus GUI) can show
-            % them without a debug rerun. Written unconditionally, since it is cheap relative
-            % to the per-voxel arrays already computed above; goes to dir_cache (regenerable
-            % intermediates, always created) rather than the debug-only dir_debug_medium.
-            medium_stats = struct();
-            medium_stats.subject_id    = parameters.subject_id;
-            medium_stats.medium        = parameters.simulation.medium;
-            medium_stats.output_affix  = char(parameters.io.output_affix);
-            medium_stats.layer         = label_name;
-            medium_stats.n_voxels      = numel(skull_idx);
-            medium_stats.mapping       = struct('density', pct_mapping_density, ...
-                                                 'sound_speed', pct_mapping_soundspeed, ...
-                                                 'attenuation', pct_mapping_attenuation);
+            % kept for the medium_stats JSON written below (WRITE_MEDIUM_STATS)
+            pct_info.mapping = struct('density', pct_mapping_density, ...
+                                      'sound_speed', pct_mapping_soundspeed, ...
+                                      'attenuation', pct_mapping_attenuation);
             if strcmp(pct_mapping_density, 'k-plan')
-                [~, ~, medium_stats.mapping.density_calibration] = medium_pct_density_calibration(parameters);
+                [~, ~, pct_info.mapping.density_calibration] = medium_pct_density_calibration(parameters);
             end
-            medium_stats.properties.pseudoCT_HU = distribution_stats(pseudoCT(skull_idx));
-            medium_stats.properties.density     = distribution_stats(density(skull_idx));
-            medium_stats.properties.sound_speed = distribution_stats(sound_speed(skull_idx));
-            medium_stats.properties.alpha_coeff = distribution_stats(alpha_coeff(skull_idx));
-            medium_stats.reference = struct();
-            for ref_name = {'skull', 'skull_cortical', 'skull_trabecular'}
-                rn = ref_name{1};
-                if isfield(medium, rn)
-                    medium_stats.reference.(rn) = struct( ...
-                        'density', medium.(rn).density, ...
-                        'sound_speed', medium.(rn).sound_speed, ...
-                        'alpha_coeff', medium.(rn).alpha_coeff);
-                end
-            end
-            try
-                filename_medium_stats = fullfile(parameters.io.dir_cache, ...
-                    sprintf('sub-%03d_%s_medium_stats%s.json', ...
-                    parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
-                fid = fopen(filename_medium_stats, 'w');
-                fwrite(fid, jsonencode(medium_stats, 'PrettyPrint', true));
-                fclose(fid);
-            catch ME
-                warn('medium_setup:statsCacheWrite', ...
-                    'Could not write medium property stats cache: %s', ME.message);
-            end
-            clear medium_stats
+            pct_info.pseudoCT_HU = distribution_stats(pseudoCT(skull_idx));
 
             % [DEBUG] save pCT mapping overview
             if debug_on(parameters, 'medium', 'figures')
@@ -269,6 +237,24 @@ end
             'fit_alpha_power=%d overridden to 1 for jwave backend (requires alpha_power_fixed=2).', ...
             parameters.fit_alpha_power);
         parameters.fit_alpha_power = 1;
+    end
+
+    % Modelled skull properties, before the optional smoothing and the power-law refit
+    % below change the maps: summary for RUN_STATS (telemetry gets the medians), full
+    % distributions for the Nexus (medium_stats JSON in io.dir_cache). Bookkeeping only:
+    % a failure here never stops the medium setup.
+    skull_stats = struct();
+    try
+        [skull_stats, skull_dist] = skull_property_stats(parameters, medium_masks, ...
+            sound_speed, density, alpha_coeff, alpha_power);
+    catch ME
+        warn('medium_setup:skullStats', 'Skull property statistics not recorded: %s', ME.message);
+        skull_dist = struct();
+    end
+    try
+        write_medium_stats(parameters, medium, skull_dist, pct_info);
+    catch ME
+        warn('medium_setup:statsCacheWrite', 'Could not write the medium property stats: %s', ME.message);
     end
 
     if parameters.fit_alpha_power == 1
@@ -464,6 +450,7 @@ end
     medium_plus.absorption_np = absorption_np;
     medium_plus.absorption_fraction = absorption_fraction;
     medium_plus.absorption_from_coeff = absorption_from_coeff;
+    medium_plus.skull_stats = skull_stats;   % SKULL_PROPERTY_STATS, kept with the medium cache
     kwave_medium = rmfield(kwave_medium, 'temp_0');
 
 end
@@ -529,4 +516,56 @@ function a = get_absorption_coeff(medium, label_name)
         error('medium_setup:badAbsorptionCoeff', ...
             'medium_properties.%s.absorption_coeff must be a non-negative number [dB/(cm MHz^y)].', label_name);
     end
+end
+
+function write_medium_stats(parameters, medium, skull_dist, pct_info)
+% In-skull property distributions (DISTRIBUTION_STATS) for the Nexus Skull CT tab:
+% <io.dir_cache>/sub-XXX_<medium>_medium_stats<affix>.json, for every model with a
+% skull layer. All skull voxels and the skull on the beam paths; a CT-mapped skull
+% adds its (pseudo-)HU distribution and the mapping names.
+    if isempty(fieldnames(skull_dist))
+        return
+    end
+    ms = struct();
+    ms.subject_id   = parameters.subject_id;
+    ms.medium       = parameters.simulation.medium;
+    ms.output_affix = char(parameters.io.output_affix);
+    if isfield(pct_info, 'mapping')
+        ms.skull_model = 'pct';
+        if ~isempty(pct_ct_file(parameters))
+            ms.skull_model = 'ct';                   % a measured CT, read as is
+        end
+        ms.layer   = 'skull';
+        ms.mapping = pct_info.mapping;
+    else
+        ms.skull_model = 'layered';
+        ms.layer   = strjoin(skull_dist.layers, ', ');
+        ms.mapping = struct('density', 'layered', 'sound_speed', 'layered', 'attenuation', 'layered');
+    end
+    ms.layers     = skull_dist.layers;
+    ms.n_voxels   = skull_dist.n_voxels;
+    ms.properties = skull_dist.properties;
+    if isfield(pct_info, 'pseudoCT_HU')
+        ms.properties.pseudoCT_HU = pct_info.pseudoCT_HU;
+    end
+    if isfield(skull_dist, 'beam_path')
+        ms.beam_path = skull_dist.beam_path;
+    end
+    ms.reference = struct();
+    for ref_name = {'skull', 'skull_cortical', 'skull_trabecular'}
+        rn = ref_name{1};
+        if isfield(medium, rn)
+            ms.reference.(rn) = struct('density', medium.(rn).density, ...
+                'sound_speed', medium.(rn).sound_speed, 'alpha_coeff', medium.(rn).alpha_coeff);
+        end
+    end
+    filename = fullfile(parameters.io.dir_cache, sprintf('sub-%03d_%s_medium_stats%s.json', ...
+        parameters.subject_id, parameters.simulation.medium, parameters.io.output_affix));
+    fid = fopen(filename, 'w');
+    if fid < 0
+        warn('medium_setup:statsCacheWrite', 'Could not write %s.', filename);
+        return
+    end
+    cleaner = onCleanup(@() fclose(fid));
+    fwrite(fid, jsonencode(ms, 'PrettyPrint', true));
 end

@@ -150,6 +150,7 @@ QTabBar::tab:hover {{ color: {c['ink']}; }}
 #Card {{ background: {c['surface']}; border: 1px solid {c['line']}; border-radius: 8px; }}
 #CardTitle {{ font-size: 14px; font-weight: 600; color: {c['ink']}; }}
 #CardSub {{ color: {c['ink3']}; }}
+#LoadFooter {{ background: {c['surface2']}; border: 1px solid {c['line']}; border-radius: 6px; }}
 #SubGroup {{ background: {c['surface2']}; border: 1px solid {c['line']}; border-radius: 6px; }}
 #SubGroupTitle {{ font-weight: 600; color: {c['ink2']}; }}
 #FieldLabel {{ color: {c['ink']}; }}

@@ -24,6 +24,7 @@ function telemetry_set_consent(opt_in)
     cfg.opt_in      = opt_in;
     cfg.decided_on  = char(datetime('now', 'TimeZone', 'UTC', 'Format', 'yyyy-MM-dd'));
     cfg.prestus_ver = prestus_version();
+    cfg.notice      = telemetry_notice_version();
 
     fid = fopen(cfg_file, 'w');
     fprintf(fid, '%s\n', jsonencode(cfg));

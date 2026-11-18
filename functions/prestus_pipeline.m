@@ -70,6 +70,9 @@ function [parameters] = prestus_pipeline(parameters, options)
     telemetry_setup();
     telemetry_t0  = tic;
     telemetry_rid = generate_run_id();
+    % run_start pairs with run_end/run_error by run_id: a job killed by the
+    % scheduler (time or memory limit) sends no end event
+    track_usage('run_start', parameters, struct('run_id', telemetry_rid), options);
     run_stats('reset');
     try
 
@@ -597,10 +600,24 @@ function [parameters] = prestus_pipeline(parameters, options)
             'status',     'error', ...
             'run_id',     telemetry_rid, ...
             'error_id',   me_.identifier, ...
+            'failed_stage', failed_stage(), ...
             'sim_stats',  run_stats('get')), options);   % stages done before the error
         rethrow(me_);
     end
 
+end
+
+function s = failed_stage()
+% The timed stage the run was in when it failed (LOG_TIMER 'open'; '' if none).
+    s = '';
+    try
+        labels = log_timer('open');
+        labels = labels(~strcmp(labels, 'prestus_pipeline'));
+        if ~isempty(labels)
+            s = labels{1};
+        end
+    catch
+    end
 end
 
 function pos = planned_positions(parameters, field)
