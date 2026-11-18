@@ -23,7 +23,7 @@ function lib = save_library_entry(lib, out_file, mode, report, extra_meta)
     if nargin < 5; extra_meta = struct(); end
     lib.meta.calibration_type = 'user_empirical';
     lib.meta.last_updated     = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
-    try; [~, lib.meta.prestus_version] = prestus_version(); catch; lib.meta.prestus_version = 'unknown'; end
+    [lib.meta.prestus_version, lib.meta.prestus_commit] = library_provenance();
     lib.meta.refinement_mode  = mode;
     lib.meta.refinement_report = struct('depths_ep_mm', report.depth_ep_mm', ...
         'r2_library', report.r2_library', 'r2_refined', report.r2_refined');

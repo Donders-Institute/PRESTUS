@@ -24,12 +24,17 @@ function model = fit_transducer_model(tran, prof, options)
 % With a single depth and a Prior this is the depth-specific refinement:
 % fit phases (and gains), regularised towards the static model.
 %
-% Advanced options reproduce PERFORM_GLOBAL_SEARCH (the pre-2026-09
-% per-depth calibration): phase precession constraints (.PhaseConstraint),
+% Advanced options reproduce PERFORM_GLOBAL_SEARCH (per-depth calibration): phase precession constraints (.PhaseConstraint),
 % an absolute-intensity fit with a fitted drive velocity (.AmplitudeFit),
 % global optimisers (.Optimizer) and focal weighting / a fit window
 % (.FocalWeight, .FitWindowMm). All results are still returned as offsets
 % relative to geometric steering, so the library and loader are unchanged.
+%
+% The defaults below (amplitude-domain loss, HuberDelta 0.05) are this
+% function's own. The calibration tools (CALIBRATION_FIT, the GUIs,
+% BUILD_TRANSDUCER_LIBRARY, CALIBRATE_LIBRARY_ENTRY) start from the
+% CALIBRATION_FIT_OPTIONS preset instead (intensity domain, HuberDelta 0.8);
+% pass calibration_fit_options() to fit as they do.
 %
 % Use as:
 %   model = fit_transducer_model(tran, prof)
@@ -67,7 +72,7 @@ function model = fit_transducer_model(tran, prof, options)
 %     .NStarts         - number of lsqnonlin starts incl. the prior (default 16)
 %     .ZShiftStarts    - 'full' (default): extra starts draw dz stratified over
 %                        the whole ZShiftBounds range | 'central': uniform over
-%                        the middle half (previous behaviour)
+%                        the middle half
 %     .Seed            - RNG seed for the extra starts (default 1)
 %     .Prior           - model struct to start from / regularise towards
 %                        (default: geometric, unit gains, c_steer = CWater, dz = 0)

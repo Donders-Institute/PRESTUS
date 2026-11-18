@@ -108,11 +108,7 @@ end
     data = struct();
     data.meta.tran_serial = parameters.calibration.equipment_name;
     data.meta.created_at  = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
-    try
-        data.meta.prestus_version = prestus_version();
-    catch
-        data.meta.prestus_version = 'unknown';
-    end
+    [data.meta.prestus_version, data.meta.prestus_commit] = library_provenance();
     % Calibration provenance
     cal = parameters.calibration;
     if isfield(cal, 'phase_mode');       data.meta.calibration.phase_mode       = cal.phase_mode;       end

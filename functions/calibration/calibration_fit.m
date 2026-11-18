@@ -21,10 +21,12 @@ function [fit, msg] = calibration_fit(tran, prof, options)
 %             (CALIBRATION_DESIRED_PROFILES / INTERPOLATE_AXIAL_PROFILES);
 %             with .n_z_scan only the first n_z_scan z samples are fitted
 %   options - struct, all optional:
-%     .Mode          - 'per_depth' (default; the former 'static' has been removed)
+%     .Mode          - 'per_depth' (default and only mode)
 %     .FreeParams    - subset of {'phase', 'amp'} (default both)
 %     .FitOptions    - further FIT_TRANSDUCER_MODEL options (ForwardModel,
-%                      NearFieldSkipMm, HuberDelta, NStarts, Domain, advanced ones)
+%                      NearFieldSkipMm, HuberDelta, NStarts, Domain, advanced ones);
+%                      options not given are those of the 'rayleigh_phase_gain'
+%                      preset (CALIBRATION_FIT_OPTIONS), not FIT_TRANSDUCER_MODEL's
 %     .Library       - current library entry (prior and base of the new entry) or []
 %     .IsppaWcm2     - reference ISPPA for the stored drives (default 30)
 %     .TranSerial    - transducer serial for the entry's meta (default '')
@@ -59,7 +61,8 @@ function [fit, msg] = calibration_fit(tran, prof, options)
     assert(strcmp(mode, 'per_depth'), 'calibration_fit:mode', ...
         'Mode must be ''per_depth'', not ''%s'' (the static joint model has been removed).', mode);
     free = cellstr(opt(options, 'FreeParams', {'phase', 'amp'}));
-    fo   = opt(options, 'FitOptions', struct());
+    fo_in = opt(options, 'FitOptions', struct());
+    fo   = calibration_fit_options('rayleigh_phase_gain', fo_in);   % options not given: the preset's
     lib  = opt(options, 'Library', []);
     msg  = '';
 
@@ -99,7 +102,7 @@ function [fit, msg] = calibration_fit(tran, prof, options)
     tran = library_transducer(tran, lib);
     if isfield(tran.transducer.annular, 'ring_profile')
         rp = tran.transducer.annular.ring_profile;
-        if ~isfield(fo, 'NearFieldSkipMm'); fo.NearFieldSkipMm = rp.near_field_skip_mm; end
+        if ~isfield(fo_in, 'NearFieldSkipMm'); fo.NearFieldSkipMm = rp.near_field_skip_mm; end
     end
     % z shift stays at 0 (also for the prior). The prior only pins the
     % unobservable common phase (default Lambda): a stronger pull stops

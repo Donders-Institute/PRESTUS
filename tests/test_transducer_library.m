@@ -177,6 +177,19 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_transd
                 @() resolve_transducer_from_serial(tr, tc.equip_param, empty_dir, 1));
         end
 
+        function test_ds_agnostic_fallback_warning_has_identifier(tc)
+            % No DS-specific entry, only {serial}.yaml: falls back with a
+            % warning that carries its identifier (not fused into the text).
+            serial = tc.first_annular_serial();
+            n_elem = tc.equip_param.trans.(serial).transducer.annular.elem_n;
+            lib_dir = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            tc.write_synthetic_library(lib_dir, serial, n_elem, 60, 32);
+            tr = tc.minimal_tr_with_targets(serial, 60, 32);
+            tr.combo.ds_serial = 'NO_SUCH_DS';
+            tc.verifyWarning(@() resolve_transducer_from_serial(tr, tc.equip_param, lib_dir, 1), ...
+                'resolve_transducer_from_serial:dsAgnosticFallback');
+        end
+
     end
 
     % ------------------------------------------------------------------ %
@@ -296,6 +309,73 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_transd
             out_blend = load_transducer_from_library(serial, 42, 30, tc.equip_param, lib_dir);
             tc.verifyTrue(out_knot.transducer.tx_calibration.amp_kwave_calibrated);
             tc.verifyFalse(out_blend.transducer.tx_calibration.amp_kwave_calibrated);
+        end
+
+        function test_single_element_refinement_per_depth(tc)
+            % YAML stores a one-element device's per-depth corrections as a
+            % flat list: one value per depth, not one row of several elements
+            serials = fieldnames(tc.equip_param.trans);
+            one = serials(cellfun(@(s) isfield(tc.equip_param.trans.(s).transducer, 'annular') && ...
+                tc.equip_param.trans.(s).transducer.annular.elem_n == 1, serials));
+            tc.assumeNotEmpty(one, 'No single-element annular transducer in the equipment library.');
+            tran = tc.equip_param.trans.(one{1});
+            d0 = tran.transducer.annular.dist_geom_ep_mm;
+            lib.meta.tran_serial = one{1};
+            lib.global_model.elem_phase_correction_deg = 0;
+            lib.refinement = struct('depths_ep_mm', [d0 - 5, d0], ...
+                'elem_phase_correction_deg', {{10, 20}}, 'elem_amp_weight', {{1, 1}}, 'blend_mm', 5);
+            f = fullfile(tc.fresh_dir(), 'entry.yaml');
+            yaml.dumpFile(f, lib);
+            lib = yaml.loadFile(f, 'ConvertToArray', true);
+            tc.assertFalse(iscell(lib.refinement.elem_phase_correction_deg));   % the flat list
+            for k = 1:2
+                d = d0 - 5 * (2 - k);
+                m = library_model_at_depth(lib, tran, d, 30);
+                tc.verifyEqual(tc.wrap(m.elem_phase_deg - tc.geo(tran, d)), 10 * k, 'AbsTol', 1e-9);
+            end
+        end
+
+        function test_models_listed_before_their_units(tc)
+            % Each model entry comes first, its units (by 'model' or by their
+            % model-<MODEL> folder) follow it without other entries between
+            eq = tc.equip_param;
+            serials = fieldnames(eq.trans);
+            group = serials;
+            for i = 1:numel(serials)
+                d = eq.trans.(serials{i});
+                [~, folder] = fileparts(fileparts(eq.files.(serials{i})));
+                if isfield(d, 'model') && ~isempty(d.model) && isfield(eq.trans, char(d.model))
+                    group{i} = char(d.model);
+                elseif startsWith(folder, 'model-') && isfield(eq.trans, extractAfter(folder, 'model-'))
+                    group{i} = extractAfter(folder, 'model-');
+                end
+            end
+            is_unit = ~strcmp(group, serials);
+            tc.assumeTrue(any(is_unit), 'No unit entries in the equipment library.');
+            for i = find(is_unit)'
+                m = find(strcmp(serials, group{i}));
+                tc.verifyLessThan(m, i, serials{i});
+                tc.verifyTrue(all(strcmp(group(m:i), group{i})), serials{i});
+            end
+            tc.verifyEqual(fieldnames(eq.files), serials);
+            tc.verifyEqual(fieldnames(eq.user), serials);
+        end
+
+        function test_steerable_device_helper(tc)
+            % Picks by properties, never a single-element or fixed-focus model
+            [serial, tran] = steerable_annular_serial(tc.equip_param);
+            tc.verifyGreaterThan(tran.transducer.annular.elem_n, 1);
+            tc.verifyGreaterThan(tran.max_foc, tran.min_foc);
+            [~, has] = library_entry_file(fullfile(get_prestus_path(), 'config', 'calibration'), serial);
+            tc.verifyFalse(has);
+            % negative control: a library of fixed-focus models only has none
+            eq = tc.equip_param;
+            fixed = fieldnames(eq.trans);
+            fixed = fixed(cellfun(@(s) ~isfield(eq.trans.(s), 'max_foc') || ...
+                ~(eq.trans.(s).max_foc > eq.trans.(s).min_foc), fixed));
+            tc.assumeNotEmpty(fixed, 'No fixed-focus device in the equipment library.');
+            eq.trans = rmfield(eq.trans, setdiff(fieldnames(eq.trans), fixed));
+            tc.verifyError(@() steerable_annular_serial(eq), 'steerable_annular_serial:none');
         end
 
         function test_model_at_depth_matches_loader(tc)
@@ -698,16 +778,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_transd
         end
 
         function serial = first_annular_serial(tc)
-            serials = fieldnames(tc.equip_param.trans);
-            serial  = '';
-            for i = 1:numel(serials)
-                tran = tc.equip_param.trans.(serials{i});
-                if isfield(tran, 'transducer') && isfield(tran.transducer, 'annular')
-                    serial = serials{i};
-                    return;
-                end
-            end
-            error('test_transducer_library: no annular transducer found in equipment config');
+            serial = steerable_annular_serial(tc.equip_param);
         end
 
         function tr = minimal_tr(~, serial)

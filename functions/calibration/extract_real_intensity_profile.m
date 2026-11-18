@@ -5,7 +5,6 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
     intens_data, ...
     equipment_name, ...
     dist_from_exit_plane)
-
 % EXTRACT_REAL_INTENSITY_PROFILE  Extract or interpolate an empirical axial intensity profile
 %
 % Selects the intensity profile for the desired focal depth from the
@@ -87,7 +86,7 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
 
     % Determine the maximum intensity beyond the specified skip distance
     % for scaling to prevent catching max peak in near field peak.
-    [~, closestIndex] = min(abs(dist_from_exit_plane - cal.skip_front_peak_mm));
+    [~, closestIndex] = min(abs(dist_from_exit_plane - io.NearFieldSkipMm));
     max_intens = max(norm_profile_focus(closestIndex:end));
 end
 

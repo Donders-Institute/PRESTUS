@@ -13,11 +13,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_calibr
 
     methods (TestClassSetup)
         function setup(tc)
-            equip = load_equipment_config();
-            serials = fieldnames(equip.trans);
-            k = find(cellfun(@(s) isfield(equip.trans.(s).transducer, 'annular'), serials), 1);
-            tc.Serial = serials{k};
-            tc.Tran = equip.trans.(tc.Serial);
+            [tc.Serial, tc.Tran] = steerable_annular_serial();
             d0 = tc.Tran.transducer.annular.dist_geom_ep_mm;
             z = (0:0.25:1.4 * d0)';
             dm = round(d0 + [-10 0 10], 2);
@@ -117,6 +113,25 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_calibr
             tc.verifyError(@() calibration_save_entry(fit.entry, fit, tc.Dir, ...
                 struct('ShippedLibraryPath', tc.Dir)), 'calibration_save_entry:shipped');
             calibration_save_entry(fit.entry, fit, tc.Dir, struct('ShippedLibraryPath', tc.Dir, 'AllowShipped', true));
+        end
+
+        function test_writers_stamp_the_same_provenance(tc)
+            % calibration_save_entry and save_library_entry store the version
+            % string in prestus_version and the commit hash in prestus_commit.
+            [hash, ver] = prestus_version();
+            lib0 = struct('meta', struct('tran_serial', 'PROV_TEST'));
+            fit = struct('mode', 'per_depth', 'record', struct('mode', 'per_depth'), ...
+                'prof', struct('profile_type', {{'measured'}}));
+            file = calibration_save_entry(lib0, fit, tc.Dir);
+            a = yaml.loadFile(file, 'ConvertToArray', true);
+            report = struct('depth_ep_mm', 50, 'r2_library', 0.9, 'r2_refined', 0.95);
+            file_b = fullfile(tc.Dir, 'b', 'PROV_TEST.yaml');
+            save_library_entry(lib0, file_b, 'per_depth', report);
+            b = yaml.loadFile(file_b, 'ConvertToArray', true);
+            for m = {a.meta, b.meta}
+                tc.verifyEqual(string(m{1}.prestus_version), string(ver));
+                tc.verifyEqual(string(m{1}.prestus_commit), string(hash));
+            end
         end
 
         function test_focus_beyond_ignores_the_near_field(tc)

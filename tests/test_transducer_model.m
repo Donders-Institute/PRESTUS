@@ -47,6 +47,18 @@ classdef (SharedTestFixtures = {prestus_paths}) test_transducer_model < matlab.u
             tc.verifyEqual(abs(H * (0.05 * exp(1i * ph(:)))), ref(:), 'RelTol', 1e-10);
         end
 
+        function test_rayleigh_full_bowl_matches_oneil(tc)
+            % integrating over the curved bowl surface gives O'Neil's on-axis field
+            tran = tc.equip_param.trans.CTX_250_001;
+            ann  = tran.transducer.annular;
+            tran.transducer.annular = struct('elem_n', 1, 'elem_id_mm', 0, ...
+                'elem_od_mm', max(ann.elem_od_mm), 'curv_radius_mm', ann.curv_radius_mm);
+            z    = linspace(0.5, 1.2, 141)' * ann.curv_radius_mm;
+            H_r  = axial_transfer_matrix(tran, z, 1500, 994, 'rayleigh');
+            H_o  = axial_transfer_matrix(tran, z, 1500, 994, 'oneil');
+            tc.verifyLessThan(max(abs(abs(H_r) - abs(H_o))) / max(abs(H_o)), 1e-6);
+        end
+
         function test_oneil_and_rayleigh_place_focus_alike(tc)
             % Both forward models take distances from the bowl apex, so for the
             % same geometric drive they must put the axial peak and FLHM centre
@@ -194,8 +206,7 @@ classdef (SharedTestFixtures = {prestus_paths}) test_transducer_model < matlab.u
         end
 
         function test_unknown_forward_model_raises_clear_error(tc)
-            % The output used to be named `error`, shadowing error() so this
-            % branch crashed with "used before defined" instead of its message.
+            % An unknown forward model raises the function's own error message.
             p = annular_params();
             p.calibration.forward_model = 'bogus';
             tc.verifyError(@() phase_optimization_annulus_full_curve( ...

@@ -46,6 +46,8 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 %   equip_param        - struct from load_equipment_config()
 %   library_path       - (optional) path to transducer library folder;
 %                        defaults to config/calibration/ under PRESTUS root
+%   condition          - (optional) dephased condition label in lib.conditions
+%                        ('' = focal depth, default; EXPERIMENTAL, see above)
 %
 % Output:
 %   parameters - struct with:
@@ -229,8 +231,8 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
     else
         amp_str = sprintf('amp %d @ %.1f W/cm²', round(elem_p_amp), desired_intensity);
     end
-    fprintf('Library loaded (%s, %s): %s | focal %.1f mm | %s (w=%.2f) | %s\n', ...
-        phase_model, cal_type, combo_name, focal_distance_ep, phase_model, w, amp_str);
+    fprintf('Library loaded (%s): %s | focal %.1f mm | %s (w=%.2f) | %s\n', ...
+        cal_type, combo_name, focal_distance_ep, phase_model, w, amp_str);
 end
 
 function r = library_measured_range(lib)

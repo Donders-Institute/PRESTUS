@@ -196,12 +196,7 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
         lib.meta.driving_system = combo_name(numel(tran_serial_str)+2:end);
     end
     lib.meta.last_updated  = today_str;
-    try
-        [~, ver_str]            = prestus_version();
-        lib.meta.prestus_version = ver_str;
-    catch
-        lib.meta.prestus_version = 'unknown';
-    end
+    [lib.meta.prestus_version, lib.meta.prestus_commit] = library_provenance();
 
     %% Merge into the refinement section --------------------------------
     if isfield(lib, 'refinement') && isstruct(lib.refinement) && ...

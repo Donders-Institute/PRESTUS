@@ -29,8 +29,9 @@ function equip = load_equipment_config(equipment_path, user_folders)
 %   equip = load_equipment_config(equipment_path, user_folders)   % char or cellstr
 %
 % Output:
-%   equip.gen     — general settings (from equipment_info.yaml)
-%   equip.trans   — struct keyed by tran_serial
+%   equip.gen     — general settings (from equipment_info.yaml; empty struct without it)
+%   equip.trans   — struct keyed by tran_serial; each model entry comes before
+%                   its units (a unit's 'model', else its model-<MODEL> folder)
 %   equip.ds      — struct keyed by driving-system serial
 %   equip.combos  — struct keyed by combo_name ({tran_serial}_{ds_serial})
 %   equip.files   — struct keyed by tran_serial: the file each entry came from
@@ -41,7 +42,9 @@ function equip = load_equipment_config(equipment_path, user_folders)
     end
 
     equip.path   = equipment_path;
-    equip.gen    = yaml.loadFile(fullfile(equipment_path, 'equipment_info.yaml'), 'ConvertToArray', true);
+    info = fullfile(equipment_path, 'equipment_info.yaml');
+    equip.gen    = struct();     % a folder without it (scratch folder of a single entry) has no general settings
+    if isfile(info); equip.gen = yaml.loadFile(info, 'ConvertToArray', true); end
     equip.trans  = struct();
     equip.ds     = struct();
     equip.combos = struct();
@@ -102,6 +105,12 @@ function equip = load_equipment_config(equipment_path, user_folders)
         equip.trans.(serials{i}) = d;
     end
 
+    % Each model before its units, so listings start with the generic entry
+    [equip.trans, perm] = orderfields(equip.trans, models_first(equip.trans, equip.files));
+    serials = fieldnames(equip.trans);
+    equip.files = orderfields(equip.files, perm);
+    equip.user  = orderfields(equip.user, perm);
+
     % Combos, with the driving system described by its own entry
     for i = 1:numel(serials)
         d = equip.trans.(serials{i});
@@ -123,6 +132,27 @@ function equip = load_equipment_config(equipment_path, user_folders)
         end
         equip.trans.(serials{i}) = d;
     end
+end
+
+function order = models_first(trans, files)
+% Field order listing each model entry before its units. A device belongs to
+% its 'model' entry, else to its shipped model-<MODEL> folder's entry, else
+% to itself; groups keep the order in which their first entry loaded.
+    serials = fieldnames(trans);
+    group = serials;
+    for i = 1:numel(serials)
+        d = trans.(serials{i});
+        [~, folder] = fileparts(fileparts(files.(serials{i})));
+        if isfield(d, 'model') && ~isempty(d.model) && isfield(trans, char(d.model))
+            group{i} = char(d.model);
+        elseif startsWith(folder, 'model-') && isfield(trans, extractAfter(folder, 'model-'))
+            group{i} = extractAfter(folder, 'model-');
+        end
+    end
+    [~, first] = unique(group, 'stable');
+    [~, g] = ismember(group, group(sort(first)));
+    is_unit = ~strcmp(group, serials);
+    [~, order] = sortrows([g(:), double(is_unit(:)), (1:numel(serials))']);
 end
 
 function p = canonical(p)

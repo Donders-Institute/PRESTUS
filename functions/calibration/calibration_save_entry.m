@@ -51,7 +51,7 @@ function [file, prof_csv] = calibration_save_entry(lib, fit, out_dir, options)
     end
     lib.meta.refinement_mode  = fit.mode;
     lib.meta.last_updated     = char(datetime('today', 'Format', 'yyyy-MM-dd'));
-    try; lib.meta.prestus_version = prestus_version(); catch; lib.meta.prestus_version = 'unknown'; end
+    [lib.meta.prestus_version, lib.meta.prestus_commit] = library_provenance();
     rec = fit.record;
     kw  = opt(options, 'Kwave', []);
     if ~isempty(kw); rec.kwave = kw; end

@@ -102,7 +102,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_ring_p
             end
             Ir = abs(Hr * C{1}(kron(1:a.elem_n, ones(1, M)))).^2;
             prof = struct('depths_ep_mm', d, 'z_ep_mm', z, 'I', I);
-            o = struct('NSub', M, 'Smooth', 0.1, 'NStarts', 6, 'Iterations', 5);
+            o = struct('NSub', M, 'Smooth', 0.1, 'NStarts', 16, 'Iterations', 10);
             f_ax = fit_ring_profile(tr, prof, o);
             o.OffAxis = struct('depth_ep_mm', d(1), 'r_mm', rr, 'z_ep_mm', 30 * ones(size(rr)), 'I', Ir);
             [f_oa, info] = fit_ring_profile(tr, prof, o);

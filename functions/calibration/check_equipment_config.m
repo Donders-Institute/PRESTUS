@@ -107,6 +107,14 @@ function report = check_equipment_config(equipment_path)
                 rec.issues{end+1} = sprintf('elem_od_mm has %d entries but elem_n = %d', numel(ann.elem_od_mm), n);
             end
 
+            % Each ring: inner diameter below its outer diameter
+            if numel(ann.elem_od_mm) == n && numel(ann.elem_id_mm) == n
+                inverted = ann.elem_od_mm(:)' <= ann.elem_id_mm(:)';
+                if any(inverted)
+                    rec.issues{end+1} = sprintf('Ring(s) %s: elem_od_mm must exceed elem_id_mm', ...
+                        num2str(find(inverted)));
+                end
+            end
             % No ring overlap: od(i) < id(i+1)
             if numel(ann.elem_od_mm) == n && numel(ann.elem_id_mm) == n && n > 1
                 od = ann.elem_od_mm(:)';

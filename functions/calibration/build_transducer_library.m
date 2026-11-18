@@ -22,7 +22,7 @@
 % SINGLE COMBOS / NEW PROFILES
 %   REFINE_TRANSDUCER_LIBRARY (or CALIBRATION_GUI) refits one combo's per-depth
 %   refinements, optionally with the free-water k-Wave check
-%   (KWAVE_CHECK_REFINEMENT).
+%   (KWAVE_CALIBRATE_DRIVE).
 %
 % See also: LOAD_TRANSDUCER_FROM_LIBRARY, REFINE_TRANSDUCER_LIBRARY,
 %           FIT_TRANSDUCER_MODEL, VALIDATE_TRANSDUCER_LIBRARY, CALIBRATION_GUI
@@ -61,7 +61,7 @@ if ~exist('DESIRED_INTENSITIES','var'); DESIRED_INTENSITIES = [30]; end
 % FIT_TRANSDUCER_MODEL with PER_DEPTH_FIT_OPTIONS) on a geometric global model,
 % interpolated between measured depths. Quality: held-out interpolation (each
 % interior depth predicted from its neighbours) vs geometric, in meta.quality.
-% The former static joint model (LIBRARY_MODE = 'static') has been removed.
+% LIBRARY_MODE, if set, must be 'per_depth'.
 if exist('LIBRARY_MODE', 'var') && ~strcmp(LIBRARY_MODE, 'per_depth')
     error('build_transducer_library:staticRemoved', ...
         'LIBRARY_MODE ''%s'' has been removed; only per-depth refinements are built.', LIBRARY_MODE);
@@ -225,7 +225,7 @@ function build_geometric_entry(tran_serial, ds_serial, library_path, tran)
     lib.meta.last_updated     = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>
     lib.meta.calibration_type = 'geometric';
     lib.meta.geometry_fingerprint = equipment_geometry_fingerprint(tran);
-    try; lib.meta.prestus_version = prestus_version(); catch; lib.meta.prestus_version = 'unknown'; end
+    [lib.meta.prestus_version, lib.meta.prestus_commit] = library_provenance();
 
     % Drop any legacy per-depth phase tables; phases are computed at load time.
     if isfield(lib, 'global_model')
@@ -249,7 +249,7 @@ function build_per_depth_entry(combo_name, tran_serial, ds_serial, tran, combo_e
 % the measured span; within it, LOAD_TRANSDUCER_FROM_LIBRARY interpolates the
 % per-depth phases, gains and drives.
 
-    LIBRARY_MODEL_VERSION = 3;   % 3: per-depth refinements with drive and gains (2026-09)
+    LIBRARY_MODEL_VERSION = 3;   % 3: per-depth refinements with drive and gains
 
     char_rel = combo_entry.char_data_path;
     if isempty(char_data_root); char_path = char_rel; else; char_path = fullfile(char_data_root, char_rel); end
@@ -328,7 +328,7 @@ function build_per_depth_entry(combo_name, tran_serial, ds_serial, tran, combo_e
     lib.meta.library_mode          = 'per_depth';
     lib.meta.char_data             = char_rel;
     lib.meta.quality               = q;
-    try; lib.meta.prestus_version = prestus_version(); catch; lib.meta.prestus_version = 'unknown'; end
+    [lib.meta.prestus_version, lib.meta.prestus_commit] = library_provenance();
 
     lib = library_entry_from_model(lib, geo, ref_intensity);   % geometric global model, measured drive
     lib.global_model.elem_phase_correction_deg = [];           % pure geometric steering outside the refinements

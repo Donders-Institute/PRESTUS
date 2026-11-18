@@ -234,7 +234,7 @@ function [depths, offs, amps, blend_mm, pamp, isppa, gain, amp_src, kw_r2, kw_fe
             isfield(lib.refinement, 'depths_ep_mm') && ~isempty(lib.refinement.depths_ep_mm)
         r = lib.refinement;
         d = double(r.depths_ep_mm(:)');
-        c = rows_of(r.elem_phase_correction_deg, numel(d));
+        c = rows_of(r.elem_phase_correction_deg, numel(d), n_elem);
         for k = 1:numel(d)
             depths(end+1) = d(k); %#ok<AGROW>
             offs(end+1, :) = check_length(c{k}, n_elem, ...
@@ -261,7 +261,7 @@ function [depths, offs, amps, blend_mm, pamp, isppa, gain, amp_src, kw_r2, kw_fe
         end
         gain = nan(numel(d), n_elem);
         if isfield(r, 'elem_amp_weight')
-            gc = rows_of(r.elem_amp_weight, numel(d));
+            gc = rows_of(r.elem_amp_weight, numel(d), n_elem);
             for k = 1:numel(d)
                 if all(isfinite(gc{k})); gain(k, :) = check_length(gc{k}, n_elem, ...
                         sprintf('refinement.elem_amp_weight{%d}', k), source_label); end
@@ -275,7 +275,7 @@ function [depths, offs, amps, blend_mm, pamp, isppa, gain, amp_src, kw_r2, kw_fe
             isfield(lib.global_model, 'depths_ep_mm') && ~isempty(lib.global_model.depths_ep_mm) && ...
             isfield(lib.global_model, 'elem_phase_deg') && ~isempty(lib.global_model.elem_phase_deg)
         d = double(lib.global_model.depths_ep_mm(:)');
-        c = rows_of(lib.global_model.elem_phase_deg, numel(d));
+        c = rows_of(lib.global_model.elem_phase_deg, numel(d), n_elem);
         for k = 1:numel(d)
             abs_deg = check_length(c{k}, n_elem, ...
                 sprintf('global_model.elem_phase_deg{%d}', k), source_label);
@@ -325,11 +325,15 @@ function [depths, offs, amps] = add_knot(depths, offs, amps, d, off, amp)
     amps{end+1}    = amp;
 end
 
-function c = rows_of(v, n_rows)
+function c = rows_of(v, n_rows, n_elem)
+% Per-depth rows of a per-element field. YAML stores a one-element device's
+% per-depth values as a flat list, one value per depth.
     if iscell(v)
         c = v;
     elseif n_rows == 1
         c = {v};
+    elseif n_elem == 1 && numel(v) == n_rows
+        c = num2cell(v(:));
     else
         c = num2cell(v, 2);
     end
