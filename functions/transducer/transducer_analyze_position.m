@@ -1,5 +1,4 @@
 function [dist_to_target, dist_to_target_mm, prop_intersect, mean_dts, var_dts] = transducer_analyze_position(trans_pos, pos_shift_mm, target, pixel_size, parameters, coord_mesh, full_skull_mask, skin_boundary_coords)
-
 % TRANSDUCER_ANALYZE_POSITION  Compute geometric and statistical measures for a transducer position
 %
 % Analyses a transducer position relative to a target, computing distance

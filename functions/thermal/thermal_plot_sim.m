@@ -18,9 +18,10 @@ function thermal_plot_sim(focal_planeT, time_status_seq, parameters, trans_pos, 
 % Input:
 %   focal_planeT    - temperature in focal plane over time [°C]
 %   time_status_seq - struct array with fields time [s], status, recorded
-%   parameters      - PRESTUS config; must contain io.dir_output, io.output_affix,
-%                     subject_id, simulation.medium, transducer(1).trans_pos,
-%                     transducer(1).focus_pos, thermal.temp_0, io.save_heatingvideo
+%   parameters      - PRESTUS config; must contain io.dir_img, io.dir_cache,
+%                     io.dir_output, io.output_affix, subject_id,
+%                     simulation.medium, transducer(1).focus_pos,
+%                     io.save_heatingvideo (optional)
 %   trans_pos       - [1x3] transducer position in grid indices
 %   medium_masks    - layer label map
 %   CEM43           - k-Wave CEM43 in focal plane over time [min]

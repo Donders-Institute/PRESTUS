@@ -1,5 +1,4 @@
 function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_orig, focus_pos_orig, segmented_img_final, trans_pos_final, focus_pos_final, parameters, output_plot)
-
 % SHOW_POSITIONING_PLOTS  Visualise transducer positioning before and after preprocessing
 %
 % Displays orthogonal slice overlays and a 3D view of the segmented head
@@ -23,7 +22,7 @@ function show_positioning_plots(segmented_img_orig, t1_pixel_size, trans_pos_ori
 %   parameters          - (1,1) simulation parameters struct
 %   output_plot         - path to save the output figure (empty string to skip)
 %
-% See also: SHOW_3D_HEAD, PLOT_CORONAL_SLICES
+% See also: SHOW_3D_HEAD
 
     arguments
         segmented_img_orig  (:,:,:) {mustBeNumericOrLogical}

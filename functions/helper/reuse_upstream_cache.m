@@ -1,6 +1,5 @@
 function reuse = reuse_upstream_cache(filename, parameters, kind)
-% REUSE_UPSTREAM_CACHE  True when an existing upstream cache must be loaded
-%                       regardless of io.overwrite_files.
+% REUSE_UPSTREAM_CACHE  True when an existing upstream cache must be loaded regardless of io.overwrite_files
 %
 %   Chained pipelines (async, multi-ISPPA, uncertainty) set
 %   io.reuse_upstream_caches on output-stage sub-jobs. Those jobs honour

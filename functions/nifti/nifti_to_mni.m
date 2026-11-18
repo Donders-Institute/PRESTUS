@@ -39,10 +39,10 @@ function nifti_to_mni(orig_file_gz, mni_file, parameters, is_layered, m2m_folder
 %   FillMethod   - 'constant' or 'nearest' (default: 'constant')
 %   FillValue    - scalar used when FillMethod='constant' (default: NaN)
 %   FovMask      - logical MNI-space array; 1=valid T1w source, 0=background
-%                  Required for FillMethod='nearest'; optional for 'constant'.
-%                  See MNI_FOV_MASK.
+%                  Required for FillMethod='nearest' (no fill without it);
+%                  optional for 'constant'.
 %
-% See also: NIFTI_WRITE_VOLUME, CONVERT_FINAL_TO_MNI_SIMNIBS, MNI_FOV_MASK
+% See also: NIFTI_TO_T1W, CONVERT_FINAL_TO_MNI_SIMNIBS
 
 arguments
     orig_file_gz   string

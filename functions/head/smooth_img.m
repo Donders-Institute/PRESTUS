@@ -51,8 +51,8 @@ function thresholded_img = smooth_img(unsmoothed_img, fwhm_mm, voxel_size_mm, th
     % Convert FWHM(mm) → FWHM(voxels) per dimension
     fwhm_voxels = fwhm_mm ./ voxel_size_mm;
 
-    % Convert FWHM(voxels) → σ(voxels) for Gaussian [web:9]
-    sigma_voxels = fwhm_voxels / 2.35482;  % FWHM = 2.35482 × σ [web:9]
+    % Convert FWHM(voxels) → σ(voxels) for Gaussian
+    sigma_voxels = fwhm_voxels / 2.35482;  % FWHM = 2.35482 × σ
 
     if any(fwhm_voxels > 0)
 

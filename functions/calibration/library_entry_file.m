@@ -2,7 +2,7 @@ function [file, found, index] = library_entry_file(library_path, key, tran_seria
 % LIBRARY_ENTRY_FILE  Path of a calibration-library entry in a flat or nested library
 %
 % A library folder holds entries in one of two layouts (both are read):
-%   flat     <library_path>/<KEY>.yaml                      (user libraries, v0.6)
+%   flat     <library_path>/<KEY>.yaml                      (user libraries)
 %   nested   <library_path>/model-<MODEL>/tran-<TRAN>[_ds-<DS>]_calib.yaml
 % where KEY is <TRAN>_<DS> for a transducer–driving-system entry and <TRAN>
 % for a driving-system-agnostic one. The shipped library (config/calibration)

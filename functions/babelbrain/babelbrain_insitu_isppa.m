@@ -1,6 +1,5 @@
 function isppa = babelbrain_insitu_isppa(parameters, sensor_data, kwave_medium, medium_masks)
-% BABELBRAIN_INSITU_ISPPA  In-brain peak intensity of an acoustic field, as
-% BabelBrain's thermal solver defines its Isppa input.
+% BABELBRAIN_INSITU_ISPPA  In-brain peak ISPPA of an acoustic field, as BabelBrain's thermal Isppa input
 %
 % BabelBrain's BHTE rescales the acoustic field so that max p^2/(2*rho*c)
 % inside the brain equals the Isppa it is given (CalculateTemperatureEffects.py,

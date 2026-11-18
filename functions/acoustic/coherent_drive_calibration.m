@@ -1,5 +1,4 @@
 function [parameters, drive_cal] = coherent_drive_calibration(parameters, simulate_baseline)
-
 % COHERENT_DRIVE_CALIBRATION  Set each transducer's drive to its own ISPPA target (coherent runs)
 %
 % In a coherent multi-transducer run all transducers fire together in one

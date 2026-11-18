@@ -20,7 +20,7 @@ function prestus_nexus(config_file, options)
 %            of the last start, the conda env 'prestus-nexus', python3). The
 %            Python that started the Nexus is remembered for the next call.
 %
-% See also: PRESTUS_GUI, FIND_NEXUS_PYTHON, LOAD_PARAMETERS, PRESTUS_CONFIG_INIT
+% See also: FIND_NEXUS_PYTHON, LOAD_PARAMETERS, PRESTUS_CONFIG_INIT
 
 arguments
     config_file (1,:) char = ''

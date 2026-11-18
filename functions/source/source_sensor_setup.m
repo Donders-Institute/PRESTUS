@@ -163,7 +163,7 @@ end
         if nargin >= 6 && ~isempty(min_sound_speed)
             c_check = min_sound_speed;
         else
-            c_check = max_sound_speed;  % fallback: conservative (overestimates PPW)
+            c_check = max_sound_speed;  % fallback: fastest medium (overestimates PPW)
         end
         ppw_actual = c_check / (tx.freq_hz * parameters.grid.resolution_mm / 1e3);
         if ppw_actual < min_ppw
@@ -237,17 +237,11 @@ end
     % run_jwave_sim.py's auto_pad_for_pml silently EXPANDS the domain actually
     % propagated over whenever the transducer source lands within pml_size
     % voxels of the FOV boundary -- which can still happen even after
-    % acoustic_fov_crop.m's own PML pre-expansion (observed empirically: a
-    % source landed exactly at the pre-expanded boundary, 1 voxel from the
-    % edge, triggering a further ~pml_size-voxel Python-side pad). t_end above
-    % has no visibility into that later, Python-side expansion, so without
-    % this margin the "last num_periods" recording window can start BEFORE
-    % the wavefront has even crossed the domain that is actually simulated
-    % (confirmed via run_jwave_sim.py --debug: margin of -5.23 periods, i.e.
-    % negative, on a benchmark run with this exact source-near-PML geometry).
-    % Add worst-case margin (pml on both ends of one axis) so recording start
-    % stays safely past the true one-way transit regardless of whether the
-    % Python-side pad actually triggers.
+    % acoustic_fov_crop.m's PML pre-expansion: a source near the boundary
+    % makes run_jwave_sim.py pad the grid by up to pml_size per side, which
+    % t_end does not see. Add the worst-case margin (PML on both ends of one
+    % axis) so the recording window starts after the wavefront has crossed
+    % the simulated domain, whether or not the pad triggers.
     if ~fixed_t_end && isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'jwave')
         if isfield(parameters.grid, 'pml_size') && isnumeric(parameters.grid.pml_size)
             pml_voxels = max(parameters.grid.pml_size(:));
@@ -346,7 +340,6 @@ end
     end
     time_points_to_record = round(num_periods * wave_period / kgrid.dt);
     sensor.record_start_index = simulation_time_points - time_points_to_record + 1;
-    % alternative (EM): sensor.record_start_index = simulation_time_points - 3*points_per_period;
 
     fprintf('[source_sensor_setup] ---- simulation grid summary ----\n');
     fprintf('[source_sensor_setup] Grid dims         : %s\n', num2str(parameters.grid.dims));

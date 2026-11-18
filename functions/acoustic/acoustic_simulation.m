@@ -45,22 +45,14 @@ end
 %   4: C++ GPU code 'cpp_gpu'
 %   5: C++ Apple Silicon GPU code 'cpp_mlx' (kspaceFirstOrder-MLX)
 
-% Disable k-Wave's PlotSim when not interactive, when using C++ backends
-% (which run out-of-process), or when the PRESTUS GUI is open.  The GUI is
-% a uifigure whose figure management conflicts with k-Wave's gcf-based
-% plotting: waitbar updates steal gcf from the simulation figure, causing
-% planeplot to draw into the wrong window.  Command-line interactive runs
-% (no GUI) are unaffected and still receive the real-time animation.
-gui_open   = ~isempty(findall(0, 'Tag', 'prestus_gui'));
+% Disable k-Wave's PlotSim when not interactive or when using C++ backends
+% (which run out-of-process). Interactive MATLAB runs keep the real-time
+% animation.
 cpp_backend = ismember(parameters.simulation.code_type, {'cpp_cpu', 'cpp_gpu', 'cpp_mlx'});
-if ~parameters.simulation.interactive || gui_open || cpp_backend
+if ~parameters.simulation.interactive || cpp_backend
     input_args.PlotSim = false;
     if parameters.simulation.interactive
-        if gui_open
-            disp('Interactive acoustic visualization is disabled when the PRESTUS GUI is open.');
-        elseif cpp_backend
-            disp('Interactive acoustic visualization is not available for C++ backends (cpp_cpu/cpp_gpu/cpp_mlx).');
-        end
+        disp('Interactive acoustic visualization is not available for C++ backends (cpp_cpu/cpp_gpu/cpp_mlx).');
     end
 end
 

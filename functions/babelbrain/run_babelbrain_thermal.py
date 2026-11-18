@@ -49,7 +49,7 @@ def parse_args():
     p.add_argument('--acoustic_h5',        required=True,
                    help='Path to *DataForSim.h5 from acoustic simulation')
     p.add_argument('--isppa',              required=True, type=float,
-                   help='ISPPA [W/cm²] at the focus')
+                   help='Peak ISPPA in brain [W/cm²] (BabelBrain Isppa; the field is rescaled to it)')
     p.add_argument('--duty_cycle',         required=True, type=float,
                    help='Duty cycle [0–1]')
     p.add_argument('--prf',                required=True, type=float,
@@ -57,7 +57,7 @@ def parse_args():
     p.add_argument('--duration_s',         required=True, type=float,
                    help='Pulse train duration [s]')
     p.add_argument('--computing_backend',  required=True, type=int,
-                   help='1=CUDA 2=OpenCL 3=Metal 4=MLX (Apple Silicon only; BabelBrain''s thermal '
+                   help="1=CUDA 2=OpenCL 3=Metal 4=MLX (Apple Silicon only; BabelBrain's thermal "
                         'engine has no CPU backend)')
     p.add_argument('--device_name',        required=True)
     p.add_argument('--babelbrain_root',    default='',

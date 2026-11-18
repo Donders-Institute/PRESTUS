@@ -6,10 +6,9 @@ function [baseline, source] = isppa_baseline(acoustic_provenance)
 % BabelBrain water run) takes precedence over the library calibration value
 % (tx_calibration.isppa_wcm2).
 %
-% The origin is read from freefield_source (written since the baseline fix),
-% then tx_calibration.isppa_source. Caches written before freefield_source
-% existed carry a freefield value without a calibration only when a free-water
-% simulation produced it, so that case is reported as 'kwave_simulation'.
+% The origin is read from freefield_source, then tx_calibration.isppa_source.
+% A freefield value without either and without a calibration can only come
+% from a free-water simulation, so it is reported as 'kwave_simulation'.
 %
 % Use as:
 %   [baseline, source] = isppa_baseline(acoustic_provenance)
@@ -46,7 +45,7 @@ function [baseline, source] = isppa_baseline(acoustic_provenance)
         elseif ~isempty(cal_source)
             source = cal_source;
         elseif ~has_cal
-            source = 'kwave_simulation';   % legacy cache: only a simulation writes this
+            source = 'kwave_simulation';   % no source recorded: only a simulation writes this
         end
     elseif has_cal && positive_scalar(acoustic_provenance.tx_calibration, 'isppa_wcm2')
         baseline = double(acoustic_provenance.tx_calibration.isppa_wcm2);

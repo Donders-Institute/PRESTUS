@@ -1,9 +1,9 @@
-# The configuration is structured using YAML (https://yaml.org/). Note that YAML uses spaces, not tabs, for identation.
+# The configuration is structured using YAML (https://yaml.org/). Note that YAML uses spaces, not tabs, for indentation.
 
 # !!! Important !!! Do not edit this document. Instead, copy (at least) the first segment into your own config file.
 
 #------------------------------------------------
-#------------ Setup-specific specfication (Defaults)
+#------------ Setup-specific specification (Defaults)
 # The following information is study-specific.
 # Defaults should be overwritten (where sensible or necessary) in a separate <simulation-X>config.yaml file.
 #------------------------------------------------
@@ -18,7 +18,7 @@ platform: 'auto' # Execution platform: auto (recommended) | slurm | qsub | matla
 #------------ Simulation type & execution
 
 simulation:
-  medium: layered     # select which medium setup to use: 'water' or 'layered' (a layered medium consists of several layers defined below)
+  medium: layered     # select which medium setup to use: 'water', 'layered' (a layered medium consists of several layers defined below), or 'phantom'
   code_type: matlab_gpu # Select which k-Wave code to run:
                         #   MATLAB CPU code 'matlab_cpu'
                         #   MATLAB GPU code 'matlab_gpu'
@@ -171,7 +171,7 @@ hpc:
   exclude: ''      # [slurm] Nodes to avoid, comma-separated (sbatch --exclude), e.g. a node with an occupied GPU
   wait_for_job: false
   timelimit: '04:00:00'
-  memorylimit: 20
+  memorylimit: 20  # [GB]
   posthoc_water_timelimit: '05:00:00'  # Wall time for the post-hoc free-water jobs (modules.run_posthoc_water_sims)
   posthoc_water_memorylimit: 40        # Memory [GB] for the post-hoc free-water jobs
   ld_library_path: '' # Prefixed to LD_LIBRARY_PATH for SimNIBS tools; '' = the libraries of the install in startup.simnibs_bin_path (<simnibs package>/external/lib/linux). Set only to override, e.g. [qsub] /opt/gcc/7.2.0/lib64
@@ -193,7 +193,7 @@ snellius:
 
 #------------ Target analysis
 analysis:
-  focus_area_radius: 5  # Radius of the target area around the focus in which the ISPPA is averaged for the outputs [mm]
+  focus_area_radius: 5  # Half-width of the cube around the focus in which Ipa is averaged for the outputs [mm]
   target_mni_mm: []     # [x y z] intended target in MNI mm for targeting accuracy (modules.run_targeting_analysis).
                         #   [] = the MNI target of the placement mode (heuristic/plantus mni_target_mm, mni focus_pos_mm), if any.
   target_roi_mni: ''    # Target ROI mask in MNI space (NIfTI) for targeting accuracy: overlap with the -3 dB focal volume,
@@ -341,7 +341,7 @@ placement:
                               #            nonlinear warp; no scalp snapping, unlike mode='mni').
                               # ras/mni are converted to T1 voxels in the placement stage, per transducer.
   localite:
-    enabled: 0        # Use Localite neuronavigation to position the transducer?
+    enabled: 0        # Use Localite neuronavigation to position the transducer in head preprocessing? Older switch; placement.mode: 'localite' is the placement-stage equivalent
     # --- File mode: a single Localite XML file (TriggerMarkers, GUMMarkers or InstrumentMarker; type detected) ---
     file: ''          # Path to a single Localite XML file; leave empty for automatic mode
     # --- Automatic mode: ingested markers under path.localite_post (ingested from path.localite_raw on first use) ---
@@ -367,17 +367,17 @@ placement:
   heuristic:
     mni_target_mm: []    # [x y z] MNI coordinate of the sonication target (required for mode='heuristic')
     target_name: ''      # Label string for the target, used in output filenames (required for mode='heuristic')
-    dist_close: []
-    ear_radius: 35
+    dist_close: []       # [mm]
+    ear_radius: 35       # [mm]
     save_localite_t1: false # Save Localite-aligned T1 output for header correction?
-    left_ear_center: []
-    right_ear_center: []
-    criterion_intersection: 0.05
-    criterion_skin_mean: []
-    criterion_skull_mean: []
-    criterion_skin_var: []
-    criterion_skull_var: []
-    expand_step: 0.01
+    left_ear_center: []  # [image voxels]
+    right_ear_center: [] # [image voxels]
+    criterion_intersection: 0.05 # [fraction]
+    criterion_skin_mean: []   # [quantile]
+    criterion_skull_mean: []  # [quantile]
+    criterion_skin_var: []    # [quantile]
+    criterion_skull_var: []   # [quantile]
+    expand_step: 0.01         # [fraction]
     candidate: []        # idx of a candidate of the last heuristic run (tpars_sub-XXX_<target>.csv) to place instead of
                          # the heuristic's choice (set on the Nexus Heuristic page); [] = apply the criteria
   mni:
@@ -462,20 +462,22 @@ grid:
   resolution_mm: 0.5  # Grid resolution (must be isotropic) [mm]
   default_dims: 'auto'          # [points per dimension] [used for setting up free-water grid]; 'auto' = sized to the transducer:
                                 #   aperture + 2 x water_margin_mm laterally, focal distance (bowl) + z_beyond_focus_mm axially.
-                                #   Same free-water ISPPA and focus as [144, 144, 400] (k-Wave drive benchmark, 2026-10).
+                                #   Same free-water ISPPA and focus as [144, 144, 400] (k-Wave drive benchmark).
                                 #   A matrix transducer placed by trans_pos/focus_pos (grid indices) keeps [144, 144, 400].
   # water_margin_mm: 5      # Lateral margin on each side of the aperture when default_dims='auto' [mm].
   # z_beyond_focus_mm: 40   # Extra axial length beyond the focus when acoustic_fov_length_mm='auto' or default_dims='auto' [mm].
-  #                          # Default 40 mm, matching BabelBrain conventions.  Override to extend or
-  #                          # shorten the acoustic-only sub-grid along the beam axis.
+  #                          # Default 40 mm. Also sets BabelBrain's narrow-beam domain (babelbrain.tight_narrow_beam).
   # acoustic_fov_diameter_mm: []  # Lateral diameter of the beam-axis-aligned acoustic sub-grid [mm].
-  #                               # 'auto' → outermost element diameter of transducer(1).
-  #                               # Set to a number to restrict the acoustic sim to a smaller lateral FOV.
+  #                               # 'auto' → outermost element diameter of transducer(1) + 4 grid voxels per side
+  #                               #   (holds the source points spread beyond the bowl rim).
+  #                               # Set to a number to restrict the acoustic sim to a smaller lateral FOV;
+  #                               #   values below outer diameter + margin are enlarged with a warning.
   # acoustic_fov_length_mm: []    # Axial length of the acoustic sub-grid [mm].
   #                               # 'auto' → bowl apex (trans_pos) to focus distance + z_beyond_focus_mm.
   # thermal_use_acoustic_fov: 0   # 1 = thermal simulation also runs within the acoustic FOV (faster,
   #                               # less accurate cooling boundary). 0 = thermal uses the full grid (default).
   # thermal_resolution_mm: []     # Override grid resolution for thermal simulation only [mm].
+  # origin_ras_mm: []             # Phantom and water grids: RAS position of voxel [1,1,1] [mm], so output NIfTIs open in place; the simulation is unaffected.
   #                               # Leave empty to reuse the acoustic grid resolution.
   # thermal_fov_mm: []            # Independent thermal FOV [mm]; defines a sub-grid around the focus
   #                               # for the thermal solver, independent of the acoustic FOV.
@@ -580,7 +582,7 @@ pct:
 # You can remove or add layers. If you want a skull-only simulation, remove brain and skin for example.
 
 layers:
-  water: [0, 3, 6, 9, 10] # this isn't really neccessary as water is a default layer - all that has a number not used for other layers will be assigned water properties
+  water: [0, 3, 6, 9, 10] # this isn't really necessary as water is a default layer - all that has a number not used for other layers will be assigned water properties
   brain: [1, 2]
   skin: [5]
   skull: [4]
@@ -596,7 +598,7 @@ timing:
   pt_timestep: 0.02   # Modelling time step within a pulse train [s]; used with equal_step_duration: 1
   ptri: 0          # Pulse Train Repetition Interval (PTRI) [s]
   ptrd: 0          # Pulse Train Repetition Duration (PTRD) [s]
-  post_ptri_dur: 0 # Cooling period after the PTRD [s]
+  post_ptri_dur: 0 # Steady-state period after the PTRD [s]
   post_pt_timestep: 1 # Modelling time step between pulse trains and after the PTRD [s]
   equal_step_duration: 0 # Equal step durations for on and off cycles? 1=yes, 0=no
 
@@ -700,62 +702,62 @@ babelbrain:
 # other inherited from earlier layers; setting both in one layer errors.
 medium_properties:
   water:
-    sound_speed: 1500
-    density: 994
-    alpha_coeff: 2.17e-3
+    sound_speed: 1500 # [m/s]
+    density: 994 # [kg/m^3]
+    alpha_coeff: 2.17e-3 # [dB/(cm MHz^y)]
     alpha_power: 2
     thermal_conductivity: 0.60 # [W/m/°C]
     specific_heat_capacity: 4178 # [J/kg/°C]
-    perfusion: 0
+    perfusion: 0 # [mL/min/kg]
     absorption_fraction: 1
     absorption_coeff: [] # [dB/(cm MHz^y)]; alternative to absorption_fraction, e.g. 2.17e-3 (= alpha_coeff)
   brain:
     sound_speed: 1546 # [m/s]
     density: 1046 # [kg/m^3]
-    alpha_coeff: 0.59
+    alpha_coeff: 0.59 # [dB/(cm MHz^y)]
     alpha_power: 1.2
     thermal_conductivity: 0.51 # [W/m/°C]
     specific_heat_capacity: 3630 # [J/kg/°C]
-    perfusion: 559
+    perfusion: 559 # [mL/min/kg]
     absorption_fraction: 1
     absorption_coeff: [] # [dB/(cm MHz^y)]; alternative to absorption_fraction, e.g. 0.59 (= alpha_coeff, conservative); measured brain absorption is lower (~0.05-0.16 dB/cm at 500 kHz)
   skin:
     sound_speed: 1610 # [m/s]
     density: 1090 # [kg/m^3]
-    alpha_coeff: 0.4
+    alpha_coeff: 0.4 # [dB/(cm MHz^y)]
     alpha_power: 1
     thermal_conductivity: 0.37 # [W/m/°C]
     specific_heat_capacity: 3391 # [J/kg/°C]
-    perfusion: 106
+    perfusion: 106 # [mL/min/kg]
     absorption_fraction: 1
     absorption_coeff: [] # [dB/(cm MHz^y)]; alternative to absorption_fraction, e.g. 0.4 (= alpha_coeff)
   skull: # (single skull layer only; mostly following cortical bone)
     sound_speed: 2800 # [m/s]
     density: 1850 # [kg/m^3]
-    alpha_coeff: 13.3
+    alpha_coeff: 13.3 # [dB/(cm MHz^y)]
     alpha_power: 1
     thermal_conductivity: 0.32 # [W/m/°C]
     specific_heat_capacity: 1793 # [J/kg/°C]
-    perfusion: 20
+    perfusion: 20 # [mL/min/kg]
     absorption_fraction: 0.28
     absorption_coeff: [] # [dB/(cm MHz^y)]; alternative to absorption_fraction, e.g. 3.78: longitudinal + 0.2 x shear absorption (2.7 + 0.2 x 5.4; Pinton et al., 2012)
   skull_trabecular: # trabecular bone
     sound_speed: 2300 # [m/s]
     density: 1700 # [kg/m^3]
-    alpha_coeff: 13.3
+    alpha_coeff: 13.3 # [dB/(cm MHz^y)]
     alpha_power: 1
     thermal_conductivity: 0.32 # [W/m/°C]
     specific_heat_capacity: 2274 # [J/kg/°C]
-    perfusion: 30
+    perfusion: 30 # [mL/min/kg]
     absorption_fraction: 0.28
     absorption_coeff: [] # [dB/(cm MHz^y)]; alternative to absorption_fraction, e.g. 3.78: longitudinal + 0.2 x shear absorption (2.7 + 0.2 x 5.4; Pinton et al., 2012)
   skull_cortical: # cortical bone
     sound_speed: 2800 # [m/s]
     density: 1850 # [kg/m^3]
-    alpha_coeff: 13.3
+    alpha_coeff: 13.3 # [dB/(cm MHz^y)]
     alpha_power: 1
     thermal_conductivity: 0.32 # [W/m/°C]
     specific_heat_capacity: 1313 # [J/kg/°C]
-    perfusion: 10
+    perfusion: 10 # [mL/min/kg]
     absorption_fraction: 0.28
     absorption_coeff: [] # [dB/(cm MHz^y)]; alternative to absorption_fraction, e.g. 3.78: longitudinal + 0.2 x shear absorption (2.7 + 0.2 x 5.4; Pinton et al., 2012)

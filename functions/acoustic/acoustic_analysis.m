@@ -12,8 +12,8 @@ function [results, acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoust
 %   Ita  — intensity of temporal average: Ipa × duty_cycle  [W/cm²]
 %            requires parameters.timing.pd and .pri; otherwise Ita = []
 %
-% For layered and phantom media, computes per-tissue peak values (skin, skull,
-% brain) and transcranial MI (all Ipa-based).  Writes a summary CSV and saves
+% For layered and phantom media, computes per-tissue peak intensities (Ipa),
+% pressures, and MI (skin, skull, brain) and the transcranial MI.  Writes a summary CSV and saves
 % overlay plots of the intensity on the segmentation.
 %
 % Use as:
@@ -73,7 +73,7 @@ end
     trans_pos = tr.trans_pos;
     focus_pos = tr.focus_pos;
 
-    % intialize output structure
+    % initialize output structure
     results = struct();
 
     % For async-combined caches, p_max_async holds the per-voxel pressure
@@ -211,7 +211,7 @@ end
         after_exit_plane_mask = after_exit_plane_mask | mask_it;
     end
 
-    % [1] average Isppa within a circle around the target
+    % [1] average Isppa within a cube around the target (half-width focus_area_radius)
     % convert the radius from mm to voxels
     avg_radius = round(parameters.analysis.focus_area_radius/parameters.grid.resolution_mm); % [voxel]
     idx = arrayfun(@(d) max(1,focus_pos(d)-avg_radius):...
@@ -264,7 +264,7 @@ end
     %   * bowl APEX (trans_pos): BabelBrain FocalLength/ZSteering, curv_radius_mm,
     %     focal_distance_bowl, and the *_bowl_mm columns.
     %   * EXIT PLANE: manufacturer specs (FLHM centre), focal_distance_ep, and
-    %     the O'Neill/Rayleigh analytical convention.
+    %     the O'Neil/Rayleigh analytical convention.
     % The exit plane sits curv_radius_mm - dist_geom_ep_mm (focal_distance_offset;
     % not the rim sagitta for library devices) in front of the apex, along the
     % beam axis toward the focus.

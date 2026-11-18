@@ -1,6 +1,5 @@
 function jobs = multi_isppa_pipeline(parameters, options)
-% MULTI_ISPPA_PIPELINE  Run acoustic simulation once, then thermal analysis at
-%                       multiple free-water target intensities in parallel
+% MULTI_ISPPA_PIPELINE  Run the acoustic simulation once, then thermal analysis at several free-water target intensities in parallel
 %
 % When transducer(1).target_isppa_wcm2 contains more than one value, the
 % pipeline automatically splits into:
@@ -71,7 +70,7 @@ function jobs = multi_isppa_pipeline(parameters, options)
 %                .output_affixes (1×M cell, io.output_affix of each target's outputs)
 %
 % See also: PRESTUS_PIPELINE_START, PRESTUS_PIPELINE,
-%           MEASURE_FREEFIELD_BASELINE, APPLY_ISPPA_SCALING
+%           ACOUSTIC_WATER_BASELINE, APPLY_ISPPA_SCALING
 
 arguments
     parameters (1,1) struct
@@ -418,10 +417,8 @@ end
 % =========================================================================
 
 function assert_thermal_outputs_exist(parameters, affixes)
-    % Filename must match the thermal stage's actual output (see the csv_file
-    % built in the slurm/qsub branch above, and resolve_io_dirs.m's
-    % io.filename_table derivation) — not '_output_table', which no stage
-    % here ever writes.
+    % Filename as the thermal stage writes it (io.filename_table; same as the
+    % csv_file of the slurm/qsub branch above)
     subject_id = parameters.subject_id;
     medium     = parameters.simulation.medium;
     output_dir = get_output_dir(parameters);

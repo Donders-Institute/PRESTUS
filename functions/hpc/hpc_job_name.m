@@ -2,7 +2,7 @@ function job_name = hpc_job_name(parameters)
 % HPC_JOB_NAME  Generate a standardised HPC job name for a PRESTUS pipeline run
 %
 % Constructs a job name in the format PREFIX_sub-NNN[_affix], where PREFIX
-% defaults to 'PRESTUS' (overridable via parameters.hpc.job_prefix) and affix
+% defaults to 'PS' (overridable via parameters.hpc.job_prefix) and affix
 % is appended from io.output_affix when set (e.g. '_desc-temphigh' → 'desc-temphigh').
 % If parameters.hpc.job_name is already set, it is returned unchanged.
 %
@@ -13,7 +13,7 @@ function job_name = hpc_job_name(parameters)
 %   parameters - PRESTUS config struct; relevant fields:
 %                  .subject_id        — used to form sub-NNN suffix
 %                  .hpc.job_name      — if set, returned as-is (bypass)
-%                  .hpc.job_prefix    — prefix string (default: 'PRESTUS')
+%                  .hpc.job_prefix    — prefix string (default: 'PS')
 %                  .io.output_affix   — appended as disambiguator (optional)
 %
 % Output:

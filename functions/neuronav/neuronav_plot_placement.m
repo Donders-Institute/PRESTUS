@@ -10,16 +10,21 @@ function fig = neuronav_plot_placement(sub_id, session, active_sides, trans_pos,
 % Use as:
 %   fig = neuronav_plot_placement(sub_id, session, active_sides, trans_pos, target_pos, ...
 %             target_map, parameters, output_dir)
+%   fig = neuronav_plot_placement(..., output_dir, params_plot)
 %
 % Input:
 %   sub_id       - subject identifier string (e.g. 'sub-001')
+%   session      - session identifier string; names the PNG
+%                  (<sub_id>_<session>_placement.png)
 %   active_sides - integer array of series indices with valid data
 %   trans_pos    - [Nx3] transducer voxel positions (indexed by series index)
 %   target_pos   - [Nx3] target voxel positions (indexed by series index)
 %   target_map   - struct array (one entry per coil).  Required fields:
 %                    .series_index   integer — maps into trans_pos / target_pos rows
-%                    .transducer_id  integer — which parameters.transducer() to use
-%                    .target_name    char    — must start with 'L_' or 'R_'
+%                    .transducer_id  integer — 0-based coil index; selects
+%                                    params_plot.transducer(id + 1), clamped
+%                    .target_name    char    — legend label ('L_'/'R_' prefix
+%                                    shown as LEFT/RIGHT)
 %   parameters   - PRESTUS config struct.  Must contain parameters.path.seg.
 %   output_dir   - folder where the PNG is saved
 %   params_plot  - (optional) separate config struct whose transducer array

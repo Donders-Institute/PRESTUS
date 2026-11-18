@@ -1,5 +1,4 @@
 function [x, y] = get_arc(center, radius, angleStart, angleEnd, npoints)
-
 % GET_ARC  Generate x/y coordinates of a 2-D arc
 %
 % Computes uniformly sampled points along a circular arc defined by a

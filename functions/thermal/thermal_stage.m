@@ -3,7 +3,7 @@ function [results_heating, time_status_seq, kwave_medium, medium_masks, ...
     thermal_stage(parameters, sensor_data, kgrid, kwave_medium, medium_plus, ...
                   medium_masks, segmentation, planimg, source, sensor, ...
                   trans_pos, focus_pos, acoustic_provenance, fov_state, highlighted_pos)
-% THERMAL_STAGE  Run or load the bio-heat thermal simulation (Stage 8).
+% THERMAL_STAGE  Run or load the bio-heat thermal simulation.
 %
 % Handles acoustic-FOV restore, thermal-grid setup, backend dispatch
 % (k-Wave default / BabelBrain), and cache save/load.  Returns results
@@ -140,8 +140,8 @@ if run_new_sim
 
     kwave_medium.temp_0              = medium_plus.temp_0;
     % absorption_np when any tissue uses an absorption coefficient; runs with
-    % fractions only keep the fraction x attenuation path (medium caches from
-    % before absorption_from_coeff hold one of the two maps)
+    % fractions only keep the fraction x attenuation path (a medium cache
+    % without absorption_from_coeff holds one of the two maps)
     if isfield(medium_plus, 'absorption_np') && ...
             (~isfield(medium_plus, 'absorption_fraction') || ...
              (isfield(medium_plus, 'absorption_from_coeff') && medium_plus.absorption_from_coeff))
@@ -267,7 +267,7 @@ if run_new_sim
 
 elseif exist(filename_heating_data, 'file')
     disp('Skipping thermal simulation, loading existing output file.')
-    time_status_seq = [];   % pre-init for caches from older PRESTUS versions
+    time_status_seq = [];   % for caches without time_status_seq
     loaded = load(filename_heating_data);
     results_heating = loaded.results_heating;
     if isfield(loaded, 'time_status_seq')

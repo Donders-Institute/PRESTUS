@@ -276,18 +276,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_medium
         end
 
         function test_get_alpha_coeff(tc)
-            % KNOWN BUG (2026-10): get_alpha_coeff.m:28 reads
-            % load_parameters().medium.(name); the tissue table is
-            % parameters.medium_properties and there is no top-level 'medium'
-            % key, so every call errors. No caller in functions/ uses it.
             ref = tc.Cfg.medium_properties.brain;
-            try
-                a = get_alpha_coeff('brain', 500e3);
-            catch ME
-                tc.verifyFail(sprintf(['Known bug: get_alpha_coeff reads load_parameters().medium ' ...
-                    'instead of .medium_properties (%s)'], ME.message));
-                return
-            end
+            a = get_alpha_coeff('brain', 500e3);
             tc.verifyEqual(a, ref.alpha_coeff * 0.5^ref.alpha_power, 'RelTol', 1e-12);
         end
 

@@ -3,8 +3,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_isppa_
 %
 % Covers NEEDS_WATER_BASELINE (modules.run_water_baseline = 1 | 'auto' | 0),
 % ISPPA_BASELINE (baseline lookup incl. legacy caches), ISPPA_SCALE_FACTOR and
-% APPLY_ISPPA_SCALING. Regression for the case where a target ISPPA on an
-% uncalibrated transducer was silently reported at the raw drive level.
+% APPLY_ISPPA_SCALING. A target ISPPA on an uncalibrated transducer is never
+% reported at the raw drive level.
 % Pure logic: no k-Wave, no data.
 %
 %   results = runtests('tests/test_isppa_policy.m');
@@ -113,7 +113,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_isppa_
         end
 
         function test_target_without_baseline_errors(tc)
-            % The regression: previously a warning and an unscaled field
+            % A target that needs scaling without a baseline errors (no unscaled field)
             tc.verifyError(@() isppa_scale_factor(30, struct()), 'prestus:isppa:noBaseline');
         end
 

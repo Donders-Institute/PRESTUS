@@ -9,8 +9,8 @@ classdef (SharedTestFixtures = {prestus_paths}) test_physics_water < matlab.unit
 %   - focal peak pressure                             within PeakRelTol
 %   - -3 dB (intensity) axial focal length            within LengthRelTol
 % a multi-ring annular array (in phase) against the O'Neil solution summed over
-% its rings (axisymmetric; regression for rings placed at the apex plane instead
-% of on the bowl, fixed 2026-10), plus two invariants of the linear solver and
+% its rings (axisymmetric; rings must lie on the bowl, not at the apex plane),
+% plus two invariants of the linear solver and
 % the ISPPA targeting:
 %   - doubling the drive doubles the pressure          (axisymmetric)
 %   - a target ISPPA on an uncalibrated transducer is met in water, and with
@@ -22,9 +22,8 @@ classdef (SharedTestFixtures = {prestus_paths}) test_physics_water < matlab.unit
 %                     run on a GPU / HPC node (set PRESTUS_PHYSICS_CODE_TYPE, e.g.
 %                     'matlab_gpu' or 'cpp_gpu')
 %
-% Regression for the axisymmetric source mask that dropped the negative BLI
-% side lobes and raised the focal pressure by 6-11 % (fixed 2026-10).
-% Tolerances: see Tol below and doc_testing.md (fix them to the first passing
+% The axisymmetric source mask must keep the negative BLI side lobes (dropping
+% them raises the focal pressure by 6-11 %). Tolerances: see Tol below and doc_testing.md (fix them to the first passing
 % run on the reference machine and keep them fixed thereafter).
 %
 %   run_all_tests('physics')                                   % axisymmetric

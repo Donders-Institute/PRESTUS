@@ -154,7 +154,7 @@ else
             % Annular transducers are placed on the auto grid (GRID_TRANSDUCER_LOCATION
             % clears their positions in water); other types keep trans_pos/focus_pos,
             % which are indices of a grid of known size: keep the grid they were
-            % set for (the default until 2026-10)
+            % set for
             tr1 = parameters.transducer(1);
             pos_set = any(cellfun(@(f) isfield(tr1, f) && ~isempty(tr1.(f)), ...
                 {'trans_pos', 'focus_pos', 'trans_pos_mm', 'focus_pos_mm'}));

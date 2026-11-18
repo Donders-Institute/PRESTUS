@@ -4,7 +4,7 @@ function parameters = fov_restore_transducers(parameters, fov_state)
 % ACOUSTIC_GRID_FOV moves every transducer's trans_pos/focus_pos into FOV
 % voxels. Stages that return to the full grid (NIfTI export, thermal) call
 % this to undo that for all transducers; transducer(1) uses
-% fov_state.trans_pos_full/focus_pos_full as before.
+% fov_state.trans_pos_full/focus_pos_full.
 %
 % Use as:
 %   parameters = fov_restore_transducers(parameters, fov_state)

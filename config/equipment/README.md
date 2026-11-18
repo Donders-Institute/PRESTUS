@@ -22,7 +22,6 @@ config/equipment/
   ds/ds-<DS>_driver.yaml                          # driving systems
   model-<MODEL>/tran-<MODEL>_transducer.yaml      # device model: geometry, steering range, sources
   model-<MODEL>/tran-<SERIAL>_transducer.yaml     # measured units of the model: overrides and combos only
-  housing/                                        # housing meshes (Nexus 3D view)
 ```
 
 Your own entries belong in your own library folder (`transducer.library_path`, `path.transducer_library` or the `PRESTUS_TRANSDUCER_LIBRARY` environment variable; see `doc_transducer_library.md`), not here: equipment files there named `*_transducer.yaml` or `*_driver.yaml` add transducers or replace shipped ones of the same serial (`load_equipment_config(equipment_path, user_folders)`).

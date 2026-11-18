@@ -1,9 +1,8 @@
 function output_dir = get_output_dir(parameters)
 % GET_OUTPUT_DIR  Derive the simulation output directory from parameters
 %
-%   Single source of truth for output_dir derivation, used by
+%   Single source of the output directory, without side effects; used by
 %   path_log_setup, hpc_setup_temp_files, and uncertainty_pipeline.
-%   Mirrors the logic in path_log_setup without any side effects.
 %
 % Use as:
 %   output_dir = get_output_dir(parameters)

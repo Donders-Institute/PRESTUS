@@ -15,7 +15,7 @@ function alpha_db_cm = get_alpha_coeff(medium, freq)
 %   freq        - source frequency [Hz]
 %
 % Output:
-%   alpha_db_cm - amplitude attenuation coefficient [dB/(MHz cm)]
+%   alpha_db_cm - amplitude attenuation coefficient at freq [dB/cm]
 %
 % See also: FITPOWERLAWPARAMSMULTI, MEDIUM_SETUP
 
@@ -29,6 +29,6 @@ end
 
     % Compute the attenuation coefficient using tissue-specific parameters
     % `alpha_coeff` and `alpha_power` define the scaling relationship
-    alpha_db_cm = medium.alpha_coeff * ((freq / 1e6) .^ medium.alpha_power); % [db / MHz cm]
+    alpha_db_cm = medium.alpha_coeff * ((freq / 1e6) .^ medium.alpha_power); % [dB/cm]
 
 end

@@ -40,7 +40,7 @@ function [out_file, fits, report] = refine_transducer_library(combo_name, profil
 %     .Mode           - 'per_depth' (default) | 'geometric'
 %     .Preset         - per-depth fit settings, CALIBRATION_FIT_OPTIONS:
 %                       'rayleigh_phase_gain' (default) | 'oneil_phase_only'
-%                       (former PERFORM_GLOBAL_SEARCH behaviour)
+%                       (as PERFORM_GLOBAL_SEARCH)
 %     .MaxGapMm       - warn when a depth is interpolated across a larger gap
 %                       between measured depths [mm] (default 10)
 %     .Depths         - depths [mm from EP] to calibrate (default: all in the CSV).

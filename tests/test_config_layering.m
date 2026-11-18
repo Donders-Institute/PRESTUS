@@ -124,7 +124,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_config
             tc.verifyEqual(fileread(r.backup), before);
             tc.verifyEqual(fileread(fullfile(tc.Dir, 'config_default.yaml')), ...
                 fileread(fullfile(tc.Repo, 'config', 'config_default.yaml')));
-            % Now up to date: loading no longer warns about a stale copy
+            % Now up to date: loading does not warn about a stale copy
             % (promote that warning to an error so it would fail the call)
             prev = warning('error', 'prestus:staleProjectDefault');
             tc.addTeardown(@() warning(prev));

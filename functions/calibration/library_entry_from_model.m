@@ -2,8 +2,10 @@ function lib = library_entry_from_model(lib, model, isppa_wcm2, c_water, rho_wat
 % LIBRARY_ENTRY_FROM_MODEL  Write a FIT_TRANSDUCER_MODEL result into a library struct
 %
 % Fills the static model (global_model) of a transducer library entry from a
-% multi-depth fit. Existing refinements are kept; legacy per-depth phase
-% tables are removed because the new static model supersedes them.
+% FIT_TRANSDUCER_MODEL result: phase corrections, gains, steering sound speed,
+% and the drive for isppa_wcm2 (amplitude_scaling, amplitude_by_depth). Other
+% fields, including refinements, are kept; global_model.depths_ep_mm and
+% .elem_phase_deg are removed (the static model supersedes them).
 %
 % Use as:
 %   lib = library_entry_from_model(lib, model, isppa_wcm2)

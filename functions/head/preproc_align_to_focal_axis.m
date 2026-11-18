@@ -1,6 +1,5 @@
 function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = ...
     preproc_align_to_focal_axis(nii_image, nii_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters)
-
 % PREPROC_ALIGN_TO_FOCAL_AXIS  Rotate a 3D image so the focal axis aligns with the z-axis
 %
 % Rotates and optionally scales a 3D image such that the vector from
@@ -32,14 +31,17 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 %   montage_img          - comparison montage image
 %
 % Algorithm:
-%   1. Focal vector d = focus_pos_grid - trans_pos_grid (homogeneous).
-%   2. theta_y = atan2(d(1), d(3)); R_y(-theta_y) via makehgtform.
-%   3. d' = R_y * d; theta_x = atan2(d'(2), d'(3)); R_x(theta_x).
-%   4. R = R_x * R_y; S = scale; T_rs = R * S.
-%   5. Bounds from affine_bounds on corners; newdims = ceil(max-min).
-%   6. Center c = (sz+1)/2; forward = translate(-c); backward = translate((newdims+1)/2).
-%   7. T = forward' * T_rs' * backward'; rotated_img = affine_resample_3d(nii_image, T).
-%   Assumes right-handed coordinates; angles ensure positive rotation.
+%   1. Focal vector d = focus_pos_grid - trans_pos_grid (homogeneous); with
+%      align_to_focus false, d points along z to the natural focus.
+%   2. theta_y = atan(d(1)/d(3)), shifted by pi when negative; R_y(-theta_y)
+%      via makehgtform.
+%   3. d' = R_y * d; theta_x = atan(d'(2)/d'(3)); R_x(theta_x).
+%   4. R = R_x * R_y; T_rs = R * S (S = scale_factor).
+%   5. newdims = ceil(2 * max |p|) + 2 over the transformed image corners,
+%      trans_pos and focus_pos, centred on the input centre.
+%   6. forward = translate(-(sz+1)/2); backward = translate((newdims+1)/2).
+%   7. T = forward' * T_rs' * backward'; rotated_img = affine_resample_3d(nii_image, T)
+%      (nearest for images with fewer than 20 values, else linear).
 %
 % See also: PREPROC_HEAD, PREPROC_CROP_GRID
 

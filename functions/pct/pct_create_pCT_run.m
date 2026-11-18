@@ -90,15 +90,15 @@ end
         matlab_bin = fullfile(matlabroot, 'bin', 'matlab');
     else
         error(['parameters.startup.matlab_bin_path must be set for HPC pseudoCT generation. ' ...
-               'Set it in your config (e.g. startup.matlab_bin_path: ''/opt/matlab/R2024a/bin/matlab'').']);
+               'Set it in your config (e.g. startup.matlab_bin_path: ''/opt/matlab/R2023b/bin/matlab'').']);
     end
 
     % ── Build environment preamble ────────────────────────────────────────
-    % Two mechanisms are supported and can be combined:
+    % Three mechanisms:
     %   1. startup.modules_to_load  — cell array of module names, loaded via
     %      "module load" (preferred on HPC with environment-module systems).
     %   2. startup.*_bin_path       — directories prepended to PATH directly
-    %      (fallback for systems without modules or fixed install paths).
+    %      (used only when modules_to_load is empty).
     %   3. startup.ants_simg_path   — Singularity image; sets ANTS_SIMG so
     %      the bash script calls ANTs tools via "singularity exec".
 

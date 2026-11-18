@@ -8,9 +8,9 @@ function [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx
 % a +1000 HU offset; 'marsac' uses the linear model from Marsac et al.
 % 2017; 'aubry' uses the porosity mixture model from Aubry et al. 2003;
 % 'air-tissue' uses the linear air-to-bone model (Pichardo and McDannold
-% workflows); 'none' uses the
-% fixed scalar from parameters.medium_properties.skull.
-% All algorithms clamp density to at least water density.
+% workflows); 'none' uses the fixed scalar from parameters.medium_properties.skull.
+% 'k-plan', 'k-wave' and 'air-tissue' clamp density to at least water density;
+% 'marsac' clamps HU to [300, 2000] HU (density from water to 2100 kg/m^3).
 %
 % Use as:
 %   [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx, algorithm)
@@ -88,7 +88,7 @@ switch algorithm
         rho_max     = 2100;     % max. density in skull [kg/m3]
 
         % Preprocess pCT values
-        % Offset CT values to use housfield2density
+        % Offset CT values to use hounsfield2density
         pseudoCT(skull_idx) = pseudoCT(skull_idx) + offset_HU;
 
         % set minimum to air tissue (pHU=-1000, pHU_scaled = 0)

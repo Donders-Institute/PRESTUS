@@ -1,6 +1,6 @@
 function [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, trans_pos, focus_pos] = ...
     grid_stage(parameters)
-% GRID_STAGE  Build or load the head model grid cache (Stage 3).
+% GRID_STAGE  Build or load the head model grid cache.
 %
 % Determines whether to run full grid setup or load a cached result, then
 % writes a planimg sidecar for downstream stages.  When grid setup is

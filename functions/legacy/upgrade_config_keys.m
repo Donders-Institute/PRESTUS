@@ -1,5 +1,5 @@
 function cfg = upgrade_config_keys(cfg, source)
-% UPGRADE_CONFIG_KEYS  Convert config keys from PRESTUS v0.5.0 onwards to their current names
+% UPGRADE_CONFIG_KEYS  Rename old config keys (PRESTUS v0.5.0 onwards) in one config layer to their current names
 %
 % Applies the 'deprecated:' list of the Nexus overlay (CONFIG_DEPRECATIONS) to
 % one config layer before it is merged: renamed keys are moved to their current
@@ -26,7 +26,7 @@ function cfg = upgrade_config_keys(cfg, source)
 % Output:
 %   cfg    - the layer with current key names
 %
-% See also: CONFIG_DEPRECATIONS, LOAD_PARAMETERS, CALIBRATION_TRANSDUCER
+% See also: CONFIG_DEPRECATIONS, LOAD_PARAMETERS, PRESTUS_CONFIG_UPGRADE, CALIBRATION_TRANSDUCER
 
     if nargin < 2 || isempty(source)
         source = 'config';

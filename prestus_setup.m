@@ -45,7 +45,7 @@ end
         prestus_check_install();
         if ~options.Save
             fprintf(['The path holds for this MATLAB session; prestus_setup(Save=true) ' ...
-                     'keeps it.\nNext: doc/doc_getting-started.md (Your First Simulation).\n']);
+                     'keeps it.\nNext: doc/doc_first-simulation.md (First Simulation).\n']);
         end
     end
 end

@@ -3,8 +3,8 @@ function [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = 
                        acoustic_provenance, acoustic_info, kwave_medium)
 % CACHE_ACOUSTIC  Save or load the slim acoustic results cache.
 %
-% Centralises all cache I/O for the acoustic stage so that
-% acoustic_wrapper and prestus_pipeline stay free of cache bookkeeping.
+% Centralises all cache I/O for the acoustic stage (saved by ACOUSTIC_WRAPPER,
+% loaded by ACOUSTIC_STAGE).
 %
 % SAVE mode
 %   Writes a slim cache containing only the variables that cannot be
@@ -15,8 +15,8 @@ function [sensor_data, kgrid, acoustic_provenance, acoustic_info, parameters] = 
 %   from each per-transducer cache file, so it is included in async runs.
 %
 % LOAD mode
-%   Reads the slim variables from the cache file.  For legacy full caches
-%   the extra fields are silently ignored; the caller's in-scope variables
+%   Reads the slim variables from the cache file.  Extra fields in a cache
+%   file are ignored; the caller's in-scope variables
 %   (from the grid/medium/source stages) are always preferred.
 %   Calls apply_isppa_scaling so the caller receives a correctly scaled
 %   field. Axisymmetric runs: the cached field is already expanded; the
@@ -131,10 +131,9 @@ kgrid               = cached.kgrid;
 acoustic_provenance = cached.acoustic_provenance;
 acoustic_info       = cached.acoustic_info;
 
-% Legacy caches may hold acoustic_provenance.freefield_isppa_wcm2 (and its
-% copy in tx_calibration.isppa_wcm2) as a serialized scalar gpuArray
-% (water_baseline previously cast with double() alone, which does not move
-% data off the device). Such a scalar can fail to deserialize, and the first
+% A cache may hold acoustic_provenance.freefield_isppa_wcm2 (and its copy in
+% tx_calibration.isppa_wcm2) as a serialized scalar gpuArray (double() alone
+% does not move data off the device). Such a scalar can fail to deserialize, and the first
 % touch (isa, gather, isfinite) throws an opaque "Unrecognized field name
 % gpuArrayReal". Coerce to host doubles; unreadable values become NaN so the
 % caller can substitute the baseline computed in the current run.

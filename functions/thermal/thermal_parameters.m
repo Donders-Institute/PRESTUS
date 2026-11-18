@@ -133,7 +133,7 @@ if ~silent
         params_thermal.ptri, params_thermal.n_ptri_reps, params_thermal.ptri_off, ...
         params_thermal.ptri_off_steps_n, params_thermal.post_pt_timestep);
     
-    fprintf('PTRD:         PTRD=%.1fs s total sonication\n', params_thermal.ptrd);
+    fprintf('PTRD:         PTRD=%.1fs total sonication\n', params_thermal.ptrd);
     
     if params_thermal.post_ptri_steps_n > 0
         fprintf('Steady-state:     %.0fs post-PTRD (%d steps @ %.1fs)\n', ...

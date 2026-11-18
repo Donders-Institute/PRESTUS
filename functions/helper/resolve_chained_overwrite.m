@@ -1,6 +1,5 @@
 function ow = resolve_chained_overwrite(parameters)
-% RESOLVE_CHAINED_OVERWRITE  Map io.overwrite_files onto the stages of a
-%                            chained pipeline (async, multi-ISPPA, uncertainty).
+% RESOLVE_CHAINED_OVERWRITE  Map io.overwrite_files onto the stages of a chained pipeline (async, multi-ISPPA, uncertainty)
 %
 %   Chained pipelines split a run into intermediate stages (preprocessing,
 %   per-transducer / stage-1 acoustics, field combination) whose caches feed

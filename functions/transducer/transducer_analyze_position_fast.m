@@ -1,5 +1,4 @@
 function [prop_intersect, mean_dist_skin, var_dist_skin, mean_dist_skull, var_dist_skull] = transducer_analyze_position_fast(i, norm_v, ex_plane_pos, coord_mesh_gpu, full_skull_mask_idx, skin_boundary_coords, skull_boundary_coords, max_od)
-
 % TRANSDUCER_ANALYZE_POSITION_FAST  GPU-accelerated transducer position analysis
 %
 % Computes the fraction of exit-plane area intersecting the skull mask and

@@ -57,7 +57,7 @@ function [out_path, ct_out_path] = write_babelbrain_input(medium_masks, focus_po
 %   ct_out_path   - full path to the written CT NIfTI file, or '' if pseudoCT
 %                   was not supplied
 %
-% See also: BABELBRAIN_WRAPPER, BABELBRAIN_TRANSDUCER_MAP, EXPORT_BABELBRAIN_WEIGHTS
+% See also: BABELBRAIN_WRAPPER, BABELBRAIN_TX_GEOMETRY, EXPORT_BABELBRAIN_WEIGHTS
 
 arguments
     medium_masks  (:,:,:) {mustBeNumeric}

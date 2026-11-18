@@ -1,10 +1,10 @@
 function [err, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, parameters, velocity, axial_position, desired_intensity_curve, plot_results, opt_limits, weights)
-
 % PHASE_OPTIMIZATION_ANNULUS_FULL_CURVE  Compute intensity profile error for full-curve phase optimisation
 %
-% Evaluates the O'Neil axial intensity model, restricts comparison to the
-% optimisation range, applies optional Gaussian weighting around the FLHM
-% centre, and returns the weighted mean squared error. Optionally plots the
+% Evaluates the axial intensity model (calibration.forward_model: 'oneil',
+% default, or 'rayleigh'), restricts comparison to the optimisation range,
+% applies optional Gaussian weighting around the FLHM centre, and returns the
+% weighted mean squared error. Optionally plots the
 % profiles and cost function.
 %
 % Use as:
@@ -21,8 +21,8 @@ function [err, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, param
 %   plot_results            - enable visualisation (default: 0)
 %   opt_limits              - [1x2] distance limits for error computation [mm]
 %                             (default: [1, max(axial_position)])
-%   weights                 - weights for the cost function; 0 = Gaussian around FLHM centre
-%                             (default: 0)
+%   weights                 - 0 = uniform (default); >= 1 = Gaussian around the FLHM
+%                             centre with sigma = centre / weights (larger is narrower)
 %
 % Output:
 %   err   - weighted mean squared error between computed and desired profiles
@@ -114,7 +114,7 @@ function [err, ax1, ax2, h] = phase_optimization_annulus_full_curve(phase, param
         yyaxis right;
         plot(axial_position, weights);
         hold off;
-        legend(["fitted profile", "real profile", "cost function", "error"], 'Location', 'South');
+        legend(["fitted profile", "real profile", "weights"], 'Location', 'South');
         legend('boxoff')
 
         % Plot error values within optimization limits

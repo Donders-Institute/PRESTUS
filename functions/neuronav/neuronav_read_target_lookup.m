@@ -1,6 +1,5 @@
 function target_lookup_vox = neuronav_read_target_lookup(lookup_csv, sub_id, target_map)
-% NEURONAV_READ_TARGET_LOOKUP  Look up pre-specified target coordinates from
-% a study-supplied lookup table, keyed by subject and target name.
+% NEURONAV_READ_TARGET_LOOKUP  Look up pre-specified target coordinates from a study lookup table, keyed by subject and target name
 %
 % Some studies establish the intended stimulation target BEFORE the session
 % (e.g. via individual anatomical segmentation and an optimization search

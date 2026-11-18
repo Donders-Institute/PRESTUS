@@ -236,7 +236,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
         end
 
         function test_cache_kwave_medium_not_saved_by_default(tc)
-            % KNOWN DEVIATION (2026-10): cache_acoustic.m documents a slim cache
+            % KNOWN DEVIATION: cache_acoustic.m documents a slim cache
             % that includes kwave_medium only "when explicitly requested"
             % (async runs). io.save_kwave_medium is not in config_default.yaml,
             % and SHOULD_SAVE_OUTPUT returns true for unlisted fields, so every
@@ -249,7 +249,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
                 struct('density', ones(2)));
             tc.verifyFalse(ismember('kwave_medium', {whos('-file', f).name}), ...
                 ['Known deviation: kwave_medium is saved when io.save_kwave_medium is unset ' ...
-                 '(should_save_output default true; cache_acoustic.m:84).']);
+                 '(should_save_output defaults to true).']);
         end
 
         function test_cache_rejects_unknown_mode(tc)
@@ -290,17 +290,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
             p.io.overwrite_files = 'never';
             write_results_cache(p, ones(p.grid.dims), struct('freefield_isppa_wcm2', NaN));
             live = struct('freefield_isppa_wcm2', 7.5, 'freefield_source', 'kwave_simulation');
-            % KNOWN BUG (2026-10): CACHE_ACOUSTIC applies ISPPA scaling on load
-            % (cache_acoustic.m:193) before ACOUSTIC_STAGE substitutes the live
-            % baseline (acoustic_stage.m:117), so with a target set the load
-            % errors 'prestus:isppa:noBaseline' and the fallback never runs.
-            try
-                [sd, ~, ~, prov] = call_acoustic_stage(p, [], live);
-            catch ME
-                tc.verifyFail(sprintf(['Known bug: cached field is scaled before the live ' ...
-                    'baseline is filled in (%s: %s)'], ME.identifier, ME.message));
-                return
-            end
+            [sd, ~, ~, prov] = call_acoustic_stage(p, [], live);
             tc.verifyEqual(prov.freefield_isppa_wcm2, 7.5);
             tc.verifyEqual(sd.p_max_all, 2 * ones(p.grid.dims), 'RelTol', 1e-12);   % sqrt(30/7.5)
         end

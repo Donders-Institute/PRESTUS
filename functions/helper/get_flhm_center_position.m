@@ -1,9 +1,10 @@
 function [flhm_center, flhm_center_index] = get_flhm_center_position(x, y)
 % GET_FLHM_CENTER_POSITION  Compute the centre of the focal length at half maximum (FLHM)
 %
-%   Locates the FLHM region (where y >= half-max) and returns the midpoint
-%   between the left and right FLHM crossing positions, along with its index.
-%   Assumes y has a single peak with monotonically decreasing flanks.
+%   The threshold is (min(y) + max(y)) / 2. From the peak, the FLHM region
+%   extends on each side to the last sample above the threshold before y
+%   first drops to it; returns the midpoint of the two edge samples and the
+%   index closest to it. Assumes y has a single peak.
 %
 % Use as:
 %   [flhm_center, flhm_center_index] = get_flhm_center_position(x, y)
@@ -23,19 +24,19 @@ arguments
     y (1,:) {mustBeNumeric}
 end
 
-    % Compute half of the maximum range (half-max value)
+    % Threshold halfway between minimum and maximum
     halfMax = (min(y) + max(y)) / 2;
 
     % Find the index of the maximum value in `y`
     [~, max_pos] = max(y);
 
-    % Find where `y` first drops below half-max on the left side of the peak
+    % Left edge: first sample after the last one at or below the threshold left of the peak
     index1 = find(y <= halfMax & x < x(max_pos), 1, 'last') + 1;
 
-    % Find where `y` last rises above half-max on the right side of the peak
+    % Right edge: last sample before y first drops to the threshold right of the peak
     index2 = find(y <= halfMax & x > x(max_pos), 1, 'first') - 1;
 
-    % Compute FLHM center as the midpoint between `index1` and `index2`
+    % FLHM centre: midpoint between the edge samples
     flhm_center = (x(index2) - x(index1)) / 2 + x(index1);
 
     % Find the index in `x` closest to the computed FLHM center

@@ -1,5 +1,4 @@
 function preset = babelbrain_preset(bb_root, tx_system)
-
 % BABELBRAIN_PRESET  Resolve a BabelBrain preset from BabelBrain's transducer registry
 %
 % Looks the preset up in BabelBrain/SelFiles/transducer_list.yaml (BabelBrain

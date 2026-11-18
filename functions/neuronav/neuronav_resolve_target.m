@@ -1,8 +1,7 @@
 function [target_vox, target_mm, target_source] = neuronav_resolve_target( ...
         parameters, sub_id, session, sessions, target_map, t1_header, ...
         target_pos_projected, target_lookup_csv)
-% NEURONAV_RESOLVE_TARGET  Resolve each target_map entry's brain-target
-% coordinate from the best available source, in order of confidence.
+% NEURONAV_RESOLVE_TARGET  Resolve each target_map entry's brain-target coordinate from the best available source
 %
 % Multi-target Localite studies (see doc_placement_neuronav_targets.md#target-coordinates-from-several-sources)
 % need one confirmed brain-target coordinate per named target

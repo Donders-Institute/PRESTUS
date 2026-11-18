@@ -1,5 +1,4 @@
 function [transducer_pos, target_pos] = get_trans_pos_from_trigger_markers(trigger_markers_file, trigger_index, reference_to_transducer_distance, reference_to_target_distance)
-
 % GET_TRANS_POS_FROM_TRIGGER_MARKERS  Compute transducer/target positions from a Localite XML file
 %
 % Calculates transducer and target positions from a specified trigger marker

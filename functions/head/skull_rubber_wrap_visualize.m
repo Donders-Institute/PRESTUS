@@ -12,8 +12,8 @@ function skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON, downsam
 % Input:
 %   parameters        - (1,1) simulation parameters struct with io fields
 %   SKULL             - [Nx x Ny x Nz] original binary skull mask
-%   ZADDED            - [Nx x Ny x Nz] binary mask of voxels added by rubber wrap
-%   BALLOON           - [Nx x Ny x Nz] inflated balloon mask
+%   ZADDED            - [Nx x Ny x Nz] binary mask of voxels added by filling gaps along z
+%   BALLOON           - [Nx x Ny x Nz] binary mask of voxels added by the rubber wrap
 %   downsample_factor - integer downsampling factor for rendering (default: 1)
 %
 % See also: SKULL_RUBBER_WRAP, SKULL_FILL_HOLES
@@ -86,14 +86,14 @@ function skull_rubber_wrap_visualize(parameters, SKULL, ZADDED, BALLOON, downsam
     set(0, 'DefaultFigureRenderer', 'painters'); % HPC-safe, avoids OpenGL issues
     fig = figure('Color','k','Position',[100 100 1800 800], 'PaperPositionMode','auto', 'Visible','off');
 
-    t = tiledlayout(fig, 3, 3, 'TileSpacing','compact', 'Padding','compact'); % [web:126]
+    t = tiledlayout(fig, 3, 3, 'TileSpacing','compact', 'Padding','compact');
     % Left column
-    axL(1) = nexttile(t, 1);  % [web:139]
+    axL(1) = nexttile(t, 1);
     axL(2) = nexttile(t, 4);
     axL(3) = nexttile(t, 7);
     % Right: two big tiles (2x2 + 1x2)
-    axR(1) = nexttile(t, 2, [2 2]); % spans rows 1-2, cols 2-3 [web:139]
-    axR(2) = nexttile(t, 8, [1 2]); % spans row 3, cols 2-3 [web:139]
+    axR(1) = nexttile(t, 2, [2 2]); % spans rows 1-2, cols 2-3
+    axR(2) = nexttile(t, 8, [1 2]); % spans row 3, cols 2-3
 
     set([axL axR], 'Color','k');
 

@@ -1,6 +1,5 @@
 function telemetry_setup_reset()
-% TELEMETRY_SETUP_RESET  Remove the telemetry consent file so the opt-in
-% prompt is shown again on the next pipeline run.
+% TELEMETRY_SETUP_RESET  Remove the telemetry consent file so the opt-in prompt is shown again on the next run
 %
 % Use as:
 %   telemetry_setup_reset()

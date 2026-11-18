@@ -1,6 +1,5 @@
 function [upsampled_image, transformation_matrix, trans_pos_new, focus_pos_new] = ...
     upsample_to_grid(nii_image, previous_transformation_matrix, resample_factor, trans_pos_grid, focus_pos_grid)
-
 % UPSAMPLE_TO_GRID  Resample a 3D image and update grid positions to a higher-resolution grid
 %
 % Scales the affine transform by resample_factor, computes new grid

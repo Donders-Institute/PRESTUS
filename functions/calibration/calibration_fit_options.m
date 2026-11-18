@@ -9,7 +9,7 @@ function fo = calibration_fit_options(preset, overrides)
 %               intensity-domain pseudo-Huber loss (delta 0.8), weak pull to the
 %               prior (Lambda 1e-3), near field below 10 mm ignored. The axial
 %               shift is not fitted: it is not applied at run time.
-%   'oneil_phase_only' - the behaviour of the former PERFORM_GLOBAL_SEARCH path: O'Neil
+%   'oneil_phase_only' - as PERFORM_GLOBAL_SEARCH: O'Neil
 %               forward model, FEX-minimize multi-start search, phases only, no
 %               pull to the prior, (practically) least-squares loss on
 %               intensity, no near-field penalty. Gaussian focal weighting

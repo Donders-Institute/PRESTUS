@@ -225,8 +225,7 @@ end
 function tf = module_on(parameters, name)
 % Modules missing from the config count as enabled, so the check errs on the
 % side of requiring the tool. Text values such as 'auto' (run_water_baseline)
-% count as enabled unless they say off; logical() on a char array returned a
-% vector, which made the || in the caller fail when run_acoustic_sims was 0.
+% count as enabled unless they say off; the result is always a scalar.
     v = get_field(parameters, {'modules', name}, true);
     if ischar(v) || isstring(v)
         tf = ~any(strcmpi(strtrim(char(v)), {'0', 'off', 'false', 'no', 'never'}));

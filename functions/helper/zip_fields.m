@@ -1,5 +1,4 @@
 function cell_arr = zip_fields(input_struct)
-
 % ZIP_FIELDS  Convert a struct into an alternating {field, value, field, value, ...} cell array
 %
 % Useful for passing struct contents as name-value pairs to functions that

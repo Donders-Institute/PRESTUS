@@ -1,6 +1,6 @@
 function [kwave_medium, medium_plus, planimg, medium_masks] = ...
     medium_stage(parameters, medium_masks, planimg, pseudoCT)
-% MEDIUM_STAGE  Build or load the acoustic/thermal medium property cache (Stage 4).
+% MEDIUM_STAGE  Build or load the acoustic/thermal medium property cache.
 %
 % Maps tissue-class labels onto acoustic and thermal material properties.
 % When medium setup is disabled, loads any available cache.  If the grid

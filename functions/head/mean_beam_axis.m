@@ -1,5 +1,4 @@
 function [axis_vec, axis_norm] = mean_beam_axis(beam_units, min_norm)
-
 % MEAN_BEAM_AXIS  Mean axis of several transducer beams, taken as axes
 %
 % Averages the beams' unit vectors as axes (lines), not directions: a beam

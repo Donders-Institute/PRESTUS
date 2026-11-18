@@ -1,5 +1,4 @@
 function babelbrain_check_geometry(parameters, trans_pos, focus_pos)
-
 % BABELBRAIN_CHECK_GEOMETRY  Error for geometries the BabelBrain backend cannot simulate
 %
 % BabelBrain simulates one transducer per run, with its beam along the z axis

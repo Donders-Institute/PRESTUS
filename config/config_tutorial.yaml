@@ -4,7 +4,7 @@ path:
   t2_pattern: ernie_T2.nii.gz # path to T2 relative to path.anat
 
 startup:
-  simnibs_bin_path: /home/.../SimNIBS-4.0/bin/ # change to simnibs install
+  simnibs_bin_path: /home/.../SimNIBS/bin/ # change to simnibs install
 
 segmentation:
   # If you encounter the error "The qform and sform do not match. Please run charm with the --forceqform option" when running charm, you can set this to 1 to do it for all subjects
@@ -20,8 +20,8 @@ transducer:
   focal_distance_bowl: []   # Expected focal distance from transducer bowl [mm]
 
   annular:
-    # Illustrative legacy geometry with matching phases/amplitude. For the current
-    # Sonic Concepts CTX ring geometry see config/equipment/CTX_*.yaml (transducer library).
+    # Illustrative geometry with matching phases/amplitude. For the Sonic Concepts
+    # CTX ring geometry see config/equipment/model-CTX_*/ (transducer library).
     elem_p_amp: 91590 # [Pa]
     elem_phase_deg: [0, 0, 0, 274]
     depth_mm: 16 # depth of transducer used for visualization purposes
@@ -29,7 +29,7 @@ transducer:
     elem_id_mm: [0, 32.9184, 46.1264, 56.0324]
     elem_od_mm: [32.3596, 45.5676, 55.5244, 64.008]
     curv_radius_mm: 63.20 # radius of curvature of the bowl
-    dist_geom_ep_mm: 52.38 # distance to the transducer plane from the geometric focus # original: [0.0, 13.2, 26.4, 52.8] # source phase [deg] (calibrated values at 20 W/cm^2 free-water Isppa)
+    dist_geom_ep_mm: 52.38 # distance to the transducer plane from the geometric focus
 
   matrix:
     elem_p_amp: 91590 # [Pa]
@@ -45,7 +45,6 @@ transducer:
     # Element area is based on a rectangular shape with the specified height and width.
     # If a disc or bowl shape is selected, its area matches that of the rectangular element
     # (5.317 x 5.317 mm -> 6.0 mm bowl diameter), unless elem_diameter_mm is set.
-    # (Was 5.317e-3, a leftover from when these fields were read as metres.)
     elem_height_mm: 5.317 # [mm]
     elem_width_mm: 5.317 # [mm]
 

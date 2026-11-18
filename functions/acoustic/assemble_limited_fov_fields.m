@@ -1,5 +1,5 @@
 function assemble_limited_fov_fields(files_in, file_out, targets_wcm2)
-% ASSEMBLE_LIMITED_FOV_FIELDS  Back-project and combine N limited-FOV acoustic results.
+% ASSEMBLE_LIMITED_FOV_FIELDS  Back-project and combine N partial-FOV acoustic results.
 %
 % Each input file was produced by a PRESTUS acoustic simulation that ran on
 % a cropped sub-grid (via ACOUSTIC_GRID_FOV).  The crop offset is stored in
@@ -30,7 +30,7 @@ function assemble_limited_fov_fields(files_in, file_out, targets_wcm2)
 %   assemble_limited_fov_fields(files_in, file_out, targets_wcm2)
 %
 % Input:
-%   files_in     - cell array of paths to limited-FOV acoustic cache .mat
+%   files_in     - cell array of paths to partial-FOV acoustic cache .mat
 %                  files {N×1}.  Each must contain acoustic_provenance with
 %                  fov_offset_ac ([1×3]) and full_ac_dims ([1×3]).
 %   file_out     - path where the combined cache file will be written.
@@ -54,7 +54,7 @@ function assemble_limited_fov_fields(files_in, file_out, targets_wcm2)
 %
 % Typical workflow
 % ----------------
-%   % 1. Run limited-FOV acoustic sims for each placement:
+%   % 1. Run partial-FOV acoustic sims for each placement:
 %   %      prestus_pipeline(params_t1)  % saves sub-001_..._results_t1.mat
 %   %      prestus_pipeline(params_t2)  % saves sub-001_..._results_t2.mat
 %   %
@@ -88,7 +88,7 @@ files_in = files_in(:);
 N = numel(files_in);
 if N < 2
     error('assemble_limited_fov_fields:tooFewFiles', ...
-        'At least two limited-FOV acoustic cache files are required.');
+        'At least two partial-FOV acoustic cache files are required.');
 end
 for k = 1:N
     if ~isfile(files_in{k})
@@ -105,7 +105,7 @@ end
 %% Load first file — reference grid and metadata
 % =========================================================================
 
-fprintf('Loading limited-FOV acoustic result 1/%d:\n  %s\n', N, files_in{1});
+fprintf('Loading partial-FOV acoustic result 1/%d:\n  %s\n', N, files_in{1});
 data_ref = load(files_in{1}, 'sensor_data', 'kgrid', 'kwave_medium', 'source', ...
     'sensor', 'segmentation', 'source_labels', 'medium_masks', ...
     'acoustic_provenance', 'acoustic_info');
@@ -144,7 +144,7 @@ clear p_fov_ref_scaled p_fov_ref_min_scaled;
 % =========================================================================
 
 for k = 2:N
-    fprintf('Loading limited-FOV acoustic result %d/%d:\n  %s\n', k, files_in{k});
+    fprintf('Loading partial-FOV acoustic result %d/%d:\n  %s\n', k, files_in{k});
     data_k  = load(files_in{k}, 'sensor_data', 'acoustic_provenance', 'acoustic_info');
     prov_k  = data_k.acoustic_provenance;
 
@@ -237,7 +237,7 @@ save(file_out, ...
     'segmentation', 'source_labels', 'medium_masks', 'acoustic_info', ...
     'acoustic_provenance', '-v7.3');
 
-fprintf('Done — combined cache written from %d limited-FOV fields.\n', N);
+fprintf('Done — combined cache written from %d partial-FOV fields.\n', N);
 end
 
 % =========================================================================

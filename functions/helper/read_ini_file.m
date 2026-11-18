@@ -13,8 +13,6 @@ function iniData = read_ini_file(filename)
 %
 % Output:
 %   iniData - struct with one field per section, each containing key-value pairs
-%
-% See also: SET_REAL_PHASES
 
 arguments
     filename (1,:) char

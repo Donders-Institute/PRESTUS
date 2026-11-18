@@ -62,7 +62,7 @@ try
             'FillValue', water_fill.(prop));
     end
 
-    % Batch all MNI conversions into a single parallel subject2mni call
+    % Batch all MNI conversions into one convert_final_to_MNI_simnibs call
     if should_save_output(parameters.io, 'save_MNI')
         mni_in    = {};
         mni_out   = {};

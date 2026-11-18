@@ -27,11 +27,11 @@ function pct_skullexpand(seg_path, path_pct)
     assert(exist(skull_path,'file')==2,"Missing: %s", skull_path);
 
     %% --- Load NIfTI volumes + headers ---
-    info_tissues = niftiinfo(final_tissues_path);                 % header/meta [web:149]
-    final_tissues = niftiread(info_tissues);                      % data [web:148]
+    info_tissues = niftiinfo(final_tissues_path);
+    final_tissues = niftiread(info_tissues);
 
-    info_skull = niftiinfo(skull_path);             % header/meta [web:149]
-    final_tissues_skull = niftiread(info_skull);                  % data [web:148]
+    info_skull = niftiinfo(skull_path);
+    final_tissues_skull = niftiread(info_skull);
 
     % Sanity: same grid
     assert(isequal(size(final_tissues), size(final_tissues_skull)), ...
@@ -68,7 +68,7 @@ function pct_skullexpand(seg_path, path_pct)
     end
 
     % SimNIBS tissue label conventions (charm)
-    parameters.layers.brain = [1, 2];     % GM/WM
+    parameters.layers.brain = [1, 2];     % WM/GM
     parameters.layers.skin  = [5];        % skin
 
     % skull_rubber_wrap uses fieldnames(medium_properties) to locate brain/skin

@@ -1,4 +1,4 @@
-# The configuration is structured using YAML (https://yaml.org/). Note that YAML uses spaces, not tabs, for identation.
+# The configuration is structured using YAML (https://yaml.org/). Note that YAML uses spaces, not tabs, for indentation.
 
   ## Parameters for standalone calibration (using Donders equipment)
 
@@ -33,7 +33,7 @@
 
   # Calibration (the same core as build_transducer_library / refine_transducer_library)
   phase_mode: 'single_depth'        # 'single_depth' (default): fit each requested depth | 'geometric': no fit, geometric steering with the measured drive
-  fit_preset: 'rayleigh_phase_gain' # 'rayleigh_phase_gain': per-ring phase + gain, Rayleigh model, robust intensity loss | 'oneil_phase_only': former global-search behaviour (O'Neil model, opt_method optimiser, phases only)
+  fit_preset: 'rayleigh_phase_gain' # 'rayleigh_phase_gain': per-ring phase + gain, Rayleigh model, robust intensity loss | 'oneil_phase_only': O'Neil model, opt_method optimiser, phases only
   # forward_model: 'rayleigh'       # Optional override of the preset's forward model: 'rayleigh' | 'oneil'
   # fit_options: {}                 # Optional fit_transducer_model options on top of the preset (e.g. {NStarts: 32})
   opt_phase_precession: false       # false (default) | 'linear' (phase ramp, 2 params) | 'monotonic' (ordered phases via cumulative increments)
@@ -58,7 +58,7 @@
 
   # Free-water k-Wave drive calibration per calibrated depth: rescales the stored drive to the simulated ISPPA
   # and reports the agreement with the measured profile; phases unchanged
-  kwave_drive_calibration: true     # Run it? (former name: run_free_water_sim, still read)
+  kwave_drive_calibration: true     # Run it?
   force_kwavearray: 1               # Simulate with kWaveArray?
   axisymmetric2D: 0                 # 2D axisymmetric grid instead of 3D: ~1 min per depth, drive within ~3 % ISPPA of 3D (doc_transducer_library.md)
   kwave_grid_dims: []               # Free-water grid: [] = grid.default_dims of the simulation config | 'auto' = sized to the aperture and focus (water_grid_dims) | [Nx Ny Nz]

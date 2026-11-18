@@ -1,14 +1,15 @@
 function elem_phase_deg = set_real_phases(tran, focal_distance_ep, parameters)
 % SET_REAL_PHASES  Compute geometric steering phases for a focal depth
 %
-% Derives per-element phase delays from ring geometry (elem_id_mm, elem_od_mm,
-% curv_radius_mm) stored in the equipment YAML — no external file required.
+% Returns COMPUTE_PHASES for the ring geometry (elem_id_mm, elem_od_mm,
+% curv_radius_mm) in the equipment YAML: one phase per ring
+% (transducer.annular.elem_n).
 %
 % Use as:
 %   elem_phase_deg = set_real_phases(tran, focal_distance_ep, parameters)
 %
 % Input:
-%   tran              - transducer struct with manufact, n_elem, transducer fields
+%   tran              - equipment transducer struct (n_elem, transducer.annular)
 %   focal_distance_ep - desired focal depth relative to exit plane [mm]
 %   parameters        - PRESTUS config; uses medium_properties.water.sound_speed [m/s]
 %

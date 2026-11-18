@@ -1,9 +1,10 @@
 function [rec, record_file] = read_placement_record(run_dir)
 % READ_PLACEMENT_RECORD  Read the run record of a placement run folder
 %
-% Reads placement_run.json (WRITE_PLACEMENT_RECORD), or the
-% placement_run.mat that PRESTUS wrote before v0.6.2, from a placement run
-% folder (PLACEMENT_RUN_DIR) into one struct with N×3 position matrices.
+% Reads placement_run.json (WRITE_PLACEMENT_RECORD), or else a
+% placement_run.mat holding the record fields as variables (loaded as is),
+% from a placement run folder (PLACEMENT_RUN_DIR) into one struct with N×3
+% position matrices.
 %
 % Use as:
 %   [rec, record_file] = read_placement_record(run_dir)

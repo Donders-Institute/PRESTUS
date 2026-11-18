@@ -3,9 +3,9 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_grid_c
 % settings when it reuses another run's grid: only the grid-space positions
 % come from the cache.
 %
-%   Regression test: a reused cache with the same number of transducers
-%   replaced the whole transducer array, so e.g. the ISPPA targets and drives
-%   of a coherent run on an async run's grid were those of the async run.
+%   With the same number of transducers, the reused cache does not replace
+%   the transducer array: e.g. a coherent run on an async run's grid keeps
+%   its own ISPPA targets and drives.
 %
 %   Run with:   results = runtests('tests/test_grid_cache_transducers.m');
 

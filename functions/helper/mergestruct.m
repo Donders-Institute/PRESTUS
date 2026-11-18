@@ -1,7 +1,13 @@
 function Res = mergestruct(A,B)
-%% Recursively merges fields and subfields of structures A and B to result structure Res
-% Simple recursive algorithm merges fields and subfields of two structures
-%   Example:
+% MERGESTRUCT  Recursively merge the fields of structure B into structure A
+%
+% Fields of B overwrite those of A; struct-valued fields present in both are
+% merged recursively. An empty or yaml.Null field in A is replaced by B.
+%
+% Use as:
+%   Res = mergestruct(A, B)
+%
+% Example:
 %   A.field1=1;
 %   A.field2.subfield1=1;
 %   A.field2.subfield2=2;

@@ -1,5 +1,4 @@
 function geom = babelbrain_tx_geometry(tr, tx_system, bb_root)
-
 % BABELBRAIN_TX_GEOMETRY  Transducer geometry BabelBrain simulates for a PRESTUS transducer
 %
 % With an empty tx_system, BabelBrain simulates the PRESTUS transducer itself:

@@ -64,7 +64,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_isppa_
         end
 
         function test_script_changed_default_is_not_default(tc)
-            % a value set after load_parameters no longer counts as the default
+            % a value set after load_parameters does not count as the default
             [msg, ~] = isppa_intent(tc.params(60, [], 30));
             tc.verifyTrue(~contains(msg, 'toolbox default'));
         end

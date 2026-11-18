@@ -1,15 +1,13 @@
 function vol = nearest_fill_nan(vol)
 % NEAREST_FILL_NAN  Replace NaN voxels with the value of the nearest non-NaN voxel
 %
-% Drop-in replacement for the bwdist-based nearest-fill pattern:
+% Approximates the bwdist-based nearest fill
 %   [~, idx] = bwdist(~isnan(vol));
 %   vol(isnan(vol)) = vol(idx(isnan(vol)));
-%
-% Uses iterative 26-connected dilation so that each NaN voxel is
-% replaced by the average of its non-NaN 26-neighbours. Repeats until no
-% NaN voxels remain (or no progress is made). The averaging gives
-% identical results to true nearest-neighbour when the fill front advances
-% one voxel at a time, and is a good approximation otherwise.
+% by iterative 26-connected dilation: each pass sets the NaN voxels next to
+% filled voxels to the mean of their filled 26-neighbours, until no NaN
+% voxels remain (or no progress is made). Where those neighbours differ, the
+% mean differs from the nearest value. An all-NaN input returns zeros.
 %
 % Use as:
 %   vol = nearest_fill_nan(vol)

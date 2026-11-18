@@ -167,8 +167,8 @@ end
                 num2str(unique(all_freqs)));
         end
 
-        % Legacy expected_focal_distance_mm: v0.5.0 read it from the bowl apex in
-        % most code paths and from the exit plane in others, so it cannot be converted
+        % Legacy expected_focal_distance_mm: its reference point (bowl apex or
+        % exit plane) differed between code paths, so it cannot be converted
         if isfield(parameters, 'expected_focal_distance_mm') && ~isempty(parameters.expected_focal_distance_mm)
             error('prestus:legacyConfigKey', ...
                 ['expected_focal_distance_mm is no longer read: set transducer.focal_distance_ep ' ...

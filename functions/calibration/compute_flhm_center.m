@@ -9,8 +9,9 @@ function [flhm_center, z_first, z_last] = compute_flhm_center(I, z, focal_refere
 %   extent, where frac is the threshold fraction for the requested
 %   focal_reference convention (see FOCAL_REFERENCE_TO_FRAC).
 %
-%   Falls back to the peak position when no threshold crossing is found
-%   (e.g. profile is entirely above threshold, or has only one sample).
+%   Without a threshold crossing on a side (e.g. the profile is entirely
+%   above threshold, or has one sample), the region runs to the profile end,
+%   so the centre is the midpoint of the sampled span.
 %
 %   The threshold convention varies by manufacturer/equipment: some define
 %   "focal depth" as the -3 dB intensity point ('flhm_3db', I >= peak/2,

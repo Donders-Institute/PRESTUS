@@ -6,9 +6,8 @@ function localite = neuronav_select_localite(parameters, sub_id, ses_id, target_
 % and returns it as a parsed struct.  An optional target_name filter selects
 % a single InstrumentMarker entry by its description attribute.
 %
-% This function is Stage 2 of the neuronav pipeline.  Raw marker selection,
-% de-duplication, and series statistics are handled upstream by
-% NEURONAV_INGEST_MARKERS; this function is a thin reader only.
+% Raw marker selection, de-duplication, and series statistics are handled
+% upstream by NEURONAV_INGEST_MARKERS; this function only reads.
 %
 % Use as:
 %   localite = neuronav_select_localite(parameters, sub_id, ses_id)

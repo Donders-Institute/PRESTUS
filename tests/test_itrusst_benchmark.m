@@ -24,7 +24,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'itrusst'}) test_itr
 %   'itrusst_axisym'  PRESTUS on a 2D axisymmetric grid, SC1 and SC2 (minutes on CPU)
 %   'itrusst_3d'      PRESTUS on a 3D grid, SC1 (GPU/HPC; PRESTUS_PHYSICS_CODE_TYPE)
 %
-% Before the 2026-10 fix of the axisymmetric source mask, PRESTUS exceeded the
+% An axisymmetric source mask without the negative BLI side lobes exceeds the
 % reference focal pressure by 6 % (0.5 mm) to 11 % (0.25 mm). Tolerances: see
 % Tol below and doc_testing.md.
 %

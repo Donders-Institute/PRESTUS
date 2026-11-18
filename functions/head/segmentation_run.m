@@ -22,8 +22,7 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         parameters.path.seg = data_path;
     end
 
-    % Create log directory in segmentaion folder (if it does not exist)
-
+    % Create log directory in segmentation folder (if it does not exist)
     log_dir = fullfile(parameters.path.seg, 'log_hpc');
     if ~isfolder(log_dir)
         mkdir(log_dir)
@@ -38,15 +37,10 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
     if ~exist(result_simnibs, 'file')
         parameters.io.overwrite_simnibs = 1;
     end
-    % Build the charm arguments as an argv cell array rather than a
-    % shell command string. For the 'matlab' branch below this is handed
-    % straight to run_command(), which invokes charm directly with no
-    % shell at all -- filename_t1/filename_t2 (which come from scanned
-    % raw-data filenames) reach the process as literal argument values
-    % regardless of their contents, with nothing to quote or escape.
-    % The 'slurm'/'qsub' branches still need this as shell-safe text
-    % (their bash scripts are executed on a compute node later), so
-    % shell_quote_arg() is applied there when the line is composed.
+    % charm arguments as an argv cell array. The 'matlab' branch passes it
+    % to run_command, which runs charm without a shell, so filenames need no
+    % quoting. The 'slurm'/'qsub' branches write it into a bash script and
+    % quote each argument with shell_quote_arg.
     charm_args = {subj_id_string, filename_t1};
     if ~isempty(filename_t2)
         charm_args = [charm_args, {filename_t2}];
@@ -117,10 +111,7 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
 
     % Deploy on selected platform
     if strcmp(parameters.platform, 'qsub')
-        % Job output/error log filenames used to embed a shell-side
-        % `$timestamp` set via `timestamp=$(date ...)` in the same command
-        % line as `echo ... | qsub ...`. Computing it directly in MATLAB
-        % removes the need for that shell altogether.
+        % Job output/error log filenames carry a timestamp set in MATLAB.
         timestamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
         qsub_argv = {'qsub', ...
             '-N', ['simnibs-', subj_id_string], ...
@@ -130,13 +121,9 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
             '-e', fullfile(log_dir, sprintf('%s_qsub_segment_error_%s.log', subj_id_string, timestamp)), ...
             '-d', parameters.path.seg};
 
-        % qsub reads the job script from stdin when given no file operand
-        % (the original `echo <script> | qsub ...` pattern). run_command's
-        % Stdin option replicates this directly via ProcessBuilder, with
-        % no shell pipe and no outer shell parsing the qsub invocation
-        % itself; charm_line still needs its own shell_quote_arg()
-        % quoting because it IS executed by a shell -- just the one on
-        % the compute node when the job actually runs, not a local one.
+        % qsub reads the job script from stdin when given no file operand;
+        % run_command passes charm_line as Stdin, with no local shell.
+        % charm_line is quoted because the compute-node shell runs it.
         fprintf('Running segmentation with a command \n%s\n', charm_line)
         [res, out] = run_command(qsub_argv, 'Stdin', charm_line);
         display(res);
@@ -175,12 +162,10 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         fprintf(fid, '%s\n', charm_line);
         fclose(fid);
 
-        % Ensure script is executable. java.io.File.setExecutable (not
-        % system('chmod +x ...')) needs no shell for a plain, internally
-        % generated path.
+        % Make the script executable (no shell needed)
         java.io.File([temp_slurm_file '.sh']).setExecutable(true);
 
-        % Submit the batch script via argv -- no shell involved locally.
+        % Submit the batch script via argv (no local shell)
         fprintf('Running segmentation with a command \nsbatch --export=MANPATH %s.sh\n', temp_slurm_file);
         [res, out] = run_command({'sbatch', '--export=MANPATH', [temp_slurm_file '.sh']});
         display(res);
@@ -189,9 +174,7 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
         fprintf('Now wait for the job with the id listed above to finish')
 
     elseif strcmp(parameters.platform, 'matlab')
-        % run_command invokes charm directly via argv, in parameters.path.seg,
-        % with no shell at all -- filename_t1/filename_t2 reach the process
-        % as literal argument values regardless of their contents.
+        % run_command runs charm via argv in parameters.path.seg, without a shell
         fprintf('Running segmentation locally:\n%s\n', charm_line);
         [res, out] = run_command([{charm_path}, charm_args], 'WorkingDir', parameters.path.seg);
 

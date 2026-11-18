@@ -1,10 +1,10 @@
 function sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, parameters)
-% APPLY_ISPPA_SCALING  Scale the simulated pressure field so the free-water
-%                      ISPPA matches parameters.transducer(1).target_isppa_wcm2.
+% APPLY_ISPPA_SCALING  Scale the simulated pressure field so its free-water ISPPA matches the target
 %
-% Rescaling is applied when a target is set and the free-water baseline
-% (ISPPA_BASELINE) differs from it by more than 1 %. The baseline must come
-% from an actually-run free-water simulation (k-Wave, jwave or BabelBrain):
+% Rescaling is applied when a target (parameters.transducer(1).target_isppa_wcm2)
+% is set and the free-water baseline (ISPPA_BASELINE) differs from it by more
+% than 1 %. The baseline must come from an actually-run free-water simulation
+% (k-Wave, jwave or BabelBrain):
 %
 %   * a multi-ISPPA sweep, whose Stage-1 always runs a free-water baseline and
 %     scales each requested level from that measured baseline; and
@@ -28,8 +28,8 @@ function sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, par
 % p_final.  Scaling p_max_all alone would leave the mechanical index computed at
 % the unscaled drive level, inconsistent with the reported intensities.
 %
-% Called after loading a cached acoustic result in a thermal-only job
-% spawned by MULTI_ISPPA_PIPELINE or PRESTUS_PIPELINE.
+% Called by ACOUSTIC_STAGE after a simulation and by CACHE_ACOUSTIC when a
+% cached acoustic result is loaded.
 
     % Combined async/FOV caches have p_max_all (thermal) and p_max_async (safety)
     % already scaled to the per-transducer targets inside combine_async_intensity /

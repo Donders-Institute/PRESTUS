@@ -18,8 +18,7 @@ function out = interpolate_axial_profiles(prof, depths_ep_mm, options)
 % The focal position used for the alignment is the column's focal-depth
 % label (Align = 'label', default: the headers are the nominal setpoints,
 % which correspond to the FLHM centre, see doc_calibration.md) or the
-% intensity peak beyond the near field (Align = 'peak', as in the legacy
-% EXTRACT_REAL_INTENSITY_PROFILE). The interpolated focal position is
+% intensity peak beyond the near field (Align = 'peak'). The interpolated focal position is
 % interpolated linearly between the two, and equals d for 'label'.
 % Shifted profiles are resampled linearly; samples shifted in from beyond
 % the scan take the nearest edge value. Near-field structure is shifted with

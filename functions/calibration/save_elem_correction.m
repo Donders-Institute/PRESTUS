@@ -22,7 +22,7 @@ function save_elem_correction(equipment_yaml_path, opt_phases_deg, geo_phases_de
 %     ref_depth_ep_mm: <value>
 %     deg: [e1, e2, ...]
 %
-% See also: CALIBRATION_EXTRACT_CORRECTION, CALIBRATION_TRANSDUCER, COMPUTE_PHASES
+% See also: CALIBRATION_TRANSDUCER, COMPUTE_PHASES
 
 arguments
     equipment_yaml_path (1,:) char

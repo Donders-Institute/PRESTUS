@@ -3,7 +3,7 @@ function [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, 
 % LOAD_GRID_CACHE_FILE  Load a PRESTUS grid cache and restore pipeline state.
 %
 % Encapsulates the shared cache-load sequence used in two places in
-% prestus_pipeline:
+% GRID_STAGE:
 %   1. run_grid_setup == 1, cache-hit branch (skip head preprocessing).
 %   2. run_grid_setup == 0, optional cache-load for downstream stages.
 %
@@ -12,9 +12,10 @@ function [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, 
 %   - restore the grid keys the grid stage computes (dims, default_dims,
 %     resolution_mm, display_orientation) from the cache; other grid keys
 %     keep the caller's settings
-%   - conditionally restore parameters.transducer: keep the caller's array
-%     when the cache was built with MORE transducers (async shared preproc),
-%     otherwise use the cached array.
+%   - restore parameters.transducer: when the cache was built with more
+%     transducers (async shared preproc) or the same number, keep the
+%     caller's array and copy only the grid-space positions from the cache;
+%     with fewer, use the cached array.
 %   - recompute derived transducer fields via load_transducer_parameters
 %   - refresh trans_pos / focus_pos: for async per-transducer jobs
 %     (io.async_transducer_idx present) the grid-space positions are copied
@@ -36,7 +37,7 @@ function [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, 
 %   parameters   - updated: grid-stage keys of parameters.grid from cache;
 %                  parameters.transducer preserved or restored (see above)
 %   planimg      - planning image loaded from cache
-%   medium_masks - tissue mask struct loaded from cache
+%   medium_masks - medium label array loaded from cache
 %   segmentation - segmentation volume loaded from cache
 %   bone_mask    - bone mask loaded from cache
 %   pseudoCT     - pseudo-CT volume loaded from cache

@@ -278,7 +278,7 @@ function parameters = load_parameters(varargin)
     if ~ischar(parameters.io.output_affix)
         parameters.io.output_affix = '';
     end
-    % Allow hyphens (needed for BIDS entity values like desc-liberal).
+    % Allow hyphens (needed for BIDS entity values like desc-<label>).
     sanitized_affix = regexprep(parameters.io.output_affix, '[^a-zA-Z0-9_-]', '_');
     if ~strcmp(sanitized_affix, parameters.io.output_affix)
         fprintf('The original `io.output_affix` was sanitized. "%s" will be used instead of "%s"\n', ...
@@ -330,10 +330,10 @@ function parameters = load_parameters(varargin)
 
     %% MATLAB version check for compatibility
 
-    % Warn user about outdated MATLAB versions (< R2022b)
+    % Warn user about outdated MATLAB versions (< R2022b); PRESTUS is tested with R2023b
     if isMATLABReleaseOlderThan('R2022b')
         confirm_or_warn(parameters, 'prestus:oldMatlab', ...
-            sprintf('MATLAB %s is older than R2022b; please update.', version('-release')));
+            sprintf('MATLAB %s is older than R2022b; please update (PRESTUS is tested with R2023b).', version('-release')));
     end
 
     %% Validate acoustic_backend value

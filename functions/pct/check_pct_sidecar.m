@@ -3,8 +3,8 @@ function ok = check_pct_sidecar(pct_dir, parameters)
 %
 % An existing pseudoCT.nii.gz is reused instead of generated again
 % (PREPROC_SEGMENTATION); it must have been made with this run's skull
-% mapping (PCT_SIGNATURE). Reads pseudoCT.json (PCT_CREATE_PCT_RUN); one
-% written before v0.6.2 records only SkullMapping, which is compared. A mismatch is handled per
+% mapping (PCT_SIGNATURE). Reads pseudoCT.json (PCT_CREATE_PCT_RUN); a sidecar
+% without a signature but with SkullMapping has that compared. A mismatch is handled per
 % io.cache_signature_check (error | warn | off); a pseudo-CT without a
 % sidecar is used with a warning.
 %
@@ -32,7 +32,7 @@ end
         sc = read_sidecar(sidecar);
         if isfield(sc, 'signature')
             stored = sc.signature;
-        elseif isfield(sc, 'SkullMapping')          % pseudoCT.json written before v0.6.2
+        elseif isfield(sc, 'SkullMapping')          % sidecar without a signature
             stored = struct('signature_version', 1, 'skull_mapping', sc.SkullMapping);
         end
     else

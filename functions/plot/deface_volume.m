@@ -59,8 +59,7 @@ function vol_out = deface_volume(vol, seg, voxel_size_mm, margin_mm)
     [~, y_brain, ~] = ind2sub(size(seg), find(brain_mask));
     anterior_is_high_y = mean(y_eye) > mean(y_brain);
 
-    % Cut plane: posterior edge of eye socket shifted margin_mm into the head,
-    % placing the cut at roughly the ear-canal level.
+    % Cut plane: posterior edge of the eye labels shifted margin_mm into the head
     margin_vox = round(margin_mm / voxel_size_mm);
     if anterior_is_high_y
         % Face at high Y — mask from cut plane upward

@@ -1,6 +1,5 @@
 function [trans_candidate, outer_sphere_3d, parameters] = ...
     tp_find_initial_candidate(img, target, pixel_size, parameters)
-
 % TP_FIND_INITIAL_CANDIDATE  Find an initial candidate transducer position on the skull surface
 %
 % Expands a sphere outward from the target until it intersects the skull

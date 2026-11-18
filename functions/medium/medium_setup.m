@@ -21,8 +21,8 @@ function [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, pl
 %
 % Input:
 %   parameters   - PRESTUS config; must contain medium_properties, layers,
-%                  grid.dims, grid.resolution_mm [mm], pct.enabled, fit_alpha_power,
-%                  and transducer(1).freq_hz [Hz]
+%                  grid.dims, grid.resolution_mm [mm], pct.enabled,
+%                  transducer(1).freq_hz [Hz], and optionally fit_alpha_power (default 1)
 %   medium_masks - layer label map (values = medium index)
 %   planimg      - planning image info from GRID_TISSUE_SETUP;
 %                  may be empty for non-layered simulations
@@ -45,7 +45,7 @@ function [kwave_medium, medium_plus] = medium_setup(parameters, medium_masks, pl
 %                  kwave_medium during acoustic simulation)
 %
 % See also: MEDIUM_PCT_DENSITY, MEDIUM_PCT_SOUNDSPEED, MEDIUM_PCT_ATTENUATION,
-%   FITPOWERLAWPARAMSMULTI, MEDIUM_PROPERTIES_NIFTI
+%   FITPOWERLAWPARAMSMULTI, NIFTI_MEDIUM_PROPERTIES
 
 arguments
     parameters   (1,1) struct
@@ -255,7 +255,7 @@ end
 
     %% account for k-Wave's actual attenuation behaviour
     % limits discrepancies for high attenuation estimates (see https://doi.org/10.1121/1.4894790).
-    % 'alpha_coeff' is rescaled to match the specified alpha_coeff and alpa_power_true for the center frequency
+    % 'alpha_coeff' is rescaled to match the specified alpha_coeff and alpha_power at the center frequency
 
     if ~isfield(parameters, 'fit_alpha_power')
         parameters.fit_alpha_power = 1;

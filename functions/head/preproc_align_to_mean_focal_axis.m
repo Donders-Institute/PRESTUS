@@ -1,6 +1,5 @@
 function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rotation_matrix, angle_x_rad, angle_y_rad, montage_img] = ...
     preproc_align_to_mean_focal_axis(nii_image, nii_header, trans_pos_grid, focus_pos_grid, scale_factor, parameters)
-
 % PREPROC_ALIGN_TO_MEAN_FOCAL_AXIS  Rotate a 3D image so the mean focal axis aligns with z
 %
 % Computes a rotation that aligns the mean focal unit vector of all
@@ -49,7 +48,7 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 %   angle_y_rad           - rotation angle around y-axis [rad]
 %   montage_img           - side-by-side comparison montage
 %
-% See also: PREPROC_ALIGN_TO_FOCAL_AXIS, PREPROC_ALIGN_TO_PRINCIPAL_AXIS, PREPROC_HEAD
+% See also: PREPROC_ALIGN_TO_FOCAL_AXIS, MEAN_BEAM_AXIS, PREPROC_HEAD
 
     arguments
         nii_image (:,:,:) {mustBeNumericOrLogical}

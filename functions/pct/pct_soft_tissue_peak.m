@@ -1,7 +1,7 @@
 function pct_soft_tissue_peak(simnibs_folder, path_pct)
 % PCT_SOFT_TISSUE_PEAK  Identify the soft tissue peak from a UTE image intensity distribution
 %
-% Constrains a bias-corrected UTE image to grey and white matter voxels,
+% Constrains a bias-corrected UTE image to white and grey matter voxels,
 % finds the peak of the log-intensity distribution, and saves the peak
 % value and histogram figure to path_pct.
 %
@@ -23,7 +23,7 @@ end
     ute_file = fullfile(path_pct, 'UTE_reg_thr0_corr.nii.gz');
     ute_corr = niftiread(ute_file);
 
-    % Constrain analysis to grey matter (label 1) and white matter (label 2)
+    % Constrain analysis to white matter (label 1) and grey matter (label 2)
     mask_file = fullfile(simnibs_folder, 'final_tissues.nii.gz');
     mask_corr = niftiread(mask_file);
     mask_corr = logical(mask_corr == 1 | mask_corr == 2); % Hard-coded SimNIBS labels

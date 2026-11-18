@@ -1,5 +1,5 @@
 function report = prestus_config_upgrade(target_dir, options)
-% PRESTUS_CONFIG_UPGRADE  Refresh a project's config_default.yaml from the toolbox
+% PRESTUS_CONFIG_UPGRADE  Refresh a project's copy of the defaults file (config_default.yaml) from the toolbox
 %
 % prestus_config_init copies config_default.yaml into a project folder to pin
 % its defaults. When the toolbox later adds keys, LOAD_PARAMETERS fills them
@@ -27,7 +27,7 @@ function report = prestus_config_upgrade(target_dir, options)
 %              changed  table (key, project, toolbox) of differing values
 %              backup   path of the backup ('' for a dry run / no change)
 %
-% See also: PRESTUS_CONFIG_INIT, LOAD_PARAMETERS
+% See also: PRESTUS_CONFIG_INIT, LOAD_PARAMETERS, UPGRADE_CONFIG_KEYS
 
     arguments
         target_dir     (1,:) char

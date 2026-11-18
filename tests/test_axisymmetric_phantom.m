@@ -68,8 +68,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_axisym
         end
 
         function test_focus_pos_stays_row_and_beam_axis_inferred(tc)
-            % focus_pos(1) > focus_pos(2) used to turn focus_pos into a column,
-            % which GRID_AXISYMMETRY then did not flip with trans_pos
+            % With focus_pos(1) > focus_pos(2), focus_pos stays a row and
+            % GRID_AXISYMMETRY flips it with trans_pos
             p = make_minimal_parameters(tc.Dir);
             p.simulation.medium = 'phantom';
             p.grid.axisymmetric = 1;

@@ -16,7 +16,7 @@
 #                   Use this if wb_command is already available as an HPC module
 #
 # After installation, point PRESTUS at the new environment:
-#   parameters.simnibs_bin_path      = '<HOME>/.conda/envs/PRESTUS_env_4.6.0/bin'
+#   parameters.startup.simnibs_bin_path   = '<HOME>/.conda/envs/PRESTUS_env_4.6.0/bin'
 #   parameters.placement.plantus.env_path = '<HOME>/.conda/envs/PRESTUS_env_4.6.0/bin'
 #
 # Requirements: Linux, conda (Anaconda / Miniconda / Miniforge), internet access.
@@ -114,7 +114,7 @@ echo "============================================================"
 echo ""
 echo "Add the following to your PRESTUS config or MATLAB script:"
 echo ""
-echo "  parameters.simnibs_bin_path = '${ENV_BIN}';"
+echo "  parameters.startup.simnibs_bin_path = '${ENV_BIN}';"
 echo "  parameters.placement.plantus.env_path = '${ENV_BIN}';"
 echo ""
 echo "To verify the installation:"

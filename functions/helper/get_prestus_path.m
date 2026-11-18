@@ -1,5 +1,5 @@
 function prestus_path = get_prestus_path()
-% GET_PRESTUSPATH  Return the absolute path to the PRESTUS toolbox root
+% GET_PRESTUS_PATH  Return the absolute path to the PRESTUS toolbox root
 %
 % Resolves the PRESTUS root directory at runtime from this file's location
 % (functions/helper/get_prestus_path.m → three levels up), so it works

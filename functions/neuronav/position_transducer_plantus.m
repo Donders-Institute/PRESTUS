@@ -551,7 +551,8 @@ end
 % ── Write minimal YAML ────────────────────────────────────────────────────
 function write_yaml(fname, s)
 % Write a scalar struct to a flat YAML file.
-% Uses yaml.dump (MATLAB R2023a+) when available; falls back to manual write.
+% Uses yaml.dumpFile when a yaml class exists; the vendored external/yaml is a
+% package (exist(...,'class') is 0), so the manual writer below runs.
 
     if exist('yaml', 'class') == 8
         yaml.dumpFile(fname, s);

@@ -1,6 +1,5 @@
 function [transducer_box, ex_plane_pos_trig, geom_focus_pos, dist_to_ep_mm] = ...
     get_transducer_box(trans_pos, focus_pos, natural_foc, grid_step, parameters, is_plot)
-
 % GET_TRANSDUCER_BOX  Compute transducer bounding box, exit plane, and geometric focus
 %
 % Calculates the 2-D bounding box of a transducer from its grid position,

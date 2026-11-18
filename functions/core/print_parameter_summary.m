@@ -205,9 +205,10 @@ end
 props = {'sound_speed', 'density', 'alpha_coeff', 'alpha_power', ...
          'thermal_conductivity', 'specific_heat_capacity', 'perfusion', ...
          'absorption_coeff', 'absorption_fraction'};
-labels = {'Sound Speed [m/s]', 'Density [kg/m³]', 'Attenuation (1 MHz) [dB/(MHz·cm)]', ...
-          'Attn: Freq^Power [-]', 'Thermal Cond. [W/(m·K)]', 'Heat Cap. [J/(kg·K)]', ...
-          'Perfusion [1/s]', 'Absorption (1 MHz) [dB/(MHz·cm)]', 'Absorption Fraction [-]'};
+% units: GET_UNIT
+labels = {'Sound Speed', 'Density', 'Attenuation (1 MHz)', ...
+          'Attn: Freq^Power', 'Thermal Cond.', 'Heat Cap.', ...
+          'Perfusion', 'Absorption (1 MHz)', 'Absorption Fraction'};
 
 for t_idx = 1:length(tissues)
     tissue = tissues{t_idx};
@@ -251,7 +252,7 @@ print_if_field(hpc, 'partition', '%s');
 fprintf('\n');
 
 fprintf('========================================\n');
-fprintf('Configuration verified - Ready to run!\n');
+fprintf('End of configuration summary\n');
 fprintf('========================================\n');
 
 end
@@ -418,7 +419,7 @@ function [base, prop] = split_path(path)
 end
 
 function unit = get_unit(prop)
-% GET_UNIT returns units for tissue properties (MATLAB R2016b+ compatible)
+% GET_UNIT returns units for tissue properties
 if contains(prop, 'sound_speed')
     unit = 'm/s';
 elseif contains(prop, 'density')
@@ -449,7 +450,7 @@ function print_tissue_props(params, tissue, props, labels, absorption_model)
         val = get_nested_safe(params, sprintf('medium_properties.%s.%s', tissue, prop));
         
         if ~isempty(val) && ~isnan(val) && isfinite(val)
-            unit = get_unit(prop);  % Reuse your function
+            unit = get_unit(prop);
             
             % Smart formatting
             if contains(prop, {'sound_speed','density','specific_heat_capacity','perfusion'})

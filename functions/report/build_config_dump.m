@@ -10,7 +10,7 @@ function html = build_config_dump(parameters)
 % Use as:
 %   html = build_config_dump(parameters)   % returns an HTML fragment
 %
-% See also: GENERATE_SIMULATION_REPORT, BUILD_CONFIG_SUMMARY
+% See also: GENERATE_SIMULATION_REPORT, HTML_UTILS
 
     try
         pruned = local_prune(parameters, 0);

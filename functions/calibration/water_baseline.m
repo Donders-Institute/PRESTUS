@@ -11,7 +11,7 @@ function [freefield_isppa_wcm2, freefield_axial] = water_baseline(parameters, kg
 % The simulation backend matches parameters.acoustic_backend so that the
 % free-water baseline is produced by the same solver as the tissue simulation.
 %   'jwave'  → jwave_wrapper with homogeneous water medium
-%   default  → acoustic_simulation (k-Wave) — the original behaviour
+%   default  → acoustic_simulation (k-Wave)
 %
 % No amplitude parameters are modified. This function is purely a measurement.
 %
@@ -105,12 +105,8 @@ end
 
     %% Compute ISPPA from peak pressure
     % gather() first: p_max_all is a gpuArray under GPU backends, and double()
-    % alone casts its element type without moving it off the device. Leaving
-    % freefield_isppa_wcm2 as a gpuArray means it gets cached in
-    % acoustic_provenance and later reloaded across MATLAB sessions
-    % (cache_acoustic), where the orphaned device handle throws an opaque
-    % "Unrecognized field name gpuArrayReal" the next time it's touched
-    % (e.g. acoustic_analysis's isfinite(provenance.freefield_isppa_wcm2)).
+    % alone does not move it off the device; a cached gpuArray scalar fails to
+    % reload in a later session (see cache_acoustic).
     rho = wp.density;
     c   = wp.sound_speed;
     peak_pa = double(gather(max(sensor_data_baseline.p_max_all(:))));

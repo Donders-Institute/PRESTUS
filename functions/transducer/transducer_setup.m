@@ -1,6 +1,5 @@
 function [transducer_mask, source_label, tr] = ...
     transducer_setup(tr, trans_pos, focus_pos, grid_dims, grid_res_mm, parameters)
-
 % TRANSDUCER_SETUP  Create a transducer mask and label matrix for a k-Wave grid
 %
 % Generates a binary transducer mask and element-labelled source matrix

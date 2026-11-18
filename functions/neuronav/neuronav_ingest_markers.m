@@ -14,12 +14,12 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
 % and are named
 %   InstrumentMarker_<sub_id>_<ses_id>.xml / .json
 %
-% This function is Stage 1 of the neuronav pipeline.  Downstream functions
-% (neuronav_select_localite, neuronav_convert_trigger_to_voxels, …) read the
-% normalised XML; they do NOT need to know the original marker type.
+% Downstream functions (neuronav_select_localite,
+% neuronav_convert_trigger_to_voxels, …) read the normalised XML; they do
+% not need to know the original marker type.
 %
 % Use as:
-%   [xml_path, json_path] = neuronav_ingest_markers(parameters, sub_id, ses_id, target_map)
+%   [xml_path, json_path, results] = neuronav_ingest_markers(parameters, sub_id, ses_id, target_map)
 %
 % Required inputs:
 %   parameters - PRESTUS config struct.  Relevant fields:
@@ -50,6 +50,9 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
 % Outputs:
 %   xml_path   - full path to the written InstrumentMarker XML file
 %   json_path  - full path to the written JSON sidecar file
+%   results    - {1xN} per-series statistics (NEURONAV_COMPUTE_SERIES_STATISTICS);
+%                {} when existing outputs are kept; all three outputs are
+%                empty when no markers were found
 %
 % See also: NEURONAV_SELECT_LOCALITE, NEURONAV_COMPUTE_SERIES_STATISTICS
 
@@ -395,7 +398,6 @@ function write_json_sidecar(json_path, target_map, results, markertype, source_f
         entries.(matlab.lang.makeValidName(tm.target_name)) = s;
     end
 
-    % jsonencode is available since R2016b
     json_str = jsonencode(entries, 'PrettyPrint', true);
     fid = fopen(json_path, 'w', 'n', 'UTF-8');
     if fid < 0

@@ -1,6 +1,5 @@
 function [native_target_mm, native_trans_mm, target_pos, trans_pos] = ...
     neuronav_convert_MNI_to_native(sub_id, parameters, trans_mm, targ_mm)
-
 % NEURONAV_CONVERT_MNI_TO_NATIVE  Transform coordinates from MNI space to native subject space
 %
 % Converts stimulation coordinates from MNI space back to native anatomical

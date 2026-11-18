@@ -7,6 +7,7 @@ function plot_transducer_overlay(parameters, trans_pos, focus_pos, natural_foc, 
 % Use as:
 %   plot_transducer_overlay(parameters, trans_pos, focus_pos, natural_foc, ...
 %       max_data_pos, options, overlay_weight, overlay_color)
+%   plot_transducer_overlay(..., tr_idx)
 %
 % Input:
 %   parameters     - (1,1) simulation parameters struct with transducer geometry

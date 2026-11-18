@@ -6,7 +6,7 @@
 % Edit start_elem, end_elem, n_v_elem, and perc_elem at the top of the script
 % to match the target transducer geometry before running.
 %
-% See also: CALIBRATION_TRANSDUCER, COMPUTE_ONEIL_SOLUTION
+% See also: CALIBRATION_TRANSDUCER
 
 clear;
 

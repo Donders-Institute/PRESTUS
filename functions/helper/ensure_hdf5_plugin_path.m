@@ -8,11 +8,11 @@ function ensure_hdf5_plugin_path(python_bin)
 %
 % This function locates a plugin directory that actually contains the required
 % filter libraries and registers it via HDF5_PLUGIN_PATH.  Priority:
-%   1. HDF5_PLUGIN_PATH already set, directory exists, and contains *.so/dylib → done
+%   1. HDF5_PLUGIN_PATH already set, directory exists, and contains *.so/dylib/dll → done
 %   2. python_bin supplied: query hdf5plugin Python package for its plugin path
 %   3. Default system path (/usr/local/hdf5/lib/plugin) exists with plugins
-%   4. Default system path created (writable) with plugins
-%   5. Fall back to tempdir — valid directory, but warns that plugins are absent
+%   4. Default system path, created if needed (used without a plugin check)
+%   5. Fall back to tempdir; warns when it holds no plugins
 %
 % Called automatically by babelbrain_wrapper (which passes python_bin) and by
 % jwave_wrapper / read_babelbrain_output (no python_bin, best-effort).

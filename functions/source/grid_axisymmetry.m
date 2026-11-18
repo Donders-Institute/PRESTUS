@@ -128,8 +128,6 @@ end
         % column 1 is treated as the axis.  The transducer is on the axis,
         % so the correct split point is trans_pos(2): include that column
         % as column 1 of the half-grid and discard everything to its left.
-        % Using floor(dims(2)/2)+1 instead would silently drop the axis
-        % column and shift every phantom feature by one voxel radially.
         center_col = trans_pos(2);
         segmentation = segmentation(:, center_col:end);
         bone_mask    = bone_mask(:, center_col:end);

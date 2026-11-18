@@ -10,9 +10,7 @@ function [D_star_ep_mm, diag] = calibrate_focal_steering(tr, target_ep_mm, param
 %
 % The forward model is the in-repo Rayleigh–Sommerfeld solver
 % (RAYLEIGH_AXIAL_INTENSITY); geometric phases for a candidate steer come from
-% SET_REAL_PHASES / COMPUTE_PHASES.  focusedAnnulusONeil is intentionally NOT
-% used (it is resolved from the MATLAB path at runtime and is not guaranteed to
-% be present).
+% SET_REAL_PHASES / COMPUTE_PHASES.  focusedAnnulusONeil (k-Wave) is not used.
 %
 % Use as:
 %   [D_star_ep_mm, diag] = calibrate_focal_steering(tr, target_ep_mm, parameters)
