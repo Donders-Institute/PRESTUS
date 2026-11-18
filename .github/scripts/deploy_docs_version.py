@@ -52,14 +52,22 @@ def load_versions(pages: Path) -> list:
     return []
 
 
+def remove_path(p: Path) -> None:
+    """Remove a folder, file, or symbolic link (mike stores aliases as links)."""
+    if p.is_symlink() or p.is_file():
+        p.unlink()
+    elif p.is_dir():
+        shutil.rmtree(p)
+
+
 def upsert(versions: list, version: str, title: str, aliases: list, pages: Path) -> list:
     out = []
     for v in versions:
         if v.get("version") == version:
             # aliases dropped since the last deploy (e.g. mike's latest/dev) leave no folder behind
             for a in set(v.get("aliases", [])) - set(aliases):
-                if a and (pages / a).is_dir() and a != version:
-                    shutil.rmtree(pages / a)
+                if a and a != version:
+                    remove_path(pages / a)
             continue
         out.append(v)
     out.append({"version": version, "title": title, "aliases": aliases})
@@ -124,8 +132,7 @@ def main() -> None:
     pages.mkdir(parents=True, exist_ok=True)
 
     dest = pages / version
-    if dest.exists():
-        shutil.rmtree(dest)
+    remove_path(dest)
     shutil.copytree(site, dest)
 
     versions = upsert(load_versions(pages), version, a.title or version, a.alias, pages)
