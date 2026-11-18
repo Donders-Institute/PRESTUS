@@ -211,9 +211,8 @@ def parse_args():
     p.add_argument('--out_diameters',       default='',
                    help='--tx_system PRESTUS: comma-separated outer ring diameters [m].')
     p.add_argument('--z_steering',          default=0.0, type=float,
-                   help='ZSteering: axial offset of electronic focus from preset FocalLength [m]. '
-                        'Derived automatically from focal_distance_mm vs FocalLength when no '
-                        'calibrated weights file is provided.')
+                   help='ZSteering: axial offset of electronic focus from preset FocalLength [m] '
+                        '(default 0; babelbrain_wrapper.m derives it).')
     p.add_argument('--z_beyond_focus_mm',      default=40.0,  type=float,
                    help='Axial domain extent beyond focal point [mm] (default 40). '
                         'Increase to reduce boundary reflections at the focus.')
@@ -222,7 +221,7 @@ def parse_args():
                         'Slower but eliminates lateral truncation artefacts.')
     p.add_argument('--babelbrain_root',     default='',
                    help='Path to BabelBrain source root (contains TranscranialModeling/). '
-                        'If empty, searches relative to this script and common v05 locations.')
+                        'If empty, uses external/BabelBrain of this PRESTUS copy.')
     p.add_argument('--weights_file',        default='',
                    help='Path to OptimizedWeightsFile (.h5); omit to use geometric focusing')
     p.add_argument('--do_refocusing',       action='store_true',
@@ -276,7 +275,7 @@ def parse_args():
                         'BabelBrain silently adds a skin-surface-dependent domain correction '
                         '(GlobalStartSkin - LineOfSightStartSkin) on top of the requested '
                         'adjustment, moving the source millimetres off the PRESTUS-intended '
-                        'position (observed -5.5 mm). Set this flag only to reproduce the '
+                        'position (e.g. -5.5 mm). Set this flag only to reproduce the '
                         'un-patched BabelBrain behaviour.')
     p.add_argument('--medium_properties_json', default='',
                    help='Path to a JSON dump of PRESTUS parameters.medium_properties. When given, '
@@ -284,6 +283,12 @@ def parse_args():
                         'with these values (sound_speed, density, attenuation converted from '
                         'dB/cm/MHz to Np/m; shear set to 0) so k-Wave / jwave / BabelBrain assume '
                         'identical tissue acoustics. No effect on the CT path bone mapping.')
+    p.add_argument('--bone_shear',          action='store_true',
+                   help='Elastic bone (babelbrain.shear: prestus_elastic). Keeps BabelBrain shear on for '
+                        'the non-CT path and sets cortical/trabecular shear speed, shear attenuation and '
+                        'longitudinal attenuation from the babelbrain_elastic entries of the skull layers '
+                        'in --medium_properties_json (the kwave_elastic values at the drive frequency). '
+                        'Requires --medium_properties_json; not available with --use_ct.')
     p.add_argument('--log_file',            default='',
                    help='Path to write a copy of all stdout/stderr output for post-hoc debugging.')
     p.add_argument('--source_amp_pa',       default=0.0, type=float,
@@ -410,9 +415,9 @@ def load_run_sim(preset):
 def convert_weights_if_needed(weights_path):
     """Convert legacy PRESTUS split-format weights HDF5 to BabelBrain native complex format.
 
-    export_babelbrain_weights.m now writes the native layout (compound r/i
+    export_babelbrain_weights.m writes the native layout (compound r/i
     /CALIBRATION with 'type' attributes), which passes through unchanged.
-    Files from earlier PRESTUS versions have:
+    The older split layout has:
         /CALIBRATION/real  [N x 1] float32
         /CALIBRATION/imag  [N x 1] float32
 
@@ -722,7 +727,7 @@ def _patch_annular_array_weights(RunSimClass, dump_path=None, anchor_path=None,
           f'for per-ring weight expansion.')
 
 
-def _patch_noncat_skull_attenuation(bb_root, bone_q=1.0):
+def _patch_noncat_skull_attenuation(bb_root, bone_q=1.0, keep_shear=False):
     """Make the non-CT (binary-mask) path attenuate through the skull correctly
     by reproducing BabelBrain's *CT-mode* bone treatment.
 
@@ -731,10 +736,9 @@ def _patch_noncat_skull_attenuation(bb_root, bone_q=1.0):
     On the non-CT path, babel_integration_base.Step1_InitializeConditions builds the
     per-material Q-correction array as ``QCorrArr = np.ones(5)`` (or ``np.ones(8)``
     with brain segmentation) — i.e. it applies *no* Q correction to cortical or
-    trabecular bone. Historically the
-    transcranial field then came out almost identical to the water-only field
-    (observed ISPPA ~30 W/cm² vs ~11 W/cm² for k-Wave / jwave with identical
-    settings), which was attributed to the missing bone Q correction.
+    trabecular bone. The transcranial field then comes out almost identical to
+    the water-only field (ISPPA ~30 W/cm² vs ~11 W/cm² for k-Wave / jwave with
+    identical settings).
 
     The CT path adds bone with ``ShearSoS = 0`` and ``QCorrArr[bone] =
     self._QCorrection`` (default 3.0). This routine sets on the non-CT path:
@@ -758,7 +762,7 @@ def _patch_noncat_skull_attenuation(bb_root, bone_q=1.0):
     ---------------------------------------
     BabelBrain's BenchmarkTestFile mechanism could inject materials + QCorrArr, but
     it also requires a MaterialMap whose shape matches BabelBrain's *internal*
-    domain exactly. With ``bTightNarrowBeamDomain`` (PRESTUS default) the domain is
+    domain exactly. With ``bTightNarrowBeamDomain`` (babelbrain.tight_narrow_beam) the domain is
     cropped to follow the acoustic beam, so that shape is emergent from the
     Rayleigh-field setup and is not known until BabelBrain has already run. A
     BenchmarkTestFile would therefore need a throw-away run to discover the grid.
@@ -767,6 +771,10 @@ def _patch_noncat_skull_attenuation(bb_root, bone_q=1.0):
 
     The patch is self-guarding: it only alters the non-CT, non-water, non-homogeneous,
     non-benchmark branch. It is a no-op for CT / water-only / benchmark runs.
+
+    With ``keep_shear`` (``--bone_shear``) ``self._Shear`` is left at BabelBrain's 1.0,
+    so the bone shear speed and attenuation injected into MatFreq are used; only the
+    bone Q correction is set.
     """
     import inspect  # noqa: F401  (kept for parity with sibling patch helper)
 
@@ -793,7 +801,7 @@ def _patch_noncat_skull_attenuation(bb_root, bone_q=1.0):
                           and not getattr(self, '_bForceHomogenousMedium', False)
                           and len(getattr(self, '_BenchmarkTestFile', '') or '') == 0)
 
-        if non_ct_layered:
+        if non_ct_layered and not keep_shear:
             # Bone → fluid. Must be set before Step1's AddMaterial() calls and the
             # CFL calculation, both of which read self._Shear.
             self._Shear = 0.0
@@ -809,8 +817,9 @@ def _patch_noncat_skull_attenuation(bb_root, bone_q=1.0):
                     if idx < qc.size:
                         qc[idx] = bone_q
                 ss._QCorrection = qc
+                shear_str = 'ShearSoS(bone) kept' if keep_shear else 'ShearSoS(bone)=0'
                 print('[run_babelbrain_case] Non-CT skull-attenuation fix applied: '
-                      f'ShearSoS(bone)=0, QCorrArr[bone]→{bone_q:g} '
+                      f'{shear_str}, QCorrArr[bone]→{bone_q:g} '
                       f'(QCorrArr now {qc.tolist()}).')
             else:
                 print('[run_babelbrain_case] Warning: unexpected non-CT QCorrArr '
@@ -838,19 +847,19 @@ def _patch_zdomain_reference(bb_root):
     globally shallowest skin voxel anywhere in the domain and the skin voxel on
     the beam axis. In BabelBrain's own GUI workflow this compensates for oblique
     trajectories through its full-head domain. PRESTUS, however, computes the
-    intended source position itself (babelbrain_wrapper.m derives
-    TxMechanicalAdjustmentZ = preset_FL - focal_distance_bowl so the apex sits at
-    its true distance from the target) and hands BabelBrain a beam-aligned,
+    intended source position itself (babelbrain_placement_correction.m derives
+    TxMechanicalAdjustmentZ = preset_FL - |focus_pos - trans_pos| so the apex sits
+    at its true distance from the target) and hands BabelBrain a beam-aligned,
     possibly FOV-cropped mask — the skin-surface heuristic then silently moves
     the source off the requested position by GlobalStartSkin - LineOfSightStartSkin
-    (observed: -5.5 mm for a pFOV benchmark, where lateral domain corners contain
-    skin voxels shallower than the on-axis skin). Every millimetre of that shift
+    (e.g. -5.5 mm on a pFOV grid whose lateral corners contain skin voxels
+    shallower than the on-axis skin). Every millimetre of that shift
     (a) changes the physical source-to-skull distance the FDTD actually simulates,
     and (b) desynchronizes the returned field from the tissue mask it was solved
     on once the output resample re-anchors on the tissue marker.
 
-    THE FIX
-    -------
+    THE PATCH
+    ---------
     Override SimulationConditionsBASE.CalculateDomainZReference to return 0.0, so
     Tx placement honours TxMechanicalAdjustmentZ exactly. The original per-run
     value is recorded on the instance (self._prestus_zdomain_neutralized_m) and
@@ -972,9 +981,7 @@ def _patch_calculate_temperature_effects(bb_root):
     empty array.
 
     This patch rewrites the six bare .max() calls (TI / TIS / TIC and CEMBrain /
-    CEMSkin / CEMSkull) to guard with ``if <mask>.any() else 0.0`` — matching
-    the fix previously applied directly to
-    external/BabelBrain/ThermalModeling/CalculateTemperatureEffects.py.
+    CEMSkin / CEMSkull) to guard with ``if <mask>.any() else 0.0``.
 
     Implementation: uses inspect.getsource + string replacement + exec to redefine
     just the function in the module namespace — the 1185-line function body is NOT
@@ -1291,7 +1298,7 @@ def _quantize_ct_for_babelbrain(basedir, subject_id, target, freq, ppw):
     print(f'[run_babelbrain_case] CT index map written (overwriting raw-HU CT.nii.gz): {ct_path}')
 
 
-def _inject_prestus_materials(bb_root, freq, props_json_path):
+def _inject_prestus_materials(bb_root, freq, props_json_path, bone_shear=False):
     """Overwrite BabelBrain's built-in non-CT material database (``MatFreq``) with
     PRESTUS's configured medium properties, so k-Wave / jwave / BabelBrain all
     assume identical tissue acoustics.
@@ -1304,6 +1311,16 @@ def _inject_prestus_materials(bb_root, freq, props_json_path):
     path and with ``_patch_noncat_skull_attenuation``. The realised bone
     attenuation still depends on the Q-correction applied there; a validation run
     against k-Wave is the check that the two agree.
+
+    With ``bone_shear`` (babelbrain.shear: prestus_elastic), a skull layer with a
+    ``babelbrain_elastic`` entry gets its shear speed [m/s], longitudinal and shear
+    attenuation [Np/m at the drive frequency] from there. PRESTUS
+    (babelbrain_skull_elastic.m) has already converted them: kwave_elastic's y = 2
+    coefficient a2 [dB/(cm MHz^2)], exact at f0, times f_MHz^2 gives dB/cm, times
+    100 / 8.686 gives Np/m, the unit of the MatFreq / AddMaterial columns
+    [Density, LongSoS, ShearSoS, LongAtt, ShearAtt].
+
+    Returns the set of BabelBrain material keys that received elastic values.
     """
     import json
 
@@ -1313,7 +1330,7 @@ def _inject_prestus_materials(bb_root, freq, props_json_path):
     except Exception as e:
         print(f'[run_babelbrain_case] Warning: could not import babel_integration_helpers; '
               f'PRESTUS material injection skipped ({e}).', file=sys.stderr)
-        return
+        return set()
 
     try:
         with open(props_json_path) as f:
@@ -1321,13 +1338,13 @@ def _inject_prestus_materials(bb_root, freq, props_json_path):
     except Exception as e:
         print(f'[run_babelbrain_case] Warning: could not read medium properties JSON '
               f'{props_json_path}; material injection skipped ({e}).', file=sys.stderr)
-        return
+        return set()
 
     MatFreq = getattr(bbase, 'MatFreq', None)
     if not MatFreq:
         print('[run_babelbrain_case] Warning: MatFreq not found in babel_integration_helpers; '
               'PRESTUS material injection skipped.', file=sys.stderr)
-        return
+        return set()
 
     # Locate the frequency key BabelBrain will actually index (MatFreq[self._Frequency]).
     keys = np.array(sorted(MatFreq.keys()), dtype=float)
@@ -1335,10 +1352,11 @@ def _inject_prestus_materials(bb_root, freq, props_json_path):
     if abs(k - freq) > 1.0:
         print(f'[run_babelbrain_case] Warning: no MatFreq entry within 1 Hz of {freq:.0f} Hz '
               f'(closest {k:.0f}); PRESTUS material injection skipped.', file=sys.stderr)
-        return
+        return set()
 
     f_MHz = freq / 1e6
     applied = {}
+    elastic = set()
     for pk, bk in _PRESTUS_TO_BB_MATERIAL:
         m = props.get(pk)
         if not isinstance(m, dict):
@@ -1351,18 +1369,28 @@ def _inject_prestus_materials(bb_root, freq, props_json_path):
         a_coeff = float(m.get('alpha_coeff', 0.0) or 0.0)
         a_power = float(m.get('alpha_power', 1.0) or 1.0)
         long_att_npm = a_coeff * (f_MHz ** a_power) * _DB_CM_TO_NP_M
-        MatFreq[k][bk] = np.array([density, c_long, 0.0, long_att_npm, 0.0])
-        applied[bk] = (density, c_long, long_att_npm)
+        shear_sos, shear_att_npm = 0.0, 0.0
+        el = m.get('babelbrain_elastic') if bone_shear else None
+        if isinstance(el, dict):
+            shear_sos     = float(el['shear_sound_speed'])
+            shear_att_npm = float(el['shear_att_np_m'])
+            long_att_npm  = float(el['long_att_np_m'])     # already Np/m at f0
+            elastic.add(bk)
+        else:
+            elastic.discard(bk)    # a later fluid entry overrides an earlier elastic one
+        MatFreq[k][bk] = np.array([density, c_long, shear_sos, long_att_npm, shear_att_npm])
+        applied[bk] = (density, c_long, long_att_npm, shear_sos, shear_att_npm)
 
     if applied:
-        print(f'[run_babelbrain_case] Injected PRESTUS materials into MatFreq[{k:.0f} Hz] '
-              f'(shear set to 0):')
-        for bk, (d, c, a) in applied.items():
+        print(f'[run_babelbrain_case] Injected PRESTUS materials into MatFreq[{k:.0f} Hz]'
+              + (':' if bone_shear else ' (shear set to 0):'))
+        for bk, (d, c, a, cs, sa) in applied.items():
             print(f'    {bk:11s} density={d:7.1f} kg/m³  LongSoS={c:7.1f} m/s  '
-                  f'LongAtt={a:8.2f} Np/m')
+                  f'LongAtt={a:8.2f} Np/m  ShearSoS={cs:7.1f} m/s  ShearAtt={sa:8.2f} Np/m')
     else:
         print('[run_babelbrain_case] Warning: no PRESTUS materials matched known tissues; '
               'BabelBrain built-in database left unchanged.', file=sys.stderr)
+    return elastic
 
 
 def main():
@@ -1409,7 +1437,8 @@ def main():
               'skull attenuation UN-patched (expect inflated ISPPA).')
     else:
         _patch_noncat_skull_attenuation(
-            bb_root, bone_q=args.q_correction if args.q_correction > 0 else 1.0)
+            bb_root, bone_q=args.q_correction if args.q_correction > 0 else 1.0,
+            keep_shear=args.bone_shear)
 
     # Place the source at exactly the requested TxMechanicalAdjustmentZ (see
     # function docstring): BabelBrain otherwise adds a skin-surface-dependent
@@ -1429,12 +1458,23 @@ def main():
     # realised). Water-only runs do not read it (BabelBrain's own water). On the
     # CT path bone comes from the HU mapping, but Skin and Brain still come from
     # MatFreq (babel_integration_helpers.py), so their injected values apply there.
+    bone_shear = args.bone_shear and not args.water_only
+    if bone_shear and (args.use_ct or not args.medium_properties_json):
+        print('[run_babelbrain_case] --bone_shear needs --medium_properties_json and the non-CT '
+              'path (BabelBrain sets bone shear to 0 on the CT path).', file=sys.stderr)
+        sys.exit(1)
     if args.medium_properties_json:
         if args.no_skull_atten_fix:
             print('[run_babelbrain_case] Warning: --medium_properties_json given together with '
                   '--no_skull_atten_fix; injected bone attenuation will NOT be realised (QCorr '
                   'left at 1.0 for bone).', file=sys.stderr)
-        _inject_prestus_materials(bb_root, args.freq, args.medium_properties_json)
+        elastic = _inject_prestus_materials(bb_root, args.freq, args.medium_properties_json,
+                                            bone_shear=bone_shear)
+        if bone_shear and not {'Cortical', 'Trabecular'} <= elastic:
+            print('[run_babelbrain_case] --bone_shear: elastic properties were not injected for '
+                  f'both bone materials (got {sorted(elastic)}); stopping instead of running '
+                  'with BabelBrain\'s built-in shear values.', file=sys.stderr)
+            sys.exit(1)
 
     # Defensive crash-prevention patches (no result change for normal inputs).
     _patch_resave_normalized(bb_root, write_output=args.debug)
@@ -1571,8 +1611,8 @@ def main():
             src_dump = os.path.join(args.basedir, args.subject_id,
                                     f'{args.target}_babelbrain_source_dump.h5')
             print(f'[run_babelbrain_case] Debug: will dump BabelBrain source geometry to {src_dump}')
-        # Written every run: source-placement diagnostic (realized vs requested
-        # Tx position). read_babelbrain_output.m reads it back and warns when the
+        # Written on every run with a weights file: source-placement diagnostic
+        # (realized vs requested Tx position). read_babelbrain_output.m reads it back and warns when the
         # residual exceeds a native voxel (see _write_anchor_sidecar).
         anchor_sidecar = os.path.join(args.basedir, args.subject_id,
                                       f'{args.target}_prestus_anchor.json')

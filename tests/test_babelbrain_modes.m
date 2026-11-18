@@ -14,6 +14,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelb
 %     simulation.medium 'water' (babelbrain_wrapper then passes --water_only).
 %   - water / phantom medium: the label map write_babelbrain_input writes.
 %   - Single preset: --aperture and --focal_length reach run_babelbrain_case.py.
+%   - thermal backend: named computing_backend values reach
+%     run_babelbrain_thermal.py as integers; 'cpu' is rejected.
 %
 % prestus_pipeline_start, prestus_pipeline and run_command are replaced by
 % recorders (fixtures written to a temp folder at the front of the path), so
@@ -288,6 +290,32 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelb
             tc.verifyEqual(unique(lab(:))', uint8([0 5]));
         end
 
+        %% thermal backend names
+
+        function thermalNamedBackendsMapped(tc)
+            % computing_backend names reach run_babelbrain_thermal.py as the
+            % integers its --computing_backend (type=int) expects, as for the
+            % acoustic run (resolve_bb_backend).
+            cases = {'cuda', '1', 'CPU'; 'opencl', '2', 'CPU'; 'metal', '3', 'Apple'; ...
+                     'CUDA', '1', 'CPU'; 2, '2', 'CPU'};   % last: numeric (control)
+            for k = 1:size(cases, 1)
+                argv = run_thermal(tc, cases{k, 1});
+                lbl = sprintf('computing_backend = %s', num2str(cases{k, 1}));
+                tc.verifyEqual(flag_value(argv, '--computing_backend'), cases{k, 2}, lbl);
+                tc.verifyEqual(flag_value(argv, '--device_name'), cases{k, 3}, lbl);
+            end
+        end
+
+        function thermalCpuBackendRejected(tc)
+            % BabelBrain's thermal engine has no CPU backend, by name or number;
+            % an unknown name errors as in the acoustic run.
+            for b = {'cpu', 4}
+                tc.verifyError(@() run_thermal(tc, b{1}), ...
+                    'babelbrain_thermal_wrapper:noCpuBackend', num2str(b{1}));
+            end
+            tc.verifyError(@() run_thermal(tc, 'vulkan'), 'resolve_bb_backend:unknownBackend');
+        end
+
     end
 end
 
@@ -305,9 +333,19 @@ function p = bb_parameters(tmp, platform)
     p.transducer(1).target_isppa_wcm2 = 30;
     p.acoustic_backend = 'babelbrain';
     p.thermal_backend  = 'babelbrain';
-    % babelbrain_wrapper only checks that <root>/TranscranialModeling exists
+    % babelbrain_wrapper only checks that <root>/TranscranialModeling exists;
+    % named presets resolve through BabelBrain's transducer registry (rows as
+    % in BabelBrain/SelFiles/transducer_list.yaml, no preset yaml needed)
     bb_root = fullfile(tmp, 'BabelBrain');
     mkdir(fullfile(bb_root, 'TranscranialModeling'));
+    sel = fullfile(bb_root, 'BabelBrain', 'SelFiles');
+    if ~isfolder(sel); mkdir(sel); end
+    fid = fopen(fullfile(sel, 'transducer_list.yaml'), 'w');
+    fprintf(fid, ['- {name: Single, module_name: SingleTx, custom: false, steering: false, ' ...
+                  'transducer_type: simple_focused}\n' ...
+                  '- {name: R15473, module_name: R15473, custom: false, steering: false, ' ...
+                  'transducer_type: focused_annular_array}\n']);
+    fclose(fid);
     p.babelbrain.root              = bb_root;
     p.babelbrain.python_env        = '';
     p.babelbrain.tx_system         = 'R15473';
@@ -363,6 +401,41 @@ function [js, argv, nii] = run_wrapper(tc, p, masks, fp, tp, pct)
     nii = fullfile(p.io.dir_cache, 'sub-001', ...
         sprintf('%s_250kHz_%dPPW_BabelViscoInput.nii.gz', tgt, ppw_of(argv)));
     tc.verifyTrue(isfile(nii));
+end
+
+function argv = run_thermal(tc, backend)
+% babelbrain_thermal_wrapper with run_command recorded; returns the argv of
+% the run_babelbrain_thermal.py call. The wrapper then stops because no
+% thermal output exists, which is expected here.
+    p = bb_parameters(tc.TmpDir, 'matlab');
+    p.babelbrain.computing_backend = backend;
+    p.babelbrain.device_name       = 'auto';
+    p.babelbrain.isppa_w_per_cm2   = 5;   % skip the in-situ ISPPA (needs a field)
+    p.timing.pd  = 0.02;                  % a protocol: the defaults (0) are rejected
+    p.timing.pri = 0.2;                   % before the backend is resolved
+    p.timing.ptd = 1;
+    h5_dir = fullfile(tc.TmpDir, 'thermal');
+    if ~isfolder(h5_dir); mkdir(h5_dir); end
+    h5 = fullfile(h5_dir, 't_250kHz_3PPW_DataForSim.h5');
+    fclose(fopen(h5, 'w'));
+    sd = struct('babelbrain_source', h5);
+    planimg = struct('t1_header', [], 'transf', [], 'inv_transf', [], 'origin_ras_mm', [0 0 0]);
+    setappdata(0, 'prestus_test_cmds', {});
+    try
+        babelbrain_thermal_wrapper(p, sd, planimg);
+    catch ME
+        if ~contains(ME.message, 'thermal output HDF5 not found')
+            rethrow(ME);
+        end
+    end
+    cmds = getappdata(0, 'prestus_test_cmds');
+    is_th = cellfun(@(c) any(contains(c, 'run_babelbrain_thermal.py')), cmds);
+    tc.assertEqual(nnz(is_th), 1, 'one BabelBrain thermal call');
+    argv = cmds{is_th};
+end
+
+function v = flag_value(argv, flag)
+    v = argv{find(strcmp(argv, flag), 1) + 1};
 end
 
 function t = target_name(p)

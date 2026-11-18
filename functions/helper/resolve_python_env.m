@@ -4,12 +4,14 @@ function python_bin = resolve_python_env(env_path, exe_name)
 %   python_bin = resolve_python_env(env_path)
 %   python_bin = resolve_python_env(env_path, exe_name)
 %
-%   env_path  - path to the conda/venv environment root or its bin/ dir,
-%               or '' / [] to use the system executable.
+%   env_path  - path to the conda/venv environment root, its bin/ dir, or
+%               the Python executable itself, or '' / [] to use the system
+%               executable.
 %   exe_name  - executable name to look for (default: 'python3').
 %               Pass 'python' for BabelBrain, 'python3' for jwave, etc.
 %
 %   The function tries, in order:
+%     0. <env_path>                  (an existing file: the executable itself)
 %     1. <env_path>/bin/<exe_name>   (Linux/macOS env root)
 %     2. <env_path>/<exe_name>       (Windows, or caller passed bin/ directly)
 %     3. <exe_name>                  (system PATH fallback when env_path empty)
@@ -20,6 +22,12 @@ end
 
 if isempty(env_path)
     python_bin = exe_name;
+    return
+end
+
+env_path = char(env_path);
+if isfile(env_path)
+    python_bin = env_path;   % the executable itself
     return
 end
 

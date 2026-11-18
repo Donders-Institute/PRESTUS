@@ -2,18 +2,20 @@ function sensor_data = babelbrain_wrapper( ...
         parameters, medium_masks, kwave_medium, focus_pos, trans_pos, planimg, pseudoCT)
 % BABELBRAIN_WRAPPER  Run BabelBrain acoustic simulation as PRESTUS backend
 %
-% Drop-in replacement for ACOUSTIC_WRAPPER that uses BabelBrain's
-% BabelViscoFDTD solver instead of k-Wave. Accepts the same pre-processed
-% PRESTUS state (medium masks, transducer parameters, focus position) and
-% returns sensor_data in the same format as acoustic_wrapper so that all
-% downstream stages (acoustic_analysis, thermal_simulation) remain unchanged.
+% Alternative to ACOUSTIC_WRAPPER that uses BabelBrain's BabelViscoFDTD solver
+% instead of k-Wave. Takes the pre-processed PRESTUS state (medium masks,
+% transducer parameters, focus and transducer positions) and returns
+% sensor_data in the format of acoustic_wrapper, so the downstream stages
+% (acoustic_analysis, thermal stage) run unchanged.
 %
 % Pipeline:
-%   1. Transducer geometry: PRESTUS rings or a BabelBrain preset (babelbrain_tx_geometry)
-%   2. Write BabelViscoInput NIfTI mask (write_babelbrain_input)
+%   1. Transducer geometry: PRESTUS rings or a BabelBrain preset (babelbrain_tx_geometry),
+%      focal calibration, placement correction and ZSteering, sanity checks
+%   2. Write BabelViscoInput NIfTI mask (write_babelbrain_input) and medium properties JSON
 %   3. Write OptimizedWeightsFile HDF5 (export_babelbrain_weights)
 %   4. Invoke BabelBrain Python bridge via run_command()
-%   5. Read *DataForSim.h5 output (read_babelbrain_output)
+%   5. Read *DataForSim.h5 output (read_babelbrain_output); free-water ISPPA normalization
+%   6. Optional cache cleanup
 %
 % Required config fields (parameters.babelbrain):
 %   .tx_system          - '' (default): BabelBrain simulates the PRESTUS transducer's
@@ -83,6 +85,11 @@ function sensor_data = babelbrain_wrapper( ...
 %                         (realises the specified bone alpha_coeff; 91% in the bone-slab
 %                         phantom, as k-Wave) and BabelBrain's 3.0 on the CT path. Realised
 %                         bone attenuation scales ~1/Q. Values > 0 override both paths.
+%   .shear              - 'off' (default): bone as a fluid (shear speed 0).
+%                         'prestus_elastic': cortical/trabecular bone get the shear speed,
+%                         shear attenuation and longitudinal attenuation that kwave_elastic
+%                         uses (elastic: section; BABELBRAIN_SKULL_ELASTIC), at the drive
+%                         frequency. Label path only (not with ct_mapping).
 %   .focal_calibration  - logical (default true). Without explicit element phases, choose the
 %                         geometric steer so the achieved focus lands at focal_distance_ep
 %                         (CALIBRATE_FOCAL_STEERING); with explicit phases, only report it.
@@ -95,7 +102,7 @@ function sensor_data = babelbrain_wrapper( ...
 %   .source_amp_pa      - BabelBrain Rayleigh surface pressure amplitude [Pa].
 %                         Empty (default): auto-populated from elem_p_amp when available,
 %                         because elem_p_amp = rho_water * c_water * v_opt is the physical
-%                         face pressure derived by the O'Neill/Rayleigh calibration — the
+%                         face pressure derived by the O'Neil/Rayleigh calibration — the
 %                         same quantity BabelBrain expects here. This gives consistent
 %                         free-water focal Isppa between kWave and BabelBrain at the
 %                         calibrated depth without any additional cross-calibration step.
@@ -155,7 +162,11 @@ bb = apply_default(bb, 'device_name',        'auto');
 bb = apply_default(bb, 'ppw',                12);
 bb = apply_default(bb, 'do_refocusing',      false);
 bb = apply_default(bb, 'tight_narrow_beam',  []);   % [] = auto (off unless no FOV crop AND explicitly requested); see below
-bb = apply_default(bb, 'z_beyond_focus_mm',  40);
+z_beyond_focus_mm = 40;   % grid.z_beyond_focus_mm: shared with the k-Wave/jwave FOV and free-water grid
+if isfield(parameters, 'grid') && isfield(parameters.grid, 'z_beyond_focus_mm') && ...
+        ~isempty(parameters.grid.z_beyond_focus_mm)
+    z_beyond_focus_mm = parameters.grid.z_beyond_focus_mm;
+end
 % Focal calibration: choose the geometric steer so the achieved FWHM-centre
 % (or peak) lands at focal_distance_ep, rather than steering geometrically to
 % focal_distance_ep directly (which places the peak proximal via the diffraction
@@ -196,7 +207,6 @@ else
     tight_narrow_beam = false;   % default: full (non-narrow) domain, so the pre-focal field is emitted
 end
 
-z_beyond_focus_mm = bb.z_beyond_focus_mm;
 if tight_narrow_beam
     fprintf(['[babelbrain_wrapper] BabelBrain narrow-beam domain ENABLED (babelbrain.tight_narrow_beam=true): ' ...
         'z_beyond_focus=%.1f mm. NOTE: the pre-focal field is not emitted -- the returned axial profile will be ' ...
@@ -225,7 +235,7 @@ if bb.air_regions && isempty(bb.ct_mapping)
          'taken from the pseudoCT HU values. Ignored for this run.']);
 end
 bb = apply_default(bb, 'cleanup_cache',      true);   % delete BabelBrain cache dir after reading output
-bb = apply_default(bb, 'source_amp_pa',     []);    % [] = use BabelBrain built-in default (~50 kPa)
+bb = apply_default(bb, 'source_amp_pa',     []);    % [] = elem_p_amp(1), else BabelBrain's default (~50 kPa); see Step 4
 bb = apply_default(bb, 'water_amp_calibration', true);  % scale output to the intended free-water ISPPA
 % Water-field solver. false (default) => full-wave FDTD for the water-only field,
 % matching the other PRESTUS backends (k-Wave/jwave) so BabelBrain is comparable
@@ -236,6 +246,24 @@ bb = apply_default(bb, 'water_amp_calibration', true);  % scale output to the in
 % always uses FDTD.
 bb = apply_default(bb, 'use_rayleigh_for_water', false);
 bb = apply_default(bb, 'q_correction', []);   % [] = 1.0 non-CT / BabelBrain 3.0 CT
+bb = apply_default(bb, 'shear', 'off');       % 'off' (fluid bone) | 'prestus_elastic'
+if islogical(bb.shear) && isscalar(bb.shear) && ~bb.shear, bb.shear = 'off'; end   % unquoted YAML off
+bb.shear = lower(char(bb.shear));
+if ~ismember(bb.shear, {'off', 'prestus_elastic'})
+    error('babelbrain_wrapper:unknownShear', ...
+        'Unknown babelbrain.shear "%s" (off | prestus_elastic).', bb.shear);
+end
+bone_shear = strcmp(bb.shear, 'prestus_elastic');
+if bone_shear && ~isempty(bb.ct_mapping)
+    error('babelbrain_wrapper:shearWithCT', ...
+        ['babelbrain.shear ''prestus_elastic'' needs the label path: BabelBrain''s CT path ' ...
+         '(babelbrain.ct_mapping) always sets the bone shear speed to 0. Clear ct_mapping.']);
+end
+if bone_shear && pct_skull_mapped(parameters)
+    warning('babelbrain_wrapper:shearWithPct', ...
+        ['babelbrain.shear ''prestus_elastic'' uses the medium_properties skull densities; ' ...
+         'kwave_elastic with a pseudo-CT maps shear speed voxel-wise, so the two differ.']);
+end
 
 % Water-medium mode: run BabelBrain's --water_only path as the primary simulation.
 % medium_masks will be all-water (zeros in BabelBrain label space); the NIfTI is
@@ -646,8 +674,8 @@ fprintf('[babelbrain_wrapper] ------------------------------------\n\n');
 %% Step 2 — Write BabelViscoInput NIfTI (and companion CT NIfTI, if configured)
 fprintf('[babelbrain_wrapper] Writing input mask...\n');
 if ~isempty(bb.ct_mapping) && isempty(pseudoCT)
-    error(['babelbrain_wrapper: ct_mapping is set but no pseudoCT was supplied.\n' ...
-        'Pass the pseudoCT output of grid_tissue_setup as the 8th argument.']);
+    error('babelbrain_wrapper:noPseudoCT', ['babelbrain_wrapper: ct_mapping is set but no pseudoCT was supplied.\n' ...
+        'Pass the pseudoCT output of grid_tissue_setup as the 7th argument.']);
 end
 pseudoCT_for_write = [];
 if ~isempty(bb.ct_mapping)
@@ -662,12 +690,26 @@ end
 % tissue acoustics. Failure here is non-fatal: BabelBrain falls back to its
 % built-in database.
 medium_json_path = fullfile(out_dir, subj_id, sprintf('%s_medium_properties.json', target));
+% babelbrain.shear 'prestus_elastic': each skull layer also carries the
+% kwave_elastic properties in BabelBrain units (babelbrain_elastic: shear speed
+% [m/s], longitudinal and shear attenuation [Np/m] at the drive frequency).
+% Computed outside the try: a failure must stop the run, not fall back to fluid bone.
+medium_json = parameters.medium_properties;
+if bone_shear && ~is_water_medium
+    skull_el = babelbrain_skull_elastic(parameters);
+    for name = fieldnames(skull_el)'
+        medium_json.(name{1}).babelbrain_elastic = skull_el.(name{1});
+        fprintf(['[babelbrain_wrapper] Elastic bone (%s): cS = %.1f m/s, shear att. %.1f Np/m, ' ...
+                 'long. att. %.1f Np/m at %.0f kHz\n'], name{1}, skull_el.(name{1}).shear_sound_speed, ...
+            skull_el.(name{1}).shear_att_np_m, skull_el.(name{1}).long_att_np_m, freq_hz / 1e3);
+    end
+end
 try
     fid = fopen(medium_json_path, 'w');
     if fid == -1
         error('cannot open %s for writing', medium_json_path);
     end
-    fwrite(fid, jsonencode(parameters.medium_properties), 'char');
+    fwrite(fid, jsonencode(medium_json), 'char');
     fclose(fid);
     fprintf('[babelbrain_wrapper] Wrote medium properties JSON: %s\n', medium_json_path);
 catch ME
@@ -679,15 +721,13 @@ catch ME
         ME.message);
     medium_json_path = '';
 end
+if bone_shear && ~is_water_medium && isempty(medium_json_path)
+    error('babelbrain_wrapper:shearNeedsMediumJson', ...
+        'babelbrain.shear ''prestus_elastic'' needs the medium properties JSON, which could not be written.');
+end
 
 %% Step 3 — Write OptimizedWeightsFile (calibrated phases)
 weights_path = fullfile(out_dir, subj_id, [target '_CalibWeights.h5']);
-
-% CHECK: source amplitude available when weights exist (must follow weights_path definition)
-if ~isempty(weights_path) && isfile(weights_path) && ~exist('elem_p_amp', 'var')
-    fprintf('[babelbrain_wrapper]  ⚠  WARN: Weights found but elem_p_amp not set — source amplitude flag will be omitted.\n');
-    any_warn = true;
-end
 
 if isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && isfield(tr.annular, 'elem_p_amp')
     phases_rad = tr.annular.elem_phase_rad;
@@ -722,15 +762,12 @@ if isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && isfield(tr
     % derives internally (AllPhi) by Rayleigh back-propagation from its steering
     % target, and the delta must be referenced to the geometric phases at THAT
     % aim so that AllPhi + delta reproduces phases_rad. The exact aim BabelBrain
-    % uses is entangled with its voxelised grid setup (see the analysis in
-    % doc_babelbrain.md / CHANGELOG) and is NOT cleanly reproduced by an ideal-
-    % geometry compute_phases call: sweeping the aim, the geometric focus
-    % (preset_FL - bowl_off = dist_geom_ep) is the closest single reference
-    % (water focal centre lands at ~84.5 mm vs the k-Wave/jwave 85 mm), but a
-    % residual ~2-3 mm proximal peak bias persists. The durable fix is to
-    % reference the delta to BabelBrain's OWN emitted AllPhi rather than an
-    % analytic reconstruction; until that is wired in, use the geometric-focus
-    % aim as the best available approximation.
+    % uses is entangled with its voxelised grid setup (see doc_babelbrain.md)
+    % and is NOT cleanly reproduced by an ideal-geometry compute_phases call;
+    % the geometric focus (preset_FL - bowl_off = dist_geom_ep) is the closest
+    % single reference. run_babelbrain_case.py re-references the weights to
+    % BabelBrain's own AllPhi from /DRIVE_phases_rad, so this delta is the
+    % stored /CALIBRATION value and the fallback when that is unavailable.
     if ~isempty(preset_focal_length_m)
         aim_ep_ref_mm = (preset_focal_length_m + z_steering_m) * 1e3 - bowl_off_mm;
     else
@@ -757,8 +794,6 @@ if isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && isfield(tr
 
     % Per-ring drive (elem_p_amp, one value per ring) sets the relative
     % amplitude shading in the weights; a scalar drive means uniform rings.
-    % (Read elem_amp before, which validate_annular_transducer renames to
-    % elem_p_amp, so per-ring shading never reached BabelBrain.)
     elem_amp_for_weights = [];
     if numel(tr.annular.elem_p_amp) == tr.annular.elem_n
         elem_amp_for_weights = tr.annular.elem_p_amp;
@@ -793,7 +828,7 @@ dry_run = isfield(bb, 'dry_run') && bb.dry_run;
 
 % BabelBrain source amplitude:
 % elem_p_amp = rho_water * c_water * v_opt is the physical face pressure derived
-% by the O'Neill/Rayleigh calibration fit.  BabelBrain's --source_amp_pa is the
+% by the O'Neil/Rayleigh calibration fit.  BabelBrain's --source_amp_pa is the
 % same quantity (Rayleigh surface pressure amplitude), so elem_p_amp transfers
 % directly — no cross-calibration is needed for free-water simulations.
 % An explicit bb.source_amp_pa overrides the auto-populated value.
@@ -801,7 +836,7 @@ resolved_source_amp_pa = bb.source_amp_pa;
 if isempty(resolved_source_amp_pa) || resolved_source_amp_pa <= 0
     if exist('elem_p_amp', 'var') && elem_p_amp > 0
         resolved_source_amp_pa = elem_p_amp;
-        fprintf('[babelbrain_wrapper] source_amp_pa auto-set from elem_p_amp (O''Neill face pressure): %.1f Pa\n', resolved_source_amp_pa);
+        fprintf('[babelbrain_wrapper] source_amp_pa auto-set from elem_p_amp (O''Neil face pressure): %.1f Pa\n', resolved_source_amp_pa);
     end
 end
 
@@ -846,6 +881,7 @@ babelbrain_argv = [{python_bin, bb_runner, ...
     bb_wateronly_flag(is_water_medium), ...
     bb_rayleigh_water_flag(bb.use_rayleigh_for_water), ...
     bb_qcorr_flag(bb.q_correction), ...
+    bb_shear_flag(bone_shear && ~is_water_medium), ...
     bb_debug_flag(parameters)];
 
 if is_water_medium
@@ -978,10 +1014,9 @@ else
     % water-only simulation is triggered here before reading. The ISPPA is needed
     % downstream for babelbrain_thermal_wrapper.
     water_h5 = strrep(h5_path, '_DataForSim.h5', '_Water_DataForSim.h5');
-    % Same cache invalidation as the main h5 above (line ~847): without this,
-    % a stale Water_DataForSim.h5 from an earlier/buggy run is silently reused
-    % forever, since the block below only triggers a re-run when the file is
-    % entirely absent. A stale water baseline contaminates the free-water ISPPA
+    % Same cache invalidation as the main h5 (Step 4): without this, a stale
+    % Water_DataForSim.h5 from an earlier run is silently reused, since the
+    % block below only triggers a re-run when the file is entirely absent. A stale water baseline contaminates the free-water ISPPA
     % normalization used for the skull-attenuation ratio and downstream thermal
     % calibration.
     if isfile(water_h5) && isfield(parameters, 'io') && isfield(parameters.io, 'overwrite_files') && ...
@@ -1282,12 +1317,19 @@ function flag = bb_qcorr_flag(q)
     end
 end
 
+function flag = bb_shear_flag(bone_shear)
+    if bone_shear
+        flag = {'--bone_shear'};
+    else
+        flag = {};
+    end
+end
+
 function flag = bb_debug_flag(parameters)
 % Keep BabelBrain debug-only outputs (currently: *_Sub_NORM.nii.gz, a
 % brain-masked/normalized FullElasticSolution useful for visualizing the
 % brain/skull mask boundary) when running in PRESTUS debug mode.
-    if isfield(parameters, 'simulation') && isfield(parameters.simulation, 'debug') ...
-            && parameters.simulation.debug == 1
+    if debug_on(parameters, 'babelbrain')
         flag = {'--debug'};
     else
         flag = {};

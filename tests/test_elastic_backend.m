@@ -2,7 +2,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_elasti
 % TEST_ELASTIC_BACKEND  Elastic (shear-wave) skull backend: acoustic_backend 'kwave_elastic'.
 %
 % Covers MEDIUM_ELASTIC_PROPERTIES (Pichardo et al. 2017 shear mapping, density
-% threshold, Poisson-ratio floor, Kelvin-Voigt absorption conversion), config
+% threshold, Poisson-ratio floor, Kelvin-Voigt absorption conversion), the
+% matched BabelBrain skull properties (BABELBRAIN_SKULL_ELASTIC), config
 % validation, and — with a small 2D free-water run — that the pressure→stress
 % source conversion in ACOUSTIC_SIMULATION_ELASTIC reproduces the fluid
 % k-Wave focal pressure.
@@ -123,6 +124,50 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_elasti
                 tc.verifyEqual(to_npm(em.alpha_coeff_shear(2), f0/1e6), a_s, 'RelTol', 2e-3);
                 tc.verifyEqual(to_npm(em.alpha_coeff_compression(2), f0/1e6), a_l, 'RelTol', 2e-3);
             end
+        end
+
+        function test_babelbrain_skull_elastic_matches_kwave_elastic(tc)
+            % babelbrain.shear 'prestus_elastic': per skull layer, the kwave_elastic
+            % shear speed, and both attenuations in Np/m at f0
+            [medium, masks] = tc.skull_medium();
+            p = tc.params();
+            em = medium_elastic_properties(p, medium, masks);
+            sk = babelbrain_skull_elastic(p);
+            tc.verifyEqual(sort(fieldnames(sk))', {'skull', 'skull_cortical', 'skull_trabecular'});
+            np = 100 / (20*log10(exp(1)));
+            % voxels 2/3/4 of skull_medium are skull / trabecular / cortical
+            cases = {'skull', 2; 'skull_trabecular', 3; 'skull_cortical', 4};
+            for k = 1:size(cases, 1)
+                s = sk.(cases{k, 1}); v = cases{k, 2};
+                tc.verifyEqual(s.shear_sound_speed, em.sound_speed_shear(v), 'AbsTol', 1e-9);
+                tc.verifyEqual(s.density, medium.density(v));
+                tc.verifyEqual(s.sound_speed, medium.sound_speed(v));
+                tc.verifyEqual(s.shear_att_np_m, 43.63 * 0.5^1.662 * np, 'RelTol', 1e-12);
+                tc.verifyEqual(s.long_att_np_m,  27.31 * 0.5^1.722 * np, 'RelTol', 1e-12);
+            end
+        end
+
+        function test_babelbrain_skull_elastic_reproduces_pichardo_values(tc)
+            % Np/m conversion: the defaults give Pichardo et al. 2017's values
+            p = tc.params(); p.transducer.freq_hz = 270e3;
+            sk = babelbrain_skull_elastic(p);
+            tc.verifyEqual(sk.skull_cortical.shear_att_np_m, 57, 'RelTol', 2e-3);
+            tc.verifyEqual(sk.skull_cortical.long_att_np_m,  33, 'RelTol', 2e-3);
+            tc.verifyEqual(sk.skull_cortical.shear_sound_speed, 0.458*1850 + 545.52, 'AbsTol', 1e-9);
+        end
+
+        function test_babelbrain_skull_elastic_long_attenuation_medium(tc)
+            p = tc.params(); p.elastic = struct('long_attenuation', 'medium');
+            p.medium_properties.skull_cortical.alpha_coeff = 13.3;
+            p.medium_properties.skull_cortical.alpha_power = 1;
+            sk = babelbrain_skull_elastic(p);
+            tc.verifyEqual(sk.skull_cortical.long_att_np_m, db_cm_mhz_to_np_m(13.3, 500e3, 1), 'RelTol', 1e-12);
+        end
+
+        function test_babelbrain_skull_elastic_needs_skull(tc)
+            p = tc.params();
+            p.medium_properties = rmfield(p.medium_properties, {'skull', 'skull_cortical', 'skull_trabecular'});
+            tc.verifyError(@() babelbrain_skull_elastic(p), 'babelbrain_skull_elastic:noSkull');
         end
 
         function test_shear_ppw_warning(tc)

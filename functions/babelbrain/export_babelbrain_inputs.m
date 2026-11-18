@@ -12,11 +12,9 @@ function out_files = export_babelbrain_inputs( ...
 %       2=cortical, 3=trabecular, 4=brain, 5=focal point).
 %
 %   <target>_CalibWeights.h5
-%       OptimizedWeightsFile with per-element phasors encoding the PRESTUS
-%       calibration (delta from geometric phases). Stored as split real/imag
-%       float32 datasets (MATLAB cannot write native complex HDF5).
-%       run_babelbrain_case.py auto-converts to BabelBrain's native complex64
-%       format (_bb.h5) before passing to RunCases.
+%       OptimizedWeightsFile with per-ring phasors encoding the PRESTUS
+%       calibration (delta from geometric phases), in BabelBrain's native
+%       layout (complex64 /CALIBRATION; see EXPORT_BABELBRAIN_WEIGHTS).
 %
 %   RunBabelBrain.py
 %       Ready-to-run Python script that calls RUN_SIM().RunCases() with the
@@ -43,7 +41,7 @@ function out_files = export_babelbrain_inputs( ...
 %     .config_yaml  - path to babelbrain_config.yaml
 %
 % See also: BABELBRAIN_WRAPPER, WRITE_BABELBRAIN_INPUT, EXPORT_BABELBRAIN_WEIGHTS,
-%           BABELBRAIN_TRANSDUCER_MAP
+%           BABELBRAIN_TX_GEOMETRY
 
 arguments
     parameters    (1,1) struct
@@ -77,12 +75,17 @@ if isfield(parameters, 'babelbrain')
     bb = parameters.babelbrain;
 end
 bb = apply_default(bb, 'tx_system',          '');
-bb = apply_default(bb, 'z_beyond_focus_mm',  40);
 bb = apply_default(bb, 'computing_backend',   3);
 bb = apply_default(bb, 'device_name',         'Apple');
 bb = apply_default(bb, 'ppw',                 6);
 bb = apply_default(bb, 'do_refocusing',       false);
 bb = apply_default(bb, 'python_env',          '');
+
+z_beyond_focus_mm = 40;   % grid.z_beyond_focus_mm: shared with the k-Wave/jwave FOV and free-water grid
+if isfield(parameters, 'grid') && isfield(parameters.grid, 'z_beyond_focus_mm') && ...
+        ~isempty(parameters.grid.z_beyond_focus_mm)
+    z_beyond_focus_mm = parameters.grid.z_beyond_focus_mm;
+end
 
 % Domain size: derived from parameters.grid.acoustic_fov_length_mm, not from babelbrain.*
 fov_len_mm = [];
@@ -97,9 +100,7 @@ if tight_narrow_beam
             ~isempty(parameters.transducer(1).focal_distance_ep)
         focal_depth_mm = parameters.transducer(1).focal_distance_ep;
     end
-    z_beyond_focus_mm = max(bb.z_beyond_focus_mm, fov_len_mm - focal_depth_mm);
-else
-    z_beyond_focus_mm = bb.z_beyond_focus_mm;
+    z_beyond_focus_mm = max(z_beyond_focus_mm, fov_len_mm - focal_depth_mm);
 end
 bb = apply_default(bb, 'tx_mech_adjust_z_m',  0.0);
 
@@ -113,9 +114,9 @@ res_mm   = parameters.grid.resolution_mm;
 % PPW target: BabelBrain's own spatial step is SmallestSOS/(freq*PPW), where
 % SmallestSOS is floored by its built-in Pichardo shear-speed reference at
 % density=1000 kg/m3 (1102.515 m/s) under the fluid-bone model -- see
-% write_babelbrain_input.m for the full derivation. Using plain brain/water
-% sound speed here (as this used to) targets the wrong reference and
-% inflates the resampling write_babelbrain_input.m has to do.
+% write_babelbrain_input.m for the full derivation. Plain brain/water sound
+% speed would target the wrong reference and inflate the resampling
+% write_babelbrain_input.m has to do.
 pichardo_shear_floor_ms = 1000.0 * 0.422 + 680.515;
 c_min = pichardo_shear_floor_ms;
 if isfield(parameters, 'medium_properties')
@@ -356,15 +357,19 @@ fprintf(fid, '  run_script:  %s\n', run_script_path);
 
 % Timing for thermal (in case user wants to run BabelBrain thermal too)
 if isfield(parameters, 'timing') && isfield(parameters.timing, 'pd')
-    t = parameters.timing;
-    fprintf(fid, '\nthermal_inputs:\n');
-    fprintf(fid, '  # Map to BabelBrain: DutyCycle = pd/pri, PRF = 1/pri, DurationUS = ptrd\n');
-    if isfield(t, 'pd') && isfield(t, 'pri') && t.pri > 0
-        fprintf(fid, '  DutyCycle:   %.4f  # pd=%.3f s / pri=%.3f s\n', t.pd/t.pri, t.pd, t.pri);
-        fprintf(fid, '  PRF:         %.1f  # Hz = 1/pri\n', 1/t.pri);
-    end
-    if isfield(t, 'ptrd')
-        fprintf(fid, '  DurationUS:  %.1f  # ptrd [s]\n', t.ptrd);
+    try
+        bt = babelbrain_thermal_timing(parameters.timing);
+        fprintf(fid, '\nthermal_inputs:\n');
+        fprintf(fid, '  # From babelbrain_thermal_timing (as used by babelbrain_thermal_wrapper)\n');
+        fprintf(fid, '  DutyCycle:   %.6g  # pd / pri\n', bt.duty_cycle);
+        fprintf(fid, '  PRF:         %.6g  # Hz = 1 / pri\n', bt.prf_hz);
+        fprintf(fid, '  DurationUS:  %.6g  # ptd [s]\n', bt.duration_s);
+        fprintf(fid, '  DurationOff: %.6g  # ptri - ptd [s]\n', bt.duration_off_s);
+        fprintf(fid, '  Repetitions: %d  # n_ptri_reps\n', bt.repetitions);
+        fprintf(fid, '  PauseBetweenGroupedSonications: %.6g  # post_ptri_dur [s]\n', bt.pause_after_s);
+    catch ME
+        warning('export_babelbrain_inputs:thermalTiming', ...
+            'thermal_inputs not written: %s', ME.message);
     end
 end
 fclose(fid);

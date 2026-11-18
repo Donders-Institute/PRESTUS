@@ -48,23 +48,24 @@ function results_heating = babelbrain_thermal_wrapper( ...
 % ISPPA INSIDE THE BRAIN equals the Isppa it receives
 % (PressureRatio = sqrt(Isppa*2*rho*c) / max(p_amp(brain)) in
 % CalculateTemperatureEffects.py). Unless babelbrain.isppa_w_per_cm2 is set
-% explicitly, this wrapper therefore passes the in-brain peak Isptp of
+% explicitly, this wrapper therefore passes the in-brain peak ISPPA of
 % sensor_data.p_max_all (the same calibrated/scaled field k-Wave thermal
 % consumes) -- NOT the free-water calibration ISPPA, which would drop the
 % transcranial loss and overestimate heating.
 %
 % Output:
-%   results_heating - struct with fields matching thermal_simulation output:
+%   results_heating - struct with fields matching thermal_simulation output
+%                     (see READ_BABELBRAIN_THERMAL), on the PRESTUS grid:
+%     .p_amp            peak pressure [Pa]
+%     .maxT             temperature at end of sonication [°C]
+%     .heating_endT     final temperature (after cooling) [°C]
+%     .CEM43, .CEM43_end  thermal dose at end of sonication / after cooling [min]
+%     .CEM43_iso, .CEM43_iso_end  NaN (BabelBrain computes no ISO CEM43)
+%     .focal_planeT, .focal_planeCEM43, .focal_planeCEM43_iso  empty
+%     .timeseries       temperature time courses (.TempProfileTarget,
+%                       .TimeProfileTarget, per-tissue .T and .Tdiff)
+%     .MaxIsppa, .MaxIspta, .Isppa, .Ispta  BabelBrain intensity metrics [W/cm²]
 %     .dx_step          grid voxel size [m]
-%     .p_amp            [Nx x Ny x Nz] peak pressure [Pa], resampled to PRESTUS grid
-%     .T                [Nx x Ny x Nz] temperature rise at end of sonication [°C]
-%     .T_end            [Nx x Ny x Nz] final temperature (after cooling) [°C]
-%     .CEM43            [Nx x Ny x Nz] thermal dose [CEM43]
-%     .CEM43_end        [Nx x Ny x Nz] final CEM43
-%     .TempProfileTarget [1 x Nt]     temperature at focal target over time [°C]
-%     .TimeProfileTarget [1 x Nt]     time axis [s]
-%     .MaxIsppa         peak ISPPA in brain [W/cm²]
-%     .MaxIspta         peak ISPTA in brain [W/cm²]
 %     .babelbrain_thermal_source  path to thermal HDF5 output
 %
 % See also: BABELBRAIN_WRAPPER, THERMAL_SIMULATION, THERMAL_ANALYSIS
@@ -311,7 +312,13 @@ function [backend, device] = resolve_backend(backend, device)
 % to 'CUDA','OpenCL','Metal','MLX' and has no CPU option (unlike the acoustic
 % engine), so backend 4 means MLX (Apple Silicon only). Without a GPU this
 % errors rather than falling back to a CPU path that does not exist.
-    if ~(ischar(backend) && strcmp(backend, 'auto'))
+    if isstring(backend); backend = char(backend); end
+    if ischar(backend) && ~strcmpi(backend, 'auto')
+        % Named backend ('cuda' | 'opencl' | 'metal' | 'cpu') -> 1-4, as for
+        % the acoustic run; the device is left to the logic below.
+        backend = resolve_bb_backend(backend, 'unused');
+    end
+    if ~(ischar(backend) && strcmpi(backend, 'auto'))
         if backend == 4
             error('babelbrain_thermal_wrapper:noCpuBackend', ...
                 ['computing_backend=4 requested for the BabelBrain thermal engine, but BabelBrain''s ' ...

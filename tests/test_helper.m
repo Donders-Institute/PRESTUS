@@ -290,4 +290,32 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_helper
         end
 
     end
+
+
+    % resolve_python_env
+    methods (Test, TestTags = {'resolve_python_env'})
+
+        function test_python_env_every_accepted_form(tc)
+            % The environment root, its bin/ directory, and the executable
+            % itself all resolve to the same executable.
+            env = tempname;
+            mkdir(fullfile(env, 'bin'));
+            tc.addTeardown(@() rmdir(env, 's'));
+            exe = fullfile(env, 'bin', 'python');
+            fclose(fopen(exe, 'w'));
+            tc.verifyEqual(resolve_python_env(env, 'python'), exe, 'environment root');
+            tc.verifyEqual(resolve_python_env(fullfile(env, 'bin'), 'python'), exe, 'bin directory');
+            tc.verifyEqual(resolve_python_env(exe, 'python'), exe, 'executable');
+            tc.verifyEqual(resolve_python_env(string(exe), 'python'), exe, 'executable as string');
+        end
+
+        function test_python_env_missing_and_empty(tc)
+            % Negative controls: a missing environment keeps the root-layout
+            % path (so the OS error names it); empty uses the system executable.
+            env = tempname;
+            tc.verifyEqual(resolve_python_env(env, 'python'), fullfile(env, 'bin', 'python'));
+            tc.verifyEqual(resolve_python_env('', 'python'), 'python');
+        end
+
+    end
 end
