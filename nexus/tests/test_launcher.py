@@ -173,3 +173,19 @@ def test_plantus_submit_script_keeps_platform(tmp_path, prestus_root):
     assert launcher.PLACEMENT_ONLY in job
     assert launcher.matlab_value(0) == "0" and launcher.matlab_value("never") == "'never'"
     assert launcher.matlab_value([]) == "[]" and launcher.matlab_value(True) == "true"
+
+
+def test_kwave_drive_submit_script(tmp_path):
+    """Submitting the k-Wave drive check calls kwave_drive_submit with the script, fit and config."""
+    from prestus_nexus import launcher as L
+    script = tmp_path / "kwave_drive_combo.m"
+    script.write_text("% drive check\n")
+    fit = tmp_path / "combo_fit.mat"
+    cfg = tmp_path / "study.yaml"
+    path = L.write_kwave_drive_submit(script, fit, cfg, tmp_path / "PRESTUS")
+    assert path == script.with_name("submit_kwave_drive_combo.m")
+    text = path.read_text()
+    assert f"kwave_drive_submit('{script.resolve()}', '{fit.resolve()}', '{cfg}')" in text
+    assert "addpath(genpath(fullfile(" in text
+    body = L.kwave_drive_submit_body("/p/s.m", "/p/f.mat", None, "/p/PRESTUS")
+    assert body.endswith("kwave_drive_submit('/p/s.m', '/p/f.mat', '')")

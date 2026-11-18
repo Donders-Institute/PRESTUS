@@ -219,7 +219,71 @@ def test_trajectory_import(app, schema, prestus_root, subject, tmp_path, monkeyp
     assert trans[2] - focus[2] == pytest.approx(60 + page._bowl().offset, abs=0.1)
 
 
+class _FakeBridge:
+    """Answers nexus_neuronav 'file_series' with a recorded MATLAB answer."""
+    def __init__(self, out):
+        self.out, self.calls = out, []
+
+    def call(self, fn, args, on_done=None, on_error=None, **_):
+        self.calls.append((fn, args))
+        on_done(self.out)
+
+
+def _localite_answer(xml):
+    pose = {"is_pose": True, "tracked": True, "error": ""}
+    return {"file": str(xml), "markertype": "TriggerMarkers", "note": "", "series": [
+        {"index": 1, "description": "", "n_markers": 1, "pos_dev_mm": 0, "is_pose": False,
+         "tracked": True, "trans_pos": [], "focus_pos": [], "error": ""},       # planned point
+        dict(pose, index=2, description="L_M1", n_markers=80, pos_dev_mm=1.2,
+             trans_pos=[61, 61, 111], focus_pos=[61, 61, 71]),
+        dict(pose, index=3, description="", n_markers=80, pos_dev_mm=0.8,
+             trans_pos=[61, 21, 61], focus_pos=[61, 61, 61])]}
+
+
+@pytest.mark.parametrize("pick, expect_target, expect_position", [
+    (0, "L_M1", None),          # unique description: chosen by name
+    (1, None, 3)])              # no description: chosen by series number
+def test_localite_import_sets_file_mode(app, schema, prestus_root, subject, tmp_path, monkeypatch,
+                                        pick, expect_target, expect_position):
+    """A Localite XML in Import trajectory: localite mode with placement.localite.file and
+    the chosen series; the viewer shows the positions MATLAB resolved for that series."""
+    from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
+    xml = tmp_path / "TriggerMarkers_Coil0_1.xml"
+    xml.write_text("<TriggerMarkerList/>")
+    shown = {}
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *a, **k: (str(xml), ""))
+    monkeypatch.setattr(QInputDialog, "getItem",
+                        lambda _p, _t, _l, items, *a, **k: (shown.setdefault("items", items)[pick], True))
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: shown.setdefault("info", a[2]))
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: pytest.fail(str(a[2:])))
+    m, page = _page(app, schema, prestus_root, subject, "voxel")
+    m.set("transducer.trans_pos", [1, 2, 3])
+    bridge = _FakeBridge(_localite_answer(xml))
+    page.bridge_getter = lambda: bridge
+    page.saved_config_getter = lambda: str(tmp_path / "study.yaml")
+    page._import_trajectory()                        # manual mode not needed for a Localite file
+    assert bridge.calls[0][1]["action"] == "file_series" and bridge.calls[0][1]["file"] == str(xml)
+    assert len(shown["items"]) == 2 and "L_M1" in shown["items"][0]   # planned point not offered
+    assert m.get("placement.mode") == "localite"
+    assert m.get("placement.localite.file") == str(xml)
+    assert (m.get("placement.localite.target") or None) == expect_target
+    if expect_position is not None:
+        assert m.get("placement.localite.position") == expect_position
+    assert m.get("transducer.trans_pos") in (None, [], "")       # resolved from the file
+    chosen = _localite_answer(xml)["series"][1 + pick]
+    trans, focus = page.positions()
+    np.testing.assert_allclose(trans, pl.prestus_voxel_to_ras(page.t1, chosen["trans_pos"]))
+    np.testing.assert_allclose(focus, pl.prestus_voxel_to_ras(page.t1, chosen["focus_pos"]))
+    assert "Localite" in shown["info"]
+    # another series configured by hand: the imported positions no longer apply
+    m.set("placement.localite.target", "")
+    m.set("placement.localite.position", 1 if pick else 2)
+    page._forget()
+    assert page.positions() == (None, None)
+
+
 def test_placement_undo_redo(app, schema, prestus_root, tmp_path):
+    """The viewer's buttons step through the window's one edit history (Edit ▸ Undo)."""
     import numpy as np
     from prestus_nexus.model import ConfigModel
     from prestus_nexus.session import Session
@@ -228,31 +292,47 @@ def test_placement_undo_redo(app, schema, prestus_root, tmp_path):
     m.set("placement.manual.coordinate_space", "ras")
     w = MainWindow(m, Session(tmp_path / "s.yaml"), prestus_root)
     v = w.pages[VIEWER]
+    assert v.history is w.history
     assert not v.undo_btn.isEnabled() and not v.redo_btn.isEnabled()
     v._write("focus_pos", np.array([1.0, 2.0, 3.0]))
     app.processEvents()                                   # one undo step per action
     v._write("focus_pos", np.array([4.0, 5.0, 6.0]))
     v._write("trans_pos", np.array([0.0, 0.0, -60.0]))   # same action: no extra step
     app.processEvents()
-    assert len(v._undo) == 2 and v.undo_btn.isEnabled()
-    m.set("transducer.freq_hz", 250e3)                   # an edit elsewhere is kept by undo
+    assert len(w.history._undo) == 2 and v.undo_btn.isEnabled()
+    assert w.undo_action.text() == "Undo move focus"
+    m.set("transducer.freq_hz", 250e3)                   # an edit on another tab: the same history
+    v.undo()
+    assert m.get("transducer.freq_hz") != 250e3 and m.get("transducer.focus_pos") == [4.0, 5.0, 6.0]
     v.undo()
     assert m.get("transducer.focus_pos") == [1.0, 2.0, 3.0]
     assert not m.is_overridden("transducer.trans_pos")
-    assert m.get("transducer.freq_hz") == 250e3
-    v.undo()
+    w.undo_action.trigger()                               # the menu and the buttons are one history
     assert not m.is_overridden("transducer.focus_pos") and not v.undo_btn.isEnabled()
     v.redo()
     v.redo()
     assert m.get("transducer.focus_pos") == [4.0, 5.0, 6.0]
-    assert m.get("transducer.trans_pos") == [0.0, 0.0, -60.0] and not v.redo_btn.isEnabled()
+    assert m.get("transducer.trans_pos") == [0.0, 0.0, -60.0] and v.redo_btn.isEnabled()
     v._add_transducer()                                   # adding a transducer undoes too
     app.processEvents()
-    assert m.n_transducers == 2
+    assert m.n_transducers == 2 and not v.redo_btn.isEnabled()
     v.undo()
-    assert m.n_transducers == 1 and m.get("transducer.focus_pos") == [4.0, 5.0, 6.0]
+    assert m.n_transducers == 1 and v.ti == 0 and m.get("transducer.focus_pos") == [4.0, 5.0, 6.0]
     w.dirty = False
     w.close()
+
+
+def test_standalone_viewer_keeps_its_own_history(app, schema):
+    import numpy as np
+    from prestus_nexus.model import ConfigModel
+    m = ConfigModel(schema)
+    m.set("placement.manual.coordinate_space", "ras")
+    v = PlacementPage(m)
+    v._write("focus_pos", np.array([1.0, 2.0, 3.0]))
+    app.processEvents()
+    assert v.undo_btn.isEnabled()
+    v.undo()
+    assert not m.is_overridden("transducer.focus_pos") and v.redo_btn.isEnabled()
 
 
 def test_images_load_in_the_background_and_grid_z_shows_with_two_transducers(

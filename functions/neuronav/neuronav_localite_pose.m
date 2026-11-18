@@ -42,7 +42,7 @@ function [coord_matrix, info] = neuronav_localite_pose(parameters)
 %   info         - struct: .source (file read), .mode ('file'/'automatic'),
 %                  .target (description, may be ''), .series_index
 %
-% See also: LOCALITE_MATRIX_TO_POSITIONS, NEURONAV_INGEST_MARKERS,
+% See also: LOCALITE_MATRIX_TO_POSITIONS, NEURONAV_LOCALITE_FILE_SERIES, NEURONAV_INGEST_MARKERS,
 %           NEURONAV_SELECT_LOCALITE, NEURONAV_RESOLVE_PATHS
 
     lc = struct();
@@ -74,25 +74,8 @@ end
 
 % ======================================================================
 function [M, info] = pose_from_file(file, target, position, seg_len)
-    localite = readstruct(file);
-    if isfield(localite, 'TriggerMarker')
-        markertype = 'TriggerMarkers';
-    elseif isfield(localite, 'Element')
-        markertype = 'GUMMarkers';
-    elseif isfield(localite, 'InstrumentMarker')
-        markertype = 'InstrumentMarker';
-    else
-        error('PRESTUS:localite:unknownFormat', ...
-            'Not a TriggerMarkers, GUMMarkers or InstrumentMarker file: %s', file);
-    end
-    if ~strcmp(markertype, 'TriggerMarkers'), seg_len = []; end
-
-    stats = neuronav_compute_series_statistics(localite, 1, seg_len, markertype);
-    if isempty(stats)
-        error('PRESTUS:localite:noStats', 'No valid marker series found in: %s', file);
-    end
-
-    descr = cellfun(@series_description, stats, 'UniformOutput', false);
+    series = neuronav_localite_file_series(file, seg_len);
+    descr = {series.description};
     if ~isempty(target)
         k = find(strcmp(descr, target), 1);
         if isempty(k)
@@ -102,24 +85,23 @@ function [M, info] = pose_from_file(file, target, position, seg_len)
         end
     else
         k = position;
-        if k < 1 || k > numel(stats)
+        if k < 1 || k > numel(series)
             error('PRESTUS:localite:noSeries', ...
                 'placement.localite.position = %d, but %s has %d series.', ...
-                position, file, numel(stats));
+                position, file, numel(series));
         end
-        if numel(stats) > 1
-            fprintf('[localite] %d series in %s; using series %d.\n', numel(stats), file, k);
+        if numel(series) > 1
+            fprintf('[localite] %d series in %s; using series %d.\n', numel(series), file, k);
         end
     end
 
-    mk = stats{k}.markers(1);
-    if isfield(mk, 'element_type') && strcmp(mk.element_type, 'EntryTargetPair')
+    if ~series(k).is_pose
         error('PRESTUS:localite:notAPose', ...
             ['Series %d of %s is a planned EntryTargetPair (a target point), not a ' ...
              'recorded instrument pose, and cannot place the transducer.'], k, file);
     end
 
-    M = reshape(squeeze(stats{k}.matrix4d_mean), [4, 4]);
+    M = series(k).matrix;
     info = struct('source', file, 'mode', 'file', 'target', descr{k}, 'series_index', k);
 end
 
@@ -230,14 +212,6 @@ function s = series_of(meta, name)
     s = NaN;
     if isfield(meta, key) && isfield(meta.(key), 'series_index')
         s = meta.(key).series_index;
-    end
-end
-
-function d = series_description(r)
-    d = '';
-    mk = r.markers(1);
-    if isfield(mk, 'description') && ~isempty(mk.description) && ~ismissing(string(mk.description))
-        d = strtrim(char(string(mk.description)));
     end
 end
 

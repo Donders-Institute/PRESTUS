@@ -160,7 +160,7 @@ class HeuristicPage(QWidget):
         info = run_info(self.model)
         if info is None:
             self.stack.show_empty("No heuristic run folder yet",
-                                  "Set the subject, path.sim (or path.placement) and "
+                                  "Set the subject, path.sim (or path.placement), and "
                                   "placement.heuristic.target_name (Settings).")
             return
         run, sid, target = info

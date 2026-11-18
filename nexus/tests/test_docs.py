@@ -55,10 +55,10 @@ def test_doc_mentions_in_help_text_resolve():
 
 
 def test_key_doc_prefers_override_then_section(schema):
-    assert docs.key_doc("grid.mode", schema) == "doc_preproc.md#orientation"
+    assert docs.key_doc("grid.mode", schema) == "doc_head-model.md#orientation"
     assert docs.key_doc("grid.resolution_mm", schema) == docs.section_doc("grid")
     # a key shown on another card (group:) follows that card
-    node = schema.get("simulation.async_grid_mode")
+    node = schema.get("grid.async_layout")
     assert node is not None and node.group == "coupling"
     assert docs.key_doc("simulation.code_type", schema) == docs.section_doc("compute")
 
@@ -73,7 +73,7 @@ def test_tab_and_subtab_docs():
 def test_urls(monkeypatch):
     site, dir_urls = docs.site_settings()
     assert site.startswith("https://") and dir_urls
-    assert docs.doc_url("doc_preproc.md#orientation", offline=False) == f"{site}/doc_preproc/#orientation"
+    assert docs.doc_url("doc_head-model.md#orientation", offline=False) == f"{site}/doc_head-model/#orientation"
     assert docs.doc_url("doc/doc_hpc.md", offline=False) == f"{site}/doc_hpc/"
     local = docs.doc_url("doc_hpc.md", offline=True)
     assert local.startswith("file:") and local.endswith("/doc/doc_hpc.md")
@@ -117,8 +117,8 @@ def test_versioned_urls(monkeypatch):
     monkeypatch.delenv("PRESTUS_DOCS_VERSION", raising=False)
     assert docs.doc_url("doc_hpc.md", offline=False) == f"{site}/doc_hpc/"      # unversioned now
     monkeypatch.setenv("PRESTUS_DOCS_VERSION", "latest")
-    assert docs.doc_url("doc_preproc.md#orientation", offline=False) == \
-        f"{site}/latest/doc_preproc/#orientation"
+    assert docs.doc_url("doc_head-model.md#orientation", offline=False) == \
+        f"{site}/latest/doc_head-model/#orientation"
     monkeypatch.setattr(docs, "DOCS_VERSION", "dev")
     monkeypatch.delenv("PRESTUS_DOCS_VERSION")
     assert docs.doc_url("README.md", offline=False) == f"{site}/dev/"

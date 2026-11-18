@@ -8,7 +8,9 @@ variants keep its head geometry but give the skull layer the homogeneous values 
 file (simulation.uncertainty_<variant>, else the files shipped in config/uncertainty/). The
 histograms come from, in order of preference:
   - the default run's own cache, sub-XXX_<medium>_medium_stats<affix>.json in dir_cache
-    (functions/medium/medium_setup.m), else the newest sub-XXX_*_medium_stats*.json there;
+    (functions/medium/medium_setup.m, written for every model with a skull layer: skull_model
+    'pct', 'ct', or 'layered'; beam_path holds the same distributions on the beam path), else
+    the newest sub-XXX_*_medium_stats*.json there;
   - the prediction sub-XXX_<medium>_pct_prediction<affix>.json that
     pct_predict_skull_properties.m writes without simulating (the "Predict skull properties"
     button, nexus_pct through the bridge).
@@ -28,8 +30,7 @@ from ..bridge import BridgeError, as_list
 from ..model import is_empty
 from ..outputs import dir_output, dir_pct, measured_ct_file, pseudoct_file
 from ..study import sanitize_affix
-from ..uncertainty import VARIANTS, variant_file
-from ..yamlio import load_file
+from ..uncertainty import property_sets
 from . import style
 from .empty_state import EmptyStack
 from .export import subject_stem
@@ -155,10 +156,7 @@ class PctPage(QWidget):
         self.window = window
         self._loaded_for: tuple | None = None
 
-        outer = QVBoxLayout(self)
-        title = QLabel("Skull CT")
-        title.setObjectName("CardTitle")
-        outer.addWidget(title)
+        outer = QVBoxLayout(self)                    # the sub-tab label names the page
         content = QWidget()
         self.stack = EmptyStack(content)
         outer.addWidget(self.stack, 1)
@@ -360,17 +358,8 @@ class PctPage(QWidget):
         return stats_candidates(base / "cache", int(sid), medium, affix)
 
     def _bounds(self) -> dict[str, dict]:
-        """{variant: medium_properties dict} for each readable uncertainty variant file."""
-        root = self.window.prestus_root
-        out = {}
-        for variant in VARIANTS:
-            path = variant_file(self.window.model, root, variant)
-            if path.is_file():
-                try:
-                    out[variant] = load_file(path).get("medium_properties", {}) or {}
-                except Exception:
-                    pass
-        return out
+        """{variant: medium_properties of its bounds, edits included} for each readable variant."""
+        return dict(property_sets(self.window.model, self.window.prestus_root).listed)
 
     def _load_stats(self) -> None:
         if self.canvas is None:

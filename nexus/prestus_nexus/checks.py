@@ -59,7 +59,7 @@ def check_value(node: Node, value: Any) -> str | None:
     if kind == "bool":
         return None if isinstance(value, bool) or is_empty(value) else "must be true or false"
     if kind == "tristate":
-        return None if value is None or isinstance(value, bool) else "must be true, false or ~ (auto)"
+        return None if value is None or isinstance(value, bool) else "must be true, false, or ~ (auto)"
     if kind == "strlist":
         if is_empty(value) or isinstance(value, str):
             return None
@@ -172,7 +172,7 @@ def _subject_issues(model: ConfigModel) -> list[Issue]:
         if is_empty(anat):
             issues.append(Issue("error", "path.anat", "Anatomy folder is required for layered simulations"))
         elif not Path(anat).is_dir():
-            issues.append(Issue("error", "path.anat", "Folder not found"))
+            issues.append(Issue("error", "path.anat", f"Folder not found: {anat}"))
         elif sid is not None:
             hits = resolve_pattern(anat, g("path.t1_pattern") or "", sid)
             if not hits:
@@ -210,7 +210,8 @@ def _subject_issues(model: ConfigModel) -> list[Issue]:
                                     f"PlanTUS needs the SimNIBS mesh {mesh.name}, not found in {m2m.name}"))
         elif is_empty(simnibs):
             issues.append(Issue("error", "startup.simnibs_bin_path",
-                                f"{m2m.name} not found and no SimNIBS path set to run charm"))
+                                f"No SimNIBS segmentation yet ({m2m.name}), and SimNIBS is not set to "
+                                "create it: set the SimNIBS bin folder"))
         else:
             issues.append(Issue("info", "path.seg", f"{m2m.name} not found; charm will run"))
         issues += _simnibs_issues(model, m2m)
@@ -237,7 +238,8 @@ def _simnibs_issues(model: ConfigModel, m2m: Path) -> list[Issue]:
                                  f"Not on this computer, nor among the SimNIBS installs found on {host}: "
                                  "scan the cluster on Medium › Segmentation"))
             elif inst is None:
-                out.append(Issue("error", "startup.simnibs_bin_path", "Folder not found"))
+                out.append(Issue("error", "startup.simnibs_bin_path",
+                                 f"Folder not found: {bin_path}"))
         if inst is not None and inst.supported is False:
             out.append(Issue("error", "startup.simnibs_bin_path",
                              f"SimNIBS {inst.version}: PRESTUS segments with charm from SimNIBS 4 or later"))
@@ -298,7 +300,7 @@ def _worst(*parts: ModeStatus) -> ModeStatus:
     reasons = [p.reason for p in parts if p.state != "ready" and p.reason]
     if state == "ready":
         reasons = [p.reason for p in parts if p.reason]
-    return ModeStatus(state, "; ".join(reasons))
+    return ModeStatus(state, ". ".join(reasons))          # each reason is a sentence
 
 
 def _subject_id(model: ConfigModel) -> int | None:
@@ -310,9 +312,11 @@ def _t1_status(model: ConfigModel) -> ModeStatus:
     g = model.get
     sid, anat = _subject_id(model), g("path.anat")
     if sid is None or is_empty(anat):
-        return ModeStatus("pending", "set subject_id and path.anat to find the T1")
+        return ModeStatus("pending", "Set the subject ID and the anatomical images folder, so the T1 "
+                                     "image can be found")
     if not resolve_pattern(anat, g("path.t1_pattern") or "", sid):
-        return ModeStatus("unavailable", "no T1 matches path.anat / path.t1_pattern")
+        return ModeStatus("unavailable", "No T1 image found: check the anatomical images folder and the "
+                                         "T1 file pattern")
     return ModeStatus("ready")
 
 
@@ -322,7 +326,7 @@ def _segmentation_status(model: ConfigModel, mesh: bool = False) -> ModeStatus:
     sid = _subject_id(model)
     seg_root = g("path.seg") if not is_empty(g("path.seg")) else g("path.anat")
     if sid is None or is_empty(seg_root):
-        return ModeStatus("pending", "set subject_id and path.seg (or path.anat) to find the segmentation")
+        return ModeStatus("pending", "Set the subject ID and the SimNIBS segmentations folder")
     m2m = m2m_dir(seg_root, sid)
     need = [m2m / "final_tissues.nii.gz", m2m / "toMNI" / "MNI2Conform_nonl.nii.gz"]
     if mesh:
@@ -331,10 +335,16 @@ def _segmentation_status(model: ConfigModel, mesh: bool = False) -> ModeStatus:
     if not missing:
         return ModeStatus("ready")
     simnibs = g("startup.simnibs_bin_path")
-    what = f"{m2m.name}: {', '.join(missing)} not found"
+    if "final_tissues.nii.gz" in missing:
+        what = f"No SimNIBS segmentation yet for subject {sid}"
+    elif missing == [f"sub-{sid:03d}.msh"]:
+        what = f"The SimNIBS segmentation has no head mesh (sub-{sid:03d}.msh)"
+    else:
+        what = f"The SimNIBS segmentation is incomplete ({', '.join(missing)} missing)"
     if not is_empty(simnibs) and Path(simnibs).is_dir():
-        return ModeStatus("pending", f"{what}; SimNIBS charm runs first")
-    return ModeStatus("unavailable", f"{what}, and no startup.simnibs_bin_path to run charm")
+        return ModeStatus("pending", f"{what}; SimNIBS charm runs first to create it")
+    return ModeStatus("unavailable", f"{what}, and SimNIBS is not set to create it: set the SimNIBS "
+                                     "bin folder")
 
 
 def _localite_status(model: ConfigModel) -> ModeStatus:
@@ -343,17 +353,23 @@ def _localite_status(model: ConfigModel) -> ModeStatus:
     f = g("placement.localite.file")
     if not is_empty(f):
         return ModeStatus("ready") if Path(str(f)).is_file() else \
-            ModeStatus("pending", "placement.localite.file not found")
+            ModeStatus("pending", f"Localite pose file not found: {f}")
     sid = _subject_id(model)
     if sid is None:
-        return ModeStatus("pending", "set subject_id to find the recorded poses")
+        return ModeStatus("pending", "Set the subject ID, so the recorded poses can be found")
     sub = f"sub-{sid:03d}"
-    if (post := post_root(model)) and (Path(post) / sub).is_dir():
+    post, raw = post_root(model), raw_root(model)
+    if post and (Path(post) / sub).is_dir():
         return ModeStatus("ready", f"ingested poses in {Path(post) / sub}")
-    if (raw := raw_root(model)) and (Path(raw) / sub).is_dir():
+    if raw and (Path(raw) / sub).is_dir():
         return ModeStatus("ready", f"raw exports in {Path(raw) / sub}; ingested on first use")
-    return ModeStatus("unavailable", f"no recorded poses for {sub} (placement.localite.file, "
-                                     "path.localite_post or path.localite_raw)")
+    if not post and not raw:
+        # Nothing says where the poses are yet: a setting of the mode itself, so the
+        # mode stays selectable (see ModeStatus)
+        return ModeStatus("pending", "Set where the recorded Localite poses are: one exported pose file, "
+                                     "the Localite exports folder, or the ingested poses folder")
+    looked = "; ".join(f"{k} = {v}" for k, v in (("path.localite_raw", raw), ("path.localite_post", post)) if v)
+    return ModeStatus("unavailable", f"No recorded poses for subject {sid}: no {sub} folder in {looked}")
 
 
 def _tool_status(model: ConfigModel, mode: str) -> ModeStatus:
@@ -363,14 +379,13 @@ def _tool_status(model: ConfigModel, mode: str) -> ModeStatus:
     if mode == "plantus":
         if is_empty(g("placement.plantus.script_path")) or \
                 (is_empty(g("placement.plantus.env_path")) and is_empty(g("startup.simnibs_bin_path"))):
-            todo.append("set the PlanTUS paths (placement.plantus.script_path; startup.simnibs_bin_path "
-                        "or placement.plantus.env_path)")
+            todo.append("Set the PlanTUS script and its Python environment (or the SimNIBS bin folder)")
         if is_empty(g("placement.plantus.focal_distance_list")):
-            todo.append("set placement.plantus.focal_distance_list / flhm_list")
+            todo.append("Set the focal distances and FLHM values PlanTUS may choose from")
     elif mode == "tus_entry":
         if is_empty(g("placement.tus_entry.script_path")) or is_empty(g("placement.tus_entry.env_path")):
-            todo.append("set the TUS_entry paths (placement.tus_entry.script_path, env_path)")
-    return ModeStatus("pending", "; ".join(todo)) if todo else ModeStatus("ready")
+            todo.append("Set the TUS_entry script and its R environment")
+    return ModeStatus("pending", ". ".join(todo)) if todo else ModeStatus("ready")
 
 
 # Settings placement_mode_status reads. Its answer is reused for _STATUS_TTL_S while
@@ -428,7 +443,10 @@ def placement_issues(model: ConfigModel) -> list[Issue]:
     mode = g("placement.mode") or "manual"
     st = placement_mode_status(model).get(mode)
     if st is not None and st.state == "unavailable":
-        issues.append(Issue("error", "placement.mode", f"'{mode}' cannot run: {st.reason}"))
+        from . import labels
+        node = model.schema.get("placement.mode")
+        name = labels.choice(node, mode) if node is not None else mode
+        issues.append(Issue("error", "placement.mode", f"{name} cannot run yet. {st.reason}"))
 
     if mode == "plantus":
         script, env = g("placement.plantus.script_path"), g("placement.plantus.env_path")
@@ -489,7 +507,7 @@ def placement_issues(model: ConfigModel) -> list[Issue]:
         if is_empty(g("placement.tus_entry.target_mask")) and is_empty(g("placement.tus_entry.mni_target_mm")) \
                 and all(is_empty(t.get("focus_pos")) for t in model.effective_transducers()):
             issues.append(Issue("error", "placement.tus_entry.mni_target_mm",
-                                "Set the target: target_mask, mni_target_mm or transducer.focus_pos"))
+                                "Set the target: target_mask, mni_target_mm, or transducer.focus_pos"))
         lo, hi = g("placement.tus_entry.minimal_distance_cm"), g("placement.tus_entry.maximal_distance_cm")
         if _is_num(lo) and _is_num(hi) and lo >= hi:
             issues.append(Issue("error", "placement.tus_entry.maximal_distance_cm",
@@ -540,11 +558,10 @@ def rule_issues(model: ConfigModel) -> list[Issue]:
         issues.append(Issue("error", "modules.run_transducer_placement",
                             f"coordinate_space '{cs}' needs the placement stage to convert positions"))
 
-    # load_transducer_parameters.m: one frequency for all transducers
+    # load_transducer_parameters.m (151-157): transducers at different frequencies run as
+    # separate single-frequency simulations (async: in turn; coherent: together), so mixed
+    # frequencies are allowed
     txs = model.effective_transducers()
-    freqs = {t.get("freq_hz") for t in txs if _is_num(t.get("freq_hz"))}
-    if len(freqs) > 1:
-        issues.append(Issue("error", "transducer.freq_hz", "All transducers must use the same frequency"))
 
     # load_parameters.m (restore_struct_arrays): identical fields in every element
     first_keys = set(txs[0].keys())
@@ -732,13 +749,29 @@ def grid_issues(model: ConfigModel) -> list[Issue]:
 
 
 def uncertainty_issues(model: ConfigModel) -> list[Issue]:
-    """uncertainty_pipeline.m errors when a variant's medium file is missing (configNotFound)."""
+    """uncertainty_medium_layer.m errors on a missing bounds file or an invalid edit
+    (badOverride); edited bounds are a warning, as uncertainty_pipeline.m logs (editedBounds)."""
     if model.get("simulation.uncertainty") is not True:
         return []
-    from .uncertainty import VARIANT_SHORT, property_sets
+    if str(model.get("simulation.medium") or "") == "water":      # uncertainty_pipeline.m
+        return [Issue("error", "simulation.uncertainty",
+                      "Uncertainty analysis does not apply to free water: the variants change tissue "
+                      "properties only. Turn it off, or choose a layered or phantom medium.")]
+    from .uncertainty import OVERRIDES_KEY, VARIANT_SHORT, override_errors, property_sets
+    issues = [Issue("error", OVERRIDES_KEY, f"Edited uncertainty bounds: {why}") for why in override_errors(model)]
+    if issues:
+        return issues
     sets = property_sets(model, model.schema.toolbox_path.parent.parent)
-    return [Issue("error", f"simulation.uncertainty_{variant}", f"{VARIANT_SHORT[variant]} variant: {why}")
-            for variant, why in sets.errors.items()]
+    issues = [Issue("error", "simulation.uncertainty", f"{VARIANT_SHORT[variant]} variant: {why}")
+              for variant, why in sets.errors.items()]
+    n = sets.n_edits()
+    if n:
+        which = ", ".join(VARIANT_SHORT[v] for v in sets.edits)
+        issues.append(Issue("warning", OVERRIDES_KEY,
+                            f"{n} uncertainty bound value{'s' if n != 1 else ''} edited ({which}): these "
+                            "variants no longer bracket the ITRUSST tissue-property bounds; report the "
+                            "values you used"))
+    return issues
 
 
 def drive_issues(model: ConfigModel) -> list[Issue]:
@@ -938,6 +971,12 @@ def elastic_issues(model: ConfigModel) -> list[Issue]:
                   f"{cs / (f * need) * 1e3:.2f} mm or finer")]
 
 
+def sequence_issues(model: ConfigModel) -> list[Issue]:
+    """A sonication sequence (sequence.py) that cannot run as planned automatically."""
+    from .sequence import sequence_issues as _seq
+    return _seq(model)
+
+
 def all_issues(model: ConfigModel) -> list[Issue]:
     order = {"error": 0, "warning": 1, "info": 2}
     issues = (value_issues(model) + model.unknown_keys()
@@ -945,5 +984,6 @@ def all_issues(model: ConfigModel) -> list[Issue]:
               + library_issues(model) + isppa_issues(model) + defaults_issues(model)
               + uncertainty_issues(model) + grid_issues(model) + drive_issues(model)
               + followup_issues(model)
-              + multitransducer_issues(model) + heating_issues(model) + elastic_issues(model))
+              + multitransducer_issues(model) + heating_issues(model) + elastic_issues(model)
+              + sequence_issues(model))
     return sorted(issues, key=lambda i: order.get(i.level, 3))

@@ -1,12 +1,14 @@
-"""Medium-property sets of the uncertainty variants (functions/core/uncertainty_medium_config.m).
+"""Medium-property sets of the uncertainty variants (functions/uncertainty/uncertainty_medium_layer.m).
 
 With simulation.uncertainty on, PRESTUS runs the default medium and four variants in two pairs
 (functions/uncertainty/uncertainty_variants.m). Temp-H / Temp-L take, per property, the ITRUSST
 bound that maximises / minimises brain heating. Trans-H / Trans-L take, per acoustic property,
 the bound that maximises / minimises brain intensity; they run acoustic only, so their files
-list no thermal properties. Each variant's file is merged onto the run's config
-(uncertainty_pipeline.m, make_sim_params), so a tissue or property the file does not list keeps
-its medium_properties value.
+list no thermal properties. Each variant takes the shipped ITRUSST bounds
+(config/uncertainty/config_medium_<variant>.yaml) with the study's edits in
+simulation.uncertainty_overrides merged on top, and that layer is merged onto the run's config
+(uncertainty_pipeline.m, make_sim_params), so a tissue or property neither lists keeps its
+medium_properties value.
 """
 
 from __future__ import annotations
@@ -53,14 +55,17 @@ ABSORPTION = ("absorption_fraction", "absorption_coeff")
 PLOTTED = ("sound_speed", "density", "attenuation", "thermal_conductivity",
            "specific_heat_capacity", "perfusion", "absorption")
 FALLBACK_MHZ = 0.5          # the ITRUSST property database compares attenuation at 0.5 MHz
+OVERRIDES_KEY = "simulation.uncertainty_overrides"
 
 
 @dataclass
 class PropertySets:
     sets: dict[str, dict] = field(default_factory=dict)      # variant -> {tissue: {prop: value}}
     files: dict[str, Path] = field(default_factory=dict)     # variant -> resolved file
-    listed: dict[str, dict] = field(default_factory=dict)    # variant -> the file's own medium_properties
-    errors: dict[str, str] = field(default_factory=dict)     # variant -> why its file cannot be used
+    listed: dict[str, dict] = field(default_factory=dict)    # variant -> its bounds layer (file + edits)
+    edits: dict[str, dict] = field(default_factory=dict)     # variant -> {tissue: {prop: value}} edited
+    shipped: dict[str, dict] = field(default_factory=dict)   # variant -> the shipped bounds, unedited
+    errors: dict[str, str] = field(default_factory=dict)     # variant -> why it cannot be used
     freq_mhz: float = FALLBACK_MHZ
     freq_from_transducer: bool = False
 
@@ -81,13 +86,24 @@ class PropertySets:
         return None if is_empty(value) else value
 
     def inherited(self, variant: str, tissue: str, prop: str) -> bool:
-        """The variant's value comes from medium_properties, not from its own file."""
+        """The variant's value comes from medium_properties, not from its bounds or edits."""
         own = self.listed.get(variant, {}).get(tissue, {})
         if prop == "attenuation":
             return "alpha_coeff" not in own and "alpha_power" not in own
         if prop in ("absorption", *ABSORPTION):
             return not any(not is_empty(own.get(k)) for k in ABSORPTION)
         return prop not in own
+
+    def edited(self, variant: str, tissue: str, prop: str) -> bool:
+        return prop in self.edits.get(variant, {}).get(tissue, {})
+
+    def bound(self, variant: str, tissue: str, prop: str) -> Any:
+        """The shipped ITRUSST bound (None when the bounds do not list it)."""
+        value = self.shipped.get(variant, {}).get(tissue, {}).get(prop)
+        return None if is_empty(value) else value
+
+    def n_edits(self) -> int:
+        return sum(len(p) for t in self.edits.values() for p in t.values())
 
 
 def absorption_layer(merged: dict, layer: dict) -> dict:
@@ -108,18 +124,59 @@ def attenuation_db_cm(alpha_coeff: Any, alpha_power: Any, f_mhz: float) -> float
         return None
 
 
-def variant_file(model, prestus_root: str | Path, variant: str) -> Path:
-    """The file uncertainty_medium_config.m resolves for a variant."""
-    folder = Path(prestus_root) / "config" / "uncertainty"
-    value = model.get(f"simulation.uncertainty_{variant}")
-    if is_empty(value):
-        return folder / f"config_medium_{variant}.yaml"
-    p = Path(str(value)).expanduser()
-    return p if p.is_absolute() or _is_windows_absolute(str(value)) else folder / p
+def variant_file(prestus_root: str | Path, variant: str) -> Path:
+    """The shipped ITRUSST bounds of a variant."""
+    return Path(prestus_root) / "config" / "uncertainty" / f"config_medium_{variant}.yaml"
 
 
-def _is_windows_absolute(s: str) -> bool:
-    return len(s) > 2 and s[1] == ":" and s[2] in "\\/" or s.startswith("\\")
+def heating(variant: str) -> bool:
+    """uncertainty_variants.m: the Trans variants run acoustic only."""
+    return variant not in PAIRS["trans"]
+
+
+def editable(variant: str, prop: str) -> bool:
+    """A key the edits may set: a config property (not a derived row) the variant uses."""
+    return prop not in ("attenuation", "absorption") and (heating(variant) or prop not in THERMAL)
+
+
+def overrides(model) -> dict:
+    """simulation.uncertainty_overrides as {variant: {tissue: {prop: value}}} ({} when unset)."""
+    value = model.get(OVERRIDES_KEY)
+    return value if isinstance(value, dict) else {}
+
+
+def override_errors(model) -> list[str]:
+    """The checks uncertainty_medium_layer.m makes on simulation.uncertainty_overrides."""
+    errs = []
+    ov = model.get(OVERRIDES_KEY)
+    if not is_empty(ov) and not isinstance(ov, dict):
+        return ["must map variants to tissues and properties"]
+    base = default_properties(model)
+    for variant, tissues in overrides(model).items():
+        if variant not in VARIANTS:
+            errs.append(f"{variant}: not a variant (use {', '.join(VARIANTS)})")
+            continue
+        if not isinstance(tissues, dict):
+            errs.append(f"{variant} must list tissues")
+            continue
+        for tissue, props in tissues.items():
+            if tissue not in base:
+                errs.append(f"{variant}.{tissue}: not a tissue of medium_properties")
+                continue
+            if not isinstance(props, dict):
+                errs.append(f"{variant}.{tissue} must list properties")
+                continue
+            for prop, value in props.items():
+                key = f"{variant}.{tissue}.{prop}"
+                if prop not in base[tissue]:
+                    errs.append(f"{key}: not a medium property")
+                elif isinstance(value, bool) or not isinstance(value, (int, float)):
+                    errs.append(f"{key} must be a number")
+                elif not editable(variant, prop):
+                    errs.append(f"{key}: this variant runs acoustic only, so thermal properties are not used")
+            if all(not is_empty(props.get(k)) for k in ABSORPTION):
+                errs.append(f"{variant}.{tissue} sets both absorption_fraction and absorption_coeff")
+    return errs
 
 
 def default_properties(model) -> dict:
@@ -142,12 +199,26 @@ def transducer_mhz(model) -> float | None:
         return None
 
 
+def signature(model, prestus_root: str | Path) -> tuple:
+    """Changes when the property sets would: bounds files, edits, medium_properties, frequency."""
+    files = []
+    for variant in VARIANTS:
+        f = variant_file(prestus_root, variant)
+        try:
+            files.append((str(f), f.stat().st_mtime))
+        except OSError:
+            files.append((str(f), None))
+    base = repr(sorted((t, sorted(p.items())) for t, p in default_properties(model).items()))
+    return tuple(files), base, repr(model.get(OVERRIDES_KEY)), transducer_mhz(model)
+
+
 def property_sets(model, prestus_root: str | Path) -> PropertySets:
     base = default_properties(model)
     f = transducer_mhz(model)
     out = PropertySets(sets={"default": base}, freq_mhz=f or FALLBACK_MHZ, freq_from_transducer=f is not None)
+    edits = overrides(model)
     for variant in VARIANTS:
-        path = variant_file(model, prestus_root, variant)
+        path = variant_file(prestus_root, variant)
         out.files[variant] = path
         if not path.is_file():
             out.errors[variant] = f"file not found: {path}"
@@ -161,6 +232,12 @@ def property_sets(model, prestus_root: str | Path) -> PropertySets:
         if not isinstance(listed, dict) or not listed:
             out.errors[variant] = f"{path.name} has no medium_properties block"
             continue
+        out.shipped[variant] = listed
+        own = edits.get(variant)
+        if isinstance(own, dict) and own:
+            own = {t: p for t, p in own.items() if isinstance(p, dict) and p}
+            out.edits[variant] = own
+            listed = absorption_layer(mergestruct(listed, own), own)
         out.listed[variant] = listed
         out.sets[variant] = absorption_layer(mergestruct(base, listed), listed)
     return out

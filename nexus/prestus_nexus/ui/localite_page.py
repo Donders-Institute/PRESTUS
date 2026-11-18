@@ -8,6 +8,8 @@ batch summary with each subject's SimNIBS warp.
 
 from __future__ import annotations
 
+import html
+
 import datetime as _dt
 from pathlib import Path
 
@@ -18,11 +20,13 @@ from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFormLayout, QGridLa
                              QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget,
                              QToolButton, QVBoxLayout, QWidget)
 
+from ..labels import plural
 from .. import localite as lc
 from ..bridge import BridgeError, as_floats, as_list
 from . import style
 from .empty_state import EmptyStack
 from .matlab_status import MatlabStatus
+from .tabbar import EmphasisTabBar
 
 try:
     from .mpl_theme import ThemedCanvas as FigureCanvasQTAgg   # drawn in the Nexus theme
@@ -77,9 +81,13 @@ class LocalitePage(QWidget):
         self._idle_status(getattr(bridge, "state", ""))
         outer.addLayout(head)
 
+        # one setting per line: the two folders always, the rest behind a 'more' link
         self.summary = QLabel()
         self.summary.setWordWrap(True)
-        self.summary.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.summary.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse |
+                                             Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        self._summary_open = False
+        self.summary.linkActivated.connect(self._toggle_summary)
         srow = QHBoxLayout()
         srow.addWidget(self.summary, 1)
         edit = QPushButton("Edit settings")
@@ -122,7 +130,7 @@ class LocalitePage(QWidget):
         imp.clicked.connect(self._import)
         row.addWidget(imp)
         batch = QPushButton("Ingest all sessions…")
-        batch.setToolTip("Scan all subjects/sessions, map planned-target labels and ingest many sessions")
+        batch.setToolTip("Scan all subjects/sessions, map planned-target labels, and ingest many sessions")
         batch.clicked.connect(self.open_batch)
         row.addWidget(batch)
         mni = QPushButton("MNI view…")
@@ -141,6 +149,7 @@ class LocalitePage(QWidget):
         self.table.itemChanged.connect(self._series_edited)
         split.addWidget(self.table)
         tabs = QTabWidget()
+        tabs.setTabBar(EmphasisTabBar(tabs))               # the Nexus's tab dividers
         if FigureCanvasQTAgg is not None:
             self.fig_pos = Figure(figsize=(6, 4), layout="constrained")
             self.ax_pos = self.fig_pos.add_subplot(projection="3d")
@@ -201,8 +210,24 @@ class LocalitePage(QWidget):
         self.dev_stack.show_empty(*args)
 
     # ── inputs ──────────────────────────────────────────────────────────
+    SUMMARY_SHOWN = 2       # settings_summary rows always shown (the folders)
+
+    def _show_summary(self) -> None:
+        rows = lc.settings_summary(self.model)
+        shown = rows if self._summary_open else rows[:self.SUMMARY_SHOWN]
+        lines = "".join(f"<tr><td>{k}</td><td style='padding-left:10px'>{html.escape(str(v))}</td></tr>"
+                        for k, v in shown)
+        n_more = len(rows) - self.SUMMARY_SHOWN
+        toggle = ("<a href='fold'>Fewer settings</a>" if self._summary_open
+                  else f"<a href='fold'>{plural(n_more, 'more setting')}</a>") if n_more > 0 else ""
+        self.summary.setText(f"<table>{lines}</table>{toggle}")
+
+    def _toggle_summary(self, _href: str = "") -> None:
+        self._summary_open = not self._summary_open
+        self._show_summary()
+
     def refresh(self) -> None:
-        self.summary.setText(" · ".join(f"<b>{k}:</b> {v}" for k, v in lc.settings_summary(self.model)))
+        self._show_summary()
         if self.sub.count() == 0:
             self._fill_subjects()
         self._check_stale()
@@ -378,7 +403,7 @@ class LocalitePage(QWidget):
             self._status(f"Outputs already exist and io.overwrite_files is 'never': kept {Path(out['xml']).parent}",
                          "amber")
         else:
-            self._status(f"✓ Wrote {out['n_targets']} target(s) to {Path(out['xml']).parent}", "green")
+            self._status(f"✓ Wrote {plural(out['n_targets'], 'target')} to {Path(out['xml']).parent}", "green")
 
     def use_in_study(self) -> None:
         if not self.written or self.snapshot is None:
@@ -573,7 +598,8 @@ class BatchDialog(QDialog):
                 self.labels.setItem(r, c, _item(lab.get(key, "")))
             self.labels.setItem(r, 4, _item(lab.get("target", lab.get("label", "")), editable=True))
         n_sub = len({s.get("sub") for s in sess})
-        self.count.setText(f"{len(sess)} session(s) in {n_sub} subject(s); {len(labs)} distinct planned-target label(s).")
+        self.count.setText(f"{plural(len(sess), 'session')} in {plural(n_sub, 'subject')}; "
+            f"{plural(len(labs), 'distinct planned-target label')}.")
 
     def select(self, mode: str) -> None:
         for r in range(self.sessions.rowCount()):
@@ -726,7 +752,7 @@ class MniDialog(QDialog):
             t.blockSignals(False)
         ok = [r for r in self.rows if not r.get("mni_status")]
         bad = sorted({f"{r.get('sub')} ({r.get('mni_status')})" for r in self.rows if r.get("mni_status")})
-        self.status.setText(f"✓ {len(ok)} target(s) of {len({r.get('sub') for r in ok})} subject(s) mapped."
+        self.status.setText(f"✓ {plural(len(ok), 'target')} of {plural(len({r.get('sub') for r in ok}), 'subject')} mapped."
                             + (f" Not mapped: {'; '.join(bad)}" if bad else ""))
         if self.canvas is not None:
             if ok:

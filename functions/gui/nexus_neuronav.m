@@ -22,11 +22,15 @@ function out = nexus_neuronav(args)
 %     'scan'      -                     session and label tables (batch)
 %     'mni'       .csv, .seg, .template, .head   summary rows in MNI space
 %                 (and the head outline when .head is true)
+%     'file_series' .file               series of one Localite XML export and the
+%                                       transducer/focus voxels each places
+%                                       (Import trajectory, placement.localite.file)
 %
 % Output:
 %   out - struct of plain data per action (see the local functions)
 %
-% See also: NEXUS_BRIDGE, NEURONAV_GUI, NEURONAV_DETECT_SERIES, NEURONAV_INGEST_MARKERS
+% See also: NEXUS_BRIDGE, NEURONAV_GUI, NEURONAV_DETECT_SERIES, NEURONAV_INGEST_MARKERS,
+%           NEURONAV_LOCALITE_FILE_SERIES
 
     p = load_parameters(char(args.config));
     switch char(args.action)
@@ -40,9 +44,43 @@ function out = nexus_neuronav(args)
             out = scan(p);
         case 'mni'
             out = mni(p, args);
+        case 'file_series'
+            out = file_series(p, char(args.file));
         otherwise
             error('nexus_neuronav:action', 'Unknown action ''%s''.', char(args.action));
     end
+end
+
+function out = file_series(p, file)
+% The series of one Localite XML, each with the positions a run places with it:
+% NEURONAV_LOCALITE_FILE_SERIES, then LOCALITE_MATRIX_TO_POSITIONS with the T1
+% header PREPROC_TRANSDUCER_PLACEMENT uses (1-based PRESTUS voxels).
+    seg_len = get_nested(p, {'placement', 'localite', 'expected_segment_length'}, []);
+    [series, markertype] = neuronav_localite_file_series(file, seg_len);
+    t1_header = [];
+    note = '';
+    t1_file = fullfile(p.path.anat, sprintf(p.path.t1_pattern, p.subject_id));
+    if isfile(t1_file)
+        t1_header = niftiinfo(t1_file);
+    else
+        note = sprintf('No T1 at %s: positions are resolved when the run starts.', t1_file);
+    end
+    rows = cell(1, numel(series));
+    for k = 1:numel(series)
+        s = series(k);
+        r = struct('index', s.index, 'description', s.description, 'n_markers', s.n_markers, ...
+            'pos_dev_mm', s.pos_dev_mm, 'is_pose', s.is_pose, 'tracked', s.tracked, ...
+            'trans_pos', [], 'focus_pos', [], 'error', '');
+        if s.is_pose && s.tracked && ~isempty(t1_header)
+            try
+                [r.trans_pos, r.focus_pos] = localite_matrix_to_positions(s.matrix, t1_header, p);
+            catch err
+                r.error = err.message;
+            end
+        end
+        rows{k} = r;
+    end
+    out = struct('file', file, 'markertype', markertype, 'series', {rows}, 'note', note);
 end
 
 function out = sessions(p)

@@ -17,9 +17,11 @@ from pathlib import Path
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from .. import checks
 from ..model import is_empty
 from ..outputs import dir_placement_run
 from .empty_state import EmptyStack
+from .medium_selector import setup_note
 from .plantus_page import run_placement
 
 TASK = "TUS_entry placement"
@@ -91,6 +93,11 @@ class TusEntryPage(QWidget):
         intro.setObjectName("CardSub")
         intro.setWordWrap(True)
         v.addWidget(intro)
+        self.setup = QLabel()                   # what the method still needs (Placement method row)
+        self.setup.setTextFormat(Qt.TextFormat.RichText)
+        self.setup.setWordWrap(True)
+        self.setup.hide()
+        v.addWidget(self.setup)
         bar = QHBoxLayout()
         self.run_btn = QPushButton("Run TUS_entry")
         self.run_btn.setToolTip("Run only the TUS_entry placement (no simulation): in MATLAB here, or as a "
@@ -127,6 +134,9 @@ class TusEntryPage(QWidget):
             self._stale = True
             return
         is_mode = self.model.get("placement.mode") == "tus_entry"
+        note = setup_note(checks.placement_mode_status(self.model).get("tus_entry")) if is_mode else ""
+        self.setup.setText(note)
+        self.setup.setVisible(bool(note))
         self.run_btn.setEnabled(is_mode and not self._waiting)
         if not is_mode:
             self.stack.show_empty("TUS_entry is not the placement method",

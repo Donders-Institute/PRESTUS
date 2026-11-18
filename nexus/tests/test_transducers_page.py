@@ -1,4 +1,4 @@
-"""Placement ▸ Transducers sub-tab, offscreen."""
+"""Transducers overview (Placement ▸ Settings, or a page of its own), offscreen."""
 
 import os
 
@@ -57,7 +57,7 @@ def test_table_tilts_and_mode_change(app, schema):
     assert rows == [1]
 
 
-def test_async_grid_mode_row_follows_coupling(app, schema):
+def test_async_layout_row_follows_coupling(app, schema):
     m = _model(schema)
     page = TransducersPage(m)
     page.refresh()
@@ -66,7 +66,7 @@ def test_async_grid_mode_row_follows_coupling(app, schema):
     page.refresh()
     assert not page.async_row.isHidden()
     page.async_editor.edited.emit("per_transducer")
-    assert m.get("simulation.async_grid_mode") == "per_transducer"
+    assert m.get("grid.async_layout") == "per_transducer"
 
 
 def test_coarse_tilted_beams_are_flagged(app, schema):
@@ -77,3 +77,38 @@ def test_coarse_tilted_beams_are_flagged(app, schema):
     page.refresh()
     assert not page.orient_note.isHidden()
     assert "points per wavelength" in page.orient_note.text()
+
+
+def test_head_sketch_beside_the_table(app, schema):
+    """The sketch shows every positioned transducer, left of the other one here, and hides
+    when no transducer has a position."""
+    m = _model(schema)
+    page = TransducersPage(m)
+    page.refresh()
+    heads = page.sketch.heads
+    assert len(heads) == 2 and not page.sketch.isHidden()
+    assert heads[0][0][0] < heads[1][0][0]               # x 90 is left of x 110 (RAS+)
+    assert not page.sketch.grab().isNull()
+    for ti in range(2):
+        m.reset("transducer.trans_pos", ti)
+    page.refresh()
+    assert page.sketch.isHidden()
+
+
+def test_compact_table(app, schema, prestus_root):
+    """Numbered rows in the sketch colours, the device's short name, units in the headers."""
+    from prestus_nexus.equipment import EquipmentLibrary
+    from prestus_nexus.ui import style
+    m = _model(schema)
+    m.library = EquipmentLibrary(prestus_root)
+    m.set("transducer.serial", "CTX_500_026")
+    page = TransducersPage(m)
+    page.refresh()
+    t = page.table
+    heads = [t.horizontalHeaderItem(c).text() for c in range(t.columnCount())]
+    assert heads[0] == "" and heads[1] == "Transducer" and heads[2] == "Position (vox)"
+    assert [t.item(r, 0).text() for r in range(2)] == ["1", "2"]
+    assert t.item(1, 0).background().color().name().lower() == style.series(1).lower()
+    assert t.item(0, 1).text() == "CTX-500 #026" and "CTX_500_026" in t.item(0, 1).toolTip()
+    assert t.item(0, 2).text() == "90, 100, 150"              # no brackets, unit in the header
+    assert m.transducer_title(1) == "Transducer 2: CTX-500 #026"

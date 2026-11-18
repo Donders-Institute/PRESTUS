@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QHBoxLayout, QLabel, 
 
 from .. import jobs as hpc_jobs
 from . import style
+from .tabbar import EmphasisTabBar
 
 JOB_COLUMNS = ["Job ID", "Name", "State", "Elapsed / limit", "Left", "Where", "Peak memory", "Exit"]
 LOG_TABS = (("output", "Output"), ("error", "Errors"), ("report", "Report"))
@@ -73,11 +74,12 @@ class JobsView(QWidget):
         logs = QWidget()
         lv = QVBoxLayout(logs)
         lv.setContentsMargins(0, 4, 0, 0)
-        self.path_label = QLabel("Select a job to see its output, errors and report.")
+        self.path_label = QLabel("Select a job to see its output, errors, and report.")
         self.path_label.setWordWrap(True)
         self.path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         lv.addWidget(self.path_label)
         self.tabs = QTabWidget()
+        self.tabs.setTabBar(EmphasisTabBar(self.tabs))     # the Nexus's tab dividers
         self.views: dict[str, QPlainTextEdit] = {}
         for key, title in LOG_TABS:
             view = QPlainTextEdit(readOnly=True)
@@ -181,7 +183,7 @@ class JobsView(QWidget):
         job = self.selected_job()
         if job is None:
             self.timer.stop()
-            self.path_label.setText("Select a job to see its output, errors and report.")
+            self.path_label.setText("Select a job to see its output, errors, and report.")
             return
         if self.page.job_kind != "slurm":
             self.path_label.setText("Job logs are shown for SLURM jobs only.")

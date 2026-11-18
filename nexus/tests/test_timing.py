@@ -160,3 +160,73 @@ def test_values_equal_on_screen_are_not_flagged():
     p = tm.Protocol(pd=0.7000000000000001, pri=0.7, ptd=1.4, ptri=2.8, ptrd=5.6, ramp=0.35000000000000003)
     assert p.problems() == []
     assert tm.Protocol(pd=0.71, pri=0.7, ptd=1.4).problems()      # a real excess is still reported
+
+
+# ── async firing schedule (thermal_schedule.m) ──────────────────────────
+
+def test_async_pulses_and_trains_offsets():
+    base = tm.Protocol(pd=0.02, pri=0.2, ptd=1, ptri=4, ptrd=12)
+    s = tm.AsyncSchedule.build(base, "pulses", 3)
+    assert [src.offset for src in s.sources] == pytest.approx([0, 0.2 / 3, 0.4 / 3])
+    assert s.cycle() == pytest.approx(0.4)
+    assert s.problems() == [] and s.overlaps() == []
+    blocks, level = s.blocks(1, s.cycle())
+    assert level == "pulses" and blocks[0] == pytest.approx((0.2 / 3, 0.2 / 3 + 0.02))
+    t = tm.AsyncSchedule.build(base, "trains", 2)
+    assert [src.offset for src in t.sources] == pytest.approx([0, 2])
+    assert t.cycle() == pytest.approx(4)
+    assert t.blocks(0, 4, max_blocks=3)[1] == "trains"           # 5 pulses > 3: drawn as a train
+    # each transducer keeps the timing block's duty cycle (the former async assumption)
+    assert all(src.overall_duty_cycle == pytest.approx(0.025) for src in t.sources)
+
+
+def test_async_schedule_problems_match_thermal_schedule():
+    base = tm.Protocol(pd=0.08, pri=0.2, ptd=1, ptri=4, ptrd=12)
+    assert "needs 3 × PD ≤ PRI" in " ".join(tm.AsyncSchedule.build(base, "pulses", 3).problems())
+    assert "needs 5 × PTD ≤ PTRI" in " ".join(tm.AsyncSchedule.build(base, "trains", 5).problems())
+    ok = tm.Protocol(pd=0.02, pri=0.2, ptd=1, ptri=4, ptrd=12)
+    over = tm.AsyncSchedule.build(ok, "pulses", 2, overrides=[{}, {"pd": 0.04}])
+    assert "only the 'custom' schedule" in over.problems()[0]
+    # custom: same frequency overlap is an error, different frequencies a note
+    same = tm.AsyncSchedule.build(ok, "custom", 2, offsets=[0, 0.01], freqs=[5e5, 5e5])
+    assert same.overlaps() == [(0, 1)] and "interfere" in same.problems()[0]
+    diff = tm.AsyncSchedule.build(ok, "custom", 2, offsets=[0, 0.01], freqs=[5e5, 2.5e5])
+    assert diff.problems() == [] and "different frequencies" in diff.notes()[0]
+    apart = tm.AsyncSchedule.build(ok, "custom", 2, offsets=[0, 0.1],
+                                   overrides=[{}, {"pd": 0.04, "pri": 0.4}], freqs=[5e5, 5e5])
+    assert apart.problems() == [] and apart.sources[1].protocol.pd == 0.04
+    assert apart.sources[1].overall_duty_cycle == pytest.approx(apart.sources[0].overall_duty_cycle)
+
+
+def test_async_lane_in_diagram(schema):
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PyQt6")
+    from PyQt6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from prestus_nexus.model import ConfigModel
+    from prestus_nexus.ui.timing_view import TimingPanel
+    model = ConfigModel(schema)
+    for k, v in {"timing.pd": 0.02, "timing.pri": 0.2, "timing.ptd": 1, "timing.ptri": 3,
+                 "timing.ptrd": 12}.items():
+        model.set(k, v)
+    panel = TimingPanel(model)
+    panel.resize(800, 600)
+    h_single = panel.diagram.height()
+    assert panel.diagram.sched is None
+    for _ in range(3):
+        model.add_transducer()
+    model.set("simulation.transducer_coupling", "async")
+    panel.refresh()
+    d = panel.diagram
+    assert d.sched is not None and d.sched.n == model.n_transducers and d.sched.mode == "pulses"
+    assert d.height() == h_single + d._async_h()
+    assert d._async_h() == d.lh + 8 + 4 * d.ROW_H + 6 + d.lh + 10      # one row per transducer
+    panel.show()
+    app.processEvents()
+    d.repaint()
+    assert "overall duty cycle" not in panel.summary.text()     # no async summary line
+    model.set("timing.pd", 0.08)                      # 4 x 80 ms > 200 ms
+    panel.refresh()
+    assert "needs 4 × PD ≤ PRI" in panel.summary.text()
+    panel.close()

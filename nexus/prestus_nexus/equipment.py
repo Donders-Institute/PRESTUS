@@ -29,6 +29,18 @@ class DrivingSystem:
     available_ch: int | None = None
 
 
+def short_serial(serial: str, model: str = "") -> str:
+    """'<model>_<unit>' as '<model> #<unit>' with hyphens for underscores; a serial whose last
+    part is not a number is returned unchanged."""
+    if model and serial.startswith(model + "_"):
+        base, unit = model, serial[len(model) + 1:]
+    else:
+        base, _, unit = serial.rpartition("_")
+        if not base or not unit.isdigit():
+            return serial
+    return f"{base.replace('_', '-')} #{unit}"
+
+
 @dataclass
 class Device:
     serial: str
@@ -108,10 +120,11 @@ class Calibration:
     def found(self) -> bool:
         return self.path is not None
 
-    def summary(self) -> str:
+    def summary(self, sep: str = " · ") -> str:
+        """The entry's type, depths, amplitudes and date, joined by `sep` ("<br>" for one per line)."""
         if not self.found:
-            return f"no calibration entry ({self.key}.yaml)"
-        parts = [self.path.name]
+            return "no calibration entry"
+        parts = ["DS-agnostic entry"] if self.fallback else []
         if self.calibration_type:
             parts.append(self.calibration_type)
         if self.depths_mm:
@@ -120,7 +133,22 @@ class Calibration:
             parts.append("amplitude at " + ", ".join(f"{i:g}" for i in self.intensities) + " W/cm²")
         if self.updated:
             parts.append(f"updated {self.updated}")
-        return " · ".join(parts)
+        return sep.join(parts) or "calibration entry"
+
+    def short(self) -> str:
+        """One line: the entry's type and calibrated depths (summary() has the rest)."""
+        if not self.found:
+            return "no calibration entry"
+        parts = ["DS-agnostic entry"] if self.fallback else []
+        if self.calibration_type:
+            parts.append(self.calibration_type)
+        if self.depths_mm:
+            parts.append(f"{min(self.depths_mm):g}–{max(self.depths_mm):g} mm")
+        return " · ".join(parts) or "calibration entry"
+
+    def file_note(self) -> str | Path:
+        """For a FileBadge: the entry used, or the file looked for."""
+        return self.path if self.found else f"none (looked for {self.key}.yaml)"
 
     def at_depth(self, focal_distance_ep_mm: float) -> DepthStatus | None:
         """Coverage of this entry at a given depth: in/out of the calibrated range, the
@@ -161,6 +189,7 @@ class EquipmentLibrary:
         self.equipment_dir = self.root / "config" / "equipment"
         self.calibration_dir = self.root / "config" / "calibration"
         self.devices: dict[str, Device] = {}
+        self.driving_systems: dict[str, dict] = {}   # serial -> driving-system entry (shipped and own)
         self.user_folders: tuple[Path, ...] = ()
         self._shipped_entries: dict[str, Any] | None = None
         self._load()
@@ -173,6 +202,11 @@ class EquipmentLibrary:
         if folders == self.user_folders:
             return
         self.user_folders = folders
+        self.devices = {}
+        self._load()
+
+    def reload(self) -> None:
+        """Read your own libraries again (after the equipment editor wrote to them)."""
         self.devices = {}
         self._load()
 
@@ -201,6 +235,7 @@ class EquipmentLibrary:
         entries = {**self._shipped_entries, **self._user_entries()}
         drivers = {str(d["serial"]): d for d in entries.values()
                    if isinstance(d, dict) and d.get("type") == "driving_system" and "serial" in d}
+        self.driving_systems = drivers
         for name, data in sorted(entries.items()):
             if not isinstance(data, dict) or data.get("type") != "transducer" or "serial" not in data:
                 continue
@@ -230,6 +265,7 @@ class EquipmentLibrary:
             dev.max_foc = base.max_foc if dev.max_foc is None else dev.max_foc
             dev.n_elem = base.n_elem if dev.n_elem is None else dev.n_elem
             dev.manufact = dev.manufact or base.manufact
+        self.devices = models_first(self.devices)
 
     def _read_entries(self) -> dict[str, Any]:
         """relative path -> parsed YAML of every config/equipment YAML, subfolders included
@@ -286,6 +322,17 @@ class EquipmentLibrary:
         models = [s for s, d in self.devices.items() if d.model == s and serial.startswith(s + "_")]
         return max(models, key=len) if models else None
 
+    def short_name(self, serial: Any) -> str:
+        """A compact name for a library transducer or driving system: its model, then its unit
+        number ('CTX_500_026' -> 'CTX-500 #026', 'SC_203_035' -> 'SC-203 #035'). Serials the
+        library does not know are returned as they are."""
+        serial = str(serial) if serial else ""
+        if not serial or (self.lookup(serial) is None and serial not in self.driving_systems):
+            return serial
+        dev = self.lookup(serial)
+        model = dev.model if dev is not None and dev.model and dev.model != serial else ""
+        return short_serial(serial, model)
+
     def lookup(self, serial: Any) -> Device | None:
         """The device PRESTUS uses for a serial: its own entry, else its model's."""
         model = self.model_for(serial)
@@ -319,6 +366,15 @@ class EquipmentLibrary:
             if path is not None:
                 return self._describe(path, key, fallback)
         return Calibration(path=None, key=key)
+
+    def calibrated_combos(self, serial: str, library_path: str | None = None) -> list[str]:
+        """The driving systems listed for serial that have their own calibration entry
+        (no fallback to the driving-system-agnostic <serial>.yaml)."""
+        dev = self.get(serial)
+        if dev is None:
+            return []
+        return [ds for ds in dev.combos
+                if (c := self.calibration(serial, ds, library_path)).found and not c.fallback]
 
     def profile_file(self, rel: str | None, serial: str | None = None) -> Path | None:
         """A char_data_path resolved as resolve_profile_file.m: absolute as is, else in
@@ -366,6 +422,28 @@ class EquipmentLibrary:
         isppa = amp_by_depth.get("isppa_wcm2")
         cal.amplitude_isppa_wcm2 = _float(isppa, None)
         return cal
+
+
+def model_of(serial: str, model: str, file: str | Path, serials) -> str:
+    """The model entry a device is listed under, as load_equipment_config.m: its 'model'
+    field, else its shipped model-<MODEL> folder, when that names a library entry; else
+    the device itself."""
+    if model and model in serials:
+        return model
+    folder = Path(file).parent.name if file else ""
+    if folder.startswith("model-") and folder[len("model-"):] in serials:
+        return folder[len("model-"):]
+    return serial
+
+
+def models_first(devices: dict[str, Device]) -> dict[str, Device]:
+    """Devices with each model entry listed before its units (unit entries of one model
+    follow it in load order); models keep the order in which their first entry loaded."""
+    groups: dict[str, list[str]] = {}
+    for serial, dev in devices.items():
+        groups.setdefault(model_of(serial, dev.model, dev.file, devices), []).append(serial)
+    return {s: devices[s] for g, members in groups.items()
+            for s in sorted(members, key=lambda s: s != g)}
 
 
 def library_entry_file(folder: str | Path, key: str) -> Path | None:

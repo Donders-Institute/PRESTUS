@@ -140,10 +140,7 @@ class BeamPage(QWidget):
         self._gap_line = False
         self._rows: dict[str, list] = {}
 
-        v = QVBoxLayout(self)
-        title = QLabel("Beam axis")
-        title.setObjectName("CardTitle")
-        v.addWidget(title)
+        v = QVBoxLayout(self)                        # the sub-tab label names the page
         content = QWidget()
         cv = QVBoxLayout(content)
         cv.setContentsMargins(0, 0, 0, 0)

@@ -4,6 +4,8 @@ uncertainty cases have MATLAB counterparts in
 tests/test_uncertainty_nesting.m (predictOutputsNested) — if one side changes,
 the other should too."""
 
+import pytest
+
 from prestus_nexus.model import ConfigModel
 from prestus_nexus.predict_outputs import predict, save_summary
 
@@ -26,8 +28,28 @@ def test_single_mode(schema):
     assert plan.nested == ""
     names = [a.name for a in plan.artifacts]
     assert names == ["sub-003_layered.csv", "sub-003_layered_report.html",
-                      "sub-003_layered_targeting.csv"]
+                      "sub-003_layered_targeting.csv", "sub-003_layered_segmentation_report.html",
+                      "sub-003_placement_manual.html"]
     assert len(plan.jobs) == 1
+
+
+@pytest.mark.parametrize("medium", ["layered", "water", "phantom"])
+@pytest.mark.parametrize("debug", [0, 1])
+@pytest.mark.parametrize("seg_report", [0, 1])
+@pytest.mark.parametrize("debug_report", [0, 1])
+def test_single_mode_diagnostic_reports(schema, medium, debug, seg_report, debug_report):
+    # The segmentation report needs a layered medium and report.segmentation;
+    # the debug report needs simulation.debug and report.debug
+    m = _base(schema)
+    m.set("simulation.medium", medium)
+    m.set("simulation.debug", debug)
+    m.set("report.segmentation", seg_report)
+    m.set("report.debug", debug_report)
+    names = [a.name for a in predict(m).artifacts]
+    seg = f"sub-003_{medium}_segmentation_report.html"
+    dbg = f"sub-003_{medium}_debug_report.html"
+    assert (seg in names) == (medium == "layered" and seg_report == 1)
+    assert (dbg in names) == (debug == 1 and debug_report == 1)
 
 
 def test_single_mode_water_has_no_targeting(schema):
@@ -35,7 +57,7 @@ def test_single_mode_water_has_no_targeting(schema):
     m.set("simulation.medium", "water")
     plan = predict(m)
     names = [a.name for a in plan.artifacts]
-    assert len(names) == 2
+    assert len(names) == 3   # csv, report, placement report
     assert not any("targeting" in n for n in names)
 
 
@@ -204,3 +226,35 @@ def test_save_summary_reflects_flags(schema):
     text = "\n".join(save_summary(m))
     assert "✓ acoustic matrices" in text
     assert "Debug diagnostics (simulation.debug): ON" in text
+
+
+@pytest.mark.parametrize("mode", ["manual", "localite", "heuristic", "mni", "plantus", "tus_entry", "MNI"])
+@pytest.mark.parametrize("stage", [0, 1])
+@pytest.mark.parametrize("report", [0, 1, None])
+def test_single_mode_placement_report(schema, mode, stage, report):
+    # preproc_transducer_placement.m writes sub-XXX_placement_<mode><affix>.html with the
+    # placement stage on and placement.report on or empty; the mode is lower-cased
+    m = _base(schema)
+    m.set("io.output_affix", "cond")
+    m.set("placement.mode", mode)
+    m.set("modules.run_transducer_placement", stage)
+    m.set("placement.report", report)
+    names = [a.name for a in predict(m).artifacts]
+    expected = f"sub-003_placement_{mode.lower()}_desc-cond.html"
+    assert (expected in names) == (stage == 1 and report in (1, None))
+    assert sum("_placement_" in n for n in names) == (1 if expected in names else 0)
+
+
+@pytest.mark.parametrize("medium", ["layered", "water"])
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize("backend", ["kwave", "jwave", "babelbrain"])
+def test_single_mode_time_reversal_tables(schema, medium, enabled, backend):
+    # time_reversal_stage.m writes its CSVs next to the metrics CSV; BabelBrain skips the stage
+    m = _base(schema)
+    m.set("simulation.medium", medium)
+    m.set("time_reversal.enabled", enabled)
+    m.set("acoustic_backend", backend)
+    names = [a.name for a in predict(m).artifacts]
+    tr = [f"sub-003_{medium}_timereversal_summary.csv", f"sub-003_{medium}_timereversal_elements.csv"]
+    on = enabled and backend != "babelbrain"
+    assert all((n in names) == on for n in tr)

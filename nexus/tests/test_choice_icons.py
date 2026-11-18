@@ -19,6 +19,15 @@ def test_choice_icon_entries_are_valid(schema):
                     assert name in names, f"{section}: {path}.{choice}: unknown drawing {name!r}"
 
 
+def test_choice_label_entries_are_valid(schema):
+    for path, per_choice in schema.choice_label_rules.items():
+        node = schema.get(path)
+        assert node is not None and node.choices, f"choice_labels: {path} is not a choice key"
+        assert set(per_choice) == set(node.choices), f"choice_labels: {path} must label exactly its choices"
+        for choice, text in per_choice.items():
+            assert isinstance(text, str) and text.strip(), f"choice_labels: {path}.{choice!r} is not text"
+
+
 def test_every_drawing_is_used(schema):
     used = {n for rules in schema.choice_icon_rules.values() for n in rules.values()}
     used |= {n for rules in schema.choice_figure_rules.values() for ns in rules.values() for n in ns}
@@ -78,10 +87,37 @@ def test_choice_editor_shows_icons_and_figures(app, schema):
     assert len([ed.figures.itemAt(i).widget() for i in range(ed.figures.count())
                 if ed.figures.itemAt(i).widget() is not None]) == 2
 
+    from prestus_nexus.schema import Node
+    plain = ChoiceEditor(Node(path="x", choices=["a", "b"]))
+    plain.set_value("a", "a")                                    # no labels: the raw values
+    assert [plain.combo.itemText(i) for i in range(plain.combo.count())] == ["a", "b"]
+
     plain = ChoiceEditor(schema.get("simulation.precision"))     # no icons configured
     plain.set_value("single", "single")
     assert all(plain.combo.itemIcon(i).isNull() for i in range(plain.combo.count()))
     assert plain.figures.count() == 0
+
+
+def test_choice_editor_shows_labels_and_writes_values(app, schema):
+    from PyQt6.QtCore import Qt
+    from prestus_nexus.ui.fields import ChoiceEditor
+    ed = ChoiceEditor(schema.get("simulation.code_type"))
+    ed.set_value("matlab_gpu", "matlab_gpu")
+    assert ed.combo.currentText() == "MATLAB, GPU"
+    i = ed._items.index("cpp_mlx")
+    tip = ed.combo.itemData(i, Qt.ItemDataRole.ToolTipRole)
+    assert "<code>cpp_mlx</code>" in tip
+    beam = ChoiceEditor(schema.get("grid.water_baseline_grid"))     # the item's help line too
+    beam.set_value("beam", "beam")
+    assert "fraction of the cost" in beam.combo.itemData(0, Qt.ItemDataRole.ToolTipRole)
+    got = []
+    ed.edited.connect(got.append)
+    ed.combo.setCurrentIndex(i)
+    assert got == ["cpp_mlx"]                                   # the config keeps the value
+
+    flag = ChoiceEditor(schema.get("modules.run_water_baseline"))   # 0/1 values stay integers
+    flag.set_value(1, "auto")
+    assert flag.combo.currentText() == "Always" and flag._items[flag.combo.currentIndex()] == 1
 
 
 # ── Hover help (ui/tooltip.py) ─────────────────────────────────────────
@@ -100,6 +136,9 @@ def test_help_parse_inline_lists_and_markers():
     from prestus_nexus.ui.tooltip import parse
     blocks = parse("Solver: 'kwave' (default) | 'jwave' (experimental)", ["kwave", "jwave"])
     assert blocks == [("p", "Solver:"), ("items", [("kwave", "", True), ("jwave", "experimental", False)])]
+    # an inline list that opens the line is still split per choice
+    blocks = parse("'a' (one) | 'b' (two)", ["a", "b"])
+    assert blocks == [("items", [("a", "one", False), ("b", "two", False)])]
     # a quoted value that is not a choice stays in the paragraph
     assert parse("e.g.\n'80 mm' in a table", ["peak"])[0][0] == "p"
 
@@ -134,3 +173,22 @@ def test_placement_subtabs_carry_mode_icons(app, schema, tmp_path):
         tabs = bar.parentWidget() if bar is not None and not hasattr(bar, "tabIcon") else bar
         assert not tabs.tabIcon(tabs.indexOf(page)).isNull(), key
     w.close()
+
+
+def test_choice_figure_captions_sit_beside_the_figure(app, schema):
+    """Each figure is a row: picture, then its caption filling the width beside it, and the
+    row never shorter than the picture (a wrapped caption must not clip it)."""
+    from PyQt6.QtWidgets import QHBoxLayout, QLabel
+    from prestus_nexus.ui.fields import ChoiceEditor
+    for key, value in (("simulation.transducer_coupling", "async"), ("grid.mode", "focal_axis"),
+                       ("grid.async_layout", "shared")):
+        ed = ChoiceEditor(schema.get(key))
+        ed.set_value(value, value)
+        cells = [ed.figures.itemAt(i).widget() for i in range(ed.figures.count())]
+        assert cells and all(c is not None for c in cells)
+        for c in cells:
+            assert isinstance(c.layout(), QHBoxLayout)
+            pic, text = (c.layout().itemAt(i).widget() for i in range(2))
+            assert pic.pixmap() is not None and not pic.pixmap().isNull()
+            assert isinstance(text, QLabel) and text.wordWrap() and text.text()
+            assert c.minimumHeight() >= pic.sizeHint().height()

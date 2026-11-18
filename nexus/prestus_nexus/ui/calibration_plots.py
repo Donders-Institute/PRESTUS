@@ -19,6 +19,7 @@ from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import (QButtonGroup, QHBoxLayout, QLabel, QSizePolicy, QStackedLayout,
                              QToolButton, QVBoxLayout, QWidget)
 
+from ..labels import plural
 from . import style
 from .export import PaintedExportable, attach_painted
 
@@ -199,7 +200,7 @@ def summary_text(arrays: dict, study_depths: list[float] | None = None) -> str:
     rng = arrays.get("cal_range")
     n = len(arrays.get("cal_depths") or [])
     if rng:
-        parts.append(f"{n} depth{'s' if n != 1 else ''}, {rng[0]:.1f}–{rng[1]:.1f} mm")
+        parts.append(f"{plural(n, 'depth')}, {rng[0]:.1f}–{rng[1]:.1f} mm")
     med = arrays.get("in_sample_r2_median")
     if med is None:
         r2 = sorted(x for x in arrays.get("fit_r2") or [] if math.isfinite(x))
@@ -296,9 +297,7 @@ class CalibrationCoverage(QWidget):
         v.setSpacing(4)
         bar = QHBoxLayout()
         bar.setSpacing(0)
-        self.title = QLabel()
-        self.title.setObjectName("CardSub")
-        bar.addWidget(self.title, 1)
+        bar.addStretch(1)                           # the device is named by the page's selector
         self.buttons = QButtonGroup(self)
         self.buttons.setExclusive(True)
         self._seg: list[QToolButton] = []
@@ -319,8 +318,9 @@ class CalibrationCoverage(QWidget):
         holder = QWidget()
         holder.setLayout(self.stack)
         holder.setMinimumHeight(height)
+        holder.setMaximumHeight(height)             # a fixed height that fits the page, not all of it
         self._holder, self._height = holder, height
-        holder.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        holder.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.empty = QLabel()
         self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty.setWordWrap(True)
@@ -348,8 +348,7 @@ class CalibrationCoverage(QWidget):
     def set_entry(self, entry: dict | None, study_depths: list[float] | None = None, name: str = "",
                   empty_message: str = "") -> None:
         """Show entry (parsed YAML) against study_depths (mm from the exit plane). With
-        entry None, show empty_message (default: no calibration entry; the geometric model
-        is used)."""
+        entry None, show empty_message (default: no calibration entry)."""
         self.arrays = entry_arrays(entry) if isinstance(entry, dict) else None
         self.study_depths = [float(d) for d in (study_depths or []) if d is not None and math.isfinite(float(d))]
         self.name = name
@@ -362,7 +361,8 @@ class CalibrationCoverage(QWidget):
         entry, path = load_entry(library, serial, ds, library_path)
         name = f"{serial}{' with ' + ds if ds else ''}"
         msg = "" if entry is not None else \
-            (f"No calibration entry for {serial}{' with ' + ds if ds else ''}; the geometric model is used."
+            (f"No calibration entry for {serial}{' with ' + ds if ds else ''}: an annular transducer "
+             "needs one (or phases and amplitude set inline) before it can run."
              if serial else "No transducer selected.")
         self.set_entry(entry, study_depths, name, msg)
         return path
@@ -401,11 +401,10 @@ class CalibrationCoverage(QWidget):
 
     def redraw(self) -> None:
         a = self.arrays
-        self.title.setText(f"<b>{self.name}</b>" if self.name else "")
         for b in self._seg:
             b.setVisible(a is not None and self._has_data())
         if a is None or not self._has_data() or self.canvas is None:
-            msg = self.empty_message or "No calibration entry; the geometric model is used."
+            msg = self.empty_message or "No calibration entry."
             if a is not None and not self._has_data():
                 msg = (f"{self.name or 'This entry'} is a {a.get('calibration_type') or 'geometric'} entry "
                        "without calibrated depths; the geometric model is used.")
@@ -417,7 +416,7 @@ class CalibrationCoverage(QWidget):
             return
         self.stack.setCurrentWidget(self.canvas)
         self._holder.setMinimumHeight(self._height)
-        self._holder.setMaximumHeight(16777215)
+        self._holder.setMaximumHeight(self._height)
         c = style.active()
         self._caption(c)
         fig, ax = self.fig, self.ax
@@ -436,7 +435,7 @@ class CalibrationCoverage(QWidget):
             st = depth_status(a, d)
             parts.append(f"study depth {d:g} mm: <span style='color:{c[STATUS_COLOUR[st]]}'>"
                          f"{STATUS_TEXT[st]}</span>")
-        self.caption.setText(" · ".join(parts))
+        self.caption.setText("<br>".join(parts))     # the entry's coverage, then one line per study depth
 
     def _decorate(self, ax, a: dict, c: dict) -> None:
         """Calibrated range, study depths, axes styling (shared by all views)."""

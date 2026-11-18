@@ -1,4 +1,4 @@
-"""Uncertainty variants: which medium files are used and what each variant's properties are."""
+"""Uncertainty variants: the shipped bounds, the study's edits and what each variant's properties are."""
 
 import pytest
 
@@ -12,21 +12,28 @@ def _shipped(prestus_root, variant):
     return prestus_root / "config" / "uncertainty" / f"config_medium_{variant}.yaml"
 
 
-def test_empty_keys_use_shipped_files(schema, prestus_root):
+def test_variants_use_shipped_bounds(schema, prestus_root):
     m = ConfigModel(schema)
     for variant in unc.VARIANTS:
-        assert unc.variant_file(m, prestus_root, variant) == _shipped(prestus_root, variant)
+        assert unc.variant_file(prestus_root, variant) == _shipped(prestus_root, variant)
     sets = unc.property_sets(m, prestus_root)
     assert not sets.errors and set(sets.sets) == {"default", "temp_high", "temp_low", "trans_high", "trans_low"}
+    assert sets.n_edits() == 0
 
 
-def test_file_name_and_absolute_path(schema, prestus_root, tmp_path):
+def test_edits_merge_onto_shipped_bounds(schema, prestus_root):
     m = ConfigModel(schema)
-    m.set("simulation.uncertainty_temp_low", "my_bounds.yaml")
-    m.set("simulation.uncertainty_trans_high", str(tmp_path / "th.yaml"))
-    assert unc.variant_file(m, prestus_root, "temp_low") == \
-        prestus_root / "config" / "uncertainty" / "my_bounds.yaml"
-    assert unc.variant_file(m, prestus_root, "trans_high") == tmp_path / "th.yaml"
+    m.set(unc.OVERRIDES_KEY, {"temp_high": {"brain": {"sound_speed": 1600, "absorption_coeff": 0.5},
+                                            "skin": {"density": 1200}}})
+    sets = unc.property_sets(m, prestus_root)
+    shipped = load_file(_shipped(prestus_root, "temp_high"))["medium_properties"]
+    assert sets.value("temp_high", "brain", "sound_speed") == 1600
+    assert sets.bound("temp_high", "brain", "sound_speed") == shipped["brain"]["sound_speed"]
+    assert sets.edited("temp_high", "brain", "sound_speed") and sets.n_edits() == 3
+    assert sets.value("temp_high", "brain", "absorption_fraction") is None   # replaced by the edited coeff
+    assert sets.value("temp_high", "skin", "density") == 1200 and not sets.inherited("temp_high", "skin", "density")
+    assert sets.value("temp_low", "brain", "sound_speed") == \
+        load_file(_shipped(prestus_root, "temp_low"))["medium_properties"]["brain"]["sound_speed"]
 
 
 def test_variant_values_merge_onto_default(schema, prestus_root):
@@ -67,18 +74,24 @@ def test_attenuation_at_transducer_frequency(schema, prestus_root):
         pytest.approx(brain["alpha_coeff"] * 0.25 ** brain["alpha_power"])
 
 
-def test_missing_or_invalid_file_is_an_issue(schema, prestus_root, tmp_path):
+def test_edits_are_checked_and_warned(schema, prestus_root):
     m = ConfigModel(schema)
-    m.set("simulation.uncertainty_trans_low", str(tmp_path / "missing.yaml"))
+    m.set(unc.OVERRIDES_KEY, {"temp_high": {"brain": {"sound_speed": 1600}}})
     assert checks.uncertainty_issues(m) == []                     # uncertainty off: not used
     m.set("simulation.uncertainty", True)
-    bad = tmp_path / "bad.yaml"
-    bad.write_text("grid:\n  resolution_mm: 1\n")
-    m.set("simulation.uncertainty_temp_high", str(bad))
-    found = {(i.path, i.level): i.message for i in checks.uncertainty_issues(m)}
-    assert "file not found" in found[("simulation.uncertainty_trans_low", "error")]
-    assert found[("simulation.uncertainty_trans_low", "error")].startswith("Trans-L variant")
-    assert "no medium_properties" in found[("simulation.uncertainty_temp_high", "error")]
+    issues = checks.uncertainty_issues(m)
+    assert [(i.level, i.path) for i in issues] == [("warning", unc.OVERRIDES_KEY)]
+    assert "1 uncertainty bound value edited (Temp-H)" in issues[0].message
+    # uncertainty_medium_layer.m: badOverride
+    for bad, why in (({"liberal": {"brain": {"density": 1}}}, "not a variant"),
+                     ({"temp_high": {"brainz": {"density": 1}}}, "not a tissue"),
+                     ({"temp_high": {"brain": {"densty": 1}}}, "not a medium property"),
+                     ({"temp_high": {"brain": {"density": "x"}}}, "must be a number"),
+                     ({"trans_high": {"brain": {"perfusion": 1}}}, "acoustic only"),
+                     ({"temp_high": {"brain": {"absorption_coeff": 1, "absorption_fraction": 1}}}, "both")):
+        m.set(unc.OVERRIDES_KEY, bad)
+        issues = checks.uncertainty_issues(m)
+        assert [i.level for i in issues] == ["error"] and why in issues[0].message, bad
 
 
 def test_pct_band_and_fraction_outside(schema, prestus_root):
@@ -164,3 +177,12 @@ def test_pct_constant_mapping_draws_one_bar_and_counts_exactly():
 def test_bridge_allows_nexus_pct():
     from prestus_nexus.bridge import ALLOWED
     assert "nexus_pct" in ALLOWED
+
+
+def test_stats_title_names_the_skull_model():
+    from pathlib import Path
+    from prestus_nexus.ui.pct_page import stats_title
+    f = Path("sub-001_layered_medium_stats.json")
+    assert "layered skull of the default run" in stats_title({"skull_model": "layered", "n_voxels": 9}, f)
+    assert "mapped skull of the default run" in stats_title({"skull_model": "pct", "n_voxels": 9}, f)
+    assert "mapped skull" in stats_title({"n_voxels": 9}, f)          # files written before skull_model

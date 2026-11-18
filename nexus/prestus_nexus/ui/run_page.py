@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import copy
 import html
+import shlex
 from concurrent.futures import Future, ThreadPoolExecutor
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from PyQt6.QtCore import QObject, QProcess, QProcessEnvironment, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QTextCursor
@@ -19,6 +20,8 @@ from .. import jobs as hpc_jobs
 from .. import launcher
 from .. import proctree
 from .. import remote as rmt
+from .. import sequence as sq
+from ..labels import plural
 from ..model import ConfigModel
 from . import icons, style
 from .jobs_view import JobsView, JobsWindow
@@ -118,14 +121,14 @@ class RunPage(QWidget):
         form.addRow("Remote PRESTUS", self.r_root)
         self.b_connect = QPushButton("Connect…")
         self.b_connect.setToolTip(
-            "Log in once with your password; submits, status checks and cancels reuse this "
+            "Log in once with your password; submits, status checks, and cancels reuse this "
             f"connection until it has been idle for {rmt.CONTROL_PERSIST}. Not needed with an SSH key."
             if rmt.sharing_supported() else "Connection sharing needs OpenSSH on macOS/Linux; use an SSH key.")
         self.b_connect.clicked.connect(self.connect_ssh)
         self.b_disconnect = QPushButton("Disconnect")
         self.b_disconnect.clicked.connect(self.disconnect_ssh)
         self.b_probe = QPushButton("Test connection")
-        self.b_probe.setToolTip("Report sbatch/qsub, MATLAB and the PRESTUS folder on the host")
+        self.b_probe.setToolTip("Report sbatch/qsub, MATLAB, and the PRESTUS folder on the host")
         self.b_probe.clicked.connect(self.test_connection)
         self.r_status = QLabel()
         conn_row = QHBoxLayout()
@@ -345,8 +348,13 @@ class RunPage(QWidget):
         r = self._remote()
         if r is None or not self._ready(need_matlab=False):
             return
-        mapped, unmapped = rmt.path_overrides(self.model, r)
-        options = self._pipeline_options()
+        target = self._launch_target()
+        if target is None:
+            return
+        study, options = target
+        run_model = self.model if study == self.model.path else \
+            ConfigModel.from_file(self.model.schema, study, self.model.library)
+        mapped, unmapped = rmt.path_overrides(run_model, r)
         seq_over: dict = {}
         for cfg in options.sequential_configs:
             p = Path(cfg).resolve()
@@ -365,7 +373,7 @@ class RunPage(QWidget):
                 "\n\nSubmit anyway?") != QMessageBox.StandardButton.Yes:
             return
         try:
-            argv = rmt.submit_command(r, self.model.path, self.window.prestus_root, mapped,
+            argv = rmt.submit_command(r, study, self.window.prestus_root, mapped,
                                       options=options, sequential_overrides=seq_over)
         except rmt.PathMapError as e:
             QMessageBox.warning(self, "SSH", f"{e}.\nThe study folder (and PRESTUS, unless a remote "
@@ -377,6 +385,21 @@ class RunPage(QWidget):
             self._append(f"  {key} → {value}  (on the cluster)", "#777")
 
     # ── helpers ─────────────────────────────────────────────────────────
+    def _launch_target(self) -> tuple[Path, launcher.PipelineOptions] | None:
+        """The config to run and its pipeline options: a sonication sequence simulated as a
+        chain runs its generated step 1 with the other steps as its sequential chain
+        (sequence.launch_target). None after telling the user why it cannot run."""
+        try:
+            study, options, notes = sq.launch_target(
+                self.model, self._pipeline_options(),
+                sq.load_backend(self.window.session, self.model.path))
+        except sq.SequenceError as e:
+            QMessageBox.warning(self, "Sonication sequence", str(e))
+            return None
+        for note in notes:
+            self._append(note, "#777")
+        return study, options
+
     def _pipeline_options(self):
         """Pipeline options stored for this study (Run tab ▸ Pipeline options)."""
         return launcher.load_options(self.window.session, self.model.path)
@@ -479,8 +502,11 @@ class RunPage(QWidget):
     def write_launcher(self) -> Path | None:
         if not self._ready(need_matlab=False):
             return None
-        path = launcher.write_launcher(self.model.path, self.window.prestus_root,
-                                       options=self._pipeline_options())
+        target = self._launch_target()
+        if target is None:
+            return None
+        study, options = target
+        path = launcher.write_launcher(study, self.window.prestus_root, options=options)
         self.status.setText(f"Launcher written: <tt>{path}</tt> — run it in MATLAB with "
                             f"<tt>run('{path}')</tt>")
         return path
@@ -494,7 +520,7 @@ class RunPage(QWidget):
     def run(self) -> None:
         errors = [i for i in self.window.issues if i.level == "error"]
         if errors and QMessageBox.question(
-                self, "Run", f"{len(errors)} error(s) in the Issues panel. Run anyway?") \
+                self, "Run", f"{plural(len(errors), 'error')} in the Issues panel. Run anyway?") \
                 != QMessageBox.StandardButton.Yes:
             return
         if self.model.get("simulation.interactive") == 1:
@@ -525,11 +551,11 @@ class RunPage(QWidget):
         platform = self.model.get("platform")
         if platform == "matlab":
             QMessageBox.warning(self, "Submit", "platform is 'matlab' in this config, which runs "
-                                "locally. Set it to 'auto', 'slurm' or 'qsub' (Setup tab) to submit.")
+                                "locally. Set it to 'auto', 'slurm', or 'qsub' (Setup tab) to submit.")
             return
         errors = [i for i in self.window.issues if i.level == "error"]
         if errors and QMessageBox.question(
-                self, "Submit", f"{len(errors)} error(s) in the Issues panel. Submit anyway?") \
+                self, "Submit", f"{plural(len(errors), 'error')} in the Issues panel. Submit anyway?") \
                 != QMessageBox.StandardButton.Yes:
             return
         if self._remote_on():
@@ -538,9 +564,56 @@ class RunPage(QWidget):
         if not self._ready():
             return
         self.job_remote = None
-        path = launcher.write_submit_launcher(self.model.path, self.window.prestus_root,
-                                              options=self._pipeline_options())
+        target = self._launch_target()
+        if target is None:
+            return
+        study, options = target
+        path = launcher.write_submit_launcher(study, self.window.prestus_root, options=options)
         self._start("Submit", launcher.run_command(self.matlab.text(), path), path.parent)
+
+    def remote_host(self) -> rmt.RemoteHost | None:
+        """The SSH host when Submit goes over SSH (asks for missing fields), else None."""
+        return self._remote() if self._remote_on() else None
+
+    def submit_kwave_drive(self, script: Path, fit_mat: Path, sim_config: Path | None,
+                           remote: rmt.RemoteHost | None = None) -> bool:
+        """Submit a k-Wave drive-check script as a scheduler job (kwave_drive_submit): to this
+        computer's scheduler, or over SSH when remote is given (script written with the host's
+        paths). The job submits one simulation per depth and waits for them on a compute node.
+        Returns whether it started."""
+        if self.proc is not None:
+            QMessageBox.warning(self, "Submit", f"“{self.task}” is still running on the Run tab.")
+            return False
+        script = Path(script)
+        if remote is not None:
+            if not self._ready(need_matlab=False):
+                return False
+            try:
+                r_script, r_mat = remote.to_remote(script), remote.to_remote(fit_mat)
+                r_cfg = remote.to_remote(sim_config) if sim_config else ""
+            except rmt.PathMapError as e:
+                QMessageBox.warning(self, "SSH", f"{e}.")
+                return False
+            body = launcher.kwave_drive_submit_body(r_script, r_mat, r_cfg,
+                                                    remote.remote_root(self.window.prestus_root))
+            r_dir = str(PurePosixPath(r_script).parent)
+            argv = remote.ssh(f"cd {shlex.quote(r_dir)} && {remote.matlab} -batch "
+                              f"{shlex.quote(launcher._wrapped(body))}")
+            self.job_remote = remote
+        else:
+            if self.scheduler is None:
+                QMessageBox.warning(self, "Submit", "No SLURM or qsub scheduler on this computer. "
+                                    "Turn on Submit over SSH (Run tab), or run the script on the cluster.")
+                return False
+            if not self._ready():
+                return False
+            path = launcher.write_kwave_drive_submit(script, fit_mat, sim_config, self.window.prestus_root)
+            argv = launcher.run_command(self.matlab.text(), path)
+            self.job_remote = None
+        self._start("Submit", argv, script.parent)
+        self._append("k-Wave drive check as a job: it submits one free-water simulation per depth "
+                     "and waits for them, then saves the corrected entry.", "#777")
+        return True
 
     def submits_to_cluster(self) -> bool:
         """Whether a run from this page goes to a scheduler (here or over SSH)."""
@@ -561,7 +634,7 @@ class RunPage(QWidget):
             return False
         if self.model.get("platform") == "matlab":
             QMessageBox.warning(self, "Submit", "platform is 'matlab' in this config, which runs "
-                                "locally. Set it to 'auto', 'slurm' or 'qsub' (Setup tab) to submit.")
+                                "locally. Set it to 'auto', 'slurm', or 'qsub' (Setup tab) to submit.")
             return False
         if self._remote_on():
             r = self._remote()
@@ -670,7 +743,7 @@ class RunPage(QWidget):
     def cancel_jobs(self, ids: list[str]) -> None:
         if not ids:
             return
-        if QMessageBox.question(self, "Cancel jobs", f"Cancel job(s) {', '.join(ids)}?") \
+        if QMessageBox.question(self, "Cancel jobs", f"Cancel {'job' if len(ids) == 1 else 'jobs'} {', '.join(ids)}?") \
                 != QMessageBox.StandardButton.Yes:
             return
         if self._jobs_poll is not None:           # after the query in flight
@@ -682,7 +755,7 @@ class RunPage(QWidget):
         if self._jobs_poll is not None:
             QTimer.singleShot(300, lambda: self._cancel_now(ids))
             return
-        self._append(f"Cancelling job(s) {', '.join(ids)} …", "#777")
+        self._append(f"Cancelling {'job' if len(ids) == 1 else 'jobs'} {', '.join(ids)} …", "#777")
         self._jobs_poll = submit_background(hpc_jobs.cancel, ids, self.job_kind, self.job_remote)
         self._relay.deliver("cancel", self._jobs_poll)
 

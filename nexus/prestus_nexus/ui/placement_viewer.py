@@ -3,20 +3,21 @@ transducer and focus, bowl outline and distance checks (manual placement)."""
 
 from __future__ import annotations
 
-import copy
 from pathlib import Path
 
 import numpy as np
 from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QDoubleSpinBox, QFileDialog, QFrame,
-                             QHBoxLayout, QLabel, QMenu, QMessageBox, QPushButton, QSlider,
+                             QHBoxLayout, QInputDialog, QLabel, QMenu, QMessageBox, QPushButton, QSlider,
                              QToolButton, QVBoxLayout, QWidget, QWidgetAction)
 
-from .. import checks, multitransducer as mt, neuronav_import as ni, paths, placement as pl
+from .. import checks, localite as lc, multitransducer as mt, neuronav_import as ni, paths, placement as pl
+from ..bridge import BridgeError, as_floats, as_list
 from ..heuristic_import import candidates as heuristic_candidates, selected as heuristic_selected
 from ..model import TX, ConfigModel, Issue, is_empty
 from ..outputs import dir_placement_run, placement_record
+from ..undo import History
 from . import icons, style
 from .readout import muted, readout, status
 from .empty_state import EmptyStack
@@ -62,11 +63,17 @@ _LEGEND_FRAC = 0.1             # fraction of the figure the marker legend under 
 
 class PlacementPage(QWidget):
     changed = pyqtSignal()
+    transducer_selected = pyqtSignal(int)   # the transducer clicks now edit
     navigate = pyqtSignal(str)        # config key to show (MainWindow.goto), from the empty state
 
-    def __init__(self, model: ConfigModel, parent: QWidget | None = None):
+    def __init__(self, model: ConfigModel, parent: QWidget | None = None, history: History | None = None):
         super().__init__(parent)
         self.position_source = ""         # where a non-manual position came from (banner)
+        # Import trajectory of a Localite XML asks MATLAB for its series (MainWindow sets these)
+        self.bridge_getter = None         # MainWindow.bridge: the shared MATLAB session
+        self.saved_config_getter = None   # saves the study config, returns its path (or None)
+        # (file, ti) -> (target, position, trans voxel, focus voxel) from the last import
+        self._localite_file_pos: dict[tuple[str, int], tuple] = {}
         self.model = model
         self.ti = 0
         self.t1: pl.Volume | None = None
@@ -77,10 +84,7 @@ class PlacementPage(QWidget):
         self._slice_ratio: float | None = None       # ideal slice-row height per pixel of width
 
         self._t1_error = ""                          # why the T1 could not be read, if so
-        v = QVBoxLayout(self)
-        title = QLabel("Placement viewer")
-        title.setObjectName("CardTitle")
-        v.addWidget(title)
+        v = QVBoxLayout(self)                        # the sub-tab label names the page
         content = QWidget()
         cv = QVBoxLayout(content)
         cv.setContentsMargins(0, 0, 0, 0)
@@ -153,23 +157,24 @@ class PlacementPage(QWidget):
         bar.addWidget(self.click_mode)
         bar.addSpacing(10)
 
-        # undo / redo of placement edits (positions, focal depth, mode, FOV, transducers)
-        self._undo: list[dict] = []
-        self._redo: list[dict] = []
-        self._recording = False
+        # undo / redo: the window's edit history (Edit ▸ Undo / Redo), so these buttons and
+        # Ctrl+Z step through edits made on any tab in the order they were made
+        own = history is None
+        self.history = History(model, parent=self) if own else history
+        self.history.changed.connect(self._update_undo_buttons)
+        self.history.restored.connect(self._history_restored)
         self.undo_btn = QPushButton(icons.icon("undo"), "")
-        self.undo_btn.setToolTip("Undo the last placement change (Ctrl+Z)")
         self.undo_btn.clicked.connect(self.undo)
         self.redo_btn = QPushButton(icons.icon("redo"), "")
-        self.redo_btn.setToolTip("Redo (Ctrl+Shift+Z)")
         self.redo_btn.clicked.connect(self.redo)
         for btn, keys in ((self.undo_btn, QKeySequence.StandardKey.Undo),
                           (self.redo_btn, QKeySequence.StandardKey.Redo)):
             btn.setProperty("compact", True)
-            btn.setEnabled(False)
-            sc = QShortcut(QKeySequence(keys), self, btn.click)
-            sc.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+            if own:                        # in the main window, Edit ▸ Undo / Redo own the keys
+                sc = QShortcut(QKeySequence(keys), self, btn.click)
+                sc.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
             bar.addWidget(btn)
+        self._update_undo_buttons()
         bar.addSpacing(10)
 
         b_snap = QPushButton("&Snap to scalp")
@@ -185,8 +190,9 @@ class PlacementPage(QWidget):
                                  "transducer at the focal depth, scalp gap")
         more = QMenu(self.more_btn)
         a_traj = more.addAction("Import trajectory…")
-        a_traj.setToolTip("Read a Brainsight target export (NIfTI coordinates) or a 3D Slicer "
-                          "transform and place focus and transducer from it.")
+        a_traj.setToolTip("Place focus and transducer from a Brainsight target export (NIfTI "
+                          "coordinates), a 3D Slicer transform, or a k-Plan plan; or use a series "
+                          "of a Localite export (localite placement mode; needs MATLAB).")
         a_traj.triggered.connect(self._import_trajectory)
         a_axis = more.addAction("Transducer at focal depth")
         a_axis.setToolTip("Keep the beam direction and put the transducer where the focal depth "
@@ -243,7 +249,7 @@ class PlacementPage(QWidget):
         bar.addWidget(self.view_btn)
         self.coords_btn = QPushButton("&Coordinates…")
         self.coords_btn.setCheckable(True)
-        self.coords_btn.setToolTip("Type RAS, voxel or MNI coordinates to go to or to set the "
+        self.coords_btn.setToolTip("Type RAS, voxel, or MNI coordinates to go to or to set the "
                                    "focus or transducer")
         bar.addWidget(self.coords_btn)
         cv.addLayout(bar)
@@ -313,9 +319,10 @@ class PlacementPage(QWidget):
         body.addWidget(self.info, 1)
         cv.addLayout(body, 1)
         self._body = body
-        hint = QLabel("Click a slice to set the chosen point; scroll to step through slices. "
-                      "Positions are saved to the study config at once. The Beam axis tab shows "
-                      "the medium and the free-water profile along the beam.")
+        # the how-to stays visible; the pointer to the Beam axis tab moves to the tooltip
+        hint = QLabel("Click a slice to set the chosen point; scroll to step through slices.<br>"
+                      "Positions are saved to the study config at once.")
+        hint.setToolTip("The Beam axis tab shows the medium and the free-water profile along the beam.")
         hint.setObjectName("CardSub")
         hint.setWordWrap(True)
         cv.addWidget(hint)
@@ -570,10 +577,13 @@ class PlacementPage(QWidget):
             mode = self.model.get("placement.mode")
             found, self.position_source = (None, None), ""
             if mode == "localite":
-                found, self.position_source = self._localite_positions_for(ti), "neuronav_gui"
+                found = self._localite_positions_for(ti)
+                self.position_source = ("the Localite file import"
+                                        if not is_empty(self.model.get("placement.localite.file"))
+                                        else "neuronav_gui")
             elif mode == "heuristic":
                 found, self.position_source = self._heuristic_positions_for(ti), "transducer_positioning"
-            if found == (None, None) and mode not in ("manual", None, ""):
+            if all(v is None for v in found) and mode not in ("manual", None, ""):
                 found = self._recorded_positions_for(ti)
                 rec = placement_record(self.model)
                 self.position_source = f"the last run's placement stage ({rec.get('created', '')})" \
@@ -609,6 +619,16 @@ class PlacementPage(QWidget):
         return out[0], out[1]
 
     def _localite_positions_for(self, ti: int) -> tuple[np.ndarray | None, np.ndarray | None]:
+        file = self.model.get("placement.localite.file")
+        if not is_empty(file):
+            # placement.localite.file: the positions the import got from MATLAB, while the
+            # series chosen then is still the one configured
+            hit = self._localite_file_pos.get((str(file), ti))
+            sel = (repr(self.model.get("placement.localite.target")),
+                   repr(self.model.get("placement.localite.position")))
+            if hit is None or hit[:2] != sel or self.t1 is None:
+                return None, None
+            return tuple(None if v is None else pl.prestus_voxel_to_ras(self.t1, v) for v in hit[2:])
         post = self.model.get("path.localite_post") or self.model.get("path.localite")
         sid = self.model.get("subject_id")
         session = self.model.get("placement.localite.session")
@@ -646,7 +666,7 @@ class PlacementPage(QWidget):
 
     def _write(self, key: str, ras: np.ndarray) -> None:
         self._finish_load()
-        self._record()
+        self._record("Move " + ("focus" if key == "focus_pos" else "transducer"))
         if self._space() == "ras":
             value = [round(float(c), 2) for c in ras]
         else:
@@ -655,77 +675,29 @@ class PlacementPage(QWidget):
         self.changed.emit()
 
     # ── undo / redo ─────────────────────────────────────────────────────
-    UNDO_TX_KEYS = ("trans_pos", "focus_pos", "focal_distance_ep", "focal_distance_bowl")
-    UNDO_KEYS = ("placement.mode", "grid.acoustic_fov_diameter_mm", "grid.acoustic_fov_length_mm")
-    UNDO_DEPTH = 100
-
-    def _snapshot(self) -> dict:
-        """The placement values: per transducer the positions and focal depth setting, plus
-        the placement mode, the acoustic FOV and the transducer list's length. Only these are
-        restored, so edits on other tabs in between are kept."""
-        m = self.model
-        keys = {}
-        for ti in range(m.n_transducers):
-            for k in self.UNDO_TX_KEYS:
-                path = f"{TX}.{k}"
-                keys[(path, ti)] = (m.is_overridden(path, ti), copy.deepcopy(m.get(path, ti)))
-        for path in self.UNDO_KEYS:
-            keys[(path, 0)] = (m.is_overridden(path), copy.deepcopy(m.get(path)))
-        return {"keys": keys, "tx": copy.deepcopy(m.tx), "tx_as_list": m.tx_as_list, "ti": self.ti}
-
-    @staticmethod
-    def _same(a: dict, b: dict) -> bool:
-        return repr(a["keys"]) == repr(b["keys"]) and len(a["tx"]) == len(b["tx"])
-
-    def _record(self) -> None:
-        """Remember the state before a user action (once per action, however many values it
-        writes); a new action clears the redo history."""
-        if self._recording:
-            return
-        self._recording = True
-        QTimer.singleShot(0, lambda: setattr(self, "_recording", False))
-        self._undo.append(self._snapshot())
-        del self._undo[:-self.UNDO_DEPTH]
-        self._redo.clear()
-        self._update_undo_buttons()
-
-    def _restore(self, snap: dict) -> None:
-        m = self.model
-        if len(snap["tx"]) != m.n_transducers:          # a transducer was added or removed
-            m.tx = copy.deepcopy(snap["tx"])
-            m.tx_as_list = snap["tx_as_list"]
-        for (path, ti), (overridden, value) in snap["keys"].items():
-            if ti >= m.n_transducers:
-                continue
-            if overridden:
-                m.set(path, copy.deepcopy(value), ti)
-            elif m.is_overridden(path, ti):
-                m.reset(path, ti)
-        self.ti = min(snap["ti"], m.n_transducers - 1)
-        self._cursor_set_by_user = False
-        self.changed.emit()
-        self.refresh()
-
-    def _step(self, source: list, target: list) -> None:
-        now = self._snapshot()
-        while source and self._same(source[-1], now):    # actions that changed nothing
-            source.pop()
-        if not source:
-            self._update_undo_buttons()
-            return
-        target.append(now)
-        self._restore(source.pop())
-        self._update_undo_buttons()
+    def _record(self, label: str = "Placement change") -> None:
+        """Make the values this user action writes (however many) one step of the window's
+        edit history."""
+        self.history.group_pass(label)
 
     def undo(self) -> None:
-        self._step(self._undo, self._redo)
+        self.history.undo()
 
     def redo(self) -> None:
-        self._step(self._redo, self._undo)
+        self.history.redo()
+
+    def _history_restored(self, _label: str) -> None:
+        self._cursor_set_by_user = False
+        if self.history.parent() is self:  # standalone; in the main window every page refreshes
+            self.changed.emit()
+            self.refresh()
 
     def _update_undo_buttons(self) -> None:
-        self.undo_btn.setEnabled(bool(self._undo))
-        self.redo_btn.setEnabled(bool(self._redo))
+        h = self.history
+        self.undo_btn.setEnabled(h.can_undo())
+        self.redo_btn.setEnabled(h.can_redo())
+        self.undo_btn.setToolTip(f"{h.undo_text()} (Ctrl+Z); one history for all tabs")
+        self.redo_btn.setToolTip(f"{h.redo_text()} (Ctrl+Shift+Z)")
 
     def _bowl(self) -> pl.Bowl | None:
         return self._bowl_for(self.ti)
@@ -757,7 +729,7 @@ class PlacementPage(QWidget):
     def _resolved_fov(self, trans, focus, bowl: pl.Bowl | None) -> tuple[float | None, float | None, bool, bool]:
         """(diameter_mm, length_mm, diameter_is_auto, length_is_auto) for the selected
         transducer, resolving grid.acoustic_fov_diameter_mm/length_mm 'auto' the way
-        acoustic_grid_fov.m does (doc_limited_fov.md)."""
+        acoustic_grid_fov.m does (doc_partial-fov.md)."""
         d, l = self.model.get("grid.acoustic_fov_diameter_mm"), self.model.get("grid.acoustic_fov_length_mm")
         diam_auto = not (isinstance(d, (int, float)) and not isinstance(d, bool) and d > 0)
         len_auto = not (isinstance(l, (int, float)) and not isinstance(l, bool) and l > 0)
@@ -826,7 +798,8 @@ class PlacementPage(QWidget):
                             "(read-only here; PRESTUS resolves it again at run time).")
             else:
                 level = "warning"
-                where = {"localite": "path.localite_post, placement.localite.session/.target",
+                where = {"localite": "placement.localite.file (Import trajectory), or path.localite_post "
+                                     "with placement.localite.session/.target",
                          "heuristic": "the heuristic placement run folder (tpars_*.csv)"
                          }.get(mode, "")
                 where = (where + " and " if where else "") + "sub-XXX_placement*.json in io.dir_output"
@@ -868,7 +841,7 @@ class PlacementPage(QWidget):
         return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else default
 
     def _fov_edited(self) -> None:
-        self._record()
+        self._record("Change acoustic FOV")
         self.model.set("grid.acoustic_fov_diameter_mm", self.fov_diam.value() or [])
         self.model.set("grid.acoustic_fov_length_mm", self.fov_len.value() or [])
         self.changed.emit()
@@ -924,7 +897,7 @@ class PlacementPage(QWidget):
                                   ti_trans, ti_focus, self.model.transducer_tooltip(i)))
         # Acoustic FOV box of every transducer, each resolved from its own geometry as
         # resolve_acoustic_fov_params.m does; coherent coupling crops to their union,
-        # async coupling uses one per transducer (doc_limited_fov.md).
+        # async coupling uses one per transducer (doc_partial-fov.md).
         fovs = []
         for i in range(self.model.n_transducers):
             ti_trans, ti_focus = (trans, focus) if i == self.ti else self._positions_for(i)
@@ -1145,7 +1118,7 @@ class PlacementPage(QWidget):
         title = "Target" + (f" · transducer {self.ti + 1}" if self.model.n_transducers > 1 else "")
         footer = f"Coordinates: {self._space()}"
         if self.t1 is not None:
-            footer += (f" · T1 {self.t1.path.name} "
+            footer += (f"<br>T1 {self.t1.path.name} "      # the image on its own line
                        f"({'×'.join(f'{s:.2g}' for s in self.t1.voxel_size)} mm)")
         self.info.setText(readout([(title, target), ("Contact", contact),
                                    ("Skull along the beam", skull),
@@ -1251,8 +1224,14 @@ class PlacementPage(QWidget):
         self._load_images()
 
     def show_transducer(self, ti: int) -> None:
-        if 0 <= ti < self.model.n_transducers:
+        if not 0 <= ti < self.model.n_transducers:
+            return
+        if ti < self.tx_combo.count():
             self.tx_combo.setCurrentIndex(ti)
+        elif ti != self.ti:            # list not filled yet (Viewer not shown since the change)
+            self.ti = ti
+            self._cursor_set_by_user = False
+            self.refresh()
 
     def _beam_qc_rows(self, trans, focus, bowl: pl.Bowl) -> dict[str, list]:
         """Contact and skull rows of placement.beam_qc (37 rays from the aperture to the
@@ -1285,21 +1264,24 @@ class PlacementPage(QWidget):
             self.ti = index
             self._cursor_set_by_user = False
             self.refresh()
+            self.transducer_selected.emit(self.ti)
 
     def _add_transducer(self) -> None:
-        self._record()
+        self._record("Add transducer")
         self.ti = self.model.add_transducer()
         self._cursor_set_by_user = False
         self.changed.emit()
         self.refresh()
+        self.transducer_selected.emit(self.ti)
 
     def _remove_transducer(self) -> None:
-        self._record()
+        self._record("Remove transducer")
         self.model.remove_transducer(self.ti)
         self.ti = max(0, self.ti - 1)
         self._cursor_set_by_user = False
         self.changed.emit()
         self.refresh()
+        self.transducer_selected.emit(self.ti)
 
     def _event_ras(self, event) -> np.ndarray | None:
         if self.t1 is None or event.inaxes not in self.axes or event.xdata is None:
@@ -1446,7 +1428,7 @@ class PlacementPage(QWidget):
             return
         d, dist = self._direction(), self._expected_bowl_distance()
         if d is None or dist is None:
-            QMessageBox.information(self, "Placement", "Needs a beam direction (transducer, trajectory "
+            QMessageBox.information(self, "Placement", "Needs a beam direction (transducer, trajectory, "
                                     "or segmentation) and a focal depth setting (focal_distance_ep or _bowl).")
             return
         self._write("trans_pos", pl.place_on_axis(self.positions()[1], d, dist))
@@ -1457,7 +1439,7 @@ class PlacementPage(QWidget):
             return
         d, bowl = self._direction(), self._bowl()
         if self.seg is None or d is None or bowl is None:
-            QMessageBox.information(self, "Placement", "Needs the segmentation, a beam direction "
+            QMessageBox.information(self, "Placement", "Needs the segmentation, a beam direction, "
                                     "and the transducer geometry.")
             return
         apex = pl.snap_to_scalp(self.seg, self.positions()[1], d, bowl, self.gap.value())
@@ -1471,26 +1453,35 @@ class PlacementPage(QWidget):
         trans, focus = self.positions()
         bowl = self._bowl()
         if trans is None or focus is None or bowl is None:
-            QMessageBox.information(self, "Placement", "Needs transducer, focus and transducer geometry.")
+            QMessageBox.information(self, "Placement", "Needs transducer, focus, and transducer geometry.")
             return
         ep = round(float(np.linalg.norm(focus - trans)) - bowl.offset, 2)
-        self._record()
+        self._record("Set focal depth to target")
         self.model.set(f"{TX}.focal_distance_ep", ep, self.ti)
         self.model.reset(f"{TX}.focal_distance_bowl", self.ti)      # derived from ep by PRESTUS
         self.changed.emit()
         self.refresh()
 
     def _import_trajectory(self) -> None:
-        if not self._need("any"):
-            return
-        path, _ = QFileDialog.getOpenFileName(self, "Import trajectory", "",
-                                              "Trajectories (*.txt *.tfm);;All files (*)")
+        self._finish_load()
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import trajectory", "",
+            "Trajectories (*.txt *.tfm *.kdp *.kps *.h5 *.xml);;Brainsight / 3D Slicer (*.txt *.tfm);;"
+            "k-Plan plan (*.kdp *.kps *.h5);;Localite export (*.xml);;All files (*)")
         if not path:
             return
+        if Path(path).suffix.lower() == ".xml":
+            self._import_localite(path)
+            return
+        if not self._need("any"):
+            return
         try:
-            traj = pl.read_trajectory(path)
+            traj = pl.read_trajectory(path, t1=self.t1)
         except Exception as exc:
             QMessageBox.warning(self, "Import trajectory", str(exc))
+            return
+        if traj.transducer is not None:
+            self._import_pose(traj)
             return
         self._write("focus_pos", traj.target)
         self.direction = traj.towards_transducer
@@ -1505,8 +1496,112 @@ class PlacementPage(QWidget):
                                 + ("" if dist is not None else
                                    ". Set the focal depth setting (focal_distance_ep) to place the transducer on its axis") + ".")
 
+    def _import_localite(self, path: str) -> None:
+        """A Localite XML export: transducer ti uses one of its series at run time
+        (placement.mode localite, placement.localite.file), where PRESTUS averages the
+        series' triggers and converts the pose. MATLAB lists the series and their positions
+        with that same code (nexus_neuronav 'file_series')."""
+        bridge = self.bridge_getter() if self.bridge_getter is not None else None
+        cfg = self.saved_config_getter() if self.saved_config_getter is not None else None
+        if bridge is None or cfg is None:
+            if bridge is None:
+                QMessageBox.information(self, "Import trajectory",
+                                        "Reading a Localite export needs MATLAB (Settings ▸ MATLAB).")
+            return
+        ti = self.ti
+        self.setCursor(Qt.CursorShape.BusyCursor)
+
+        def failed(err: BridgeError) -> None:
+            self.unsetCursor()
+            QMessageBox.warning(self, "Import trajectory", err.message)
+
+        bridge.call("nexus_neuronav", {"action": "file_series", "config": cfg, "file": path},
+                    on_done=lambda out: self._localite_series_read(path, ti, out), on_error=failed)
+
+    def _localite_series_read(self, path: str, ti: int, out: dict) -> None:
+        self.unsetCursor()
+        series = [dict(s) for s in as_list(out.get("series")) if isinstance(s, dict)]
+        usable = lc.usable_series(series)
+        if not usable:
+            QMessageBox.warning(self, "Import trajectory",
+                                f"{Path(path).name} has no recorded, tracked transducer pose "
+                                f"({len(series)} series: planned points or untracked).")
+            return
+        chosen = usable[0]
+        if len(usable) > 1:
+            labels = [lc.series_label(s) for s in usable]
+            what = f"transducer {ti + 1}" if self.model.n_transducers > 1 else "the transducer"
+            label, ok = QInputDialog.getItem(
+                self, "Import trajectory",
+                f"{Path(path).name} has {len(usable)} series. Place {what} with:", labels, 0, False)
+            if not ok:
+                return
+            chosen = usable[labels.index(label)]
+        self._record("Import Localite pose")
+        changes = lc.file_import_settings(self.model, path, chosen, series, ti)
+        for key, value in changes:
+            if value is None:
+                self.model.reset(key)
+            else:
+                self.model.set(key, value)
+        for key in ("trans_pos", "focus_pos"):         # the run resolves them from the file
+            self.model.reset(f"{TX}.{key}", ti)
+        trans, focus = (chosen.get(k) for k in ("trans_pos", "focus_pos"))
+        trans = as_floats(trans) if trans is not None and len(as_floats(trans)) == 3 else None
+        focus = as_floats(focus) if focus is not None and len(as_floats(focus)) == 3 else None
+        self._localite_file_pos[(path, ti)] = (
+            repr(self.model.get("placement.localite.target")),
+            repr(self.model.get("placement.localite.position")), trans, focus)
+        self._forget()
+        self.changed.emit()
+        self.refresh()
+        tgt = dict(changes).get("placement.localite.target")
+        descr = chosen.get("description") or ""
+        by_name = bool(descr) and (tgt[ti] if isinstance(tgt, list) else tgt) == descr
+        pick = f"target '{descr}'" if by_name else f"series {int(chosen['index'])}"
+        lines = [f"Placement mode set to Localite: {pick} of {Path(path).name}, "
+                 f"the mean of {int(chosen.get('n_markers') or 0)} marker(s), resolved again at run time."]
+        if trans is None:
+            lines.append(chosen.get("error") or out.get("note") or "The position shows once the run resolves it.")
+        QMessageBox.information(self, "Import trajectory", "\n".join(lines))
+
+    def _import_pose(self, traj: "pl.Trajectory") -> None:
+        """A trajectory that gives the bowl apex (k-Plan): the transducer goes exactly
+        there, and the focal depth setting is matched to the target with this
+        transducer's own geometry (k-Plan's model may put its exit plane elsewhere)."""
+        self._write("trans_pos", traj.transducer)
+        self.direction = traj.towards_transducer
+        bowl = self._bowl()
+        target = traj.target
+        if target is None:
+            dist = self._expected_bowl_distance()
+            if dist is not None:
+                target = pl.place_on_axis(traj.transducer, -traj.towards_transducer, dist)
+        if target is not None:
+            self._write("focus_pos", target)
+            self.cursor = np.asarray(target, float).copy()
+            self._cursor_set_by_user = True
+        ep = None
+        if traj.target is not None and bowl is not None:
+            ep = round(float(np.linalg.norm(traj.target - traj.transducer)) - bowl.offset, 2)
+            self._record("Set focal depth to target")
+            self.model.set(f"{TX}.focal_distance_ep", ep, self.ti)
+            self.model.reset(f"{TX}.focal_distance_bowl", self.ti)
+            self.changed.emit()
+        self.refresh()
+        lines = [f"{traj.source} plan '{traj.name}' imported: transducer at the plan's bowl apex"
+                 + (", focus at its target" if traj.target is not None else
+                    "; the file has no target, so the focus is on the beam axis at the current focal depth"
+                    if target is not None else "; the file has no target: place the focus on the beam axis") + "."]
+        if ep is not None:
+            lines.append(f"Focal depth set to {ep:.2f} mm from this transducer's exit plane.")
+        elif traj.target is not None:
+            lines.append("Choose the transducer to set the focal depth from its geometry.")
+        lines += traj.notes
+        QMessageBox.information(self, "Import trajectory", "\n".join(lines))
+
     def _use_manual(self) -> None:
-        self._record()
+        self._record("Use manual placement")
         self.model.set("placement.mode", "manual")
         self.changed.emit()
         self.refresh()

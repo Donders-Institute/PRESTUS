@@ -43,3 +43,25 @@ def test_dark_image_background_kept():
     ax.set_facecolor("black")                                        # e.g. an MRI slice view
     mpl_theme.apply(fig, style.C_DARK)
     assert to_hex(ax.patch.get_facecolor()) == "#000000"
+
+
+def test_canvas_passes_wheel_to_page_unless_it_scrolls():
+    """A plot without a scroll_event handler leaves the wheel to the scroll area around it."""
+    from PyQt6.QtCore import QPoint, QPointF, Qt
+    from PyQt6.QtGui import QWheelEvent
+    from PyQt6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+
+    def wheel():
+        return QWheelEvent(QPointF(10, 10), QPointF(10, 10), QPoint(0, 0), QPoint(0, -120),
+                           Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+                           Qt.ScrollPhase.NoScrollPhase, False)
+
+    canvas = mpl_theme.ThemedCanvas(_fig()[0], export=False)
+    ev = wheel()
+    canvas.wheelEvent(ev)
+    assert not ev.isAccepted()                       # propagates: the page scrolls
+    canvas.mpl_connect("scroll_event", lambda e: None)
+    ev = wheel()
+    canvas.wheelEvent(ev)
+    assert ev.isAccepted()                           # slice / zoom views keep the wheel

@@ -6,9 +6,11 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
                              QLabel, QPushButton, QRadioButton, QWidget)
 
+from ..labels import plural
 from .. import placement as pl
 from ..model import TX, ConfigModel, is_empty, iter_leaves
 from . import style
+from .file_badge import FileBadge
 from .readout import muted, readout, status
 
 GEOMETRY_GROUPS = ("annular", "matrix")
@@ -32,6 +34,7 @@ class DevicePanel(QGroupBox):
         form.setHorizontalSpacing(GRID_SPACING)
         form.setVerticalSpacing(8)
         form.setColumnMinimumWidth(0, LABEL_COLUMN)
+        form.setProperty("label_inset", 290 - LABEL_COLUMN)   # follows the card (section.mark_label_grid)
         form.setColumnStretch(1, 1)
 
         def add_row(label, item) -> None:
@@ -43,7 +46,10 @@ class DevicePanel(QGroupBox):
                     form.addLayout(item, r, 0, 1, 2)
                 return
             form.addWidget(QLabel(label), r, 0)
-            form.addWidget(item, r, 1)
+            if isinstance(item, QWidget):
+                form.addWidget(item, r, 1)
+            else:
+                form.addLayout(item, r, 1)
 
         self.rb_lib = QRadioButton("Equipment library")
         self.rb_custom = QRadioButton("Custom geometry")
@@ -58,7 +64,12 @@ class DevicePanel(QGroupBox):
 
         self.device = QComboBox()
         self.ds = QComboBox()
-        add_row("Transducer", self.device)
+        self.files = FileBadge()                # the device and calibration files, on hover
+        dev_row = QHBoxLayout()
+        dev_row.setContentsMargins(0, 0, 0, 0)
+        dev_row.addWidget(self.device, 1)
+        dev_row.addWidget(self.files)
+        add_row("Transducer", dev_row)
         add_row("Driving system", self.ds)
         self.info = QLabel()
         self.info.setWordWrap(True)
@@ -136,6 +147,7 @@ class DevicePanel(QGroupBox):
         m, ti = self.model, self.ti
         dev = m.device(ti)
         if dev is None:
+            self.files.set_files([])
             self.info.setText("Geometry is taken from the fields below." if self.rb_custom.isChecked()
                               else status("Serial not found in config/equipment.", "bad"))
             self.inline.setText("")
@@ -143,8 +155,10 @@ class DevicePanel(QGroupBox):
             return
         freq = f"{dev.freq_hz / 1e3:g} kHz" if dev.freq_hz else "?"
         ds = m.get(f"{TX}.combo.ds_serial", ti)
-        rows = [("Device", f"<b>{dev.manufact}</b> · {dev.type or '?'} · {dev.n_elem or '?'} elements "
-                           f"· {freq}")]
+        n_elem = (plural(int(dev.n_elem), "element") if isinstance(dev.n_elem, (int, float))
+                  and not isinstance(dev.n_elem, bool) else "? elements")
+        # maker and frequency first; the build (type, elements) on a second, muted line
+        rows = [("Device", f"<b>{dev.manufact}</b>, {freq}<br>" + muted(f"{dev.type or '?'}, {n_elem}"))]
         serial = m.get(f"{TX}.serial", ti)
         if not is_empty(serial) and str(serial) != dev.serial:
             rows.insert(0, ("Library entry", status(f"model {dev.serial}", "warn")
@@ -160,6 +174,8 @@ class DevicePanel(QGroupBox):
         else:
             rng = muted("not specified")
         rows.append(("Steering range", rng))
+        cal_file = ""                          # the calibration entry PRESTUS uses (FileBadge)
+        cal_tip = ""
         if dev.type == "annular":
             ann_set = all(not is_empty(m.get(f"{TX}.annular.{k}", ti))
                           for k in ("elem_phase_deg", "elem_p_amp"))
@@ -169,12 +185,17 @@ class DevicePanel(QGroupBox):
                 cal = m.library.calibration(dev.serial, None if is_empty(ds) else str(ds),
                                             m.get(f"{TX}.library_path", ti) or None)
                 level = "ok" if cal.found and not cal.fallback else ("warn" if cal.found else "bad")
-                rows.append(("Calibration", status(cal.summary(), level)))
+                rows.append(("Calibration", status(cal.short(), level)))     # the rest on hover
+                cal_tip = "Calibration: " + cal.summary()
+                cal_file = cal.file_note()
                 rows.append(("At the focal depth", self._depth_status_line(m, ti, cal)))
+        self.files.set_files([("Device", dev.file), ("Calibration", cal_file)])
         self.info.setText(readout([("Equipment", rows)], label_width=LABEL_COLUMN + GRID_SPACING - 4))
+        self.info.setToolTip(cal_tip)
         overrides = self._inline_geometry()
         if overrides:
-            self.inline.setText(f"{len(overrides)} geometry value(s) set in this study override the "
+            self.inline.setText(f"{plural(len(overrides), 'geometry value')} set in this study "
+                                f"{'overrides' if len(overrides) == 1 else 'override'} the "
                                 f"library: {', '.join(p.split('.', 1)[1] for p in overrides[:4])}"
                                 f"{' …' if len(overrides) > 4 else ''}")
         else:

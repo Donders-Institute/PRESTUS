@@ -5,7 +5,8 @@ affix: a study's conditions, an uncertainty variant, the per-transducer sub-runs
 joint result of async multi-transducer mode, the steps of a sequential run, ... Each run
 writes ``<tag>_<medium><affix>.csv``, ``<tag>_<medium>_report<affix>.html`` and NIfTIs
 ``nii/<tag>_<medium>_T1w<affix>_<map>.nii.gz`` (nifti_acoustic.m / nifti_thermal.m), and
-the placement stage ``<tag>_placement<affix>.json`` (write_placement_positions.m).
+the placement stage ``<tag>_placement<affix>.json`` (write_placement_positions.m) and
+``<tag>_placement_<mode><affix>.html`` (generate_placement_report.m).
 Read-only and Qt-free.
 """
 
@@ -71,6 +72,9 @@ _RENAMED_COLUMNS = {"real_focal_distance_mm": "real_focal_distance_bowl_mm"}
 
 _TRANS = re.compile(r"_trans-(\d+)$")
 _JOINT = re.compile(r"_desc-asyncJoint(?:S(\d+))?$")
+# CSVs next to a run's metrics CSV that are not runs: targeting (targeting_analysis.m) and
+# time reversal (time_reversal_stage.m)
+_NOT_A_RUN = re.compile(r"_(?:targeting|timereversal_(?:summary|elements|poses_T\d+))$")
 
 
 @dataclass
@@ -155,7 +159,7 @@ def discover_runs(base: Path, tag: str, media: tuple[str, ...] = ("layered", "wa
             affix = name[len(prefix):-len(".csv")]
             if affix and not affix.startswith("_"):
                 continue
-            if affix.endswith("_targeting"):
+            if _NOT_A_RUN.search(affix):
                 continue
             affixes[(medium, affix)] = None
         t1w = f"{prefix}_T1w"
@@ -261,8 +265,17 @@ def placement_positions(run: Run) -> list[tuple[list[float] | None, list[float] 
 
 
 def other_reports(base: Path) -> list[Path]:
-    """Every HTML report in the folder (per-run, sequential and multi-ISPPA summaries)."""
-    return sorted(base.glob("*report*.html"))
+    """Every HTML report of the subject folder: per-run, segmentation, debug, sequential,
+    multi-ISPPA and uncertainty reports (``*report*.html``) and placement reports
+    (``<tag>_placement_<mode><affix>.html``, generate_placement_report.m); then the group
+    reports in the folder above it, path.sim (``group_*report*.html``,
+    generate_group_report.m)."""
+    names = _files_in(base)
+    here = sorted(n for n in names if n.endswith(".html")
+                  and ("report" in n or re.match(r"sub-\d{3}_placement_", n)))
+    group = sorted(n for n in _files_in(base.parent)
+                   if n.startswith("group_") and "report" in n and n.endswith(".html"))
+    return [base / n for n in here] + [base.parent / n for n in group]
 
 
 # ── Thermal time courses (cache/<tag>_<medium>_HEAT<affix>.mat) ──────────────────────

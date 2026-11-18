@@ -171,6 +171,20 @@ class ThemedCanvas(FigureCanvasQTAgg):
             from .export import ExportButton, MplExporter
             self.export_button = ExportButton(self, MplExporter(self), export_name, filename_hint)
 
+    def wheelEvent(self, event) -> None:
+        """Scroll the page under a plot: matplotlib accepts every wheel event, so a canvas inside
+        a scroll area stops it scrolling. Only canvases with a scroll_event handler (slice and
+        zoom views) keep the wheel (matplotlib's own handlers do not count)."""
+        if getattr(self, "_uses_wheel", False):
+            super().wheelEvent(event)
+        else:
+            event.ignore()
+
+    def mpl_connect(self, s, func):
+        if s == "scroll_event":
+            self._uses_wheel = True
+        return super().mpl_connect(s, func)
+
     def draw(self) -> None:
         try:
             apply(self.figure)

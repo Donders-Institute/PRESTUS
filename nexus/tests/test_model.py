@@ -87,12 +87,36 @@ def test_transducer_list_has_identical_top_level_keys(schema):
     m.add_transducer()
     m.set("transducer.trans_pos", [1, 2, 3], 1)
     out = m.override_dict()["transducer"]
-    assert set(out[0]) - {"trans_pos"} <= set(out[1])
+    assert set(out[0]) == set(out[1])
     assert out[1]["name"] == "left"          # inherited value, written explicitly
     assert out[1]["annular"] == {}           # group: merged from transducer 1
+    assert out[0]["trans_pos"] == []         # set on transducer 2 only: the default on 1
     again = ConfigModel(schema)
     again.load_dict({"transducer": out})
     assert values_equal(again.effective(), m.effective())
+
+
+def test_keys_of_later_transducers_reach_every_element(schema):
+    """Every key any element sets, in every direction: plain values and groups, set on
+    transducer 2 only, on 3 only, or on 2 and 3 (a sequence's timing_offset_s and timing)."""
+    m = ConfigModel(schema)
+    for _ in range(2):
+        m.add_transducer()
+    m.set("transducer.timing_offset_s", 80.0, 1)
+    m.set("transducer.timing_offset_s", 160.0, 2)
+    m.set("transducer.timing.ptrd", 4.0, 1)
+    m.set("transducer.focal_distance_ep", 50, 2)
+    out = m.override_dict()["transducer"]
+    assert set(out[0]) == set(out[1]) == set(out[2])
+    assert out[0]["timing_offset_s"] == [] and out[0]["timing"] == {} and out[2]["timing"] == {}
+    assert out[1]["focal_distance_ep"] == []
+    again = ConfigModel(schema)
+    again.load_dict({"transducer": out})
+    # an absent key and its written empty default mean the same (unset) to PRESTUS
+    for ti in range(3):
+        for key in ("transducer.timing_offset_s", "transducer.timing.ptrd",
+                    "transducer.focal_distance_ep"):
+            assert values_equal(again.get(key, ti), m.get(key, ti))
 
 
 def test_transducer_name_title_and_tooltip(schema):

@@ -25,14 +25,31 @@ CONTENT_WIDTH = 920
 STEP_KEYS = {
     "image": ("subject_id", "path.", "startup.simnibs_bin_path"),
     "transducer": (f"{TX}.", "calibration."),
-    "target": ("placement.", "placement viewer"),     # the viewer's checks (QC_PATH)
+    "target": ("placement.", "placement viewer",      # the viewer's checks (QC_PATH)
+               f"{TX}.trans_pos", f"{TX}.focus_pos"),  # manual placement
 }
+STEP_EXCLUDE = {"transducer": (f"{TX}.trans_pos", f"{TX}.focus_pos")}
 # 'Learn more' on each step: the page that explains it (step number -> doc reference)
 STEP_DOCS = {1: "doc_nexus_tabs.md#quickstart-tab",
              2: "doc_nexus.md#2-check-the-transducer",
              3: "doc_placement.md#choosing-a-placement-mode",
              4: "doc_nexus.md#5-run-the-simulation"}
+# 'More settings' on each step: the tab that holds the rest of its settings (key, label)
+STEP_TABS = {1: ("setup", "Setup"), 2: ("transducer", "Transducer"), 3: ("placement", "Placement"),
+             4: ("run", "Run")}
 TARGET_MODES = {"heuristic": "placement.heuristic.mni_target_mm", "mni": "placement.mni.focus_pos_mm"}
+# Coordinate spaces the Target step offers: key -> (label, placement.manual.coordinate_space)
+SPACES = {"mni": "MNI (mm)",
+          "ras": "This participant's T1, scanner coordinates (mm)",
+          "voxel": "This participant's T1, voxel indices"}
+SPACE_HELP = {
+    "mni": "MNI152 template coordinates in mm. PRESTUS maps them into this participant's head with "
+           "the SimNIBS segmentation.",
+    "ras": "Millimetres in the scanner (world, RAS+) space of this participant's T1, as image viewers "
+           "show world coordinates. Used as given.",
+    "voxel": "1-based voxel indices of this participant's T1 (add 1 to the 0-based indices that FSLeyes "
+             "or Python show). Used as given.",
+}
 
 
 class _Step(QFrame):
@@ -46,6 +63,7 @@ class _Step(QFrame):
         v.setSpacing(8)
         head = QHBoxLayout()
         self.badge = QLabel(str(number))
+        self.badge.setProperty("n", str(number))       # restored after the ✓ of 'done'
         self.badge.setFixedSize(26, 26)
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         head.addWidget(self.badge)
@@ -58,13 +76,14 @@ class _Step(QFrame):
         self.learn.setToolTip("Open documentation")
         self.learn.linkActivated.connect(docs.open_doc)
         head.addWidget(self.learn)
+        self.more = QLabel()                    # set_tab: link to the tab with the remaining settings
+        self.more.setVisible(False)
+        head.addWidget(self.more)
         self.status = QLabel()
         head.addWidget(self.status)
         v.addLayout(head)
-        sub = QLabel(subtitle)
-        sub.setObjectName("CardSub")
-        sub.setWordWrap(True)
-        v.addWidget(sub)
+        t.setToolTip(subtitle)                  # what the step is for: on hover
+        self.badge.setToolTip(subtitle)
         self.body = QVBoxLayout()
         self.body.setSpacing(8)
         v.addLayout(self.body)
@@ -75,21 +94,31 @@ class _Step(QFrame):
         self.learn.setText(f"<a href='{ref}'>Learn more</a>")
         self.learn.setVisible(bool(ref))
 
-    def set_state(self, state: str, text: str) -> None:
+    def set_tab(self, key: str, label: str) -> None:
+        """Show a link to tab `key` (emitted as linkActivated(key) on self.more)."""
+        self.more.setText(f"<a href='{key}'>{label} tab ›</a>")
+        self.more.setToolTip(f"All {label} settings")
+        self.more.setVisible(bool(key))
+
+    def set_state(self, state: str, text: str, detail: str = "") -> None:
+        """The numbered dot shows the state by its colour (green done, amber warning, red
+        problem, neutral to do); the words are its hover text, not a label beside it."""
         c = style.active()
-        colour = {"done": c["green"], "todo": c["ink3"], "warn": c["amber"], "error": c["red"]}[state]
-        mark = {"done": "✓", "todo": "○", "warn": "⚠", "error": "✗"}[state]
-        fill = c["green"] if state == "done" else c["brand"]
-        ink = "#ffffff" if state == "done" else c["on_brand"]
+        fill = {"done": c["green"], "todo": c["brand"], "warn": c["amber"], "error": c["red"]}[state]
+        ink = c["on_brand"] if state == "todo" else "#ffffff"
         self.badge.setStyleSheet(f"background: {fill}; color: {ink}; border-radius: 13px; font-weight: 600;")
         self.badge.setText("✓" if state == "done" else self.badge.property("n") or self.badge.text())
-        self.status.setText(f"<span style='color:{colour}'>{mark} {text}</span>")
+        self.badge.setToolTip(text + (f"\n{detail}" if detail else ""))
+        self.status.setText("")
+        self.status.setVisible(False)
+        self.state = state
 
 
-def _value_label() -> QLabel:
+def _value_label(links: bool = False) -> QLabel:
     lbl = QLabel()
     lbl.setWordWrap(True)
-    lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+    lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction if links
+                                else Qt.TextInteractionFlag.TextSelectableByMouse)
     return lbl
 
 
@@ -105,6 +134,17 @@ def _coord_spins() -> list[QDoubleSpinBox]:
         s.setMinimumWidth(110)
         spins.append(s)
     return spins
+
+
+def _set_spin_space(spins: list[QDoubleSpinBox], space: str) -> None:
+    """Units and range of coordinate spin boxes for a coordinate space (voxel: whole indices)."""
+    voxel = space == "voxel"
+    for s in spins:
+        s.blockSignals(True)
+        s.setDecimals(0 if voxel else 1)
+        s.setRange(0 if voxel else -200, 1024 if voxel else 200)
+        s.setSuffix("" if voxel else " mm")
+        s.blockSignals(False)
 
 
 class StartPage(QWidget):
@@ -138,19 +178,9 @@ class StartPage(QWidget):
 
         title = QLabel("Set up a simulation")
         title.setStyleSheet("font-size: 20px; font-weight: 600;")
+        title.setToolTip("Four steps. Everything else uses the PRESTUS defaults, which suit most "
+                         "studies; the other tabs hold every setting if you need to change one.")
         self.col.addWidget(title)
-        intro = QLabel("Four steps. Everything else uses the PRESTUS defaults, which suit most "
-                       "studies; the other tabs hold every setting if you need to change one.")
-        intro.setObjectName("TabIntro")
-        intro.setWordWrap(True)
-        self.col.addWidget(intro)
-        # the one entry to follow-ups (Results ▸ Follow-up…), off the four-step main path
-        followup = QLabel("<a href='results'>Already have results? Start a follow-up run "
-                          "(another intensity, timing or pose) from the Results tab ›</a>")
-        followup.setObjectName("CardSub")
-        followup.setToolTip("Opens Results; pick a run and press Follow-up…")
-        followup.linkActivated.connect(self.goto_tab.emit)
-        self.col.addWidget(followup)
 
         self.step_image = self._build_image_step()
         self.step_tx = self._build_transducer_step()
@@ -159,6 +189,8 @@ class StartPage(QWidget):
         for i, s in enumerate((self.step_image, self.step_tx, self.step_target, self.step_run), 1):
             s.badge.setProperty("n", str(i))
             s.set_doc(STEP_DOCS.get(i, ""))
+            s.set_tab(*STEP_TABS.get(i, ("", "")))
+            s.more.linkActivated.connect(self.goto_tab.emit)
             self.col.addWidget(s)
         self.col.addStretch(1)
 
@@ -169,7 +201,7 @@ class StartPage(QWidget):
     # ── step 1: head image ──────────────────────────────────────────────
     def _build_image_step(self) -> _Step:
         s = _Step(1, "Head image", "The participant's T1-weighted MRI (NIfTI, .nii or .nii.gz). "
-                  "PRESTUS finds the T2, the SimNIBS segmentation and the subject number from it. "
+                  "PRESTUS finds the T2, the SimNIBS segmentation, and the subject number from it. "
                   "You can also drop the file onto this window.")
         row = QHBoxLayout()
         self.t1_edit = QLineEdit(readOnly=True)
@@ -327,8 +359,7 @@ class StartPage(QWidget):
             self.simnibs_btn.setText("Change SimNIBS…")
             self.simnibs_btn.setVisible(True)
         else:
-            self.seg_lbl.setText(f"<span style='color:{c['red']}'>Not found, and SimNIBS is not set.</span> "
-                                 "Choose the SimNIBS folder so the segmentation can be created.")
+            self.seg_lbl.setText(f"<span style='color:{c['red']}'>Not found, and SimNIBS is not set.</span>")
             self.simnibs_btn.setText("Choose SimNIBS folder…")
             self.simnibs_btn.setVisible(True)
         sim = m.get("path.sim")
@@ -364,6 +395,8 @@ class StartPage(QWidget):
         self.ep.valueChanged.connect(self._ep_changed)
         self.ep_hint = QLabel()
         self.ep_hint.setObjectName("CardSub")
+        self.ep_hint.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        self.ep_hint.linkActivated.connect(self._cal_link)       # 'Calibration available' → its tab
         ep_row = QHBoxLayout()
         ep_row.setSpacing(10)
         ep_row.addWidget(self.ep)
@@ -379,10 +412,19 @@ class StartPage(QWidget):
             else:
                 g.addWidget(w, r, 1, Qt.AlignmentFlag.AlignLeft if w is self.isppa else Qt.AlignmentFlag(0))
         s.body.addLayout(g)
-        self.cal_lbl = _value_label()
+        self.cal_lbl = _value_label(links=True)
+        self.cal_lbl.linkActivated.connect(self._cal_link)
         s.body.addWidget(self.cal_lbl)
+        self.tx_multi_row = QWidget()            # attention icon, then the note
+        row = QHBoxLayout(self.tx_multi_row)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
+        warn = QLabel()
+        warn.setPixmap(icons.icon("warning", style.active()["amber"]).pixmap(16, 16))
+        row.addWidget(warn, 0, Qt.AlignmentFlag.AlignTop)
         self.tx_multi = _value_label()
-        s.body.addWidget(self.tx_multi)
+        row.addWidget(self.tx_multi, 1)
+        s.body.addWidget(self.tx_multi_row)
         return s
 
     def _device_chosen(self, index: int) -> None:
@@ -394,8 +436,68 @@ class StartPage(QWidget):
         dev = m.device(0)
         combos = list(dev.combos) if dev is not None else []
         if m.get(f"{TX}.combo.ds_serial") not in combos:
-            m.set(f"{TX}.combo.ds_serial", combos[0] if len(combos) == 1 else "")
+            # the one driving system with a calibration entry, else the only one listed
+            calibrated = self._calibrated(dev)
+            pick = calibrated[0] if len(calibrated) == 1 else combos[0] if len(combos) == 1 else ""
+            m.set(f"{TX}.combo.ds_serial", pick)
         self.window.on_model_edited()
+
+    def _library_path(self) -> str | None:
+        return self.model.get(f"{TX}.library_path") or None
+
+    def _calibrated(self, dev) -> list[str]:
+        """Driving systems of dev with their own calibration entry."""
+        lib = self.model.library
+        if dev is None or lib is None:
+            return []
+        return lib.calibrated_combos(dev.serial, self._library_path())
+
+    def _cal_link(self, link: str) -> None:
+        """Actions offered by the calibration line: use the model entry, or open a tab."""
+        if link == "use-model":
+            dev = self.model.device(0)
+            if dev is not None and dev.model:
+                self.model.set(f"{TX}.serial", dev.model)
+                self.model.set(f"{TX}.combo.ds_serial", "")
+                self.window.on_model_edited()
+        else:
+            self.goto_tab.emit(link)
+
+    def _calibration_text(self, dev, ds: str) -> str:
+        """The calibration line when the device has no entry of its own for this driving system:
+        the generic entry PRESTUS falls back to, or what to do when there is nothing to use
+        (resolve_transducer_from_serial.m stops the run then). An entry of its own shows as
+        'Calibration available' beside the focal depth range instead."""
+        m, lib, c = self.model, self.model.library, style.active()
+        lp = self._library_path()
+        cal = lib.calibration(dev.serial, ds or None, lp)
+        link = "<a href='calibration'>Calibration tab ›</a>"
+        tab = " · " + link
+        if cal.found:
+            return (f"<span style='color:{c['amber']}'>Calibration:</span> no entry for this driving "
+                    f"system; PRESTUS uses the device's generic entry.{tab}")
+        if dev.type != "annular":
+            return f"Calibration: no library entry; PRESTUS steers geometrically.{tab}"
+        if not is_empty(m.get(f"{TX}.annular.elem_phase_deg")) and not is_empty(m.get(f"{TX}.annular.elem_p_amp")):
+            return ("Calibration: no library entry; the phases and amplitude set on the "
+                    "<a href='transducer'>Transducer tab</a> are used.")
+        calibrated = self._calibrated(dev)
+        names = ", ".join(calibrated)
+        red = f"<span style='color:{c['red']}'>Calibration:</span> "
+        if not ds and calibrated:
+            return red + f"choose the driving system you use above. This device is calibrated with {names}."
+        what = f"{dev.serial} with {ds}" if ds else dev.serial
+        options = []
+        if calibrated:
+            options.append(f"choose a calibrated driving system above ({names})")
+        if dev.model and dev.model != dev.serial and lib.calibration(dev.model, None, lp).found:
+            options.append(f"<a href='use-model'>use the geometric calibration of the {dev.model} model</a> "
+                           "(not measured on this unit)")
+        options.append("<a href='calibration'>calibrate it on the Calibration tab</a>")
+        options.append("set the phases and amplitude on the <a href='transducer'>Transducer tab</a>")
+        items = "".join(f"<li>{o}</li>" for o in options)
+        return (red + f"there is no calibration entry for {what}, so a run would stop. "
+                f"To continue:<ul style='margin:2px 0'>{items}</ul>")
 
     def _ds_chosen(self, index: int) -> None:
         if self._setting or index < 0:
@@ -431,48 +533,75 @@ class StartPage(QWidget):
         dev = m.device(0)
         ds = m.get(f"{TX}.combo.ds_serial")
         self.ds_combo.clear()
-        self.ds_combo.addItem("None (generic calibration)", "")
+        # 'None' only where it resolves to something: a generic entry, or a device without
+        # listed driving systems; otherwise the empty choice asks for one
+        generic = dev is not None and lib is not None and lib.calibration(dev.serial, None,
+                                                                          self._library_path()).found
+        self.ds_combo.addItem("None (generic calibration)" if generic or dev is None or not dev.combos
+                              else "Choose a driving system…", "")
+        calibrated = self._calibrated(dev)
+        mark = dev is not None and dev.type == "annular"
         for key, d in (dev.combos.items() if dev is not None else []):
-            self.ds_combo.addItem(f"{key} — {d.name}" if d.name else key, key)
+            text = f"{key} — {d.name}" if d.name else key
+            self.ds_combo.addItem(text + (" (not calibrated)" if mark and key not in calibrated else ""), key)
         di = self.ds_combo.findData(str(ds)) if not is_empty(ds) else 0
         self.ds_combo.setCurrentIndex(max(di, 0))
         self.ds_combo.setEnabled(dev is not None)
         ep = m.get(f"{TX}.focal_distance_ep")
         self.ep.setValue(float(ep) if isinstance(ep, (int, float)) else 0.0)
+        hint = []
         if dev is not None and dev.min_foc is not None and dev.max_foc is not None:
             inside = not isinstance(ep, (int, float)) or dev.min_foc <= ep <= dev.max_foc
             c = style.active()
-            rng = f"device range {dev.min_foc:g}–{dev.max_foc:g} mm"
-            self.ep_hint.setText(rng if inside else f"<span style='color:{c['amber']}'>outside the {rng}</span>")
-        else:
-            self.ep_hint.setText("")
+            rng = f"range {dev.min_foc:g}–{dev.max_foc:g} mm"
+            hint.append(rng if inside else f"<span style='color:{c['amber']}'>outside the {rng}</span>")
         isppa = m.get(f"{TX}.target_isppa_wcm2")
         self.isppa.setEnabled(isinstance(isppa, (int, float)))
         if isinstance(isppa, (int, float)):
             self.isppa.setValue(float(isppa))
         else:
             self.isppa.setToolTip(f"Several intensities are set ({isppa}); edit them on the Transducer tab.")
-        if dev is not None and lib is not None:
-            cal = lib.calibration(dev.serial, None if is_empty(ds) else str(ds),
-                                  m.get(f"{TX}.library_path") or None)
-            c = style.active()
-            colour = c["green"] if cal.found and not cal.fallback else c["amber"] if cal.found else c["red"]
-            self.cal_lbl.setText(f"<span style='color:{colour}'>Calibration:</span> {cal.summary()}")
-        else:
+        cal = (lib.calibration(dev.serial, None if is_empty(ds) else str(ds), self._library_path())
+               if dev is not None and lib is not None else None)
+        if cal is not None and cal.found and not cal.fallback:
+            # an entry for this device and driving system: a short note beside the depth range,
+            # its type, depths, amplitudes and date on hover
+            hint.append(f"<a href='calibration' style='color:{style.active()['green']}'>Calibration available</a>")
+            self.ep_hint.setToolTip("Calibration: " + cal.summary("\n"))
             self.cal_lbl.setText("")
+        elif dev is not None and lib is not None:
+            self.ep_hint.setToolTip("")
+            self.cal_lbl.setText(self._calibration_text(dev, "" if is_empty(ds) else str(ds)))
+        else:
+            self.ep_hint.setToolTip("")
+            self.cal_lbl.setText("")
+        self.ep_hint.setText(" · ".join(hint))
+        self.cal_lbl.setVisible(bool(self.cal_lbl.text()))
         n = m.n_transducers
-        self.tx_multi.setVisible(n > 1)
+        self.tx_multi_row.setVisible(n > 1)
         self.tx_multi.setText(f"This study has {n} transducers; this step edits transducer 1. "
                               "The others are on the Transducer tab.")
 
     # ── step 3: target ──────────────────────────────────────────────────
     def _build_target_step(self) -> _Step:
-        s = _Step(3, "Target", "Where to focus, in MNI coordinates (mm). PRESTUS maps them into the "
-                  "participant's head with the SimNIBS segmentation.")
+        s = _Step(3, "Target", "Where to focus and, if you know it, where the transducer goes. Choose the "
+                  "space your coordinates are in first.")
+        space_row = QHBoxLayout()
+        lab = QLabel("Coordinates in")
+        lab.setObjectName("CardSub")
+        space_row.addWidget(lab)
+        self.space_combo = QComboBox()
+        for key, text in SPACES.items():
+            self.space_combo.addItem(text, key)
+        self.space_combo.setToolTip("MNI: placement.mode heuristic or mni. This participant's T1: "
+                                    "placement.mode manual with placement.manual.coordinate_space ras or voxel")
+        self.space_combo.currentIndexChanged.connect(self._space_chosen)
+        space_row.addWidget(self.space_combo)
+        space_row.addStretch(1)
+        s.body.addLayout(space_row)
+
         self.rb_auto = QRadioButton("Target only: PRESTUS finds a transducer position")
-        self.rb_auto.setToolTip("placement.mode: heuristic (searches the scalp for a good entry point)")
         self.rb_entry = QRadioButton("Target and transducer position")
-        self.rb_entry.setToolTip("placement.mode: mni (the transducer point is snapped to the scalp)")
         node = self.model.schema.get("placement.mode")
         for b, mode in ((self.rb_auto, "heuristic"), (self.rb_entry, "mni")):
             ic = icons.for_choice(node, mode)
@@ -483,7 +612,15 @@ class StartPage(QWidget):
             self.mode_group.addButton(b)
             s.body.addWidget(b)
         self.mode_group.buttonClicked.connect(self._mode_chosen)
-        self.other_mode = _value_label()
+        self.auto_note = _value_label(links=True)
+        self.auto_note.setObjectName("CardSub")
+        self.auto_note.setText("Finding a transducer position needs an MNI target. With this participant's "
+                               "coordinates, give the transducer position as well, or use PlanTUS on the "
+                               "<a href='placement'>Placement tab</a>.")
+        self.auto_note.linkActivated.connect(self.goto_tab.emit)
+        s.body.addWidget(self.auto_note)
+        self.other_mode = _value_label(links=True)
+        self.other_mode.linkActivated.connect(self.goto_tab.emit)
         s.body.addWidget(self.other_mode)
 
         g = QGridLayout()
@@ -495,11 +632,14 @@ class StartPage(QWidget):
         self.target_name.editingFinished.connect(self._name_changed)
         self.focus = _coord_spins()
         self.entry = _coord_spins()
-        for sp in self.focus + self.entry:
-            sp.valueChanged.connect(self._coords_changed)
+        for sp in self.focus:
+            sp.valueChanged.connect(lambda _v: self._coords_changed("focus"))
+        for sp in self.entry:
+            sp.valueChanged.connect(lambda _v: self._coords_changed("entry"))
         self.name_lbl = QLabel("Target name")
-        self.entry_lbl = QLabel("Transducer (scalp)")
-        for r, (lab, ws) in enumerate([(self.name_lbl, [self.target_name]), (QLabel("Target"), self.focus),
+        self.focus_lbl = QLabel("Target (focus)")
+        self.entry_lbl = QLabel("Transducer")
+        for r, (lab, ws) in enumerate([(self.name_lbl, [self.target_name]), (self.focus_lbl, self.focus),
                                        (self.entry_lbl, self.entry)]):
             lab.setObjectName("CardSub")
             g.addWidget(lab, r, 0)
@@ -509,69 +649,147 @@ class StartPage(QWidget):
         self.target_grid = QWidget()
         self.target_grid.setLayout(g)
         s.body.addWidget(self.target_grid)
+        self.space_help = _value_label()
+        self.space_help.setObjectName("CardSub")
+        s.body.addWidget(self.space_help)
+        self._space = "mni"           # the chosen space while the study does not fix one yet
+        self._choice: str | None = None
         return s
 
     def _mode(self) -> str:
         return str(self.model.get("placement.mode") or "manual")
 
+    def _placement(self) -> tuple[str | None, str | None]:
+        """(choice, space) the study's placement settings amount to: choice 'auto' (heuristic),
+        'entry' (mni, or manual in ras/voxel), None (not chosen yet: manual without positions)
+        or 'other' (localite, plantus, tus_entry, manual in MNI); space 'mni' | 'ras' | 'voxel'."""
+        m, mode = self.model, self._mode()
+        if mode == "heuristic":
+            return "auto", "mni"
+        if mode == "mni":
+            return "entry", "mni"
+        if mode == "manual":
+            cs = str(m.get("placement.manual.coordinate_space") or "voxel")
+            empty = all(is_empty(m.get(f"{TX}.{k}")) for k in ("trans_pos", "focus_pos"))
+            if empty and self._choice is None:
+                return None, self._space
+            if cs in ("ras", "voxel"):
+                return "entry", cs
+        return "other", None
+
+    def _target_key(self) -> str | None:
+        mode = self._mode()
+        return TARGET_MODES.get(mode) or (f"{TX}.focus_pos" if mode == "manual" else None)
+
+    def _entry_key(self) -> str | None:
+        mode = self._mode()
+        return {"mni": "placement.mni.trans_pos_mm", "manual": f"{TX}.trans_pos"}.get(mode)
+
+    def _apply(self, choice: str, space: str) -> None:
+        """Write placement.mode (and coordinate_space) for a choice in a space; the target
+        moves along between heuristic and mni, which share MNI coordinates."""
+        m = self.model
+        old = self._mode()
+        new = "heuristic" if choice == "auto" else "mni" if space == "mni" else "manual"
+        if old in TARGET_MODES and new in TARGET_MODES and old != new:
+            m.set(TARGET_MODES[new], m.get(TARGET_MODES[old]))
+        m.set("placement.mode", new)
+        if new == "manual":
+            m.set("placement.manual.coordinate_space", space)
+        self._choice, self._space = choice, space
+        self.window.on_model_edited()
+
     def _mode_chosen(self, button) -> None:
         if self._setting:
             return
-        m = self.model
-        new = "heuristic" if button is self.rb_auto else "mni"
-        old = self._mode()
-        if old in TARGET_MODES and old != new:          # carry the target over
-            m.set(TARGET_MODES[new], m.get(TARGET_MODES[old]))
-        m.set("placement.mode", new)
-        self.window.on_model_edited()
+        self._apply("auto" if button is self.rb_auto else "entry", self.space_combo.currentData())
+
+    def _space_chosen(self, index: int) -> None:
+        if self._setting or index < 0:
+            return
+        space = self.space_combo.itemData(index)
+        choice, _ = self._placement()
+        if choice in ("auto", "entry"):
+            self._apply("entry" if space != "mni" else choice, space)
+        else:
+            self._space = space
+            self.refresh()
 
     def _name_changed(self) -> None:
         if not self._setting and self._mode() == "heuristic":
             self.model.set("placement.heuristic.target_name", self.target_name.text().strip())
             self.window.on_model_edited()
 
-    def _coords_changed(self, _v: float = 0.0) -> None:
+    def _coords_changed(self, row: str) -> None:
         if self._setting:
             return
-        mode = self._mode()
-        if mode not in TARGET_MODES:
+        choice, space = self._placement()
+        key = self._target_key() if row == "focus" else self._entry_key()
+        if choice not in ("auto", "entry") or key is None:
             return
-        m = self.model
-        m.set(TARGET_MODES[mode], [round(s.value(), 1) for s in self.focus])
-        if mode == "mni":
-            m.set("placement.mni.trans_pos_mm", [round(s.value(), 1) for s in self.entry])
+        spins = self.focus if row == "focus" else self.entry
+        vals = [int(round(s.value())) if space == "voxel" else round(s.value(), 1) for s in spins]
+        self.model.set(key, vals)
         self.window.on_model_edited()
 
     def _refresh_target(self) -> None:
         m = self.model
         mode = self._mode()
-        known = mode in TARGET_MODES
-        self.rb_auto.setChecked(mode == "heuristic")
-        self.rb_entry.setChecked(mode == "mni")
-        if not known:
-            self.mode_group.setExclusive(False)
-            self.rb_auto.setChecked(False)
-            self.rb_entry.setChecked(False)
-            self.mode_group.setExclusive(True)
+        choice, space = self._placement()
+        known = choice in ("auto", "entry", None)
+        shown_space = space if space is not None else self._space   # 'other': the space to switch to
+        self.space_combo.setCurrentIndex(max(self.space_combo.findData(shown_space), 0))
+        self.space_combo.setEnabled(True)            # also for 'other': pick a space, then an option
+        self.rb_auto.setEnabled(shown_space == "mni")
+        self.rb_auto.setToolTip("placement.mode: heuristic (searches the scalp for a good entry point)"
+                                if space == "mni" else "Needs MNI coordinates")
+        self.rb_entry.setToolTip("placement.mode: mni (the transducer point is moved onto the scalp)"
+                                 if space == "mni" else
+                                 f"placement.mode: manual, coordinate_space: {space} (used as given)")
+        self.mode_group.setExclusive(False)
+        self.rb_auto.setChecked(choice == "auto")
+        self.rb_entry.setChecked(choice == "entry")
+        self.mode_group.setExclusive(True)
+        self.auto_note.setVisible(known and space != "mni")
         self.other_mode.setVisible(not known)
-        self.other_mode.setText(f"This study places the transducer with <b>{mode}</b>; that is set on the "
-                                "Placement tab. Choose an option above to use MNI coordinates instead.")
-        self.target_grid.setVisible(known)
-        self.name_lbl.setVisible(mode == "heuristic")
-        self.target_name.setVisible(mode == "heuristic")
-        self.entry_lbl.setVisible(mode == "mni")
+        where = (f" in {m.get('placement.manual.coordinate_space')} coordinates"
+                 if mode == "manual" else "")
+        self.other_mode.setText(f"This study places the transducer with <b>{mode}</b>{where}, set on the "
+                                "<a href='placement'>Placement tab</a>. Choose an option above to enter "
+                                "coordinates here instead.")
+        shown = choice in ("auto", "entry")
+        self.target_grid.setVisible(shown)
+        self.name_lbl.setVisible(choice == "auto")
+        self.target_name.setVisible(choice == "auto")
+        self.entry_lbl.setVisible(choice == "entry")
         for sp in self.entry:
-            sp.setVisible(mode == "mni")
-        if not known:
+            sp.setVisible(choice == "entry")
+        self.space_help.setVisible(known)
+        if space is not None:
+            help_ = SPACE_HELP[space]
+            if choice == "auto":
+                help_ += " PRESTUS searches the scalp for the transducer position."
+            elif choice == "entry" and space == "mni":
+                gap = m.get("placement.skin_gap_mm")
+                gap = f" ({gap:g} mm)" if isinstance(gap, (int, float)) else ""
+                help_ += (" The transducer point is a point on the scalp: PRESTUS moves it onto the scalp "
+                          f"and places the transducer's exit plane placement.skin_gap_mm{gap} outside it.")
+            elif choice == "entry":
+                help_ += (" The transducer point is the apex of the transducer bowl (the centre of its "
+                          "curved surface), not a point on the scalp; it is not moved.")
+            self.space_help.setText(help_)
+        self.entry_lbl.setText("Transducer (scalp point)" if space == "mni" else "Transducer (bowl apex)")
+        if not shown:
             return
+        _set_spin_space(self.focus + self.entry, space)
         if not self.target_name.hasFocus():
             self.target_name.setText(str(m.get("placement.heuristic.target_name") or ""))
-        for spins, key in ((self.focus, TARGET_MODES[mode]), (self.entry, "placement.mni.trans_pos_mm")):
-            vec = m.get(key)
-            if isinstance(vec, list) and len(vec) == 3:
-                for sp, val in zip(spins, vec):
-                    if not sp.hasFocus():
-                        sp.setValue(float(val))
+        for spins, key in ((self.focus, self._target_key()), (self.entry, self._entry_key())):
+            vec = m.get(key) if key else None
+            ok = isinstance(vec, list) and len(vec) == 3
+            for k, sp in enumerate(spins):
+                if not sp.hasFocus():
+                    sp.setValue(float(vec[k]) if ok else 0.0)
 
     # ── step 4: run ─────────────────────────────────────────────────────
     def _build_run_step(self) -> _Step:
@@ -637,8 +855,8 @@ class StartPage(QWidget):
             items = "".join(f"<li><a href='{i.path}#{i.transducer}' style='color:{c['red']}'>"
                             f"{self._friendly(i)}</a>: {i.message}</li>" for i in errors[:5])
             extra = f"<br>…and {len(errors) - 5} more under Issues in the header." if len(errors) > 5 else ""
-            self.problems.setText(f"<b>{len(errors)} thing(s) to fix before running</b> "
-                                  f"(click one to go to it):<ul style='margin:4px 0'>{items}</ul>{extra}")
+            self.problems.setText(f"<b>Settings to fix:</b>"
+                                  f"<ul style='margin:4px 0'>{items}</ul>{extra}")
         else:
             self.problems.setText(f"<span style='color:{c['green']}'>✓ Ready to run.</span>")
         self.run_btn.setEnabled(not errors)
@@ -648,9 +866,10 @@ class StartPage(QWidget):
 
     # ── all ─────────────────────────────────────────────────────────────
     def _step_issues(self, step: str) -> list:
-        keys = STEP_KEYS[step]
+        keys, skip = STEP_KEYS[step], STEP_EXCLUDE.get(step, ())
         return [i for i in self.window.issues if i.level in ("error", "warning")
-                and any(i.path == k or i.path.startswith(k) for k in keys)]
+                and any(i.path == k or i.path.startswith(k) for k in keys)
+                and not any(i.path == k or i.path.startswith(k) for k in skip)]
 
     def _set_step_state(self, s: _Step, step: str, complete: bool) -> None:
         """'To do' until the user has filled the step in (its errors are expected then);
@@ -658,13 +877,13 @@ class StartPage(QWidget):
         issues = self._step_issues(step)
         errs = [i for i in issues if i.level == "error"]
         warns = [i for i in issues if i.level == "warning"]
-        s.status.setToolTip("\n".join(f"{self._friendly(i)}: {i.message}" for i in issues))
+        detail = "\n".join(f"{self._friendly(i)}: {i.message}" for i in issues)
         if not complete:
             s.set_state("todo", "To do")
         elif errs:
-            s.set_state("error", f"{len(errs)} problem{'s' if len(errs) > 1 else ''}")
+            s.set_state("error", f"{len(errs)} problem{'s' if len(errs) > 1 else ''}", detail)
         elif warns:
-            s.set_state("warn", f"{len(warns)} warning{'s' if len(warns) > 1 else ''}")
+            s.set_state("warn", f"{len(warns)} warning{'s' if len(warns) > 1 else ''}", detail)
         else:
             s.set_state("done", "Done")
 
@@ -686,16 +905,15 @@ class StartPage(QWidget):
         self._set_step_state(self.step_image, "image", bool(self.t1_edit.text()))
         self._set_step_state(self.step_tx, "transducer", not is_empty(m.get(f"{TX}.serial"))
                              and isinstance(m.get(f"{TX}.focal_distance_ep"), (int, float)))
-        mode = self._mode()
-        target = m.get(TARGET_MODES.get(mode, "")) if mode in TARGET_MODES else None
-        if mode in TARGET_MODES:
-            placed = isinstance(target, list) and len(target) == 3 and \
-                (mode != "heuristic" or not is_empty(m.get("placement.heuristic.target_name")))
-        elif mode == "manual":
-            placed = all(not is_empty(m.get(f"{TX}.{k}")) for k in ("trans_pos", "focus_pos"))
+        choice, _ = self._placement()
+        if choice in ("auto", "entry"):
+            vec3 = lambda k: k is not None and isinstance(m.get(k), list) and len(m.get(k)) == 3  # noqa: E731
+            placed = vec3(self._target_key()) and \
+                (choice != "auto" or not is_empty(m.get("placement.heuristic.target_name"))) and \
+                (choice != "entry" or vec3(self._entry_key()))
         else:
-            placed = True                       # localite/plantus/…: their checks are the issues
+            placed = choice == "other"          # localite/plantus/…: their checks are the issues
         self._set_step_state(self.step_target, "target", placed)
         n_err = sum(1 for i in self.window.issues if i.level == "error")
         self.step_run.set_state("done" if not n_err else "todo",
-                                "Ready" if not n_err else f"{n_err} error(s) left")
+                                "Ready" if not n_err else f"{labels.plural(n_err, 'error')} left")

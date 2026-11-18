@@ -16,10 +16,12 @@ from PyQt6.QtCore import QObject, Qt, QUrl, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QHBoxLayout, QLabel, QMessageBox, QPushButton,
                              QVBoxLayout, QWidget)
 
+from .. import checks
 from .. import mesh3d as m3
 from .. import plantus as pt
 from . import style
 from .empty_state import EmptyStack
+from .medium_selector import setup_note
 from .view3d import HAVE_Q3D, can_render, from_scene, look_rotation, to_scene
 
 if HAVE_Q3D:
@@ -177,6 +179,11 @@ class PlantusPage(QWidget):
         intro.setObjectName("CardSub")
         intro.setWordWrap(True)
         v.addWidget(intro)
+        self.setup = QLabel()                   # what the method still needs (Placement method row)
+        self.setup.setTextFormat(Qt.TextFormat.RichText)
+        self.setup.setWordWrap(True)
+        self.setup.hide()
+        v.addWidget(self.setup)
 
         bar = QHBoxLayout()
         bar.addWidget(QLabel("Map"))
@@ -246,6 +253,9 @@ class PlantusPage(QWidget):
             self._stale = True
             return
         is_mode = self.model.get("placement.mode") == "plantus"
+        note = setup_note(checks.placement_mode_status(self.model).get("plantus")) if is_mode else ""
+        self.setup.setText(note)
+        self.setup.setVisible(bool(note))
         self.compute_btn.setEnabled(is_mode)
         path = pt.metrics_path(self.model)
         if path is None:
@@ -427,12 +437,13 @@ class PlantusPage(QWidget):
                   if key == "skin_target_distances" else
                   {"low": "lower", "high": "higher"}[{k: b for k, _l, _u, b in pt.MAPS}[key]])
         weights = ", ".join(f"{k.replace('_', ' ')} {w:g}" for k, w in m.weights.items())
+        # one line each: the map's scale, the markers, the weights, then how to use it
         self.legend.setText(
-            f"{label}{rng}: bright = better ({better}); grey = excluded (avoidance area or no value) · "
+            f"{label}{rng}: bright = better ({better}); grey = excluded (avoidance area or no value)<br>"
             f"<span style='color:{TARGET}'>●</span> target · <span style='color:{BEST}'>●</span> optimum · "
             f"<span style='color:{style.active()[PLACED]}'>●</span> placed · <span style='color:{CLICKED}'>●</span> chosen, "
-            f"with the beam axis and the transducer · click to choose"
-            + (f" · weights: {weights}" if weights else ""))
+            f"with the beam axis and the transducer<br>"
+            + (f"Weights: {weights}<br>" if weights else "") + "Click to choose")
 
     def _reset_view(self, force: bool = False) -> None:
         """Centre on the target, seen from the chosen (else optimum) position."""

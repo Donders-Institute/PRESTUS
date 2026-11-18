@@ -234,7 +234,7 @@ def estimate(model: ConfigModel, records: list[dict] | None = None,
         vals, basis = _select(records, keys, _ACOUSTIC_FIELDS, lambda r: _num(r.get("acoustic_s")))
         est.acoustic_s = _figure(vals, basis)
         if est.acoustic_s is None:
-            est.notes.append("Acoustic sim: no earlier run with this solver, medium and resolution.")
+            est.notes.append("Acoustic sim: no earlier run with this solver, medium, and resolution.")
 
     if model.get("modules.run_heating_sims"):
         steps = thermal_steps(model)
@@ -246,7 +246,7 @@ def estimate(model: ConfigModel, records: list[dict] | None = None,
         if steps is None:
             est.notes.append("Thermal sim: timing protocol incomplete.")
         elif not vals:
-            est.notes.append("Thermal sim: no earlier run with this solver, medium and resolution.")
+            est.notes.append("Thermal sim: no earlier run with this solver, medium, and resolution.")
         else:
             est.thermal_s = _figure(vals, basis, scale=steps)
 

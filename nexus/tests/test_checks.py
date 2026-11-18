@@ -52,7 +52,7 @@ def test_transducer_rules(schema):
     m.set("transducer.freq_hz", 500e3, 1)
     m.set("transducer.serial", "CTX_500_026", 1)           # not on transducer 1
     found = _msgs(checks.rule_issues(m), "error")
-    assert ("transducer.freq_hz", "error") in found
+    assert ("transducer.freq_hz", "error") not in found      # mixed frequencies are allowed
     assert ("transducer.serial", "error") in found
 
 
@@ -116,14 +116,25 @@ def test_mode_status_without_segmentation(schema, tmp_path):
     assert st["manual"].state == "ready"
     for mode in ("heuristic", "mni", "plantus", "tus_entry"):
         assert st[mode].state == "unavailable"
-        assert "simnibs_bin_path" in st[mode].reason
+        assert "SimNIBS bin folder" in st[mode].reason
+    assert st["localite"].state == "pending"          # no pose location set yet: selectable to set it
+    assert "Localite exports folder" in st["localite"].reason
+
+
+def test_localite_unavailable_names_the_folders(schema, tmp_path):
+    model = _subject(schema, tmp_path)
+    raw = tmp_path / "localite_raw"
+    raw.mkdir()
+    model.set("path.localite_raw", str(raw))
+    st = checks.placement_mode_status(model)
     assert st["localite"].state == "unavailable"
+    assert str(raw) in st["localite"].reason
 
 
 def test_mode_status_segmentation_runs_first(schema, tmp_path):
     st = checks.placement_mode_status(_subject(schema, tmp_path, simnibs=True))
     assert st["heuristic"].state == "pending"
-    assert "charm runs first" in st["heuristic"].reason
+    assert "charm runs first" in st["heuristic"].reason and "subject" in st["heuristic"].reason
 
 
 def test_mode_status_plantus_needs_mesh_and_paths(schema, tmp_path):
@@ -135,7 +146,7 @@ def test_mode_status_plantus_needs_mesh_and_paths(schema, tmp_path):
     m = _subject(schema, tmp_path / "b", m2m=SEG + ("sub-003.msh",))
     st = checks.placement_mode_status(m)
     assert st["plantus"].state == "pending"                # tool paths not set: still selectable
-    assert "script_path" in st["plantus"].reason
+    assert "PlanTUS script" in st["plantus"].reason
 
 
 def test_mode_status_localite(schema, tmp_path):
@@ -230,3 +241,17 @@ def test_path_button_icons():
     app = QApplication.instance() or QApplication([])  # noqa: F841
     assert PathButton("file").toolTip() == "Choose a file"
     assert PathButton("dir").toolTip() == "Choose a folder" and not PathButton("dir").icon().isNull()
+
+
+def test_transducers_at_different_frequencies_allowed(schema):
+    """load_transducer_parameters.m runs each frequency as its own simulation: no error, for
+    async and coherent coupling alike."""
+    from prestus_nexus import checks
+    from prestus_nexus.model import ConfigModel
+    m = ConfigModel(schema)
+    m.set("transducer.freq_hz", 500000)
+    m.add_transducer()
+    m.set("transducer.freq_hz", 300000, 1)
+    for coupling in ("async", "coherent"):
+        m.set("simulation.transducer_coupling", coupling)
+        assert not [i for i in checks.all_issues(m) if i.path == "transducer.freq_hz" and i.level == "error"]

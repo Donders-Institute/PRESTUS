@@ -60,7 +60,7 @@ def settings_summary(model: ConfigModel) -> list[tuple[str, str]]:
         ("Localite folder", str(model.get("placement.localite.loc_folder") or "(directly under ses-XX)")),
         ("Pulses per series", "accept all" if is_empty(seg) else f"{seg} (±20)"),
         ("Coils", f"{len(coil)} in neuronav.coil_map" if isinstance(coil, list) and coil else "single coil"),
-        ("Names", naming + (f", {len(labels)} label rule(s)" if isinstance(labels, list) and labels else "")),
+        ("Names", naming + (f", {len(labels)} label {'rule' if len(labels) == 1 else 'rules'}" if isinstance(labels, list) and labels else "")),
         ("Overwrite", str(model.get("io.overwrite_files"))),
     ]
 
@@ -84,4 +84,61 @@ def use_in_study(model: ConfigModel, ses: str, targets: list[str]) -> list[tuple
         changes.append(("placement.localite.target", targets[0] if len(targets) == 1 else list(targets)))
     for key, value in changes:
         model.set(key, value)
+    return changes
+
+
+# ── Import trajectory: one Localite XML export (placement.localite.file) ──────────────
+def usable_series(series: list[dict]) -> list[dict]:
+    """Series of a file that can place a transducer: recorded poses away from the origin
+    (nexus_neuronav 'file_series'; the run refuses the others)."""
+    return [s for s in series if s.get("is_pose", True) and s.get("tracked", True)]
+
+
+def series_label(s: dict) -> str:
+    """One line per series in the import list: number, description, markers averaged."""
+    n = int(s.get("n_markers") or 0)
+    text = f"Series {int(s['index'])}"
+    if s.get("description"):
+        text += f": {s['description']}"
+    text += f" ({n} marker{'s' if n != 1 else ''}"
+    dev = s.get("pos_dev_mm")
+    if n > 1 and isinstance(dev, (int, float)) and dev == dev:
+        text += f", mean deviation {dev:.1f} mm"
+    return text + ")"
+
+
+def _per_transducer(model: ConfigModel, key: str, value: Any, ti: int) -> Any:
+    """value for transducer ti in a key that lists one entry per transducer when there are
+    several (preproc_transducer_placement); other entries keep their value (or the default)."""
+    n = model.n_transducers
+    if n <= 1:
+        return value
+    cur = model.get(key)
+    items = list(cur) if isinstance(cur, list) and len(cur) == n else [cur] * n
+    default = 1 if key.endswith(".position") else ""
+    items = [default if is_empty(v) else v for v in items]
+    items[ti] = value
+    return items
+
+
+def file_import_settings(model: ConfigModel, file: str, chosen: dict, series: list[dict],
+                         ti: int = 0) -> list[tuple[str, Any]]:
+    """Config values that make transducer ti use one series of a Localite XML at run time:
+    placement.mode localite, placement.localite.file, and the series by its description when
+    that is unique in the file (placement.localite.target), else by its number (.position)."""
+    descr = (chosen.get("description") or "").strip()
+    unique = bool(descr) and sum(1 for s in series if (s.get("description") or "").strip() == descr) == 1
+    changes: list[tuple[str, Any]] = [("placement.mode", "localite"), ("placement.localite.file", file)]
+    if unique:
+        changes.append(("placement.localite.target", _per_transducer(model, "placement.localite.target", descr, ti)))
+        if model.n_transducers <= 1:
+            changes.append(("placement.localite.position", None))       # reset: target decides
+    else:
+        changes.append(("placement.localite.position",
+                        _per_transducer(model, "placement.localite.position", int(chosen["index"]), ti)))
+        if model.n_transducers <= 1:
+            changes.append(("placement.localite.target", None))
+        elif not is_empty(model.get("placement.localite.target")):
+            # a target named for this transducer would override the number
+            changes.append(("placement.localite.target", _per_transducer(model, "placement.localite.target", "", ti)))
     return changes

@@ -140,3 +140,53 @@ def test_model_without_history_is_unchanged(schema):
     m = ConfigModel(schema)
     m.set("subject_id", 6)
     assert m.get("subject_id") == 6 and "_edit_hooks" not in m.__dict__
+
+
+class Table:
+    """A tracked target (like the Study tab's runs table)."""
+    def __init__(self):
+        self.rows = []
+
+    def snapshot(self):
+        return list(self.rows)
+
+    def restore(self, snap):
+        self.rows = list(snap)
+
+
+def test_tracked_target_and_group(schema):
+    m, h, _ = _hist(schema)
+    t = Table()
+    h.track(t)
+    with h.group("Add runs"):
+        t.rows += ["1", "2"]
+    m.set("subject_id", 3)
+    with h.group("Nothing"):                              # no change: no step
+        pass
+    with h.group("Change table file"):                    # config and target: one step
+        m.set("simulation.medium", "water")
+        t.rows = ["9"]
+    assert len(h._undo) == 3 and h.undo_text() == "Undo change table file"
+    h.undo()
+    assert t.rows == ["1", "2"] and m.get("simulation.medium") != "water" and m.get("subject_id") == 3
+    h.undo()
+    h.undo()
+    assert t.rows == [] and not m.overrides
+    h.redo()
+    assert t.rows == ["1", "2"]
+
+
+def test_group_pass_ends_at_the_event_loop(schema):
+    from PyQt6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    m, h, _ = _hist(schema)
+    h.group_pass("Move focus")
+    m.set("subject_id", 1)
+    m.set("simulation.medium", "water")
+    h.group_pass("Ignored: already open")
+    app.processEvents()
+    assert len(h._undo) == 1 and h.undo_text() == "Undo move focus"
+    h.group_pass("Move focus")
+    m.set("subject_id", 2)
+    h.undo()                                              # closes the pending step first
+    assert m.get("subject_id") == 1

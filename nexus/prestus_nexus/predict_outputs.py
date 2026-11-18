@@ -27,6 +27,13 @@ _MODE_FUNCTION = {
 }
 
 
+def _on(value, default: bool) -> bool:
+    """A 0/1 config flag; unset (None or '') means the default."""
+    if value is None or value == "":
+        return default
+    return bool(value)
+
+
 def _is_num(v) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
@@ -150,9 +157,7 @@ def predict(model: ConfigModel) -> Plan:
     warnings: list[str] = []
     if mode != "single":
         warnings.append(
-            f"Assumes {_MODE_FUNCTION[mode]} runs with its default options (see its own help text); "
-            "a non-default call to prestus_pipeline_start(parameters, options) can add to or remove "
-            "from this list.")
+            f"Assumes the default options of {_MODE_FUNCTION[mode]}; other options can change this list.")
 
     common_dirs = ["nii/", "img/", "log/", "cache/"]
     if bool(model.get("simulation.debug")):
@@ -166,6 +171,24 @@ def predict(model: ConfigModel) -> Plan:
         artifacts.append(Artifact(f"{tag}_{medium}_report{base_affix}.html", "HTML report"))
         if layered and bool(model.get("modules.run_targeting_analysis")):
             artifacts.append(Artifact(f"{tag}_{medium}{base_affix}_targeting.csv", "targeting accuracy"))
+        if layered and _on(model.get("report.segmentation"), True):
+            artifacts.append(Artifact(f"{tag}_{medium}_segmentation_report{base_affix}.html",
+                                      "segmentation report (head-model postprocessing)"))
+        if bool(model.get("simulation.debug")) and _on(model.get("report.debug"), True):
+            artifacts.append(Artifact(f"{tag}_{medium}_debug_report{base_affix}.html", "debug report"))
+        # preproc_transducer_placement.m: an empty placement.report counts as on
+        report = model.get("placement.report")
+        if _on(model.get("modules.run_transducer_placement"), True) and \
+                (report in (None, "", []) or bool(report)):
+            mode_name = str(model.get("placement.mode") or "manual").lower()
+            artifacts.append(Artifact(f"{tag}_placement_{mode_name}{base_affix}.html", "placement report"))
+        # time_reversal_stage.m (k-Wave source setup only; skipped with BabelBrain)
+        if _on(model.get("time_reversal.enabled"), False) and \
+                str(model.get("acoustic_backend") or "").lower() != "babelbrain":
+            artifacts.append(Artifact(f"{tag}_{medium}{base_affix}_timereversal_summary.csv",
+                                      "time reversal: refocusing and aberration per transducer"))
+            artifacts.append(Artifact(f"{tag}_{medium}{base_affix}_timereversal_elements.csv",
+                                      "time reversal: transfer and phases per element"))
         jobs.append("1 job — the full pipeline, start to finish (prestus_pipeline.m)")
 
     elif mode == "async":
@@ -185,7 +208,7 @@ def predict(model: ConfigModel) -> Plan:
                 label = f"{label} (sweep point {j}/{n_points})"
             artifacts.append(Artifact(f"{tag}_{medium}{affix}.csv", label))
             artifacts.append(Artifact(f"{tag}_{medium}_report{affix}.html", label))
-        grid_mode = model.get("simulation.async_grid_mode") or "shared"
+        grid_mode = model.get("grid.async_layout") or "shared"
         if grid_mode == "per_transducer":
             jobs.append(f"{n_trans} preprocessing jobs — grid.async_layout='per_transducer', one grid each")
         else:
@@ -248,12 +271,12 @@ def predict(model: ConfigModel) -> Plan:
         if nested == "multi_isppa":
             jobs.append("1 preprocessing job (stage 1)")
             jobs.append("5 multi-ISPPA runs, one per variant (default, Temp-H, Temp-L, Trans-H, Trans-L): "
-                        f"default, Temp-H and Temp-L each 1 acoustic job, {n_pts} thermal jobs and 1 summary "
+                        f"default, Temp-H, and Temp-L each 1 acoustic job, {n_pts} thermal jobs and 1 summary "
                         "job; Trans-H and Trans-L run acoustic only, without thermal jobs")
             jobs.append(f"{n_pts} uncertainty report job(s), one per target (stage 7)")
         elif nested == "async":
             jobs.append("5 async multi-transducer runs, one per variant (default, Temp-H, Temp-L, Trans-H, "
-                        "Trans-L), each with its own preprocessing, acoustic, combine and joint jobs; "
+                        "Trans-L), each with its own preprocessing, acoustic, combine, and joint jobs; "
                         "Trans-H and Trans-L run acoustic only")
             jobs.append(f"{n_pts} uncertainty report job(s), one per sweep point (stage 7)")
         else:
@@ -315,7 +338,7 @@ def save_items(model: ConfigModel) -> list[SaveItem]:
         ("save_source_matrices", "source matrices", f"cache/{stem}_kwave_source{affix}.mat",
          "transducer source array, shared across variants", not babelbrain, "BabelBrain sets up its own source"),
         ("save_acoustic_matrices", "acoustic matrices", f"cache/{stem}_results{affix}.mat",
-         "sensor data, grid, medium and source; can be very large", True, ""),
+         "sensor data, grid, medium, and source; can be very large", True, ""),
         ("save_thermal_matrices", "thermal matrices", f"cache/{stem}_heating_res{affix}.mat",
          "temperature time series and field maps", heating, "no thermal simulation"),
         ("save_grid_cache", "grid cache", f"cache/{stem}_grid_cache{affix}.mat",
@@ -362,7 +385,7 @@ def save_items(model: ConfigModel) -> list[SaveItem]:
         items.append(SaveItem(label, kind, where, saved, reason if applies else why_not, applies, note, pattern))
     debug = bool(g("simulation.debug"))
     items.append(SaveItem("debug diagnostics", "folder", "debug/", debug, f"simulation.debug: {_flag(g('simulation.debug'))}",
-                          True, "preproc/, medium/ and source/ figures and data", "debug/*"))
+                          True, "preproc/, medium/, source/, and babelbrain/ figures and data, indexed by the debug report", "debug/*"))
     return items
 
 
@@ -393,7 +416,7 @@ def save_summary(model: ConfigModel) -> list[str]:
     debug_on = bool(g("simulation.debug"))
     lines.append(("✓" if debug_on else "✗") +
                  " Debug diagnostics (simulation.debug): " +
-                 ("ON — writes debug/{preproc,medium,source}/" if debug_on else "OFF"))
+                 ("ON — writes debug/{preproc,medium,source,babelbrain}/ and a debug report" if debug_on else "OFF"))
     return lines
 
 

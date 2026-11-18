@@ -67,6 +67,19 @@ class TransducerSchematic(PaintedExportable, QWidget):
                 "min_foc": getattr(dev, "min_foc", None), "max_foc": getattr(dev, "max_foc", None),
                 "name": (dev.label() if dev else g("transducer.name", ti)) or ""}
 
+    PAD = 28
+
+    def _fit(self, z_hi: float, z_max: float, a: float, W: float, H: float) -> tuple[float, float]:
+        """(mm-per-pixel factor for both axes, so the drawing is to scale; x of the bowl apex)
+        that fit the drawn extent (apex at z = 0 to the farthest mark z_hi), centred."""
+        pad = self.PAD
+        s = min((W - 2 * pad) / z_max, (H - 2 * pad - 18) / (2.4 * a))
+        return s, max(pad, (W - z_hi * s) / 2)
+
+    def _frame(self, z_hi, z_max, a, W, H, on_screen: bool) -> tuple[float, float]:
+        """Scale and apex position for this paint: fitted to the drawing each time."""
+        return self._fit(z_hi, z_max, a, W, H)
+
     def paint(self, qp: QPainter, rect: QRectF, C: dict) -> None:
         """The schematic in palette ``C`` (style.active() on screen, export.py for files)."""
         qp.fillRect(rect, QColor(C["surface"]))
@@ -88,11 +101,11 @@ class TransducerSchematic(PaintedExportable, QWidget):
         z_rim = sag(a)
         z_ep = R - geo["dist_geom_ep"] if R and geo["dist_geom_ep"] is not None else z_rim
         marks = [z_rim + 5, (R or 0), z_ep + (geo["fd"] or 0), z_ep + (geo["max_foc"] or 0)]
-        z_max = max(marks) * 1.1 + 5
+        z_hi = max(marks)
+        z_max = z_hi * 1.1 + 5
         W, H = rect.width(), rect.height()
-        pad = 28
-        s = min((W - 2 * pad) / z_max, (H - 2 * pad - 18) / (2.4 * a))
-        X = lambda z: pad + z * s  # noqa: E731
+        s, x0 = self._frame(z_hi, z_max, a, W, H, qp.device() is self)
+        X = lambda z: x0 + z * s  # noqa: E731
         yc = H / 2 + 6
         Y = lambda r: yc - r * s  # noqa: E731
 
@@ -144,8 +157,12 @@ class TransducerSchematic(PaintedExportable, QWidget):
             qp.drawText(QPointF(X(zf) - 30, yc + 22), f"focus {geo['fd']:g} mm")
 
         qp.setPen(QColor(C["ink2"]))
-        # Elide the device name, not the dimensions, when the header is too wide.
-        dims = f"  ·  aperture {2 * a:.3g} mm" + (f"  ·  ROC {R:g} mm" if R else "")
-        fm = qp.fontMetrics()
-        name = fm.elidedText(geo["name"], Qt.TextElideMode.ElideRight, max(0, int(W - 16 - fm.horizontalAdvance(dims))))
-        qp.drawText(QRectF(8, 4, W - 16, 16), Qt.AlignmentFlag.AlignLeft, name + dims)
+        # On screen the device selector above names the device; an exported figure names it
+        # itself (eliding the name, not the dimensions, when the header is too wide).
+        dims = f"aperture {2 * a:.3g} mm" + (f"  ·  ROC {R:g} mm" if R else "")
+        if qp.device() is not self:
+            dims = "  ·  " + dims
+            fm = qp.fontMetrics()
+            dims = fm.elidedText(geo["name"], Qt.TextElideMode.ElideRight,
+                                 max(0, int(W - 16 - fm.horizontalAdvance(dims)))) + dims
+        qp.drawText(QRectF(8, 4, W - 16, 16), Qt.AlignmentFlag.AlignLeft, dims)

@@ -31,9 +31,31 @@ def window(app, schema, prestus_root, tmp_path):
 
 
 def test_tabs_span_the_window(window):
-    assert window.tabs.tabBar().expanding()
-    assert window.tabs.tabText(0) == "QuickStart"
-    assert not window.tabs.tabText(1)[0].isdigit()                 # plain labels, no step numbers
+    bar = window.tabs.tabBar()
+    assert bar.expanding()
+    assert bar.label(0) == "QuickStart"
+    assert not bar.label(1)[0].isdigit()                           # plain labels, no step numbers
+
+
+def test_tab_problems_colour_the_label_and_count_by_advanced(window):
+    """A tab with problems keeps its plain label in the status colour; the count sits next
+    to the tab's Advanced button."""
+    bar = window.tabs.tabBar()
+    flagged = 0
+    for i in range(window.tabs.count()):
+        tab = window.tabs.widget(i)
+        if not hasattr(tab, "issue_badge"):
+            continue
+        n = sum(1 for iss in window.issues if window._issue_tab(iss) == tab.key
+                and iss.level in ("error", "warning"))
+        assert not any(ch.isdigit() for ch in bar.label(i))
+        assert bar.tabIcon(i).isNull() or bar.is_compact()          # no status dot
+        assert (bar.label_color(i) is not None) == bool(n)
+        assert tab.issue_badge.isVisibleTo(tab) == bool(n)
+        if n:
+            flagged += 1
+            assert tab.issue_badge.text().split()[-1].isdigit()
+    assert flagged                          # an untitled study has problems (no subject, paths)
 
 
 def test_placement_opens_on_settings_first(window):

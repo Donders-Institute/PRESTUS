@@ -264,7 +264,7 @@ class Bowl:
 
 
 def fov_box(trans, focus, diameter_mm: float, length_mm: float) -> dict[str, np.ndarray]:
-    """Beam-aligned box for the acoustic FOV crop (doc_limited_fov.md): axial extent
+    """Beam-aligned box for the acoustic FOV crop (doc_partial-fov.md): axial extent
     length_mm starting at the transducer centre, lateral extent diameter_mm (full
     width) centred on the focus. Returns the 8 corners and the 12 edges (each a (2,3)
     point pair) in RAS mm, for drawing -- a projection of the 3-D box, not a true
@@ -362,8 +362,7 @@ def _inward_normal(seg: Volume, p: np.ndarray, labels, radius: float = 5.0) -> n
 
 
 def beam_qc(seg: Volume, trans, focus, bowl: Bowl, step: float = 0.25) -> dict[str, float]:
-    """Geometry of a placement along its beam, from the tissue labels
-    (code/report/02_placement/placement_geometry_metrics.m uses the same measures):
+    """Geometry of a placement along its beam, from the tissue labels:
 
     skull_path_mm               bone on the central ray, exit plane -> focus
     skull_incidence_deg         beam vs skull normal where the central ray enters bone

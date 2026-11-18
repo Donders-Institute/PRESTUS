@@ -25,6 +25,8 @@ function out = nexus_calibration(args)
 %     'save'    .out_dir, .allow_shipped
 %     'export_settings' .path, .settings;  'export_profiles' .path
 %     'write_fit' .path (MAT file for a k-Wave drive check script)
+%     'report'  .out_path ('' = <tempdir>/<combo>_report.html): the HTML report
+%               of the saved library entry (GENERATE_CALIBRATION_REPORT)
 %     'close'
 %   settings - .forward_model, .near_field_skip_mm, .huber_delta, .n_starts,
 %              .domain, .isppa_wcm2, .align, .max_extrapolation_mm, .tolerance,
@@ -70,6 +72,8 @@ function out = nexus_calibration(args)
             out = export_profiles(S, args);
         case 'write_fit'
             out = write_fit(S, args);
+        case 'report'
+            out = do_report(S, args);
         case 'close'
             remove(sessions, key);
             out = struct('closed', key);
@@ -203,6 +207,22 @@ function out = do_save(S, args)
         'AllowShipped', logical(get_nonempty_field(args, 'allow_shipped', false)));
     [file, prof_csv] = calibration_save_entry(S.fit.entry, S.fit, char(args.out_dir), so);
     out = struct('file', file, 'profiles_csv', prof_csv, 'out_dir', char(args.out_dir));
+end
+
+function out = do_report(S, args)
+    % The entry is looked up again: a 'save' since 'open' may have written one
+    lib_file = ''; lib_folder = '';
+    for folder = [S.user_libs, {S.lib_path}]
+        if isempty(folder{1}); continue; end
+        [f, has] = library_entry_file(folder{1}, S.combo);
+        if has; lib_file = f; lib_folder = folder{1}; break; end
+    end
+    assert(~isempty(lib_file), 'nexus_calibration:noEntry', ...
+        'No library entry for %s yet: save a fit first.', S.combo);
+    out_path = char(get_nonempty_field(args, 'out_path', ''));
+    if isempty(out_path); out_path = fullfile(tempdir, [S.combo '_report.html']); end
+    file = generate_calibration_report(S.combo, lib_folder, out_path, S.equip);
+    out = struct('file', file, 'library_file', lib_file);
 end
 
 function out = export_settings(S, args)

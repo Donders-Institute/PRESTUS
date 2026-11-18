@@ -3,8 +3,8 @@ function nexus_bridge(bridge_dir, options)
 %
 % The Nexus (Python/Qt) starts this once with matlab -batch and sends it
 % requests as files, so interactive steps (Localite detect/write, transducer
-% calibration predict/fit/save) run in MATLAB without a MATLAB start-up per
-% click. Protocol, all inside bridge_dir:
+% calibration predict/fit/save, pseudo-CT) run in MATLAB without a MATLAB
+% start-up per click. Protocol, all inside bridge_dir:
 %
 %   req/<id>.json       request {"id", "fn", "args"}, written by the Nexus
 %                       (to a temporary name, then renamed)
@@ -42,7 +42,7 @@ arguments
     options.Poll (1,1) double = 0.05
 end
 
-    allowed = {'nexus_calibration', 'nexus_neuronav', 'nexus_pct', 'nexus_ping'};
+    allowed = {'nexus_calibration', 'nexus_equipment', 'nexus_neuronav', 'nexus_pct', 'nexus_ping'};
     root = get_prestus_path();
     % genpath over a network drive takes seconds: add the trees only when missing, and of
     % external/ only what the façades use (YAML, Localite XML, the fexminimize optimiser)

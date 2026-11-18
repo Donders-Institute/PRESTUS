@@ -241,6 +241,16 @@ class ConfigModel:
             for key, value in tx[0].items():
                 if key not in t:
                     t[key] = {} if isinstance(value, dict) else copy.deepcopy(first[key])
+        # Keys only later transducers set (e.g. timing_offset_s of a sequence): every element
+        # gets them too, with the value it has anyway (the default, or {} for a group).
+        for key in dict.fromkeys(k for t in self.tx[1:] for k in t):
+            if key in self.tx[0]:
+                continue
+            group = any(isinstance(t.get(key), dict) for t in self.tx[1:])
+            default = first[key] if key in first else self._node_default(f"{TX}.{key}")
+            for t in tx:
+                if key not in t:
+                    t[key] = {} if group else copy.deepcopy([] if default is None else default)
         return tx
 
     def _ordered(self, data: dict, node: Node) -> dict:
@@ -492,8 +502,11 @@ class ConfigModel:
         return "" if is_empty(serial) else str(serial)
 
     def transducer_title(self, ti: int) -> str:
-        """'Transducer N: <serial>', or 'Transducer N' without a serial."""
+        """'Transducer N: <device>' (the library's short name, e.g. 'CTX-500 #026', else the
+        serial), or 'Transducer N' without a serial."""
         name = self.transducer_name(ti)
+        if name and self.library is not None:
+            name = self.library.short_name(name)
         return f"Transducer {ti + 1}: {name}" if name else f"Transducer {ti + 1}"
 
     def transducer_tooltip(self, ti: int) -> str:
@@ -577,7 +590,7 @@ class ConfigModel:
                     continue
                 elif node is None:
                     hint = self.schema.suggest(path)
-                    msg = "Unknown key; PRESTUS will ignore it"
+                    msg = "Not a PRESTUS setting (misspelt, or in the wrong section); PRESTUS ignores it"
                     msg += f" (did you mean '{hint.rsplit('.', 1)[-1]}'?)" if hint else ""
                     issues.append(Issue("warning", path, msg, ti))
                 elif node.is_group and isinstance(value, dict):

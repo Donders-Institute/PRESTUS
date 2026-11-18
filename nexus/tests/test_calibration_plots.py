@@ -73,7 +73,7 @@ def test_widget_offscreen():
     app = QApplication.instance() or QApplication([])
     w = cp.CalibrationCoverage()
     w.resize(420, 320)
-    assert w.stack.currentWidget() is w.empty and "geometric model" in w.empty.text()
+    assert w.stack.currentWidget() is w.empty and "No calibration entry" in w.empty.text()
     entry = {"meta": {"quality": {"in_sample_r2_median": 0.97}},
              "global_model": {"fit_depths_ep_mm": [40, 50], "fit_r2": [0.85, 0.95]},
              "refinement": {"depths_ep_mm": [40, 50], "elem_p_amp": [1e5, 1.1e5], "isppa_wcm2": 30,

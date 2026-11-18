@@ -115,3 +115,29 @@ def test_orientation_from_model_flags_tilted_beams_on_coarse_grids(schema):
     assert mt.orientation(m)["coarse_tilted"] == []
     m.set("grid.mode", "principal_axis")
     assert "removed" in mt.orientation(m)["error"]
+
+
+# ── top-view schematic ────────────────────────────────────────────────────────
+
+def test_schematic_top_view_left_right_front():
+    """Left and right stances land on the left and right, the farthest on the outline, the
+    foci inside; z is dropped; a missing position gives None."""
+    txs = [{"trans_pos": [40, 100, 150], "focus_pos": [90, 100, 100]},     # left
+           {"trans_pos": [160, 100, 150], "focus_pos": [110, 100, 100]},   # right
+           {"trans_pos": [100, 170, 120], "focus_pos": [100, 120, 100]},   # front
+           {"trans_pos": None, "focus_pos": None}]
+    out = mt.schematic_top_view(txs)
+    (l_t, l_f), (r_t, r_f), (a_t, a_f), missing = out
+    assert missing is None
+    assert l_t[0] < 0 < r_t[0] and a_t[1] > 0
+    ell = lambda v: math.hypot(v[0] / mt.HEAD_RX, v[1] / mt.HEAD_RY)   # noqa: E731
+    assert max(ell(l_t), ell(r_t), ell(a_t)) == pytest.approx(1.0)
+    assert all(ell(f) < 1 for f in (l_f, r_f, a_f))
+
+
+def test_schematic_top_view_degenerate():
+    assert mt.schematic_top_view([{"trans_pos": None}]) == [None]
+    same = mt.schematic_top_view([{"trans_pos": [1, 2, 3], "focus_pos": [1, 2, 3]}])
+    assert np.allclose(same[0][0], 0) and np.allclose(same[0][1], 0)     # no division by zero
+    no_focus = mt.schematic_top_view([{"trans_pos": [0, 0, 0]}, {"trans_pos": [10, 0, 0]}])
+    assert no_focus[0][1] is None and no_focus[0][0][0] < 0 < no_focus[1][0][0]

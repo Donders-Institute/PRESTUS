@@ -475,19 +475,24 @@ class Placement3DPage(QWidget):
         if root is not None:
             root.setProperty("background", style.active()["surface"])
         mask = self._mask is not None and self.show_mask.isChecked() and len(self._mask[1][1])
+        # markers on two lines (positions, transducer parts), the interaction hint on a third;
+        # the parenthetical notes go to the tooltip
         self.legend.setText(
-            f"<span style='color:{TARGET}'>✛</span> target (focus position) · "
-            + (f"<span style='color:{MASK[0]}'>●</span> target mask · " if mask else "") +
+            f"<span style='color:{TARGET}'>✛</span> target · "
+            + (f"<span style='color:{MASK[0]}'>●</span> target mask · " if mask else "")
+            + f"<span style='color:{GEOM_FOCUS}'>●</span> geometric focus · "
+            f"<span style='color:{SETTING_FOCUS}'>●</span> focal depth setting<br>"
             f"<span style='color:{RINGS_SELECTED[0]}'>●</span><span style='color:{RINGS_SELECTED[1]}'>●</span> "
-            "element rings (bowl apex at the transducer position) · "
+            "element rings · "
             + (f"<span style='color:{HOUSING}'>●</span> housing"
-               + ("" if self._housing_known else " (generic: no size in the equipment entry)")
+               + ("" if self._housing_known else " (generic)")
                + " · " if self.show_housing.isChecked() else "")
-            + f"<span style='color:{EXIT_PLANE[0]}'>●</span> exit plane · "
-            f"<span style='color:{GEOM_FOCUS}'>●</span> geometric focus · "
-            f"<span style='color:{SETTING_FOCUS}'>●</span> focal depth setting · "
-            + ("" if self.show_face.isChecked() else "face scrambled · ")
-            + "drag to turn, scroll to zoom")
+            + f"<span style='color:{EXIT_PLANE[0]}'>●</span> exit plane<br>"
+            + ("" if self.show_face.isChecked() else "Face scrambled · ")
+            + "Drag to turn, scroll to zoom")
+        self.legend.setToolTip(
+            "Target: the focus position.\nElement rings: the bowl apex sits at the transducer position."
+            + ("" if self._housing_known else "\nHousing: generic; the equipment entry gives no size."))
 
     def _reset_view(self, force: bool = False) -> None:
         """Centre on the selected target, seen from the transducer's side and a little above;

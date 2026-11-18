@@ -33,6 +33,11 @@ _UNITS = {"mm", "cm", "hz", "s", "us", "deg", "rad", "wcm2", "pa", "ms", "mpa", 
 _LEAD = {"is", "do"}          # 'is_curved' -> "Curved", 'do_refocusing' -> "Refocusing"
 
 
+def plural(n: int, word: str, many: str | None = None) -> str:
+    """'1 error', '3 errors' (`many` for irregular plurals: plural(n, 'is', 'are'))."""
+    return f"{n} {word if n == 1 else (many or word + 's')}"
+
+
 def humanize(key: str) -> str:
     words = [w for w in re.split(r"_+", key) if w]
     if len(words) > 1 and words[-1].lower() in _UNITS:
@@ -51,6 +56,12 @@ def humanize(key: str) -> str:
 def label(node: Node) -> str:
     """Plain label (combo items, file names, Markdown, window titles): 'ISPPA', 'ISPTA'."""
     return node.label or humanize(node.name)
+
+
+def choice(node: Node | None, value) -> str:
+    """Drop-down text of a choice value: its overlay 'choice_labels' entry, else the value."""
+    labels = node.choice_labels if node is not None else {}
+    return str(labels.get(value, value))
 
 
 # ITRUSST notation: the intensity acronyms as I with a subscript where text is rich. A

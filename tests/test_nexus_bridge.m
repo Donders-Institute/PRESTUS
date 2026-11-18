@@ -88,10 +88,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_nexus_
         end
 
         function test_calibration_open_view_fit_save(tc)
-            equip = load_equipment_config();
-            serials = fieldnames(equip.trans);
-            serial = serials{find(cellfun(@(s) isfield(equip.trans.(s).transducer, 'annular'), serials), 1)};
-            tran = equip.trans.(serial);
+            [serial, tran] = steerable_annular_serial();
             d0 = tran.transducer.annular.dist_geom_ep_mm;
             z = (0:0.25:1.4 * d0)'; dm = round(d0 + [-10 0 10], 2); I = zeros(numel(z), 3);
             for j = 1:3
@@ -129,6 +126,44 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_nexus_
             nexus_calibration(struct('action', 'close', 'session', 't'));
             tc.verifyError(@() nexus_calibration(struct('action', 'view', 'session', 't')), ...
                 'nexus_calibration:noSession');
+        end
+
+        function test_equipment_layout_matches_grid(tc)
+            % every define_here grid type gives its element count; a bad block reports, not throws
+            m = struct('steering', '1D', 'elem_shape', 'disc', 'elem_width_mm', 2, 'elem_height_mm', 2, ...
+                'outer_diameter_mm', 50, 'is_curved', 0, 'curv_radius_mm', 70, 'dist_geom_ep_mm', 60);
+            grids = {struct('type', 'rect', 'rect', struct('elem_n_row', 8, 'elem_n_col', 4, ...
+                        'elem_spacing_height_mm', 1, 'elem_spacing_width_mm', 0.5, 'sparsity_factor', 1)), 32
+                     struct('type', 'fibonacci', 'fibonacci', struct('elem_n', 64, 'kerf_mm', 0.5)), 64
+                     struct('type', 'fermat', 'fermat', struct('elem_n', 50)), 50};
+            for k = 1:size(grids, 1)
+                m.matrix_shape = struct('type', 'define_here', 'define_here', struct('grid_shape', grids{k, 1}));
+                o = nexus_equipment(struct('action', 'layout', 'matrix', m));
+                tc.verifyEmpty(o.error, grids{k, 1}.type);
+                tc.verifyEqual(o.n, grids{k, 2}, grids{k, 1}.type);
+                tc.verifyEqual(numel(o.x_mm), o.n);
+            end
+            m.matrix_shape.define_here.grid_shape = struct('type', 'nonsense');
+            o = nexus_equipment(struct('action', 'layout', 'matrix', m));
+            tc.verifyNotEmpty(o.error);
+            tc.verifyEqual(o.n, 0);
+            tc.verifyError(@() nexus_equipment(struct('action', 'nope')), 'nexus_equipment:action');
+        end
+
+        function test_equipment_check_reports_issues(tc)
+            % a valid entry passes; an inner diameter above its outer one is reported (negative control)
+            ok = fullfile(tc.Dir, 'ok'); bad = fullfile(tc.Dir, 'bad'); mkdir(ok); mkdir(bad);
+            entry = ['type: transducer\nserial: %s\nname: %s\nn_elem: 2\nmin_foc: 30\nmax_foc: 70\n' ...
+                     'transducer:\n  freq_hz: 300000\n  annular:\n    elem_n: 2\n' ...
+                     '    elem_id_mm: [0, %g]\n    elem_od_mm: [29, 60]\n' ...
+                     '    curv_radius_mm: 75\n    dist_geom_ep_mm: 64\n'];
+            tc.write(fullfile(ok, 'tran-T_OK_transducer.yaml'), sprintf(entry, 'T_OK', 'T_OK', 30));
+            tc.write(fullfile(bad, 'tran-T_BAD_transducer.yaml'), sprintf(entry, 'T_BAD', 'T_BAD', 70));
+            o = nexus_equipment(struct('action', 'check', 'folder', ok));
+            tc.verifyEmpty(o.issues, strjoin(o.issues, newline));
+            o = nexus_equipment(struct('action', 'check', 'folder', bad));
+            tc.verifyNotEmpty(o.issues);
+            tc.verifyTrue(any(startsWith(o.issues, 'T_BAD:')));
         end
     end
 

@@ -16,6 +16,7 @@ from .. import checks
 from ..fsio import copy_atomic
 from ..telemetry import show_consent_dialog
 from ..undo import History
+from ..labels import plural
 from ..model import TX, ConfigModel, is_empty, iter_leaves
 from ..paths import DEFAULT_NAME, base_default_for, toolbox_default
 from ..project_defaults import carry_pinned_values, replace_project_default
@@ -23,6 +24,7 @@ from ..schema import GENERAL, Schema
 from ..session import Session
 from . import icons, style
 from .errors import guarded
+from .load_footer import LoadFooter
 from .placement_viewer import QC_PATH
 from .section import SectionPage
 from .tabbar import tab_widget
@@ -34,6 +36,7 @@ STUDY = "__study__"
 RESULTS = "__results__"
 PCT = "__pct__"
 CALIBRATION = "__calibration__"
+EQUIPMENT = "__equipment__"       # Transducer tab, advanced: own equipment entries
 LOCALITE = "__localite__"
 PLANTUS = "__plantus__"
 START = "__start__"
@@ -42,34 +45,26 @@ MEDIUM_SELECT = "__medium__"         # overlay group of simulation.medium: the M
 PLACEMENT_SELECT = "__placement_method__"   # overlay group of placement.mode: the Placement tab header row
 TUS_ENTRY = "__tus_entry__"
 HEURISTIC = "__heuristic__"
-SPECIAL = (REVIEW, VIEWER, RUN, STUDY, RESULTS, PCT, CALIBRATION, LOCALITE, PLANTUS, TUS_ENTRY, HEURISTIC, START,
+SPECIAL = (REVIEW, VIEWER, RUN, STUDY, RESULTS, PCT, CALIBRATION, EQUIPMENT, LOCALITE, PLANTUS, TUS_ENTRY, HEURISTIC, START,
            MEDIUM_SELECT, PLACEMENT_SELECT)
 SELECTORS = (MEDIUM_SELECT, PLACEMENT_SELECT)   # header rows that own their key (goto)
 # Sub-tab label -> icon (ui/icons.py)
 SUBTAB_ICONS = {
-    "Settings": "advanced", "Calibration": "chart", "Viewer": "mri", "Beam axis": "wave", "3D": "cube",
-    "Transducers": "tx_annular", "Localite": "place_localite", "Heuristic": "place_heuristic",
+    "Settings": "advanced", "Calibration": "chart", "Equipment": "wrench", "Viewer": "mri", "Beam axis": "wave", "3D": "cube",
+    "Localite": "place_localite", "Heuristic": "place_heuristic",
     "PlanTUS": "place_plantus", "TUS entry": "place_tus_entry", "Head model": "segmentation",
     "Acoustic properties": "table", "Uncertainty": "range", "Skull CT": "ct", "Stages": "stages", "Where to run": "server",
     "Plan": "report", "Review YAML": "file", "Launch": "play", "Jobs": "jobs", "Results": "chart",
 }
-SUBTAB_PAGES = (VIEWER, PCT, RESULTS, CALIBRATION, LOCALITE, PLANTUS, TUS_ENTRY, HEURISTIC)
+# Main tab key -> icon, shown instead of the label when the window is too narrow for all labels
+TAB_ICONS = {"setup": "wrench", "transducer": "tx_annular", "placement": "target", "medium": "layers",
+             "sonication": "pulse", "solver": "wave", "study": "people", "run": "play", "results": "chart"}
+SUBTAB_PAGES = (VIEWER, PCT, RESULTS, CALIBRATION, EQUIPMENT, LOCALITE, PLANTUS, TUS_ENTRY, HEURISTIC)
 LEVEL_ICON = {"error": "✗", "warning": "⚠", "info": "ℹ"}
 LEVEL_COLOR_KEY = {"error": "red", "warning": "amber", "info": "info"}
 _OPEN_WINDOWS: list = []          # keeps windows opened from File > New / Open alive
 
 
-def _dot_icon(colour: str, size: int = 10) -> QIcon:
-    """A filled dot, for status on tabs (the tab style sheet would override a text colour)."""
-    pix = QPixmap(size, size)
-    pix.fill(Qt.GlobalColor.transparent)
-    p = QPainter(pix)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    p.setBrush(QColor(colour))
-    p.setPen(Qt.PenStyle.NoPen)
-    p.drawEllipse(0, 0, size, size)
-    p.end()
-    return QIcon(pix)
 
 
 def study_header(path: Path) -> str:
@@ -77,6 +72,9 @@ def study_header(path: Path) -> str:
             f"Written by the PRESTUS Nexus; only values that differ from config_default.yaml.\n"
             f"Load with: parameters = load_parameters('{path.name}', '{path.parent}');")
 
+
+# Tabs whose settings change simulation time and memory: they show the expected load.
+LOAD_TABS = ("transducer", "medium", "sonication", "solver", "run")
 
 class ReviewPage(QWidget):
     def __init__(self, window: "MainWindow"):
@@ -93,6 +91,9 @@ class ReviewPage(QWidget):
         self.text = QPlainTextEdit(readOnly=True)
         mono = style.mono_font()
         self.text.setFont(mono)
+        self.text.setMouseTracking(True)
+        self.text.viewport().installEventFilter(self)     # hover: the key's default
+        self._lines: dict[int, tuple] = {}                # block number -> (path, ti, differs)
         v.addWidget(self.text, 1)
         row = QHBoxLayout()
         prune = QPushButton("Drop values equal to defaults")
@@ -113,6 +114,7 @@ class ReviewPage(QWidget):
         m = self.window.model
         path = m.path or Path("config_study.yaml")
         self.text.setPlainText(m.to_yaml(study_header(path)))
+        self._mark_changed()
         n_err = sum(1 for i in self.window.issues if i.level == "error")
         n_warn = sum(1 for i in self.window.issues if i.level == "warning")
         self.info.setText(
@@ -120,8 +122,86 @@ class ReviewPage(QWidget):
             + (f"<b>Merged onto:</b> {m.schema.toolbox_path} + project defaults "
                f"{m.schema.project_path}<br>" if m.schema.project_path is not None
                else f"<b>Merged onto:</b> {m.schema.default_path}<br>") +
-            f"<b>{m.modified_count()}</b> value(s) differ from the defaults · "
-            f"{n_err} error(s), {n_warn} warning(s) — see Issues in the header.")
+            f"{plural(m.modified_count(), 'value')} "
+            f"{'differs' if m.modified_count() == 1 else 'differ'} from the defaults<br>"
+            f"{plural(n_err, 'error')}, {plural(n_warn, 'warning')}: see Issues in the header.")
+
+
+    # ── values that differ from the defaults ────────────────────────────
+    def _mark_changed(self) -> None:
+        """Tint the lines whose value differs from config_default.yaml; remember each
+        line's key for the hover text."""
+        from PyQt6.QtGui import QColor, QTextCursor, QTextFormat
+        from PyQt6.QtWidgets import QTextEdit
+        from ..model import values_equal
+        m = self.window.model
+        self._lines = {}
+        sels = []
+        tint = QColor(style.active()["accent_soft"])
+        for n, path, ti in yaml_line_keys(self.text.toPlainText()):
+            node = m.schema.get(path)
+            if node is None or node.is_group:
+                continue
+            default = m._node_default(path)
+            differs = not values_equal(m.get(path, ti), default)
+            self._lines[n] = (path, ti, differs, default)
+            if differs:
+                sel = QTextEdit.ExtraSelection()
+                sel.format.setBackground(tint)
+                sel.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+                cur = QTextCursor(self.text.document().findBlockByNumber(n))
+                sel.cursor = cur
+                sels.append(sel)
+        self.text.setExtraSelections(sels)
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt API)
+        from PyQt6.QtCore import QEvent
+        from PyQt6.QtWidgets import QToolTip
+        if obj is self.text.viewport() and event.type() == QEvent.Type.ToolTip:
+            n = self.text.cursorForPosition(event.pos()).blockNumber()
+            info = self._lines.get(n)
+            if info is None:
+                QToolTip.hideText()
+                return True
+            path, ti, differs, default = info
+            from .fields import display_text
+            where = f"{path}" + (f" (transducer {ti + 1})" if path.startswith("transducer.") else "")
+            what = (f"Default: {display_text(default) or '(empty)'}" if differs
+                    else "Same as the default: 'Drop values equal to defaults' removes it")
+            QToolTip.showText(event.globalPos(), f"{where}\n{what}", self.text.viewport())
+            return True
+        return super().eventFilter(obj, event)
+
+
+def yaml_line_keys(text: str) -> list[tuple[int, str, int]]:
+    """(line number, dotted key, transducer index) of every 'key: value' line of a config's
+    YAML (block style, as ConfigModel.to_yaml writes it; list items under 'transducer')."""
+    import re
+    out = []
+    stack: list[tuple[int, str]] = []          # (indent, key) of the enclosing mappings
+    ti = -1
+    pat = re.compile(r"^(\s*)(- )?([A-Za-z_][\w]*):(.*)$")
+    for n, line in enumerate(text.splitlines()):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        mm = pat.match(line)
+        if mm is None:
+            continue
+        indent = len(mm.group(1)) + (2 if mm.group(2) else 0)
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        if mm.group(2) and stack and stack[-1][1] == "transducer":
+            ti += 1                            # the next transducer of the list
+        if not stack and mm.group(3) == "transducer":
+            ti = -1                            # list items count from 0; a single one stays 0
+        key = mm.group(3)
+        path = ".".join([k for _, k in stack] + [key])
+        value = mm.group(4).split(" #")[0].strip()
+        if value:                              # a value on this line: a leaf (or a flow mapping)
+            out.append((n, path, max(ti, 0) if path.startswith("transducer.") else 0))
+        else:
+            stack.append((indent, key))
+    return out
 
 
 MAX_FORM_WIDTH = 1240     # cards of a tab without a side panel: wider lines are hard to read
@@ -146,6 +226,7 @@ class TabPage(QWidget):
         super().__init__()
         self.window = window
         self.key = spec["key"]
+        self.label = spec.get("label", self.key)
         self.sections: list[SectionPage] = []
         self.cards: list[QWidget] = []
         self.side: QWidget | None = None
@@ -155,6 +236,8 @@ class TabPage(QWidget):
         self.columns: list[QVBoxLayout] = []           # card columns of further sub-tabs
         self.section_columns: dict[str, QVBoxLayout] = {}   # section -> column other than 'Settings'
         self.on_refresh = None                          # tab-specific refresh (e.g. sub-tab visibility)
+        self.advanced_subtabs: list[QWidget] = []       # sub-tabs shown only with 'Advanced'
+        self.load_footer: LoadFooter | None = None      # expected load (tabs in LOAD_TABS), set in finish()
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(14, 10, 14, 6)
@@ -162,10 +245,18 @@ class TabPage(QWidget):
         intro = QLabel(spec.get("intro", ""))
         intro.setObjectName("TabIntro")
         intro.setWordWrap(True)
+        intro.setAlignment(Qt.AlignmentFlag.AlignCenter)
         head.addWidget(intro, 1)
         self.hidden = QLabel()
         self.hidden.setObjectName("CardSub")
         head.addWidget(self.hidden)
+        # this tab's problems (errors, else warnings): a coloured dot and count; the tab
+        # label itself only takes the colour (MainWindow._update_tab_counts)
+        self.issue_badge = QPushButton()
+        self.issue_badge.setFlat(True)
+        self.issue_badge.clicked.connect(window.show_issues)
+        self.issue_badge.hide()
+        head.addWidget(self.issue_badge)
         self.advanced = QPushButton(icons.icon("advanced"), "Advanced")
         self.advanced.setObjectName("AdvancedToggle")
         self.advanced.setCheckable(True)
@@ -183,7 +274,7 @@ class TabPage(QWidget):
             self.tune.setItemData(self.tune.count() - 1, spec.get("help", ""),
                                   Qt.ItemDataRole.ToolTipRole)
         self.tune.setToolTip("For optimising a run: show the settings that affect speed, accuracy, "
-                             "memory or disk space (advanced ones included) and mark them. "
+                             "memory, or disk space (advanced ones included) and mark them. "
                              "Applies to all tabs.")
         self.tune_label.setToolTip(self.tune.toolTip())
         self.tune.currentIndexChanged.connect(
@@ -286,10 +377,30 @@ class TabPage(QWidget):
         if hasattr(w, "refresh"):
             w.refresh()
 
+    def _drop_repeated_titles(self) -> None:
+        """A card whose title is the tab's or sub-tab's label, or that is the only card of a
+        card column, loses its header text: the tab label and intro already name it."""
+        plain = [self.column, *self.columns]
+        for page in self.sections:
+            col = next((c for c in plain if c.indexOf(page) >= 0), None)
+            sole = col is not None and sum(
+                1 for i in range(col.count()) if col.itemAt(i).widget() is not None) == 1
+            names = {self.label.casefold()}
+            sub = self.subtab_of(page)
+            if sub is not None:
+                names.add(self.subtabs.tabText(self.subtabs.indexOf(sub)).casefold())
+            if sole or page.title.text().casefold() in names:
+                page.set_headless()
+
     def finish(self) -> None:
         self.column.addStretch(1)
+        if self.key in LOAD_TABS:           # last in the tab, below settings and sub-tabs
+            self.load_footer = LoadFooter(self.window.model)
+            self.load_footer.details.connect(self.window.show_plan)
+            self.layout().addWidget(self.load_footer)
         for column in self.columns:
             column.addStretch(1)
+        self._drop_repeated_titles()
         tunable = TUNE_FOR and any(r.node.tune for page in self.sections for r in page.rows)
         self.tune_label.setVisible(tunable)
         self.tune.setVisible(tunable)
@@ -310,6 +421,11 @@ class TabPage(QWidget):
 
     def refresh(self) -> None:
         show = self.advanced.isChecked()
+        if self.subtabs is not None:
+            for w in self.advanced_subtabs:
+                i = self.subtabs.indexOf(w)
+                if i >= 0:
+                    self.subtabs.setTabVisible(i, show)
         schema = self.window.model.schema
         n_hidden = 0
         for page in self.sections:
@@ -326,6 +442,8 @@ class TabPage(QWidget):
         for card in [*self.cards, *self.headers]:
             if hasattr(card, "refresh"):
                 card.refresh()
+        if self.load_footer is not None:
+            self.load_footer.refresh()
         if self.on_refresh is not None:
             self.on_refresh(self)
         # the count of hidden settings sits in the toggle itself
@@ -358,10 +476,8 @@ class MainWindow(QMainWindow):
         cv.setContentsMargins(0, 0, 0, 0)
         cv.setSpacing(0)
         cv.addWidget(self._header())
-        self.tabs = QTabWidget()
-        self.tabs.setDocumentMode(True)
-        self.tabs.tabBar().setExpanding(True)       # the workflow steps span the window
-        self.tabs.tabBar().setUsesScrollButtons(False)
+        self.tabs = tab_widget()                    # the workflow steps span the window; icons when narrow
+        self.tabs.tabBar().set_compactable()
         cv.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
 
@@ -408,8 +524,21 @@ class MainWindow(QMainWindow):
         texts.addWidget(self.header_file)
         h.addLayout(texts)
         h.addStretch(1)
+        # back to where a link (issue, field link, sub-tab link) was followed from
+        self.back_btn = QPushButton("←  Back")
+        self.back_btn.setFlat(True)
+        self.back_btn.clicked.connect(self.go_back)
+        self.back_btn.hide()
+        h.addWidget(self.back_btn)
+        # coloured dots with counts (errors red, warnings amber); the words are in the tooltip.
+        # QPushButton text has one colour, so a rich-text label sits inside the button.
         self.header_issues = QPushButton()
-        self.header_issues.setToolTip("Show the issues (Ctrl+Shift+I)")
+        self.header_issues.setFlat(True)
+        self._header_dots = QLabel(self.header_issues)
+        self._header_dots.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        dots_row = QHBoxLayout(self.header_issues)
+        dots_row.setContentsMargins(8, 0, 8, 0)
+        dots_row.addWidget(self._header_dots)
         self.header_issues.clicked.connect(self.show_issues)
         h.addWidget(self.header_issues)
         open_btn = QPushButton(icons.icon("folder", style.C["ink2"]), "Open…")
@@ -516,6 +645,11 @@ class MainWindow(QMainWindow):
         issues.setShortcut(QKeySequence("Ctrl+Shift+I"))
         issues.triggered.connect(self.show_issues)
         view.addAction(issues)
+        self.back_action = QAction("Back", self)
+        self.back_action.setShortcuts([QKeySequence.StandardKey.Back, QKeySequence("Alt+Left")])
+        self.back_action.triggered.connect(self.go_back)
+        self.back_action.setEnabled(False)
+        view.addAction(self.back_action)
 
     def _build_edit_menu(self) -> None:
         edit = self.menuBar().addMenu("&Edit")
@@ -527,6 +661,12 @@ class MainWindow(QMainWindow):
         self.redo_action.triggered.connect(self.history.redo)
         edit.addAction(self.undo_action)
         edit.addAction(self.redo_action)
+        edit.addSeparator()
+        self._field_search = None
+        find = QAction("Find setting…", self)
+        find.setShortcut(QKeySequence.StandardKey.Find)
+        find.triggered.connect(self.find_setting)
+        edit.addAction(find)
         self.history.changed.connect(self._update_undo_actions)
         self._update_undo_actions()
 
@@ -579,6 +719,8 @@ class MainWindow(QMainWindow):
         for page in self.pages.values():
             if isinstance(page, SectionPage):
                 page.retint()
+        if hasattr(self, "charm_report_card"):
+            self.charm_report_card.retint()
 
     def update_context(self) -> None:
         """Facts about this computer that visibility rules read (ConfigModel.context):
@@ -631,6 +773,7 @@ class MainWindow(QMainWindow):
             if key == "study":
                 from .study_page import StudyPage
                 study = StudyPage(self)
+                self.history.track(study)                  # the runs table undoes with the config
                 study.changed.connect(self._changed)
                 self.pages[STUDY] = study
                 self._section_tab[STUDY] = key
@@ -656,6 +799,7 @@ class MainWindow(QMainWindow):
                                    icon=schema.sections.get(section, {}).get("icon"))
                 page.lock_note = str(schema.sections.get(section, {}).get("lock_note") or "")
                 page.changed.connect(self._changed)
+                page.transducer_selected.connect(self.set_current_transducer)
                 self.pages[section] = page
                 self._section_tab[section] = key
                 if section == TX:
@@ -666,7 +810,7 @@ class MainWindow(QMainWindow):
                     self.schematic_card = self._card(
                         "Transducer geometry", self.schematic,
                         "Cross-section along the beam: elements, exit plane, geometric focus, the "
-                        "focal depth setting (✕) and the device's steering range.")
+                        "focal depth setting (✕), and the device's steering range.")
                     page.add_extra(self.schematic_card)
                     # several transducers: how they fire is set with the protocol
                     self.coupling_link = QLabel(
@@ -730,6 +874,12 @@ class MainWindow(QMainWindow):
                     page.set_fold(TimingPanel.FOLDED, open_=False)      # edited in the diagram
                     self.timing_panel.fold_toggled.connect(
                         lambda shown, pg=page: (setattr(pg, "fold_open", shown), pg.refresh()))
+                    from .sequence_card import SequenceCard
+                    self.sequence_card = SequenceCard(self.model, lambda: (self.session, self.model.path))
+                    self.sequence_card.changed.connect(self._changed)
+                    self.sequence_card.edit_in_viewer.connect(self._place_stance)
+                    self.sequence_card.step_selected.connect(self.timing_panel.show_step)
+                    page.add_extra(self.sequence_card)
                 if section == "hpc":
                     from .run_profile import RunProfilePanel
                     self.run_profile_panel = RunProfilePanel(self)
@@ -742,17 +892,32 @@ class MainWindow(QMainWindow):
                 tab.add_section(page)
                 if section == "study":
                     tab.add_card(self.pages[STUDY])
+                if section == "segmentation":
+                    # charm's report: a card of its own below the segmentation (shown when there is one)
+                    from .charm_report import CharmReportCard
+                    self.charm_report_card = CharmReportCard(self.model)
+                    tab.add_card(self.charm_report_card)
             if key == "setup" and "io" in self.pages:
                 from .io_preview import IOPreviewPanel
                 self.io_preview = IOPreviewPanel(self.model)
                 self.pages["io"].extras_below.addWidget(self.io_preview)   # under the I/O fields
             elif key == "transducer":
                 tab.add_subtab(self.pages[CALIBRATION], "Calibration")
+                from .equipment_page import EquipmentPage
+                equip = EquipmentPage(self)
+                self.pages[EQUIPMENT] = equip
+                self._section_tab[EQUIPMENT] = key
+                tab.add_subtab(equip, "Equipment")
+                tab.advanced_subtabs.append(equip)
+                tab.refresh()
             elif key == "placement":
                 from .placement_viewer import PlacementPage
-                viewer = PlacementPage(self.model)
+                viewer = PlacementPage(self.model, history=self.history)   # one undo history
                 viewer.changed.connect(self._changed)
+                viewer.transducer_selected.connect(self.set_current_transducer)
                 viewer.navigate.connect(self.goto)          # empty state: 'Set T1 image…' etc.
+                viewer.bridge_getter = self.bridge          # Import trajectory: Localite XML (MATLAB)
+                viewer.saved_config_getter = self._saved_config_path
                 self.pages[VIEWER] = viewer
                 self._section_tab[VIEWER] = key
                 tab.set_full_tab(viewer, "Viewer")
@@ -765,13 +930,23 @@ class MainWindow(QMainWindow):
                 self.view3d_page = Placement3DPage(viewer)
                 viewer.changed.connect(self.view3d_page.refresh)    # drawn when shown
                 tab.add_subtab(self.view3d_page, "3D")
-                from .transducers_page import TransducersPage      # shown with 2+ transducers
-                self.transducers_page = TransducersPage(self.model, lambda: self.pages.get(VIEWER))
+                # several transducers: the overview sits on the Placement card (Settings), its
+                # table selecting the transducer the card's fields edit; shown with 2+ transducers
+                from .transducers_page import TransducersPage
+                self.transducers_page = TransducersPage(self.model, lambda: self.pages.get(VIEWER),
+                                                        embedded=True)
                 self.transducers_page.changed.connect(self._changed)
                 self.transducers_page.navigate.connect(self.goto)
                 self.transducers_page.edit_in_viewer.connect(
                     lambda ti, v=viewer: (self.show_special(VIEWER), v.show_transducer(ti)))
-                tab.add_subtab(self.transducers_page, "Transducers")
+                place = self.pages.get("placement")
+                if isinstance(place, SectionPage):
+                    place.extras.insertWidget(0, self.transducers_page)
+                    place.extras_below.insertWidget(0, self.transducers_page.details)
+                    self.transducers_page.selected.connect(self.set_current_transducer)
+                    self.transducers_page.add_requested.connect(place._add_transducer)
+                    self.transducers_page.remove_requested.connect(
+                        lambda ti, pg=place: (setattr(pg, "ti", ti), pg._remove_transducer()))
                 from .localite_page import LocalitePage
                 loc = LocalitePage(self)
                 self.pages[LOCALITE] = loc
@@ -812,10 +987,23 @@ class MainWindow(QMainWindow):
             elif key == "medium":
                 # cards that follow the sections of their sub-tab
                 tab.section_columns["uncertainty"].addWidget(self.uncertainty_card)
-                if "uncertainty" in self.pages:          # variant files: in the card's advanced fold
-                    self.uncertainty_card.attach_files(self.pages["uncertainty"])
+                if "uncertainty" in self.pages:          # the overrides key: edited in the card's table
+                    self.uncertainty_card.attach_overrides(self.pages["uncertainty"])
                 tab.section_columns["pct"].addWidget(self.pct_flow)
                 tab.section_columns["pct"].addWidget(self.pct_formulas)
+            elif key == "sonication":
+                # thermal stage off: only the pulse duration and interval are used (Ipa/Ita
+                # maps, ISPTA); the thermal model and the sequence's timing are not
+                self.heating_off_note = QLabel()
+                self.heating_off_note.setObjectName("CardSub")
+                self.heating_off_note.setText(
+                    "Thermal simulation is off: only the pulse duration and repetition interval are "
+                    "used (intensity maps, ISPTA). <a href='#on'>Turn it on</a> for the thermal model "
+                    "and the sonication sequence.")
+                self.heating_off_note.linkActivated.connect(
+                    lambda _l: (self.model.set("modules.run_heating_sims", 1), self._changed()))
+                tab.add_header(self.heating_off_note)
+                tab.on_refresh = self._refresh_sonication_tab
             elif key == "run":
                 from .run_page import RunPage
                 run = RunPage(self)
@@ -839,7 +1027,9 @@ class MainWindow(QMainWindow):
                 tab.subtabs.blockSignals(False)
             tab.finish()
             self.tab_pages[key] = tab
-            self.tabs.addTab(tab, spec.get("label", key))
+            i = self.tabs.addTab(tab, spec.get("label", key))
+            self.tabs.tabBar().set_tab(i, spec.get("label", key),
+                                       short_icon=icons.icon(TAB_ICONS.get(key, "advanced")))
         if RUN in self.pages and RESULTS in self.pages:
             self.pages[RUN].finished.connect(
                 lambda _task, ok: self.pages[RESULTS].refresh() if ok else None)
@@ -852,12 +1042,9 @@ class MainWindow(QMainWindow):
         v.setContentsMargins(14, 10, 14, 12)
         t = QLabel(title)
         t.setObjectName("CardTitle")
+        if sub:                             # what the card shows: on hover
+            t.setToolTip(sub)
         v.addWidget(t)
-        if sub:
-            s = QLabel(sub)
-            s.setObjectName("CardSub")
-            s.setWordWrap(True)
-            v.addWidget(s)
         v.addWidget(widget, 1)
         return card
 
@@ -878,6 +1065,12 @@ class MainWindow(QMainWindow):
         path = (run.matlab.text() if run is not None else "") or launcher.find_matlab(
             self.session.get("matlab_path"))
         return path or None
+
+    def _saved_config_path(self) -> str | None:
+        """Save the study config if needed (MATLAB reads the saved file, as a run does)."""
+        if (self.dirty or self.model.path is None) and not self.save():
+            return None
+        return str(self.model.path)
 
     def bridge(self):
         """The shared MATLAB session for interactive steps (Localite, Calibration)."""
@@ -915,14 +1108,68 @@ class MainWindow(QMainWindow):
         self._start_matlab_gui(launcher.calibration_gui_call(lib or None), "calibration_gui")
 
     # ── navigation ──────────────────────────────────────────────────────
+    # A jump made for the user (a link, an issue, a menu entry) records where they were, so
+    # Back (header button, View ▸ Back) returns there. Moving between tabs by hand records nothing.
+    BACK_DEPTH = 20
+
+    def _location(self) -> tuple[int, int]:
+        tab = self.tabs.currentWidget()
+        sub = tab.subtabs.currentIndex() if isinstance(tab, TabPage) and tab.subtabs is not None else -1
+        return self.tabs.currentIndex(), sub
+
+    def _location_label(self, loc: tuple[int, int]) -> str:
+        tab = self.tabs.widget(loc[0])
+        bar = self.tabs.tabBar()
+        text = bar.label(loc[0]) if hasattr(bar, "label") else self.tabs.tabText(loc[0])
+        if isinstance(tab, TabPage) and tab.subtabs is not None and loc[1] >= 0:
+            text += " ▸ " + tab.subtabs.tabText(loc[1])
+        return text.strip()
+
+    def _jump(self, go) -> None:
+        """Run `go` (a navigation) and, if it moved the view, remember where it started."""
+        if getattr(self, "_jumping", False):
+            go()
+            return
+        start = self._location()
+        self._jumping = True
+        try:
+            go()
+        finally:
+            self._jumping = False
+        if self._location() != start:
+            self._back = (getattr(self, "_back", []) + [start])[-self.BACK_DEPTH:]
+            self._update_back()
+
+    def go_back(self) -> None:
+        back = getattr(self, "_back", [])
+        while back:
+            ti, si = back.pop()
+            if 0 <= ti < self.tabs.count() and self.tabs.isTabVisible(ti):
+                self.tabs.setCurrentIndex(ti)
+                tab = self.tabs.widget(ti)
+                if isinstance(tab, TabPage) and tab.subtabs is not None and 0 <= si < tab.subtabs.count():
+                    tab.subtabs.setCurrentIndex(si)
+                break
+        self._update_back()
+
+    def _update_back(self) -> None:
+        back = getattr(self, "_back", [])
+        if hasattr(self, "back_btn"):
+            self.back_btn.setVisible(bool(back))
+            if back:
+                self.back_btn.setToolTip(f"Back to {self._location_label(back[-1])} (Alt+←)")
+        if hasattr(self, "back_action"):
+            self.back_action.setEnabled(bool(back))
+
     def _page(self, key: str) -> QWidget:
         return self.pages[key]
 
     def _start_goto(self, key: str) -> None:
-        if key == "run":
-            self.show_special(RUN)
+        special = {"run": RUN, "calibration": CALIBRATION}
+        if key in special:
+            self._jump(lambda: self.show_special(special[key]))
         else:
-            self._select_tab(key)
+            self._jump(lambda: self._select_tab(key))
 
     def on_model_edited(self) -> None:
         """A page outside the form tabs (Start) changed the model: mark it modified and
@@ -970,11 +1217,17 @@ class MainWindow(QMainWindow):
 
     def show_special(self, key: str) -> QWidget:
         """Show a special page (Run, Review, Study manifest, viewer) and return it."""
+        out = []
+        self._jump(lambda: out.append(self._show_special(key)))
+        return out[0]
+
+    def _show_special(self, key: str) -> QWidget:
         tab = self._select_tab(self._section_tab.get(key, ""))
         page = self.pages[key]
         if key in (RUN, REVIEW):
             self.run_side.setCurrentWidget(page)
         elif key in SUBTAB_PAGES and tab is not None and tab.subtabs is not None:
+            tab.subtabs.setTabVisible(tab.subtabs.indexOf(page), True)   # e.g. a hidden method page
             tab.subtabs.setCurrentWidget(page)
         page.refresh()
         return page
@@ -990,6 +1243,24 @@ class MainWindow(QMainWindow):
             section = GENERAL
         return section
 
+    def can_goto(self, path: str) -> bool:
+        """Whether goto(path) reaches a field: a header selector, a form row, or a section table."""
+        section = self.display_section(path)
+        page = self.pages.get(section)
+        if section in SELECTORS:
+            return page is not None
+        if not isinstance(page, SectionPage):
+            return False
+        return (any(r.node.path == path for r in page.rows)
+                or (page.table is not None and path.startswith(section + ".")))
+
+    def find_setting(self) -> None:
+        """Edit > Find setting (Ctrl+F): search labels, keys and help, then goto the pick."""
+        if self._field_search is None:
+            from .field_search import FieldSearch
+            self._field_search = FieldSearch(self)
+        self._field_search.open_search()
+
     def set_tune_goal(self, goal: str | None) -> None:
         """Show (and mark) the settings tagged with `goal` in overlay.yaml 'tuning', on every tab."""
         self.tune_goal = goal
@@ -999,7 +1270,7 @@ class MainWindow(QMainWindow):
     def _build_medium_tab(self, tab: TabPage) -> None:
         """Medium tab: the medium selector as a header row, then sub-tabs 'Head model'
         (segmentation, head model, tissue layers), 'Acoustic properties' (the property table),
-        'Uncertainty' (the analysis switch and ITRUSST bounds plot; variant table and files in an advanced fold) and
+        'Uncertainty' (the analysis switch and ITRUSST bounds plot; the variant table, locked like the property table, folded below) and
         'Skull CT' (CT-based skull mapping settings, equations and the CT page). Sub-tabs the medium does not use are hidden (_refresh_medium_tab)."""
         from .medium_selector import MediumSelector
         from .pct_flow import PctFlow
@@ -1024,6 +1295,7 @@ class MainWindow(QMainWindow):
         tab.columns.append(unc_column)
         tab.section_columns["uncertainty"] = unc_column
         self.uncertainty_card = UncertaintyCard(self.model, self.prestus_root)
+        self.uncertainty_card.changed.connect(self._changed)
         tab.cards.append(self.uncertainty_card)
 
         pct_scroll, pct_column = tab.new_column()
@@ -1060,17 +1332,35 @@ class MainWindow(QMainWindow):
         """The sub-tab of the placement method in use is labelled in bold (the Viewer for manual
         placement)."""
         multi_page = getattr(self, "transducers_page", None)
-        if multi_page is not None and tab.subtabs is not None:
+        place = self.pages.get("placement")
+        if multi_page is not None and isinstance(place, SectionPage):
             multi = self.model.n_transducers > 1
-            tab.subtabs.setTabVisible(tab.subtabs.indexOf(multi_page), multi)
-            if not multi and tab.subtabs.currentWidget() is multi_page:
-                tab.subtabs.setCurrentWidget(self.pages[VIEWER])
+            multi_page.refresh()
+            multi_page.select(place.ti)
+            place.tx_bar.setVisible(not multi)      # the overview's table selects instead
+        # method pages: only the one of the method in use (and one opened from the Tools menu,
+        # while it is shown), so the sub-tab bar stays short
+        if tab.subtabs is not None:
+            active = self._placement_method_page()
+            current = tab.subtabs.currentWidget()
+            for key in (LOCALITE, HEURISTIC, PLANTUS, TUS_ENTRY):
+                page = self.pages.get(key)
+                if page is not None:
+                    tab.subtabs.setTabVisible(tab.subtabs.indexOf(page), page is active or page is current)
         bar = tab.subtabs.tabBar() if tab.subtabs is not None else None
         if not hasattr(bar, "set_bold"):
             return
         widget = self._placement_method_page()
         index = tab.subtabs.indexOf(widget) if widget is not None else -1
         bar.set_bold({index} if index >= 0 else set())
+
+    def _refresh_sonication_tab(self, tab: TabPage) -> None:
+        """Without the thermal stage: no thermal model card and no sequence card, one line why."""
+        heating = self.model.get("modules.run_heating_sims") in (1, True)
+        self.heating_off_note.setVisible(not heating)
+        for widget in (self.pages.get("thermal"), getattr(self, "sequence_card", None)):
+            if widget is not None:
+                widget.setVisible(heating)
 
     def _refresh_medium_tab(self, tab: TabPage) -> None:
         """Water uses no head model and no skull CT; a phantom uses tissue layers but no skull CT."""
@@ -1089,6 +1379,10 @@ class MainWindow(QMainWindow):
             tab.subtabs.setCurrentWidget(self.medium_subtabs["acoustic"])
 
     def goto(self, path: str, ti: int | None = None) -> None:
+        """Open the field `path` (transducer `ti`); Back returns to where this was called from."""
+        self._jump(lambda: self._goto(path, ti))
+
+    def _goto(self, path: str, ti: int | None = None) -> None:
         section = self.display_section(path)
         page = self.pages.get(section)
         if section in SELECTORS and page is not None:
@@ -1120,7 +1414,7 @@ class MainWindow(QMainWindow):
         """Open the field (or the placement viewer) an issue points to."""
         self.issue_popup.hide()
         if issue.path == QC_PATH:
-            self.show_special(VIEWER).show_transducer(issue.transducer or 0)
+            self._jump(lambda: self.show_special(VIEWER).show_transducer(issue.transducer or 0))
         else:
             self.goto(issue.path, issue.transducer)
 
@@ -1143,24 +1437,62 @@ class MainWindow(QMainWindow):
                 continue
             n = sum(self._section_count(p.section) for p in tab.sections)
             label = next((t.get("label", t["key"]) for t in self._tab_specs() if t["key"] == tab.key), tab.key)
-            # The tab shows what needs attention (errors, else warnings) as a coloured dot and
-            # count; the number of changed values, which needs none, moves to the tooltip.
+            # What needs attention (errors, else warnings) colours the tab label (the icon in
+            # compact mode); the count sits by the tab's Advanced button. The number of
+            # changed values, which needs none, is in the tab's tooltip.
             mine = [iss for iss in self.issues if self._issue_tab(iss) == tab.key]
             n_err = sum(1 for iss in mine if iss.level == "error")
             n_warn = sum(1 for iss in mine if iss.level == "warning")
             level, count = ("red", n_err) if n_err else ("amber", n_warn) if n_warn else (None, 0)
-            self.tabs.setTabText(i, f"{label}  {count}" if count else label)
-            self.tabs.setTabIcon(i, _dot_icon(style.active()[level]) if level else QIcon())
-            tip = [f"{n_err} error(s), {n_warn} warning(s)" if n_err or n_warn else "No problems found"]
+            tip = [f"{plural(n_err, 'error')}, {plural(n_warn, 'warning')}" if n_err or n_warn
+                   else "No problems found"]
             if n:
-                tip.append(f"{n} value(s) changed from the defaults")
-            self.tabs.setTabToolTip(i, " · ".join(tip))
+                tip.append(f"{plural(n, 'value')} changed from the defaults")
+            colour = style.active()[level] if level else None
+            self.tabs.tabBar().set_tab(
+                i, label, None, " · ".join(tip),
+                short_icon=icons.icon(TAB_ICONS.get(tab.key, "advanced"), colour), color=colour)
+            tab.issue_badge.setVisible(bool(count))
+            if count:
+                tab.issue_badge.setText(f"●  {count}")      # plain text, as the header's
+                tab.issue_badge.setStyleSheet(f"QPushButton {{ color: {colour}; font-weight: 600; }}")
+                tab.issue_badge.setToolTip(f"{tip[0]} on this tab. Show the issues (Ctrl+Shift+I)")
 
     def _issue_tab(self, issue) -> str | None:
         """Key of the tab that holds the field an issue points to."""
         if issue.path == QC_PATH:
             return self._section_tab.get(VIEWER)
         return self._section_tab.get(self.display_section(issue.path))
+
+    def set_current_transducer(self, ti: int) -> None:
+        """One current transducer for the window: a transducer picked on any selector (the
+        Transducer card, the Placement card or its overview table, the Viewer) is the one
+        the others show and edit too."""
+        if getattr(self, "_syncing_tx", False) or not 0 <= ti < self.model.n_transducers:
+            return
+        self._syncing_tx = True
+        try:
+            for page in self.pages.values():
+                if isinstance(page, SectionPage) and page.has_tx:
+                    if page.leader is None:
+                        page.show_transducer(ti)
+                    elif page.ti != ti:
+                        page.refresh()                 # follows its leader's transducer
+            viewer = self.pages.get(VIEWER)
+            if viewer is not None and getattr(viewer, "ti", ti) != ti:
+                viewer.show_transducer(ti)
+            overview = getattr(self, "transducers_page", None)
+            if overview is not None:
+                overview.select(ti)
+        finally:
+            self._syncing_tx = False
+
+    def _place_stance(self, ti: int) -> None:
+        """Sequence card: show transducer ti in the placement viewer."""
+        viewer = self.pages.get(VIEWER)
+        self.show_special(VIEWER)
+        if viewer is not None and hasattr(viewer, "show_transducer"):
+            viewer.show_transducer(ti)
 
     def _changed(self) -> None:
         self.dirty = True
@@ -1169,6 +1501,8 @@ class MainWindow(QMainWindow):
             tab.refresh()
         if hasattr(self, "timing_panel"):
             self.timing_panel.refresh()
+        if hasattr(self, "sequence_card"):
+            self.sequence_card.refresh()
         if hasattr(self, "schematic"):
             tx = self.pages.get(TX)
             ti = tx.ti if isinstance(tx, SectionPage) else 0
@@ -1184,6 +1518,18 @@ class MainWindow(QMainWindow):
         self._update_title()
         self._update_tab_counts()
         self._issue_timer.start()
+
+    def show_plan(self) -> None:
+        """Run ▸ Plan (the full resource prediction)."""
+        run, tab = self.pages.get(RUN), self.tab_pages.get("run")
+        if run is None or tab is None:
+            return
+
+        def go():
+            self.tabs.setCurrentWidget(tab)
+            if tab.subtabs is not None:
+                tab.subtabs.setCurrentWidget(run.plan_card)
+        self._jump(go)
 
     def _refresh_issues(self) -> None:
         self.issues = checks.all_issues(self.model)
@@ -1201,10 +1547,16 @@ class MainWindow(QMainWindow):
             self.issue_tree.addTopLevelItem(item)
         n_err = sum(1 for i in self.issues if i.level == "error")
         n_warn = sum(1 for i in self.issues if i.level == "warning")
-        counts = f"{n_err} error(s) · {n_warn} warning(s)"
+        counts = f"{plural(n_err, 'error')} · {plural(n_warn, 'warning')}"
         level = "red" if n_err else "amber" if n_warn else "green"
-        self.header_issues.setText(f"●  {counts}  ▾")       # QPushButton text is plain, not rich text
-        self.header_issues.setStyleSheet(f"QPushButton {{ color: {style.C[level]}; font-weight: 600; }}")
+        dots = [f"<span style='color:{style.C[k]}'>●</span>&nbsp;{n}"
+                for k, n in (("red", n_err), ("amber", n_warn)) if n]
+        self._header_dots.setText("<b>" + ("&nbsp;&nbsp;&nbsp;".join(dots) or
+                                           f"<span style='color:{style.C['green']}'>●</span>")
+                                  + "&nbsp;&nbsp;▾</b>")
+        self.header_issues.setMinimumWidth(self._header_dots.sizeHint().width() + 16)
+        self.header_issues.setToolTip(
+            (counts if n_err or n_warn else "No problems found") + ". Show the issues (Ctrl+Shift+I)")
         self.issue_counts_lbl.setText(
             f"<b>Issues</b>  <span style='color:{palette[level]}'>●</span> {counts}")
         self._update_tab_counts()
@@ -1320,8 +1672,9 @@ class MainWindow(QMainWindow):
         box.setWindowTitle("Update project defaults")
         box.setText(
             f"<b>{schema.project_path}</b><br><br>"
-            f"{len(schema.stale_keys)} key(s) added to PRESTUS are missing from this copy; "
-            f"{len(pinned)} value(s) are pinned differently from the toolbox default.<br><br>"
+            f"{plural(len(schema.stale_keys), 'key')} added to PRESTUS "
+            f"{'is' if len(schema.stale_keys) == 1 else 'are'} missing from this copy; "
+            f"{plural(len(pinned), 'value')} {'is' if len(pinned) == 1 else 'are'} pinned differently from the toolbox default.<br><br>"
             "Replacing the copy with the toolbox default keeps a dated backup. "
             "<i>Keep pinned values</i> first writes the pinned values into the study config, "
             "so the simulation settings stay the same. The study config is saved.")
@@ -1390,7 +1743,7 @@ class MainWindow(QMainWindow):
             page.refresh()
         if n:
             self._changed()
-        self.statusBar().showMessage(f"Dropped {n} value(s) equal to the defaults", 5000)
+        self.statusBar().showMessage(f"Dropped {plural(n, 'value')} equal to the defaults", 5000)
 
     def reload(self) -> None:
         if self.model.path is None or not self.model.path.is_file():
@@ -1467,7 +1820,7 @@ class LocaliteActions(QWidget):
         note.setWordWrap(True)
         h.addWidget(note, 1)
         page = QPushButton("Localite page")
-        page.setToolTip("Detect, name and write the recorded series of a session")
+        page.setToolTip("Detect, name, and write the recorded series of a session")
         page.clicked.connect(lambda: window.show_special(LOCALITE))
         h.addWidget(page)
         imp = QPushButton("Import into study…")

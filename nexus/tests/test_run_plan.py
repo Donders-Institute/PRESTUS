@@ -131,3 +131,24 @@ def test_stage_icons_exist(schema, tmp_path):
     stages = rp.plan(m).stages
     assert all(s.icon in icons.names() for s in stages), [s.name for s in stages if s.icon not in icons.names()]
     assert {s.name: s.icon for s in stages}["Placement"] == "place_localite"
+
+
+def test_predicted_load_table():
+    """Total first, one table row per simulation and one for the other stages, and the GPU
+    list of stages timed on 'any GPU' said once."""
+    import html
+    from prestus_nexus import workload as w
+    from prestus_nexus.ui import style
+    from prestus_nexus.ui.run_plan_card import _merge_bases, prediction_html
+    rate_a = w.Rate(1.0, 0.5, 2.0, "any GPU (A100, L40S); set hpc.gpu to narrow", 10.0)
+    rate_t = w.Rate(1.0, 0.5, 2.0, "any GPU (A100, P100); set hpc.gpu to narrow", 5.0)
+    pred = w.Prediction(parts=[w.Part("Acoustic sim", 3, 1e8, 10_000, rate_a),
+                               w.Part("Thermal sim", 1, 9e7, 260, rate_t)],
+                        stages=[w.Fixed("Placement", 30, 20, 60, "runs")],
+                        untimed=["segmentation (SimNIBS charm)"], gpu_mem_gb=20)
+    out = prediction_html(pred, style.active(), html.escape)
+    assert out.index("Total") < out.index("Acoustic sim") < out.index("Thermal sim") < out.index("Other stages")
+    assert out.count("Timing basis") == 1 and "A100, L40S, P100" in out
+    assert "GPU memory ~20 GB" in out and "Not timed, add: segmentation" in out
+    assert _merge_bases(["measured on X"]) == ["measured on X"]          # other bases unchanged
+    assert prediction_html(w.Prediction(), style.active(), html.escape) == ""

@@ -212,3 +212,35 @@ def orientation(model, transducers: list[dict] | None = None) -> dict:
     if ppw is not None and ppw < PPW_WARN:
         res["coarse_tilted"] = [i for i, a in enumerate(res["tilts"]) if a is not None and a >= TILT_WARN_DEG]
     return res
+
+
+# ── Top-view schematic (timing diagram, async lane) ─────────────────────────────
+
+HEAD_RX, HEAD_RY = 0.82, 1.0          # head outline in schematic units: narrower than long
+
+
+def schematic_top_view(txs: list[dict]) -> list[tuple[np.ndarray, np.ndarray | None] | None]:
+    """Each transducer's position (and its focus) seen from above, for a small head sketch.
+
+    Positions are taken in a RAS+-oriented space (model_transducers): x to the right (R), y to
+    the front (A); z is dropped. The sketch is centred on the mean focus (the targets lie inside
+    the head; the mean transducer position when no focus is set) and scaled so that the
+    transducer farthest out sits on an ellipse of half-axes HEAD_RX x HEAD_RY. It shows where
+    the stances are relative to each other, not the subject's head shape or size. None for a
+    transducer without a position."""
+    trans = [_vec(t.get("trans_pos")) for t in txs]
+    focus = [_vec(t.get("focus_pos")) for t in txs]
+    known_f = [f for f in focus if f is not None]
+    known_t = [t for t in trans if t is not None]
+    if not known_t:
+        return [None] * len(txs)
+    centre = np.mean(known_f if known_f else known_t, axis=0)[:2]
+    reach = max(math.hypot(*(t[:2] - centre) / (HEAD_RX, HEAD_RY)) for t in known_t)
+    scale = 1.0 / reach if reach > 1e-9 else 1.0
+    out = []
+    for t, f in zip(trans, focus):
+        if t is None:
+            out.append(None)
+            continue
+        out.append(((t[:2] - centre) * scale, None if f is None else (f[:2] - centre) * scale))
+    return out

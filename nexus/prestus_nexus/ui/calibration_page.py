@@ -12,8 +12,8 @@ import datetime as _dt
 import math
 from pathlib import Path
 
-from PyQt6.QtCore import QSize, Qt, QTimer
-from PyQt6.QtGui import QFontDatabase
+from PyQt6.QtCore import QSize, Qt, QTimer, QUrl
+from PyQt6.QtGui import QDesktopServices, QFontDatabase
 from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
                              QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
                              QListWidget, QListWidgetItem, QMenu, QMessageBox, QPlainTextEdit,
@@ -26,6 +26,7 @@ from ..bridge import BridgeError, as_columns, as_floats, as_list
 from ..model import TX, is_empty
 from . import calibration_plots as cplots
 from . import icons, style
+from .file_badge import FileBadge, fit_combo_to_items
 from .matlab_status import MatlabStatus
 
 try:
@@ -260,10 +261,10 @@ class RingOptionsDialog(QDialog):
         f_row = QHBoxLayout()
         self.file = QLineEdit(str(cur["OffAxis"] or ""))
         self.file.setPlaceholderText("blank = axial profiles only")
-        self.file.setToolTip("Sonic Concepts FUS Metrology export (.mat, folder or .zip) or a CSV with "
+        self.file.setToolTip("Sonic Concepts FUS Metrology export (.mat, folder, or .zip) or a CSV with "
                              "focus_ep_mm, x_mm, y_mm, z_ep_mm, intensity_wcm2 (read_offaxis_scans)")
         f_row.addWidget(self.file, 1)
-        b = icons.PathButton("file", "Choose the off-axis scan file (.mat, folder or .zip, or CSV)")
+        b = icons.PathButton("file", "Choose the off-axis scan file (.mat, folder, .zip, or CSV)")
         b.clicked.connect(self._browse)
         f_row.addWidget(b)
         form.addRow("File", f_row)
@@ -332,7 +333,7 @@ def _header(text: str) -> QLabel:
 
 
 def _step(number: int, title: str, sub: str = "") -> tuple[QFrame, QVBoxLayout]:
-    """A numbered step group of the control column (#SubGroup look from style.py)."""
+    """A numbered step group of the controls (#SubGroup look from style.py)."""
     box = QFrame()
     box.setObjectName("SubGroup")
     v = QVBoxLayout(box)
@@ -428,47 +429,103 @@ class CalibrationPage(QWidget):
         self.tx.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.tx.currentIndexChanged.connect(lambda _i: self._select())
         top.addWidget(self.tx)
+        # any library transducer and driving system, without a study (calibration_gui's lists)
+        self.lib_serial = QComboBox()
+        self.lib_serial.setMinimumWidth(200)
+        self.lib_ds = QComboBox()
+        self.lib_ds.setMinimumWidth(160)
+        self.lib_serial.currentIndexChanged.connect(lambda _i: self._library_serial_changed())
+        self.lib_ds.currentIndexChanged.connect(lambda _i: self.refresh())
+        top.addWidget(self.lib_serial)
+        top.addWidget(self.lib_ds)
+        self.any_lib = QCheckBox("Any library transducer")
+        self.any_lib.setToolTip("Calibrate any transducer and driving system of the equipment library, not "
+                                "only this study's (as calibration_gui); entries are saved to a folder you "
+                                "choose, without changing the config.")
+        self.any_lib.setChecked(bool(window.session.get("calibration_any_library", False)))
+        self.any_lib.toggled.connect(self._toggle_any_library)
+        top.addWidget(self.any_lib)
+        geo = QPushButton("View geometry")
+        geo.setToolTip("Side and face view of the selected transducer (Equipment sub-tab)")
+        geo.clicked.connect(self._view_geometry)
+        top.addWidget(geo)
+        self.tx_files = FileBadge()             # the device and library entry files, on hover
+        top.addWidget(self.tx_files)
+        top.addStretch(1)
+        outer.addLayout(top)
+        # the entry note and MATLAB's state on their own row: the selectors above keep their
+        # full width (the combos never shrink below their longest item)
+        info = QHBoxLayout()
         self.coverage = QLabel()
         self.coverage.setObjectName("CardSub")
         self.coverage.setWordWrap(True)
-        top.addWidget(self.coverage, 1)
+        info.addWidget(self.coverage, 1)
         bridge = window.bridge()
         self.status_widget = MatlabStatus(bridge)
-        top.addWidget(self.status_widget)
+        info.addWidget(self.status_widget)
         bridge.state_changed.connect(self._idle_status)     # after MatlabStatus._update
         self._idle_status(getattr(bridge, "state", ""))
-        outer.addLayout(top)
+        outer.addLayout(info)
 
-        split = QSplitter()
+        # plots on top at full width (they scroll rather than squash when short), steps below
+        split = QSplitter(Qt.Orientation.Vertical)
         outer.addWidget(split, 1)
+        top_scroll = QScrollArea()
+        top_scroll.setWidgetResizable(True)
+        top_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        top_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        top_scroll.setWidget(self._results())
+        split.addWidget(top_scroll)
         split.addWidget(self._controls())
-        split.addWidget(self._results())
-        split.setStretchFactor(0, 0)
-        split.setStretchFactor(1, 1)
-        split.setCollapsible(0, False)
-        split.setSizes([400, 880])
+        split.setStretchFactor(0, 1)
+        split.setStretchFactor(1, 0)
+        split.setChildrenCollapsible(False)
+        self._split = split
+        self._split_sized = False
+        self._size_timer = QTimer(self, singleShot=True, interval=0)
+        self._size_timer.timeout.connect(self._size_split)
         self._entry_timer = QTimer(self, singleShot=True, interval=300)
         self._entry_timer.timeout.connect(self._draw_entry)
         self.depths.textChanged.connect(lambda _t: self._entry_timer.start())
         self._update_buttons()
 
     # ── layout ──────────────────────────────────────────────────────────
+    def showEvent(self, ev) -> None:
+        super().showEvent(ev)
+        if not self._split_sized:                   # once the width (row or stack) is known
+            self._size_timer.start()
+
+    def _size_split(self) -> None:
+        """The steps get the height they need (at most 45 %), the plots the rest."""
+        total = sum(self._split.sizes())
+        if total <= 0 or not self.isVisible():
+            return
+        self._split_sized = True
+        need = self._controls_body.sizeHint().height() + 4
+        low = min(need, int(0.45 * total))
+        self._split.setSizes([total - low, low])
+
     def _controls(self) -> QWidget:
-        """Three numbered steps (Data, Fit, Save); the fit options most users keep at their
-        defaults sit in a collapsed "Fit options" section, the rest under Advanced…"""
+        """Three numbered steps below the plots in two columns: Data with the log under it, then
+        Fit and Save. The fit options most users keep at their defaults sit in a collapsed
+        "Fit options" section, the rest under Advanced…"""
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setMinimumWidth(340)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
         body = QWidget()
-        col = QVBoxLayout(body)
-        col.setContentsMargins(0, 0, 6, 0)
-        col.setSpacing(8)
+        cols = QHBoxLayout(body)
+        cols.setContentsMargins(0, 6, 6, 0)
+        cols.setSpacing(12)
+        left, right = QVBoxLayout(), QVBoxLayout()
+        for c in (left, right):
+            c.setSpacing(8)
+            cols.addLayout(c, 1)
         scroll.setWidget(body)
 
         # 1 Data
         box, v = _step(1, "Data", "hydrophone profiles and the depths you need")
-        col.addWidget(box)
+        left.addWidget(box)
         form = _form()
         v.addLayout(form)
         csv_row = QHBoxLayout()
@@ -509,7 +566,7 @@ class CalibrationPage(QWidget):
         d_row.addWidget(sd)
         self.predict_btn = QPushButton("Predict")
         self.predict_btn.setToolTip("Profiles at these depths (measured, or interpolated from the measured "
-                                    "ones) and the geometric, library and fitted models as a study "
+                                    "ones) and the geometric, library, and fitted models as a study "
                                     "resolves them")
         self.predict_btn.clicked.connect(self.predict)
         d_row.addWidget(self.predict_btn)
@@ -517,7 +574,7 @@ class CalibrationPage(QWidget):
 
         # 2 Fit
         box, v = _step(2, "Fit")
-        col.addWidget(box)
+        right.addWidget(box)
         form = _form()
         v.addLayout(form)
         self.calat = QComboBox()
@@ -536,11 +593,11 @@ class CalibrationPage(QWidget):
         self.fit_btn.clicked.connect(self.fit)
         a_row.addWidget(self.fit_btn, 1)
         self.eval_btn = QPushButton("Evaluate")
-        self.eval_btn.setToolTip("Geometric, library and fit at the measured depths (R² against the hydrophone)")
+        self.eval_btn.setToolTip("Geometric, library, and fit at the measured depths (R² against the hydrophone)")
         self.eval_btn.clicked.connect(self.evaluate_measured)
         a_row.addWidget(self.eval_btn, 1)
         self.opt_btn = QToolButton(text="Fit options ▸", checkable=True)
-        self.opt_btn.setToolTip("Ring profile, free parameters, forward model, loss and starts. The defaults "
+        self.opt_btn.setToolTip("Ring profile, free parameters, forward model, loss, and starts. The defaults "
                                 "suit most transducers.")
         a_row.addWidget(self.opt_btn)
         v.addLayout(a_row)
@@ -557,14 +614,14 @@ class CalibrationPage(QWidget):
         self.ring.addItem("uniform rings", "none")
         self.ring.setToolTip(
             "How each ring vibrates across its width (fit_ring_profile). Fit: every ring split into sub-rings "
-            "with weights shared by all measured depths, then phases, gains and drive per depth; the near field "
+            "with weights shared by all measured depths, then phases, gains, and drive per depth; the near field "
             "from 4 mm is then fitted too. Improves transducers whose near-field / focal peak ratio uniform rings "
             "cannot reproduce (e.g. CTX). Axial profiles alone do not determine the off-axis field: add plane "
             "scans under Options… where available.")
         r_row = QHBoxLayout()
         r_row.addWidget(self.ring, 1)
         self.rpo_btn = QPushButton("Options…")
-        self.rpo_btn.setToolTip("Sub-rings, smoothness, optimiser and plane scans (off-axis data) for the "
+        self.rpo_btn.setToolTip("Sub-rings, smoothness, optimiser, and plane scans (off-axis data) for the "
                                 "ring-profile fit")
         self.rpo_btn.clicked.connect(self._ring_options)
         r_row.addWidget(self.rpo_btn)
@@ -613,12 +670,16 @@ class CalibrationPage(QWidget):
 
         # 3 Save
         box, v = _step(3, "Save")
-        col.addWidget(box)
+        right.addWidget(box)
         self.lib_label = QLabel()
         self.lib_label.setWordWrap(True)
         self.lib_label.setObjectName("CardSub")
         self.lib_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         v.addWidget(self.lib_label)
+        self.lib_folder_btn = QPushButton("Folder…")
+        self.lib_folder_btn.setToolTip("Folder of your own library for the entries of library transducers")
+        self.lib_folder_btn.clicked.connect(self._choose_library_folder)
+        v.addWidget(self.lib_folder_btn, 0, Qt.AlignmentFlag.AlignLeft)
         s_row = QHBoxLayout()
         self.save_btn = QPushButton("Save entry")
         self.save_btn.clicked.connect(self.save)
@@ -629,6 +690,9 @@ class CalibrationPage(QWidget):
         menu.addAction("Fit settings (CSV)…", self._export_settings)
         self.export_btn.setMenu(menu)
         s_row.addWidget(self.export_btn, 1)
+        self.report_btn = QPushButton("Report")
+        self.report_btn.clicked.connect(self.open_report)
+        s_row.addWidget(self.report_btn, 1)
         v.addLayout(s_row)
         k_row = QHBoxLayout()
         self.kw_btn = QPushButton("k-Wave drive check…")
@@ -643,11 +707,13 @@ class CalibrationPage(QWidget):
             self.load_btn: "Read the profiles in MATLAB (starts MATLAB on first use)",
             self.predict_btn: self.predict_btn.toolTip(),
             self.eval_btn: self.eval_btn.toolTip(),
-            self.fit_btn: "Fit phases, gains and drive per depth to the hydrophone profiles",
+            self.fit_btn: "Fit phases, gains, and drive per depth to the hydrophone profiles",
             self.save_btn: "Write the fitted entry to transducer.library_path (with meta.fit)",
             self.export_btn: "Export the shown profiles or the fit settings as CSV",
+            self.report_btn: "Open the HTML report of the saved library entry (generate_calibration_report): "
+                             "provenance, fit quality, the settings a study gets, and the amplitude lookup",
             self.kw_btn: "Per-depth fits: simulate each refined depth in free-water k-Wave with the "
-                         "study config's grid and platform, correct the drive to the simulated ISPPA "
+                         "study config's grid and platform, correct the drive to the simulated ISPPA, "
                          "and save the entry. Runs on the Run tab (minutes per depth).",
         }
 
@@ -655,13 +721,15 @@ class CalibrationPage(QWidget):
         # here by the Transducer tab (TabPage.section_columns) rather than on its Settings sub-tab
         self.settings_column = QVBoxLayout()
         self.settings_column.setSpacing(8)
-        col.addLayout(self.settings_column)
-
         self.log = QPlainTextEdit(readOnly=True)
-        self.log.setMinimumHeight(110)
+        self.log.setMinimumHeight(90)
+        self.log.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored)   # leftover height only
         self.log.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
         self.log.setPlaceholderText("Messages from the calibration steps appear here.")
-        col.addWidget(self.log, 1)
+        right.addLayout(self.settings_column)
+        right.addStretch(1)
+        left.addWidget(self.log, 1)
+        self._controls_body = body
         return scroll
 
     def _toggle_options(self, on: bool) -> None:
@@ -704,7 +772,7 @@ class CalibrationPage(QWidget):
         self.hint.setWordWrap(True)
         self.hint.setObjectName("TabIntro")
         v.addWidget(self.hint)
-        self.entry_plot = cplots.CalibrationCoverage(height=300)
+        self.entry_plot = cplots.CalibrationCoverage(height=230)
         v.addWidget(self.entry_plot, 1)
         self.views.addWidget(page)
 
@@ -722,12 +790,14 @@ class CalibrationPage(QWidget):
             self.ax_prof, self.ax_r2 = self.fig.subplots(2, 1, height_ratios=[1.3, 1])
             self.canvas = FigureCanvasQTAgg(self.fig, export_name="calibration_profiles")
             self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.canvas.setMinimumHeight(400)       # two axes with legends: below this they overlap
             v.addWidget(self.canvas, 3)
         else:
             self.fig = self.canvas = None
             v.addWidget(QLabel("Install matplotlib to see the profiles."), 3)
         self.table = QTableWidget()
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setMinimumHeight(120)
         v.addWidget(self.table, 1)
         self.views.addWidget(page)
         self._restyle_views()
@@ -751,7 +821,7 @@ class CalibrationPage(QWidget):
         self.view_btns["profiles"].setEnabled(self.view is not None)
         self.view_btns["profiles"].setToolTip(
             "Models against the hydrophone profiles" if self.view is not None else
-            "Available after Predict, Evaluate or Fit (they start MATLAB)")
+            "Available after Predict, Evaluate, or Fit (they start MATLAB)")
 
     def _depth_changed(self) -> None:
         sel = self.show_depth.currentText()
@@ -776,7 +846,7 @@ class CalibrationPage(QWidget):
         if state == "off":
             c = style.active()
             self.status_widget.label.setText(f"<span style='color:{c['ink3']}'>●</span> MATLAB starts when "
-                                             "you load, predict or fit")
+                                             "you load, predict, or fit")
 
     def _update_buttons(self) -> None:
         """Enable the step buttons for what is possible now; a disabled button says why."""
@@ -793,8 +863,10 @@ class CalibrationPage(QWidget):
             self.fit_btn: None if has_csv else "Load a hydrophone profile CSV first (step 1)",
             self.save_btn: None if self.has_fit else "Run Fit first: there is nothing to save yet",
             self.export_btn: None if self.view is not None else
-            "Predict, Evaluate or Fit first: there are no profiles to export yet",
+            "Predict, Evaluate, or Fit first: there are no profiles to export yet",
             self.kw_btn: None if self.has_fit else "Needs a per-depth fit: run Fit first",
+            self.report_btn: None if self.entry is not None or self.info.get("library_file") else
+            "No library entry yet: save a fit first",
         }
         for b, reason in why.items():
             if busy:
@@ -828,37 +900,123 @@ class CalibrationPage(QWidget):
             out.append((ti, str(serial), "" if is_empty(ds) else str(ds)))
         return out
 
+    def library_mode(self) -> bool:
+        """Any library transducer (not the study's): ti is -1 and nothing reads the config."""
+        return self.any_lib.isChecked()
+
     def current(self) -> tuple[int, str, str] | None:
+        if self.library_mode():
+            serial = self.lib_serial.currentData()
+            return (-1, str(serial), str(self.lib_ds.currentData() or "")) if serial else None
         data = self.tx.currentData()
         return tuple(data) if data else None
 
     def library_path(self) -> str:
+        if self.library_mode():
+            return str(self.window.session.get("calibration_library_out", "") or "")
         cur = self.current()
         lib = self.model.get(f"{TX}.library_path", cur[0] if cur else 0)
         return "" if is_empty(lib) else str(lib)
+
+    def _toggle_any_library(self, on: bool) -> None:
+        self.window.session.set("calibration_any_library", on)
+        self.refresh()
+
+    def _library_serial_changed(self) -> None:
+        """The driving systems of the chosen library transducer (and none)."""
+        serial = self.lib_serial.currentData()
+        dev = self.model.library.get(serial) if (self.model.library and serial) else None
+        keep = self.lib_ds.currentData()
+        self.lib_ds.blockSignals(True)
+        self.lib_ds.clear()
+        self.lib_ds.addItem("(no driving system)", "")
+        for ds in (dev.combos if dev is not None else {}):
+            self.lib_ds.addItem(ds, ds)
+        idx = self.lib_ds.findData(keep)
+        self.lib_ds.setCurrentIndex(idx if idx >= 0 else (1 if self.lib_ds.count() > 1 else 0))
+        self.lib_ds.blockSignals(False)
+        self.refresh()
+
+    def _view_geometry(self) -> None:
+        """The selected transducer on the Equipment sub-tab (calibration_gui's View geometry)."""
+        from .main_window import EQUIPMENT
+        cur = self.current()
+        tab = self.window.tab_pages.get("transducer")
+        if tab is not None and not tab.advanced.isChecked():
+            tab.advanced.setChecked(True)               # the Equipment sub-tab is an advanced one
+        page = self.window.show_special(EQUIPMENT)
+        page.refresh()
+        page.keep_serial.setChecked(False)
+        if cur is not None:
+            idx = page.start.findData(cur[1])
+            if idx >= 0:
+                page.start.setCurrentIndex(idx)
+
+    def _choose_library_folder(self) -> None:
+        start = self.library_path() or str(Path.home())
+        path = QFileDialog.getExistingDirectory(self, "Folder of your own library", start)
+        if path:
+            self.window.session.set("calibration_library_out", path)
+            self.refresh()
+
+    def _fill_library_lists(self) -> None:
+        lib = self.model.library
+        keep = self.lib_serial.currentData()
+        self.lib_serial.blockSignals(True)
+        self.lib_serial.clear()
+        for s, d in (lib.devices.items() if lib else []):
+            if d.type == "annular" and not d.excluded:
+                self.lib_serial.addItem(s, s)
+        fit_combo_to_items(self.lib_serial, 200)
+        idx = self.lib_serial.findData(keep)
+        self.lib_serial.setCurrentIndex(max(idx, 0))
+        self.lib_serial.blockSignals(False)
+        if self.lib_ds.count() == 0 or keep != self.lib_serial.currentData():
+            self.lib_ds.blockSignals(True)
+            self.lib_ds.clear()
+            dev = lib.get(self.lib_serial.currentData()) if lib else None
+            self.lib_ds.addItem("(no driving system)", "")
+            for ds in (dev.combos if dev is not None else {}):
+                self.lib_ds.addItem(ds, ds)
+            self.lib_ds.setCurrentIndex(1 if self.lib_ds.count() > 1 else 0)
+            self.lib_ds.blockSignals(False)
 
     def refresh(self) -> None:
         """Called when the sub-tab is shown: follow the config's transducers and show the
         selected one's library entry. MATLAB is not started here; once a user action has
         opened the device in MATLAB, a change of the study's depths is predicted again."""
-        items = self._transducers()
-        keep = self.current()
+        lib_mode = self.library_mode()
+        for w in (self.lib_serial, self.lib_ds, self.lib_folder_btn):
+            w.setVisible(lib_mode)
+        self.tx.setVisible(not lib_mode)
+        if lib_mode:
+            self._fill_library_lists()
+        items = self._transducers() if not lib_mode else (
+            [self.current()] if self.current() is not None else [])
+        keep = self.current() if not lib_mode else None
         self.tx.blockSignals(True)
         self.tx.clear()
-        for ti, serial, ds in items:
+        for ti, serial, ds in (items if not lib_mode else []):
             dev = self.model.library.get(serial) if self.model.library else None
             kind = f" ({dev.type})" if dev is not None and dev.type else ""
             self.tx.addItem(f"Transducer {ti + 1}: {serial}{' / ' + ds if ds else ''}{kind}", [ti, serial, ds])
+        fit_combo_to_items(self.tx, 260)
         if keep is not None:
             idx = self.tx.findData(list(keep))
             if idx >= 0:
                 self.tx.setCurrentIndex(idx)
         self.tx.blockSignals(False)
         lib = self.library_path()
-        self.lib_label.setText(f"Save to <tt>{lib}</tt>" if lib else
-                               f"<span style='color:{style.active()['amber']}'>transducer.library_path is "
-                               "not set: Save asks for a folder and sets it.</span>")
+        if lib_mode:
+            self.lib_label.setText(f"Save to <tt>{lib}</tt> (your own library; the config is not changed)" if lib
+                                   else f"<span style='color:{style.active()['amber']}'>Choose the folder of your "
+                                   "own library (Folder…); Save asks for one.</span>")
+        else:
+            self.lib_label.setText(f"Save to <tt>{lib}</tt>" if lib else
+                                   f"<span style='color:{style.active()['amber']}'>transducer.library_path is "
+                                   "not set: Save asks for a folder and sets it.</span>")
         if not items:
+            self.tx_files.set_files([])
             self.coverage.setText("No transducer from the equipment library in this config "
                                   "(set transducer.serial on the Settings tab).")
             self._device = None
@@ -891,16 +1049,19 @@ class CalibrationPage(QWidget):
                 self.auto_csv = None
                 self.info, self.view, self.has_fit = {}, None, False
                 self.measured.clear()
-                target = self.model.get(f"{TX}.target_isppa_wcm2", cur[0])
+                target = self.model.get(f"{TX}.target_isppa_wcm2", cur[0]) if cur[0] >= 0 else None
                 if isinstance(target, (int, float)) and not isinstance(target, bool) and target > 0:
                     self.isppa.setValue(float(target))
             self._device = key
             self.entry, path = cplots.load_entry(self.model.library, cur[1], cur[2], key[2])
             meta = (self.entry or {}).get("meta") or {}
-            desc = (f"library entry {path.name} ({meta.get('calibration_type') or '?'}"
-                    f"{', ' + str(meta['last_updated']) if meta.get('last_updated') else ''})"
-                    if path else "no library entry: the geometric model is used")
-            self.coverage.setText(f"<b>{cur[1]}{'_' + cur[2] if cur[2] else ''}</b> · {desc}")
+            desc = (f"Library entry: {meta.get('calibration_type') or '?'}"
+                    f"{', ' + str(meta['last_updated']) if meta.get('last_updated') else ''}"
+                    if path else "No library entry yet")
+            self.coverage.setText(desc)             # the selector names the device
+            dev = self.model.library.get(cur[1]) if self.model.library else None
+            self.tx_files.set_files([("Device", dev.file if dev is not None else ""),
+                                     ("Library entry", path or "none yet")])
             rec = meta.get("fit")
             if isinstance(rec, dict) and self._record_from != key[:2]:
                 s, _depths = cal.settings_from_record(rec, self.settings())
@@ -930,9 +1091,9 @@ class CalibrationPage(QWidget):
         depths = cal.parse_depths(self.depths.text()) or []
         name = f"{cur[1]}{' with ' + cur[2] if cur[2] else ''}"
         self.entry_plot.set_entry(self.entry, depths, name,
-                                  f"No calibration entry for {name}; the geometric model is used.")
+                                  f"No calibration entry for {name}: an annular transducer needs one (or phases and amplitude set inline) before it can run; fit one below.")
         if self.csv.text().strip():
-            nxt = ("Next: <b>Evaluate</b> compares the geometric, library and fitted models with the "
+            nxt = ("Next: <b>Evaluate</b> compares the geometric, library, and fitted models with the "
                    "hydrophone profiles; <b>Fit</b> makes a new entry. Both start MATLAB.")
         else:
             nxt = ("Load a hydrophone profile CSV (step 1) to fit a new entry, or <b>Predict</b> the "
@@ -974,10 +1135,13 @@ class CalibrationPage(QWidget):
             self.csv.setText(out.get("csv") or "")
             self.auto_csv = out.get("csv") or None
         self._fill_measured()
-        entry = (f"library entry {Path(out['library_file']).name} ({out.get('calibration_type') or '?'}"
-                 f"{', ' + out['last_updated'] if out.get('last_updated') else ''})"
-                 if out.get("library_file") else "no library entry")
-        self.coverage.setText(f"<b>{out['combo']}</b> · {entry}")
+        entry = (f"Library entry: {out.get('calibration_type') or '?'}"
+                 f"{', ' + out['last_updated'] if out.get('last_updated') else ''}"
+                 if out.get("library_file") else "No library entry")
+        self.coverage.setText(entry)                # the selector names the device
+        if out.get("library_file"):
+            self.tx_files.set_files([*(f for f in self.tx_files.files if f[0] != "Library entry"),
+                                     ("Library entry", out["library_file"])])
         self._say(f"{out['combo']}: {entry}")
         self._update_buttons()
         if out.get("matrix"):
@@ -1058,7 +1222,7 @@ class CalibrationPage(QWidget):
         dlg = AdvancedDialog(self.advanced, self.extra, self)
         if dlg.exec():
             if dlg.grid_dims() is None:
-                self._say("k-Wave grid: enter auto, nx nz or nx ny nz, or leave it blank; grid unchanged.")
+                self._say("k-Wave grid: enter auto, nx nz, or nx ny nz (or leave it blank); grid unchanged.")
             p = dlg.preset()
             if p:
                 self.fp_phase.setChecked("phase" in p["FreeParams"])
@@ -1093,7 +1257,7 @@ class CalibrationPage(QWidget):
         """Desired depths for the open device from the config, manifest and placement, and
         where they came from."""
         cur = self.current()
-        if cur is None:
+        if cur is None or cur[0] < 0:            # a library transducer: no study depths
             return [], ""
         settings = cal.study_depths(self.model, cur[1], cur[2], self._manifest())
         targets = cal.target_depths(self.model, cur[1], cur[2], self._target_depth)
@@ -1224,6 +1388,13 @@ class CalibrationPage(QWidget):
             return
         cur = self.current()
         out_dir = self.library_path()
+        if not out_dir and self.library_mode():
+            out_dir = QFileDialog.getExistingDirectory(self, "Folder of your own library", str(Path.home()))
+            if not out_dir:
+                return
+            self.window.session.set("calibration_library_out", out_dir)
+            self.opened = (cur[1], cur[2], out_dir)     # same MATLAB state; only the folder is new
+            self.refresh()
         if not out_dir:
             start = str(self.model.path.parent if self.model.path else Path.home())
             out_dir = QFileDialog.getExistingDirectory(self, "Folder for your library entries", start)
@@ -1249,6 +1420,8 @@ class CalibrationPage(QWidget):
             if out.get("profiles_csv"):
                 msg += f" (+ calibration profiles {Path(out['profiles_csv']).name})"
             self._say(msg)
+            self.info["library_file"] = out["file"]     # Report has an entry now
+            self._update_buttons()
             self.window._changed()     # the coverage line on the Settings tab reads the new entry
         self._call("save", {"out_dir": out_dir, "allow_shipped": allow}, saved)
 
@@ -1260,6 +1433,15 @@ class CalibrationPage(QWidget):
             return
         self._call(action, {"path": path, "settings": self.settings().bridge_settings()},
                    lambda out: self._say(f"Exported {out.get('what', '')} {what} to {out['path']}"))
+
+    def open_report(self) -> None:
+        """Write the saved library entry's HTML report to a temporary folder and open it."""
+        def written(out):
+            path = Path(str(out.get("file") or ""))
+            self._say(f"Calibration report: {path}")
+            if path.is_file():
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        self._call("report", {}, written, "Writing the report…")
 
     def _export_profiles(self) -> None:
         self._export("export_profiles", "profiles")
@@ -1275,40 +1457,109 @@ class CalibrationPage(QWidget):
         if not self.has_fit:
             self._say("The k-Wave drive check needs a per-depth fit: run Fit first.")
             return
-        if self.model.path is None and not self.window.save():
-            return
         lib = self.library_path()
-        if not lib:
-            self._say("Set transducer.library_path (or Save the analytical fit once) first: the "
-                      "corrected entry is saved there.")
-            return
+        if self.library_mode():
+            if not lib:
+                self._say("Choose the folder of your own library (Folder…) first: the corrected entry is "
+                          "saved there.")
+                return
+            sim_config = self._library_sim_config()
+            if sim_config is None:
+                return
+            folder = Path(lib) / "calibration"
+        else:
+            if self.model.path is None and not self.window.save():
+                return
+            if not lib:
+                self._say("Set transducer.library_path (or Save the analytical fit once) first: the "
+                          "corrected entry is saved there.")
+                return
+            sim_config = str(self.model.path)
+            folder = self.model.path.parent / "calibration"
         combo = self.info.get("combo", "calibration")
-        folder = self.model.path.parent / "calibration"
         mat = folder / f"{combo}_fit.mat"
         script = folder / f"kwave_drive_{combo}.m"
 
         def written(_out):
             folder.mkdir(parents=True, exist_ok=True)
             ko = self.settings().kwave_options()
+            axisym = self.kw_grid.currentText() == "axisymmetric"
             launcher.write_kwave_drive_script(
-                script, mat, self.window.prestus_root, lib, str(self.model.path),
-                self.kw_grid.currentText() == "axisymmetric", self.skip.value(),
-                grid_dims=ko["GridDims"], apply_correction=ko["ApplyCorrection"])
+                script, mat, self.window.prestus_root, lib, sim_config or None, axisym,
+                self.skip.value(), grid_dims=ko["GridDims"], apply_correction=ko["ApplyCorrection"])
             box = QMessageBox(self)
             box.setWindowTitle("k-Wave drive check")
             box.setText(f"Script written:\n{script}\n\nIt runs one free-water simulation per refined depth "
                         "(minutes each, with the study config's grid and platform) and saves the corrected "
-                        f"entry to {lib}.\n\nRun it now on the Run tab, or run the script yourself "
-                        "(e.g. on the cluster)?")
-            run = box.addButton("Run on the Run tab", QMessageBox.ButtonRole.AcceptRole)
+                        f"entry to {lib}.\n\nSubmit it as a job (it waits for its simulations on a compute "
+                        "node), run it here on the Run tab, or run the script yourself?")
+            job = box.addButton("Submit as a job", QMessageBox.ButtonRole.AcceptRole)
+            run = box.addButton("Run on the Run tab", QMessageBox.ButtonRole.ActionRole)
             box.addButton("Only write the script", QMessageBox.ButtonRole.RejectRole)
             box.exec()
-            if box.clickedButton() is run:
+            if box.clickedButton() is job:
+                self._submit_kwave_drive(script, mat, lib, axisym, ko, sim_config)
+            elif box.clickedButton() is run:
                 page = self.window.show_special(RUN)
                 page.run_script(f"k-Wave drive check ({combo})", script)
             else:
                 self._say(f"k-Wave drive check script: {script}")
         self._call("write_fit", {"path": str(mat)}, written)
+
+    def _submit_kwave_drive(self, script: Path, mat: Path, lib: str, axisym: bool, ko: dict,
+                            sim_config: str = "") -> None:
+        """Submit the drive check as a scheduler job from the Run tab: here, or over SSH with a
+        copy of the script that uses the host's paths."""
+        from .. import launcher
+        from .. import remote as rmt
+        from .main_window import RUN
+        page = self.window.pages[RUN]
+        remote = page.remote_host() if page._remote_on() else None
+        if page._remote_on() and remote is None:
+            return
+        if remote is not None:
+            try:
+                cluster = script.with_name(f"{script.stem}_cluster.m")
+                launcher.write_kwave_drive_script(
+                    cluster, remote.to_remote(mat), remote.remote_root(self.window.prestus_root),
+                    remote.to_remote(lib), remote.to_remote(sim_config) if sim_config else None, axisym,
+                    self.skip.value(),
+                    grid_dims=ko["GridDims"], apply_correction=ko["ApplyCorrection"])
+            except rmt.PathMapError as e:
+                self._say(f"Cannot submit over SSH: {e}.")
+                return
+            script = cluster
+        self.window.show_special(RUN)
+        if page.submit_kwave_drive(script, mat, Path(sim_config) if sim_config else None, remote):
+            self._say(f"k-Wave drive check submitted as a job (Run tab): {script}")
+
+    def _library_sim_config(self) -> str | None:
+        """Simulation config for the k-Wave drive check of a library transducer (grid, platform,
+        hpc; calibration_gui's SimConfig): asked once and remembered. '' = PRESTUS defaults;
+        None = cancelled."""
+        cfg = str(self.window.session.get("calibration_library_simconfig", "") or "")
+        box = QMessageBox(self)
+        box.setWindowTitle("k-Wave drive check")
+        box.setText("Simulation config for the check (grid, platform and HPC settings; its transducer block "
+                    f"is ignored):\n\n{cfg or 'none: PRESTUS defaults'}")
+        keep = box.addButton("Use this", QMessageBox.ButtonRole.AcceptRole)
+        choose = box.addButton("Choose…", QMessageBox.ButtonRole.ActionRole)
+        none = box.addButton("PRESTUS defaults", QMessageBox.ButtonRole.ActionRole)
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is keep:
+            return cfg
+        if clicked is none:
+            self.window.session.set("calibration_library_simconfig", "")
+            return ""
+        if clicked is choose:
+            path, _ = QFileDialog.getOpenFileName(self, "Simulation config", cfg or str(Path.home()),
+                                                  "YAML (*.yaml *.yml)")
+            if path:
+                self.window.session.set("calibration_library_simconfig", path)
+                return path
+        return None
 
     # ── drawing ─────────────────────────────────────────────────────────
     def _show(self, out: dict) -> None:

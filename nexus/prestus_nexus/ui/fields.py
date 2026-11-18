@@ -6,15 +6,16 @@ import html
 import re
 from typing import Any
 
-from PyQt6.QtCore import QEvent, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, pyqtSignal
 from PyQt6.QtWidgets import (QSizePolicy, QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
                              QToolTip, QVBoxLayout, QWidget)
 
-from .. import yamlio
+from .. import labels, yamlio
 from ..checks import check_value
 from ..model import is_empty
 from ..schema import Node
 from . import icons, style
+from .tooltip import choice_tip
 
 TRISTATE = [("auto (~)", None), ("true", True), ("false", False)]
 PATH_KINDS = ("dir", "file", "path")
@@ -182,6 +183,9 @@ def _clear_layout(layout) -> None:
             w.deleteLater()
 
 
+FIGURE_PX = 120        # width of a choice figure; its caption sits beside it
+
+
 class ChoiceEditor(FieldEditor):
     def __init__(self, node: Node, parent: QWidget | None = None):
         super().__init__(node, parent)
@@ -199,9 +203,9 @@ class ChoiceEditor(FieldEditor):
         self.math.setContentsMargins(0, 4, 0, 0)
         self.math.setSpacing(2)
         box.addLayout(self.math)
-        self.figures = QHBoxLayout()    # overlay 'choice_figures': the selected choice's schematics
-        self.figures.setContentsMargins(0, 4, 0, 0)
-        self.figures.setSpacing(12)
+        self.figures = QVBoxLayout()    # overlay 'choice_figures': one row per schematic,
+        self.figures.setContentsMargins(0, 4, 0, 0)   # its caption beside it
+        self.figures.setSpacing(8)
         box.addLayout(self.figures)
         self._layout.addLayout(box, 1)
         self._items: list[Any] = []
@@ -211,8 +215,7 @@ class ChoiceEditor(FieldEditor):
     def _options(self, value: Any) -> list[tuple[str, Any]]:
         if self.node.kind == "tristate":
             return list(TRISTATE)
-        labels = self.node.choice_labels
-        opts = [(str(labels.get(c, c)), c) for c in self.node.choices or []]
+        opts = [(labels.choice(self.node, c), c) for c in self.node.choices or []]
         if not is_empty(value) and value not in (self.node.choices or []):
             opts.append((f"{value}  (not recognised)", value))
         if is_empty(value):
@@ -232,6 +235,9 @@ class ChoiceEditor(FieldEditor):
                 ic = icons.for_choice(self.node, v)
                 if ic is not None:
                     self.combo.setItemIcon(i, ic)
+        for i, v in enumerate(self._items):
+            if self.node.kind != "tristate" and not is_empty(v):
+                self.combo.setItemData(i, choice_tip(self.node, v), Qt.ItemDataRole.ToolTipRole)
         for i, v in enumerate(self._items):
             if type(v) is type(value) and v == value:
                 self.combo.setCurrentIndex(i)
@@ -272,20 +278,21 @@ class ChoiceEditor(FieldEditor):
         from . import choice_icons, icons
         for name in names:
             cell = QWidget(self)
-            col = QVBoxLayout(cell)
-            col.setContentsMargins(0, 0, 0, 0)
-            col.setSpacing(2)
+            row = QHBoxLayout(cell)
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(12)
             pic = QLabel()
-            pic.setPixmap(icons.figure(name, 168))
+            pic.setPixmap(icons.figure(name, FIGURE_PX))
+            pic.setFixedSize(pic.sizeHint())
             text = QLabel(choice_icons.caption(name))
             text.setWordWrap(True)
             text.setObjectName("CardSub")
-            text.setMaximumWidth(168)
-            col.addWidget(pic)
-            col.addWidget(text)
-            col.addStretch(1)
+            text.setMinimumWidth(FIGURE_PX)
+            text.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            cell.setMinimumHeight(pic.sizeHint().height())   # wrapped text must not squeeze it
+            row.addWidget(pic, 0, Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(text, 1, Qt.AlignmentFlag.AlignVCenter)
             self.figures.addWidget(cell)
-        self.figures.addStretch(1)
 
     def _changed(self, index: int) -> None:
         if self._setting or index < 0:
@@ -304,22 +311,28 @@ class ChoiceEditor(FieldEditor):
             item = model.item(i) if hasattr(model, "item") else None
             if st is None or item is None:
                 continue
-            label = str(v)
+            label = labels.choice(self.node, v)
             if st.state == "unavailable":
                 label += "  (unavailable)"
                 item.setEnabled(v == current)
             elif st.state == "pending":
                 label += "  (needs setup)"
             item.setText(label)
-            item.setToolTip(st.reason or "All inputs found")
+            item.setToolTip(choice_tip(self.node, v, st.reason or "All inputs found"))
+        lines = []
         st = status.get(current) if isinstance(current, str) else None
         if st is not None and st.state != "ready" and st.reason:
             colour = style.active()["red" if st.state == "unavailable" else "amber"]
             what = "Cannot run yet" if st.state == "unavailable" else "Still to set up"
-            self.note.setText(f"<span style='color:{colour}'>{what}:</span> {st.reason}")
-            self.note.setVisible(True)
-        else:
-            self.note.setVisible(False)
+            lines.append(f"<span style='color:{colour}'>{what}:</span> {html.escape(st.reason)}")
+        # Disabled choices show no tooltip on most platforms: say here why they are unavailable
+        for v in self._items:
+            other = status.get(v) if isinstance(v, str) and v != current else None
+            if other is not None and other.state == "unavailable" and other.reason:
+                lines.append(f"<span style='color:{style.active()['ink3']}'>{html.escape(labels.choice(self.node, v))} "
+                             f"unavailable: {html.escape(other.reason)}</span>")
+        self.note.setText("<br>".join(lines))
+        self.note.setVisible(bool(lines))
 
 
 class CheckEditor(FieldEditor):

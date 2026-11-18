@@ -37,6 +37,12 @@ def _folder(tmp_path, nifti=lambda p: p.write_bytes(b"")):
             nifti(base / "nii" / f"{TAG}_{MED}_T1w{affix}_{m}.nii.gz")
     (base / f"{TAG}_{MED}_desc-coherent_targeting.csv").write_text("a\n1\n")
     (base / f"{TAG}_{MED}_sequential_report.html").write_text("<html></html>")
+    (base / f"{TAG}_placement_manual_desc-coherent.html").write_text("<html></html>")
+    (base / f"{TAG}_placement_desc-coherent.json").write_text("{}")       # not a report
+    for t in ("summary", "elements", "poses_T1"):                        # not runs
+        (base / f"{TAG}_{MED}_desc-coherent_timereversal_{t}.csv").write_text("a\n1\n")
+    (base.parent / f"group_{MED}_report.html").write_text("<html></html>")
+    (base.parent / "other.html").write_text("<html></html>")             # not a report
     (base / f"{TAG}_placement_desc-async_desc-asyncPreproc.json").write_text(json.dumps(
         {"mode": "manual", "transducers": [{"trans_pos": [1, 2, 3], "focus_pos": [4, 5, 6]},
                                            {"trans_pos": [7, 8, 9], "focus_pos": [10, 11, 12]}]}))
@@ -61,6 +67,20 @@ def test_discover_runs(tmp_path):
     assert by_affix["_desc-async_trans-02"].maps["Intensity (ISPPA)"].name.endswith("_intensity.nii.gz")
     assert by_affix["_desc-seq-t2"].csv is None and "Max temperature" in by_affix["_desc-seq-t2"].maps
     assert by_affix["_desc-coherent"].report.name == f"{TAG}_{MED}_report_desc-coherent.html"
+
+
+def test_other_reports(tmp_path):
+    # Every report of the subject folder (incl. placement reports, whose name has no
+    # 'report'), then the group reports in path.sim; nothing else
+    base = _folder(tmp_path)
+    got = rs.other_reports(base)
+    names = [p.name for p in got]
+    assert f"{TAG}_placement_manual_desc-coherent.html" in names
+    assert f"{TAG}_{MED}_sequential_report.html" in names
+    assert all(f"{TAG}_{MED}_report{a}.html" in names for a, (csv, _) in RUNS.items() if csv)
+    assert names[-1] == f"group_{MED}_report.html" and got[-1].parent == base.parent
+    assert "other.html" not in names and not any(n.endswith(".json") for n in names)
+    assert rs.other_reports(tmp_path / "missing" / TAG) == []
 
 
 def test_describe_affix():
@@ -142,6 +162,8 @@ def test_results_page_lists_runs(schema, tmp_path):
     assert len(page.acoustic.viewer.markers) == 2
     assert page.compare.rowCount() == len(labels)
     assert page.report_combo.findText(f"{TAG}_{MED}_sequential_report.html") >= 0
+    assert page.report_combo.findText(f"{TAG}_placement_manual_desc-coherent.html") >= 0
+    assert page.report_combo.findText(f"group_{MED}_report.html") >= 0
 
     # Sub-tabs other than the shown one load when opened.
     assert page.thermal.viewer.overlay is None and page.thermal.viewer.anat is None
@@ -268,11 +290,11 @@ def test_itrusst_overview(schema, tmp_path):
     rows = {(sec.title, r.label): r for sec in rep_.sections for r in sec.rows}
     safety = {r.label: r for sec in rep_.sections if sec.title.startswith("ITRUSST") for r in sec.rows}
     # limits and colour rule of the HTML report: above > limit, near >= 50 %, within below
-    assert safety["Max pressure"].status == "above" and safety["Max pressure"].value == "2.4 MPa"
+    assert "Max pressure" not in safety                  # no ITRUSST pressure limit
     assert safety["MI (transcranial)"].status == "within" and safety["MI (skull)"].status == "near"
     assert safety["Temp rise (skull)"].status == "above" and safety["Max temp (skull)"].status == "above"
     assert safety["MI (free water, from the free-water run)"].value == "1.4"
-    assert rep_.verdict == "review" and set(rep_.above) == {"Max pressure", "Temp rise (skull)", "Max temp (skull)"}
+    assert rep_.verdict == "review" and set(rep_.above) == {"Temp rise (skull)", "Max temp (skull)"}
     # the frequency the run used (CSV), not the config's
     assert rows[("Transducer", "Fundamental frequency")].value == "500 kHz"
     assert rows[("Transducer", "Fundamental frequency")].source == "run CSV"
@@ -294,7 +316,7 @@ def test_itrusst_overview(schema, tmp_path):
     assert rows[(th, "CEM43 (skull, ISO form)")].value == "9 min"
     assert rows[(th, "CEM43 (skull, ISO form)")].status == "near"
     md = ir.to_markdown(rep_)
-    assert "| Max pressure | 2.4 MPa | ≤ 2 MPa | above | run CSV |" in md
+    assert "| Peak pressure (whole grid) | 2.4 MPa |  |  | run CSV |" in md
 
 
 def test_itrusst_overview_missing_outputs(schema, tmp_path):

@@ -12,9 +12,8 @@ from PyQt6.QtWidgets import QApplication  # noqa: E402
 
 from prestus_nexus.model import ConfigModel  # noqa: E402
 from prestus_nexus.session import Session  # noqa: E402
-from prestus_nexus.uncertainty import PROPERTIES  # noqa: E402
+from prestus_nexus.uncertainty import OVERRIDES_KEY, PROPERTIES  # noqa: E402
 from prestus_nexus.ui.main_window import STUDY, MainWindow  # noqa: E402
-from prestus_nexus.ui.uncertainty_view import FILE_KEYS  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -307,7 +306,7 @@ def test_placement_modes_greyed_without_segmentation(window, tmp_path):
     assert items["manual"].isEnabled()
     assert not items["heuristic"].isEnabled()                 # no m2m, no SimNIBS
     assert "unavailable" in items["heuristic"].text()
-    assert "simnibs_bin_path" in items["plantus"].toolTip()
+    assert "SimNIBS bin folder" in items["plantus"].toolTip()
     window.model.set("placement.mode", "heuristic")             # current value stays selectable
     sel.refresh()
     assert combo.model().item(combo.findData("heuristic")).isEnabled()
@@ -466,8 +465,8 @@ def test_choice_notes_never_become_windows(window, app):
 
 
 def test_uncertainty_switch_turns_on(window):
-    """Ticking the switch on the Uncertainty analysis card: the plot appears, the variant table and
-    files sit in the card's closed advanced fold,
+    """Ticking the switch on the Uncertainty analysis card: the plot appears, the variant table is
+    folded and locked; unlocked, an edit is bold red and warned,
     and the window refresh (I/O preview of a non-single mode) completes."""
     window.model.set("simulation.medium", "layered")
     window.goto("simulation.uncertainty")
@@ -476,16 +475,202 @@ def test_uncertainty_switch_turns_on(window):
     row.editor.box.click()
     assert window.model.get("simulation.uncertainty") is True
     assert sum(r.block.isVisibleTo(page) for r in page.rows) == 1      # the switch only
+    from PyQt6.QtCore import Qt
+    from prestus_nexus.ui import style
     card = window.uncertainty_card
-    files = [r for r in page.rows if r.node.path in FILE_KEYS]
-    assert len(files) == 4 and not card.advanced.isVisibleTo(card)        # files and table: folded
-    assert all(r.block.parentWidget() is card.advanced for r in files)
+    assert not card.values.isVisibleTo(card)                              # table: folded, plot only
+    hidden = next(r for r in page.rows if r.node.path == OVERRIDES_KEY)
+    assert not hidden.block.isVisibleTo(window)                           # edited in the table only
     tab = window.tab_pages["medium"]
     assert tab.subtabs.currentWidget() is window.medium_subtabs["uncertainty"]   # its own sub-tab
     assert not card.isHidden()
-    window.goto("simulation.uncertainty_temp_high")                      # goto opens the fold
-    assert card.advanced.isVisibleTo(card)
-    assert all(r.block.isVisibleTo(card) for r in files)
+    window.goto(OVERRIDES_KEY)                                            # goto opens the fold
+    assert card.values.isVisibleTo(card)
+    # locked like the property table: greyed, nothing editable
+    cell = _uncertainty_cell(card, "Brain", "Sound speed", "Temp-H")
+    assert card.locked and not cell.flags() & Qt.ItemFlag.ItemIsEditable
+    assert not card.warning.isVisibleTo(card)
+    card.set_locked(False)
+    cell = _uncertainty_cell(card, "Brain", "Sound speed", "Temp-H")
+    assert cell.flags() & Qt.ItemFlag.ItemIsEditable
+    bound = card.sets.bound("temp_high", "brain", "sound_speed")
+    cell.setText("1600")                                                  # an edit: bold red, warned
+    assert window.model.get(OVERRIDES_KEY) == {"temp_high": {"brain": {"sound_speed": 1600}}}
+    cell = _uncertainty_cell(card, "Brain", "Sound speed", "Temp-H")
+    assert cell.font().bold() and cell.foreground().color().name() == style.active()["red"].lower()
+    assert card.warning.isVisibleTo(card) and "1 bound value edited" in card.warning.text()
+    assert not _uncertainty_cell(card, "Brain", "Perfusion", "Trans-H").flags() & Qt.ItemFlag.ItemIsEditable
+    cell.setText(f"{bound}")                                              # the bound again: edit removed
+    assert window.model.get(OVERRIDES_KEY) in (None, [], {})
+    assert not card.warning.isVisibleTo(card)
     row.editor.box.click()
     assert window.model.get("simulation.uncertainty") is False
     assert window.uncertainty_card.isHidden()
+
+
+def _uncertainty_cell(card, tissue, prop, variant):
+    t = card.table
+    col = [t.horizontalHeaderItem(c).text() for c in range(t.columnCount())].index(variant)
+    row = next(r for r in range(t.rowCount())
+               if t.item(r, 0).text() == tissue and t.item(r, 1).text() == prop)
+    return t.item(row, col)
+
+
+def _segmentation(tmp_path, labels=(1, 2, 3, 5, 7, 8), report=True):
+    """A small m2m folder: final_tissues.nii.gz with these labels, and charm_report.html."""
+    import nibabel as nib
+    import numpy as np
+    m2m = tmp_path / "seg" / "m2m_sub-001"
+    m2m.mkdir(parents=True)
+    seg = np.zeros((12, 12, 12), dtype=np.uint8)
+    for i, label in enumerate(labels):
+        seg[i] = label
+    nib.save(nib.Nifti1Image(seg, np.eye(4)), str(m2m / "final_tissues.nii.gz"))
+    if report:
+        (m2m / "charm_report.html").write_text("<html><body>CHARM report</body></html>")
+    return m2m
+
+
+def test_charm_report_card(window, tmp_path, monkeypatch):
+    pytest.importorskip("nibabel")
+    from PyQt6.QtGui import QDesktopServices
+    tab, card = window.tab_pages["medium"], window.charm_report_card
+    seg = window.pages["segmentation"]
+    window.model.set("subject_id", 1)
+    window.model.set("path.seg", str(tmp_path / "seg"))
+    tab.refresh()
+    assert card.isHidden()                            # no segmentation report yet
+    m2m = _segmentation(tmp_path)
+    tab.refresh()
+    assert not card.isHidden() and card.report == m2m / "charm_report.html"
+    assert card.parentWidget() is seg.parentWidget()  # its own card, beside the segmentation card
+    column = seg.parentWidget().layout()
+    assert column.indexOf(card) > column.indexOf(seg)
+    assert not card.button.isChecked() and card.body.isHidden()     # closed until opened
+    opened = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()))
+    window.simnibs_panel.refresh()
+    window.simnibs_panel.report.click()               # 'Open charm report': the browser
+    assert opened == [str(m2m / "charm_report.html")]
+    window.model.set("simulation.medium", "water")
+    tab.refresh()
+    assert card.isHidden()
+
+
+def test_charm_report_css_follows_palette():
+    from prestus_nexus.ui import style
+    from prestus_nexus.ui.charm_report import STYLE_ID, report_css, style_js
+    for palette in (style.C, style.C_DARK):
+        css = report_css(palette)
+        assert palette["surface"] in css and palette["ink"] in css and palette["accent"] in css
+        assert "font-size: 13px" in css and "font-size: 14px" in css      # card text, card titles
+    assert STYLE_ID in style_js(style.C) and "textContent" in style_js(style.C)
+
+
+def test_property_table_greys_tissues_without_voxels(window, tmp_path):
+    pytest.importorskip("nibabel")
+    from PyQt6.QtCore import Qt
+    from prestus_nexus.ui import style
+    _segmentation(tmp_path)                           # charm labels: no combined skull (4)
+    window.model.set("subject_id", 1)
+    window.model.set("path.seg", str(tmp_path / "seg"))
+    panel = window.medium_panel
+    panel.refresh()
+    panel.wait_census()
+    names = [t.name for t in panel.tissues]
+    head = lambda t: panel.table.horizontalHeaderItem(names.index(t)).text()
+    ink4 = style.active()["ink4"].lower()
+    cell = lambda t: panel.table.item(panel.props.index("sound_speed"), names.index(t))
+    assert panel.census_state == "done"
+    assert not panel.census["skull"].modelled and panel.census["skull_cortical"].modelled
+    tip = lambda t: panel.table.horizontalHeaderItem(names.index(t)).toolTip()
+    # the volume is in the header's tooltip only; the header names why a tissue is not modelled
+    assert "no voxels" in head("skull") and head("skin") == "Skin" and "mL" in tip("skin")
+    assert "Skull (single layer)" in panel.note.text()
+    panel.set_locked(False)
+    assert cell("skull").foreground().color().name() == ink4          # greyed though unlocked
+    assert cell("skin").foreground().color().name() != ink4
+    assert cell("skull").flags() & Qt.ItemFlag.ItemIsEditable          # still editable
+    window.model.set("pct.enabled", 1)                # pCT: one skull layer, split ones merged
+    panel.refresh()
+    assert panel.census["skull"].modelled
+    assert "pCT" in head("skull_cortical") and cell("skull_cortical").foreground().color().name() == ink4
+
+
+def test_label_column_and_tabs_follow_the_window(window):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QGridLayout
+    from prestus_nexus.ui.section import LABEL_MIN_WIDTH, LABEL_WIDTH, label_width
+    assert label_width(400) == LABEL_MIN_WIDTH and label_width(2000) == LABEL_WIDTH
+    assert LABEL_MIN_WIDTH < label_width(800) < LABEL_WIDTH
+    page = window.pages["grid"]
+    grids = [g for g in page.findChildren(QGridLayout) if g.property("label_inset") is not None]
+    assert grids
+    page.resize(600, page.height())
+    page._fit_label_column()
+    assert all(g.columnMinimumWidth(0) == label_width(600) - g.property("label_inset") for g in grids)
+    assert all(r.block.maximumWidth() == label_width(600) + 40 for r in page.rows)
+    page.resize(1200, page.height())
+    page._fit_label_column()
+    assert all(g.columnMinimumWidth(0) == LABEL_WIDTH - g.property("label_inset") for g in grids)
+    for bar in (window.tabs.tabBar(), window.tab_pages["medium"].subtabs.tabBar()):
+        assert bar.expanding() and bar.elideMode() == Qt.TextElideMode.ElideNone
+        assert not bar.usesScrollButtons()                                # full labels, none hidden
+
+
+def test_narrow_tabs_show_icons_except_quickstart(app, window):
+    from prestus_nexus.ui import icons
+    from prestus_nexus.ui.tabbar import tab_widget
+    from PyQt6.QtWidgets import QWidget
+    w = tab_widget()
+    bar = w.tabBar()
+    bar.set_compactable()
+    w.addTab(QWidget(), "QuickStart")
+    bar.set_tab(0, "QuickStart")                                    # no short icon: keeps its label
+    for i, (label, icon) in enumerate((("Transducer", "tx_annular"), ("Placement", "target"),
+                                       ("Medium  2", "layers"), ("Sonication", "pulse")), start=1):
+        w.addTab(QWidget(), label)
+        bar.set_tab(i, label, tooltip="No problems found", short_icon=icons.icon(icon),
+                    short_text="2" if label.startswith("Medium") else "")
+    w.resize(2000, 300)
+    w.show()
+    app.processEvents()
+    assert not bar.is_compact() and bar.tabText(1) == "Transducer"
+    assert bar.minimumSizeHint().width() < bar.full_labels_width()   # the window may get narrower
+    w.resize(bar.minimumSizeHint().width() + 10, 300)
+    app.processEvents()
+    assert bar.is_compact()
+    assert bar.tabText(0) == "QuickStart" and bar.tabText(1) == "" and bar.tabText(3) == "2"
+    assert not bar.tabIcon(1).isNull() and "Transducer" in bar.tabToolTip(1)
+    w.resize(2000, 300)
+    app.processEvents()
+    assert not bar.is_compact() and bar.tabText(1) == "Transducer"
+    assert bar.tabToolTip(1) == "No problems found"
+    w.close()
+    main = window.tabs.tabBar()                                      # the main tabs: compactable
+    assert main.minimumSizeHint().width() < main.full_labels_width()
+
+
+# ── Find setting (ui/field_search.py) ─────────────────────────────────
+
+def test_find_setting_matches_label_key_and_help(window):
+    from prestus_nexus.ui.field_search import entries, search
+    items = entries(window.model.schema, window.display_section, window.can_goto)
+    assert items and all(window.can_goto(e.node.path) for e in items)
+    by_label = search(items, "k-wave backend")
+    assert by_label[0].node.path == "simulation.code_type"
+    assert search(items, "code_type")[0].node.path == "simulation.code_type"      # the key
+    assert any(e.node.path == "simulation.code_type" for e in search(items, "apple silicon"))  # help/choice label
+    assert search(items, "") == [] and search(items, "zzqqxx") == []
+
+
+def test_find_setting_opens_the_field(window):
+    from PyQt6.QtCore import Qt
+    window.find_setting()
+    dlg = window._field_search
+    dlg.edit.setText("water_baseline_grid")
+    item = dlg.list.currentItem()
+    assert item is not None and item.data(Qt.ItemDataRole.UserRole) == "grid.water_baseline_grid"
+    dlg._open(item)
+    assert not dlg.isVisible()
+    assert window.tabs.currentWidget().key == window.model.schema.tab_of(window.display_section("grid.water_baseline_grid"))

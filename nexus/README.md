@@ -53,7 +53,7 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 | File | Role |
 |---|---|
 | `schema.py` | Builds the key tree from `config/config_default.yaml`: key order, defaults, and help text taken from inline comments and the comment blocks above keys. A project copy of `config_default.yaml` is merged on top, as `load_parameters` does (`stale_keys`, `pinned`). |
-| `overlay.yaml` | Adds only what the YAML can't express: widget kinds, allowed values, units, visibility rules, keys the code reads that the default omits (`extra`), deprecated aliases, tuning goals per key (`tuning`), and schematic icons and figures for drop-down choices (`choice_icons`, `choice_figures`; drawn in `ui/choice_icons.py`). |
+| `overlay.yaml` | Adds only what the YAML can't express: widget kinds, allowed values, units, visibility rules, keys the code reads that the default omits (`extra`), deprecated aliases, tuning goals per key (`tuning`), readable drop-down labels for choice values (`choice_labels`; the config keeps the value), and schematic icons and figures for drop-down choices (`choice_icons`, `choice_figures`; drawn in `ui/choice_icons.py`). |
 | `model.py` | Defaults plus sparse overrides, merged like `mergestruct` + `restore_struct_arrays` in `load_parameters`. |
 | `yamlio.py` | YAML reading and writing that matches MATLAB's loader (see below). |
 | `checks.py` | Validation. Each rule notes the MATLAB source it mirrors. |

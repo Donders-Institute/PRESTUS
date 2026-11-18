@@ -79,7 +79,7 @@ class PathMapError(ValueError):
 class RemoteHost:
     host: str                                   # user@login-node, or a ~/.ssh/config alias
     path_map: list[tuple[str, str]] = field(default_factory=list)   # (local prefix, remote prefix)
-    setup: str = ""                             # shell commands run first, e.g. 'module load slurm matlab/R2024a'
+    setup: str = ""                             # shell commands run first, e.g. 'module load slurm matlab/R2023b'
     matlab: str = "matlab"                      # MATLAB command on the remote side
     prestus_root: str = ""                      # remote PRESTUS checkout; '' = mapped local root
 

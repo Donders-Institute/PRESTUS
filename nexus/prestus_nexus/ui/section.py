@@ -11,12 +11,45 @@ from ..checks import check_value, placement_mode_status
 from ..model import TX, ConfigModel, is_empty
 from ..schema import Node
 from . import icons, style
-from .fields import PATH_KINDS, FieldEditor, display_text, make_editor
+from .fields import CheckEditor, FieldEditor, display_text, make_editor
 from .transducer_panel import DevicePanel
 
-LABEL_WIDTH = 290
-UNIT_WIDTH = 64         # fixed unit column, so the ? and ↺ buttons of all rows line up
+LABEL_WIDTH = 290       # label column of a wide card; narrower cards scale it down (label_width)
+LABEL_MIN_WIDTH = 170
+LABEL_SHARE = 0.3       # of the card width
+
+def _label_html(node: Node) -> str:
+    """The field label with its unit after it: 'Time step within a train (s)'."""
+    import html
+    name = labels.rich_label(node)
+    return f"{name} ({html.escape(node.unit, quote=False)})" if node.unit else name
+CHECK_FIRST = {"modules"}   # sections whose checkboxes sit before the label (a list of stages to tick)
+# an icon per pipeline stage, between its checkbox and its label (icons.names())
+STAGE_ICONS = {
+    "modules.run_transducer_placement": "target", "modules.run_grid_setup": "grid",
+    "modules.run_medium_setup": "layers", "modules.run_source_setup": "tx_annular",
+    "modules.run_water_baseline": "baseline_beam", "modules.run_acoustic_sims": "wave",
+    "modules.run_acoustic_analysis": "chart", "modules.run_heating_sims": "thermometer",
+    "modules.run_thermal_analysis": "histogram", "modules.run_nifti_creation": "file",
+    "modules.run_posthoc_water_sims": "medium_water", "modules.generate_report": "report",
+    "modules.run_targeting_analysis": "aim_corrected", "modules.generate_group_report": "people",
+    "modules.segmentation_only": "segmentation", "simulation.debug": "wrench",
+}
+CHECK_SLOT = 24             # width of that checkbox slot; other rows of the section keep it empty
 PANEL_KEYS = {f"{TX}.serial", f"{TX}.combo.ds_serial"}   # the Device panel edits these
+
+
+def label_width(card_width: int) -> int:
+    """Label column for a card `card_width` wide: LABEL_SHARE of it, within
+    [LABEL_MIN_WIDTH, LABEL_WIDTH]; labels wrap, so a narrow window keeps room for the inputs."""
+    return max(LABEL_MIN_WIDTH, min(LABEL_WIDTH, int(card_width * LABEL_SHARE)))
+
+
+def mark_label_grid(grid: QGridLayout, inset: int = 0) -> None:
+    """Let the card resize column 0 of `grid` with its label column; `inset` is how much
+    narrower it is (a grid inside an indented frame), so its inputs start where the card's do."""
+    grid.setProperty("label_inset", inset)
+    grid.setColumnMinimumWidth(0, LABEL_WIDTH - inset)
 
 
 def _tooltip(node: Node) -> str:
@@ -51,12 +84,14 @@ class SectionPage(QFrame):
     """Card with the form for all keys of one top-level section."""
 
     changed = pyqtSignal()
+    transducer_selected = pyqtSignal(int)   # the transducer this card now edits
     advanced_toggled = pyqtSignal()     # the card's own 'advanced' button was used
 
     def __init__(self, model: ConfigModel, section: str, nodes: list[Node],
                  title: str, parent: QWidget | None = None, subtitle: str = "", locked: bool = False,
                  icon: str | None = None):
         super().__init__(parent)
+        self._label_w = LABEL_WIDTH
         self.setObjectName("Card")
         self.model = model
         self.section = section
@@ -122,11 +157,13 @@ class SectionPage(QFrame):
         self.toggle.clicked.connect(self._toggle_body)
         head.addWidget(self.toggle)
         self.vbox.addLayout(head)
-        if subtitle:
-            sub = QLabel(subtitle)
-            sub.setObjectName("CardSub")
-            sub.setWordWrap(True)
-            self.vbox.addWidget(sub)
+        self.headless = False               # set_headless: the tab already names this card
+        self.subtitle = None
+        if subtitle:                        # what the card is for: on hover, not as a line of text
+            self.subtitle_text = subtitle
+            for w in (self.title, self.icon):
+                if w is not None:
+                    w.setToolTip(subtitle)
 
         self.body = QWidget()
         self.body_layout = QVBoxLayout(self.body)
@@ -155,13 +192,32 @@ class SectionPage(QFrame):
         self.body_layout.addLayout(self.extras_below)
         self.refresh()
 
+    def resizeEvent(self, event) -> None:                # noqa: N802
+        super().resizeEvent(event)
+        self._fit_label_column()
+
+    def _fit_label_column(self) -> None:
+        """Scale the label column with the card (label_width): its grids, the label blocks and
+        panels that mark their grids (mark_label_grid)."""
+        w = label_width(self.width())
+        if w == self._label_w:
+            return
+        self._label_w = w
+        for g in self.findChildren(QGridLayout):
+            inset = g.property("label_inset")
+            if inset is not None:
+                g.setColumnMinimumWidth(0, w - int(inset))
+        for row in self.rows:
+            if not getattr(row, "lead", False):
+                row.block.setMaximumWidth(w + 40)
+
     # ── construction ────────────────────────────────────────────────────
     @staticmethod
     def _new_grid() -> QGridLayout:
         g = QGridLayout()
         g.setHorizontalSpacing(14)
         g.setVerticalSpacing(8)
-        g.setColumnMinimumWidth(0, LABEL_WIDTH)
+        mark_label_grid(g)
         g.setColumnStretch(1, 1)
         return g
 
@@ -182,7 +238,7 @@ class SectionPage(QFrame):
             t.setToolTip(_tooltip(node))
             v.addWidget(t)
             inner = self._new_grid()
-            inner.setColumnMinimumWidth(0, LABEL_WIDTH - 14)
+            mark_label_grid(inner, 14)
             v.addLayout(inner)
             # children another card shows (overlay 'group') stay there
             children = [c for c in node.children if not c.group or c.group == self.section]
@@ -198,30 +254,43 @@ class SectionPage(QFrame):
         bl = QVBoxLayout(block)
         bl.setContentsMargins(0, 5, 0, 0)      # the label's first line on the input's text line
         bl.setSpacing(1)
-        label = QLabel(labels.rich_label(node))
+        label = QLabel(_label_html(node))
         label.setTextFormat(Qt.TextFormat.RichText)       # escaped; I<sub>SPPA</sub> (labels.rich)
         label.setObjectName("FieldLabel")
         label.setToolTip(tip)
         label.setWordWrap(True)
-        bl.addWidget(label)
 
         editor = make_editor(node)
         editor.setToolTip(tip)
         editor.setEnabled(not node.derived)
+        # Stages: the checkbox leads its label; the other rows keep the slot empty so labels align
+        check_first = self.section in CHECK_FIRST
+        lead = check_first and isinstance(editor, CheckEditor)
+        if check_first:
+            line = QHBoxLayout()
+            line.setContentsMargins(0, 0, 0, 0)
+            line.setSpacing(4)
+            slot = editor if lead else QWidget()
+            slot.setFixedWidth(CHECK_SLOT)
+            line.addWidget(slot, 0, Qt.AlignmentFlag.AlignTop)
+            pic = QLabel()                      # the stage's icon (empty slot keeps labels aligned)
+            pic.setFixedSize(18, 18)
+            if node.path in STAGE_ICONS:
+                pic.setPixmap(icons.icon(STAGE_ICONS[node.path], style.active()["ink2"]).pixmap(16, 16))
+            line.addWidget(pic, 0, Qt.AlignmentFlag.AlignTop)
+            line.addWidget(label, 1)
+            bl.addLayout(line)
+        else:
+            bl.addWidget(label)
         container = QWidget()
         container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         h = QHBoxLayout(container)
         h.setContentsMargins(0, 0, 0, 0)
-        h.addWidget(editor, 1)
-        # every row has the same columns: input | unit | ? | ↺, each top-aligned
-        u = QLabel(node.unit or "")
-        u.setObjectName("CardSub")
-        u.setFixedWidth(UNIT_WIDTH)
-        u.setContentsMargins(0, 5, 0, 0)
-        h.addWidget(u, 0, Qt.AlignmentFlag.AlignTop)
-        # a path has no unit: its field (already offset by the Browse button) takes the unit
-        # column too, so long paths (LD_LIBRARY_PATH) get the width; ? and ↺ stay in line
-        u.setVisible(bool(node.unit) or node.kind not in PATH_KINDS)
+        if lead:
+            h.addStretch(1)                 # unit, ? and ↺ stay right-aligned like the other rows
+        else:
+            h.addWidget(editor, 1)
+        # every row has the same columns: input | ? | ↺, each top-aligned; the unit is in the label
         helpb = QToolButton()
         helpb.setIcon(icons.icon("help", style.active()["ink3"]))
         helpb.setToolTip("What is this?")
@@ -236,11 +305,15 @@ class SectionPage(QFrame):
         h.addWidget(reset, 0, Qt.AlignmentFlag.AlignTop)
         # The label column keeps its width; the input fills the rest of the card, so a wide
         # window gives longer fields rather than empty space beside them.
-        block.setMaximumWidth(LABEL_WIDTH + 40)
+        if lead:                                # a stage: no input beside it, so one line
+            label.setWordWrap(False)
+        else:
+            block.setMaximumWidth(self._label_w + 40)
         r = grid.rowCount()
         grid.addWidget(block, r, 0, Qt.AlignmentFlag.AlignTop)
         grid.addWidget(container, r, 1, Qt.AlignmentFlag.AlignTop)   # full width: the editors expand
         row = _Row(node, label, container, editor, reset, block)
+        row.lead = lead
         editor.edited.connect(lambda value, rr=row: self._edited(rr, value))
         reset.clicked.connect(lambda _=False, rr=row: self._reset(rr))
         self.rows.append(row)
@@ -292,8 +365,21 @@ class SectionPage(QFrame):
     def set_auto_collapse(self, predicate, note: str = "") -> None:
         """Start collapsed while predicate() holds (e.g. geometry from the equipment library),
         until the card is opened or closed by hand; `note` follows the title meanwhile."""
+        if self.headless:                   # no title to collapse to
+            return
         self.collapse_if, self.collapse_note = predicate, note
         self.refresh()
+
+    def set_headless(self) -> None:
+        """Drop the icon, title, count, subtitle and collapse button when the tab or sub-tab
+        label and intro already name the card (it is the page's only card, or has the tab's
+        name). The documentation, advanced and lock buttons stay."""
+        self.headless = True
+        for w in (self.icon, self.title, self.count, self.subtitle, self.toggle):
+            if w is not None:
+                w.hide()
+        self.collapse_if = None
+        self._set_body(True)
 
     def _toggle_body(self) -> None:
         self._user_toggled = True
@@ -346,18 +432,27 @@ class SectionPage(QFrame):
         if index >= 0:
             self.ti = index
             self.refresh()
+            self.transducer_selected.emit(self.ti)
             self.changed.emit()
 
     def _add_transducer(self) -> None:
         self.ti = self.model.add_transducer()
         self.refresh()
+        self.transducer_selected.emit(self.ti)
         self.changed.emit()
 
     def _remove_transducer(self) -> None:
         self.model.remove_transducer(self.ti)
         self.ti = max(0, self.ti - 1)
         self.refresh()
+        self.transducer_selected.emit(self.ti)
         self.changed.emit()
+
+    def show_transducer(self, ti: int) -> None:
+        """Edit transducer ti (the window's current transducer), without announcing it."""
+        if self.has_tx and self.leader is None and 0 <= ti < self.model.n_transducers and ti != self.ti:
+            self.ti = ti
+            self.refresh()
 
     def _panel_changed(self) -> None:
         self.refresh()
@@ -513,7 +608,7 @@ class SectionPage(QFrame):
                 row.editor.set_error(check_value(row.node, value))
                 if path == "placement.mode" and hasattr(row.editor, "set_item_status"):
                     row.editor.set_item_status(placement_mode_status(self.model))
-                name = labels.rich_label(row.node)
+                name = _label_html(row.node)
                 tags = self._tune_tags(row.node)
                 if self.model.is_modified(path, ti):
                     row.label.setText(f"<b>{name}</b> <span style='color:{style.active()['accent']}'>●</span>{tags}")

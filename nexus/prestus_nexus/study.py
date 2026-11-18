@@ -126,7 +126,7 @@ class Manifest:
                 continue
             inc = row.get("include", "").strip().lower()
             if inc not in _TRUE | _FALSE:
-                issues.append(Issue("error", i, "include", "use 1/0, true/false or yes/no"))
+                issues.append(Issue("error", i, "include", "use 1/0, true/false, or yes/no"))
             if inc in _FALSE:
                 continue
             key = (int(m.group(1)), affixes[i])
@@ -167,7 +167,7 @@ def parse_subject_ids(text: str) -> list[str]:
         elif _SUBJ_RE.match(token):
             ids.append(token)
         else:
-            raise ValueError(f"'{token}' is not a subject ID (use 3, 003, sub-003 or 1-12)")
+            raise ValueError(f"'{token}' is not a subject ID (use 3, 003, sub-003, or 1-12)")
     return list(dict.fromkeys(ids))
 
 
@@ -190,6 +190,27 @@ def resolve_manifest(config_path: Path | None, value: str | None) -> Path | None
     if not p.is_absolute() and config_path is not None:
         p = Path(config_path).parent / p
     return p
+
+
+def study_report_path(sim: str | None, study_name: str | None, manifest: Path | None) -> Path | None:
+    """The study's group report, as study_setup.m / generate_group_report.m name it:
+    <path.sim>/group/<name>/group_<name>_report.html, where name is study.name or else the
+    manifest's file name without extension, other characters than [a-zA-Z0-9_-] as '_'.
+    None without path.sim or a name. Does not touch the disk."""
+    name = study_name or (manifest.stem if manifest is not None else "")
+    if not sim or not name:
+        return None
+    name = re.sub(r"[^a-zA-Z0-9_-]", "_", str(name))
+    return Path(sim) / "group" / name / f"group_{name}_report.html"
+
+
+def subject_list_report_path(sim: str | None, medium: str | None, affix: str | None) -> Path | None:
+    """The group report of a config without a study (generate_group_report.m over the subjects
+    in path.sim): <path.sim>/group_<medium>_report<io.output_affix>.html. None without path.sim
+    or a medium. Does not touch the disk."""
+    if not sim or not medium:
+        return None
+    return Path(sim) / f"group_{medium}_report{affix or ''}.html"
 
 
 def from_neuronav_summary(summary_csv: str | Path, targets: list[str] | None = None) -> Manifest:

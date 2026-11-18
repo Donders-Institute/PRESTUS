@@ -24,7 +24,7 @@ def run_segmentation(window, rerun: bool = False) -> str | None:
         answer = QMessageBox.warning(
             window, "Segment again",
             f"SimNIBS charm deletes {st.m2m} and segments the T1 (and T2) again, which takes an hour "
-            "or more. Placements, head models and MNI conversions made from the current segmentation "
+            "or more. Placements, head models, and MNI conversions made from the current segmentation "
             "no longer match it.\n\nSegment again?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Cancel)

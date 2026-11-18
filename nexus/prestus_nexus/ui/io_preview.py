@@ -39,13 +39,10 @@ class IOPreviewPanel(QWidget):
         v.setContentsMargins(0, 8, 0, 0)
         title = QLabel("I/O preview")
         title.setObjectName("SubGroupTitle")
+        title.setToolTip("Example paths for the current subject ID, filled in as you edit the "
+                         "settings. Detects async multi-transducer, multi-ISPPA, and uncertainty "
+                         "mode the same way prestus_pipeline_start.m does.")
         v.addWidget(title)
-        sub = QLabel("Example paths for the current subject ID, filled in as you edit the "
-                     "settings. Detects async multi-transducer, multi-ISPPA and uncertainty "
-                     "mode the same way prestus_pipeline_start.m does.")
-        sub.setObjectName("CardSub")
-        sub.setWordWrap(True)
-        v.addWidget(sub)
         self.text = QTextBrowser()
         self.text.setOpenLinks(False)
         self.text.setLineWrapMode(QTextBrowser.LineWrapMode.NoWrap)
@@ -129,7 +126,11 @@ class IOPreviewPanel(QWidget):
                 rows.append(("folder", "pseudo-CT", f"{os.path.join(base, tag)}/", "generated from the UTE if missing"))
 
         plan = predict(self.model)
-        if plan.mode == "single":
+        from .. import sequence as sq
+        seq = sq.describe(self.model)
+        if seq is not None:
+            mode_note = f"sonication sequence: {seq}"
+        elif plan.mode == "single":
             mode_note = "single-run mode"
         else:
             mode_note = f"{plan.mode.replace('_', '-')} mode"

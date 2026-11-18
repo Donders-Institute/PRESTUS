@@ -2,7 +2,7 @@
 
 import pytest
 
-from prestus_nexus import checks
+from prestus_nexus import checks, equipment
 from prestus_nexus.equipment import EquipmentLibrary
 from prestus_nexus.model import ConfigModel
 
@@ -25,6 +25,34 @@ def test_devices_load(library):
     assert dev is not None and dev.type == "annular" and dev.freq_hz == 500e3
     assert dev.min_foc < dev.max_foc
     assert "SC_203_035" in dev.combos
+
+
+def test_models_listed_before_their_units(library):
+    order = list(library.devices)
+    shipped = [s for s, d in library.devices.items() if not d.user]
+    units = 0
+    for serial in shipped:
+        dev = library.devices[serial]
+        group = equipment.model_of(serial, dev.model, dev.file, library.devices)
+        if group != serial:
+            units += 1
+            assert order.index(group) < order.index(serial), serial
+            between = order[order.index(group):order.index(serial)]
+            assert all(equipment.model_of(s, library.devices[s].model, library.devices[s].file,
+                                          library.devices) == group for s in between), serial
+    assert units > 0                                                  # the check ran on units
+    i = order.index("CTX_500")                                        # a unit without 'model:'
+    assert order[i:i + 3] == ["CTX_500", "CTX_500_006", "CTX_500_026"]   # joins its folder's model
+
+
+def test_models_first_orders_any_group():
+    D = equipment.Device
+    devs = {s: D(serial=s, name="", manufact="", n_elem=1, min_foc=None, max_foc=None,
+                 geometry={}, combos={}, model=m, file=f"/x/{folder}/tran-{s}_transducer.yaml")
+            for s, m, folder in [("A_1", "A", "model-A"), ("A", "A", "model-A"),
+                                 ("A_2", "", "model-A"), ("B", "", "model-B"),
+                                 ("C_9", "C", "flat"), ("Z", "", "flat")]}
+    assert list(equipment.models_first(devs)) == ["A", "A_1", "A_2", "B", "C_9", "Z"]
 
 
 def test_calibration_lookup_uses_combo_name(library, tmp_path):
@@ -219,3 +247,17 @@ def test_own_libraries_search_order(schema, prestus_root, tmp_path, monkeypatch)
     assert m.user_library_folders() == [study, project, machine]
     assert lib.profile_file("p.csv", "IS_PCD15473_09998") == machine / "profiles" / "p.csv"
     assert lib.profile_file("nope.csv") is None
+
+
+def test_short_names(prestus_root):
+    """Model then unit number for library devices and driving systems; unknown serials and
+    serials without a unit number unchanged."""
+    from prestus_nexus.equipment import EquipmentLibrary, short_serial
+    lib = EquipmentLibrary(prestus_root)
+    assert lib.short_name("CTX_500_026") == "CTX-500 #026"
+    assert lib.short_name("IS_PCD15287_01001") == "IS-PCD15287 #01001"
+    assert lib.short_name("SC_203_035") == "SC-203 #035"
+    assert lib.short_name("IGT_32_ch_comb_10_ch") == "IGT_32_ch_comb_10_ch"
+    assert lib.short_name("NOT_IN_LIBRARY_7") == "NOT_IN_LIBRARY_7"
+    assert lib.short_name("") == ""
+    assert short_serial("CTX_250_014", "CTX_250_2ch") == "CTX-250 #014"

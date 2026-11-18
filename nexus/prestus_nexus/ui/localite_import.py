@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog, QDialo
                              QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
                              QRadioButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
+from ..labels import plural
 from .. import neuronav_import as ni
 from ..study import Manifest
 from . import icons
@@ -45,7 +46,7 @@ class LocaliteImportDialog(QDialog):
         scan.clicked.connect(lambda: self.scan())
         row.addWidget(scan)
         gui = QPushButton("Localite page")
-        gui.setToolTip("Detect, name and write sessions (Placement tab ▸ Localite)")
+        gui.setToolTip("Detect, name, and write sessions (Placement tab ▸ Localite)")
         gui.clicked.connect(self._localite_page)
         row.addWidget(gui)
         v.addLayout(row)
@@ -79,7 +80,7 @@ class LocaliteImportDialog(QDialog):
         self.custom.setPlaceholderText("e.g. L_M1, R_M1")
         self.custom.textChanged.connect(lambda _t: self._preview())
         opts.addWidget(self.custom)
-        self.check_n = QCheckBox(f"Require {n_tx} target(s) per session (the configured transducers)")
+        self.check_n = QCheckBox(f"Require {plural(n_tx, 'target')} per session (the configured transducers)")
         self.check_n.setChecked(True)
         self.check_n.toggled.connect(lambda _c: self._preview())
         opts.addWidget(self.check_n)
@@ -185,8 +186,8 @@ class LocaliteImportDialog(QDialog):
                 self.table.setItem(i, j, QTableWidgetItem(r.get(c, "")))
         self.table.resizeColumnsToContents()
         n_json = sum(1 for e in self.entries if e.source == "json")
-        head = (f"{len(self.entries)} ingested target(s) found"
+        head = (f"{plural(len(self.entries), 'ingested target')} found"
                 + (f" ({n_json} from InstrumentMarker JSON files)" if n_json else "")
-                + f" → {len(m.rows)} run(s).") if self.entries else "Nothing found in this folder yet."
+                + f" → {plural(len(m.rows), 'run')}.") if self.entries else "Nothing found in this folder yet."
         self.notes.setText("<br>".join([head] + notes))
         self.result_manifest = m

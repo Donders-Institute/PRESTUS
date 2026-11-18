@@ -76,7 +76,8 @@ def parse(text: str, choices: list | None = None) -> list:
             flush_par(); flush_items()
             continue
         m = _CHOICE_LINE.match(line)
-        if m and (not choices or m.group(1) in [str(c) for c in choices]):
+        if (m and (not choices or m.group(1) in [str(c) for c in choices])
+                and not (choices and _split_inline(line, choices))):    # 'a' x | 'b' y: an inline list
             flush_par()
             items.append([m.group(1), m.group(3), bool(m.group(2))])
         elif items and not par:
@@ -108,6 +109,26 @@ def _esc(s: str) -> str:
     s = html.escape(s, quote=False)
     s = s.replace("&gt;=", "≥").replace("&lt;=", "≤").replace(" -- ", " – ")
     return labels.rich(s)               # ITRUSST notation: I<sub>SPPA</sub>, I<sub>SPTA</sub>
+
+
+def _value(node: Node, choice: str):
+    """The choice value a help-text item names (help text is a string; values may be 0/1)."""
+    return next((c for c in node.choices or [] if str(c) == str(choice)), choice)
+
+
+def choice_tip(node: Node | None, value, note: str = "") -> str:
+    """Hover text of one drop-down item: its description from the help text, `note`
+    (e.g. why it cannot run yet) and the value written to the config."""
+    body = []
+    if note:
+        body.append(f"<p>{_esc(note)}</p>")
+    if node is not None:
+        text = next((t for kind, val in parse(node.help, node.choices) if kind == "items"
+                     for c, t, _ in val if str(c) == str(value)), "")
+        if text:
+            body.append(f"<p>{_esc(text)}</p>")
+    body.append(f"<p style='color:{FAINT}'>Value in YAML: <code>{_esc(str(value))}</code></p>")
+    return "".join(body)
 
 
 def _glyph_img(name: str) -> str:
@@ -142,8 +163,11 @@ def html_for(node: Node, title: str, value_text: str | None, icons_ok: bool = Tr
             img = _glyph_img(icon) if icon else ""
             tag = (" <span style='color:%s'>(default)</span>" % FAINT
                    if default is not None and str(choice) == str(default) else "")
+            name = f"<b>{_esc(labels.choice(node, _value(node, choice)))}</b>"
+            if labels.choice(node, _value(node, choice)) != str(choice):
+                name += f"<br><code style='color:{FAINT}'>{_esc(choice)}</code>"
             rows.append(f"<tr><td style='padding:2px 6px 2px 0' valign='top'>{img}</td>"
-                        f"<td style='padding:2px 10px 2px 0' valign='top'><b>{_esc(choice)}</b></td>"
+                        f"<td style='padding:2px 10px 2px 0' valign='top'>{name}</td>"
                         f"<td style='padding:2px 0' valign='top'>{text(txt)}{tag}</td></tr>")
         body.append("<table cellspacing='0' style='margin-top:4px'>" + "".join(rows) + "</table>")
 

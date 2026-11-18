@@ -101,7 +101,7 @@ class PctFlow(QFrame):
         self.curves_note.setObjectName("CardSub")
         self.curves_note.setWordWrap(True)
         self.curves_btn = QPushButton("Draw the mapping curves")
-        self.curves_btn.setToolTip("Evaluates the configured HU → density, sound speed and attenuation "
+        self.curves_btn.setToolTip("Evaluates the configured HU → density, sound speed, and attenuation "
                                    "mappings in MATLAB (pct_mapping_curves); starts MATLAB if it is off")
         self.curves_btn.clicked.connect(lambda: self.request_curves(force=True))
         for i, s in enumerate(self.steps):
@@ -175,12 +175,14 @@ class PctFlow(QFrame):
             self.steps[3].set(gen, "Pseudo-CT", "pseudoCT.nii.gz in Hounsfield units, in the pseudo-CT folder", "ct")
             self._draw_ute(line)
         mapped = enabled and state_ct != rp.STOP
-        names = " · ".join(f"{label.lower()}: {_esc(str(g(k) or 'none'))}" for k, label in
-                           (("pct.mapping_density", "Density"), ("pct.mapping_soundspeed", "Sound speed"),
-                            ("pct.mapping_attenuation", "Attenuation")))
         cal = g("pct.density_calibration")
-        if g("pct.mapping_density") == "k-plan":
-            names += f" (calibration: {_esc(cal) if not is_empty(cal) else 'k-Plan default'})"
+        density_cal = (f" (calibration: {_esc(cal) if not is_empty(cal) else 'k-Plan default'})"
+                       if g("pct.mapping_density") == "k-plan" else "")
+        # one property per line; the k-Plan calibration stays on the density line it belongs to
+        names = "<br>".join(f"{label}: {_esc(str(g(k) or 'none'))}{extra}" for k, label, extra in
+                            (("pct.mapping_density", "Density", density_cal),
+                             ("pct.mapping_soundspeed", "Sound speed", ""),
+                             ("pct.mapping_attenuation", "Attenuation", "")))
         self.steps[4].set(rp.RUN if mapped else rp.SKIP, "HU → skull properties", names, "table")
         self._schedule_curves()
 

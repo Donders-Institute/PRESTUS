@@ -50,7 +50,6 @@ LIMITS_LAYERED: dict[str, tuple[str, float, str]] = {
     "MI_brain": ("MI (brain)", 1.9, ""),
     "MI_skull": ("MI (skull)", 1.9, ""),
     "MI_skin": ("MI (skin)", 1.9, ""),
-    "Psptp": ("Max pressure", 2e6, "Pa"),
     "riseT_brain": ("Temp rise (brain)", 2.0, "°C"),
     "riseT_skull": ("Temp rise (skull)", 2.0, "°C"),
     "riseT_skin": ("Temp rise (skin)", 2.0, "°C"),
@@ -67,7 +66,6 @@ LIMITS_LAYERED: dict[str, tuple[str, float, str]] = {
 LIMITS_WATER: dict[str, tuple[str, float, str]] = {
     "MI": ("MI (free water)", 1.9, ""),
     "MI_tc": ("MI (transcranial)", 1.9, ""),
-    "Psptp": ("Max pressure", 2e6, "Pa"),
 }
 ISO_COLUMNS = {"CEM43_brain": "CEM43iso_brain", "CEM43_skull": "CEM43iso_skull",
                "CEM43_skin": "CEM43iso_skin"}
@@ -424,7 +422,7 @@ def _safety_section(metrics: dict, water: dict, layered: bool, iso: bool) -> tup
     s = Section("ITRUSST non-significant-risk check",
                 note="Limits as in PRESTUS's HTML report (get_risk_limits.m). Above a limit means: "
                      "inspect adherence to the NSR criteria that govern the protocol; some criteria "
-                     "are alternatives (temperature rise, absolute temperature or CEM43).")
+                     "are alternatives (temperature rise, absolute temperature, or CEM43).")
     limits = LIMITS_LAYERED if layered else LIMITS_WATER
     above, counts = [], {"within": 0, "near": 0, "above": 0}
     for key, (label, limit, unit) in limits.items():

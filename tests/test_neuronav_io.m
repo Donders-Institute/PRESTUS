@@ -37,6 +37,24 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_neuron
             end
         end
 
+        function test_file_series_lists_averaged_poses(tc)
+            % The series list the Nexus import offers is the one file mode picks from.
+            f = tc.write_export(fullfile(tc.Root, 'raw'), 'sub-001', 'ses-01', 'loc');
+            [series, markertype] = neuronav_localite_file_series(f, []);
+            tc.verifyEqual(markertype, 'TriggerMarkers');
+            tc.verifyNumElements(series, 2);
+            p = base_parameters();
+            p.placement.localite.file = f;
+            for k = 1:2
+                tc.verifyEqual(series(k).index, k);
+                tc.verifyEqual(series(k).n_markers, 80);
+                tc.verifyTrue(series(k).is_pose && series(k).tracked);
+                tc.verifyEqual(series(k).matrix, tc.Poses{k}, 'AbsTol', 1e-6);
+                p.placement.localite.position = k;
+                tc.verifyEqual(neuronav_localite_pose(p), series(k).matrix);
+            end
+        end
+
         function test_position_transducer_localite_not_at_origin(tc)
             f = tc.write_export(fullfile(tc.Root, 'raw'), 'sub-001', 'ses-01', 'loc');
             p = base_parameters();

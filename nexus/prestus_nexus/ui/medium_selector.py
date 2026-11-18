@@ -5,18 +5,18 @@ tab (PLACEMENT_NOTE)."""
 
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QToolButton
 
+from .. import labels
 from . import icons, style
+from .tooltip import choice_tip
 
 KEY = "simulation.medium"
 NOTE = {
     "water": "Free field in water: only the water properties apply.",
-    "layered": "Head model from the SimNIBS segmentation: head processing, tissue properties and "
-               "optional skull mapping from a measured CT or a UTE pseudo-CT.",
-    "phantom": "A designed test object: the segmentation is mapped onto tissues without "
-               "preprocessing; only the tissues its layers assign are modelled.",
+    "layered": "Multi-layer head model based on segmentation.",
+    "phantom": "Designed test object made of tissue layers.",
 }
 PLACEMENT_KEY = "placement.mode"
 PLACEMENT_NOTE = {
@@ -29,6 +29,25 @@ PLACEMENT_NOTE = {
     "tus_entry": "TUS_entry picks the flattest scalp entry within the distance window: run it on the "
                  "TUS entry sub-tab.",
 }
+
+
+# placement methods whose sub-tab lists what is still to set up (setup_note): the selector only
+# points there, so the header row stays short; other methods keep their (short) reason inline
+PLACEMENT_SUBTAB = {"plantus": "PlanTUS", "tus_entry": "TUS entry"}
+
+
+def _what(st) -> tuple[str, str]:
+    colour = style.active()["red" if st.state == "unavailable" else "amber"]
+    return colour, "Cannot run yet" if st.state == "unavailable" else "Still to set up"
+
+
+def setup_note(st) -> str:
+    """What a placement method still needs (checks.ModeStatus), one item per line; '' when ready."""
+    if st is None or st.state == "ready" or not st.reason:
+        return ""
+    colour, what = _what(st)
+    items = "".join(f"<li>{r[:1].upper()}{r[1:]}</li>" for r in st.reason.split("; ") if r)
+    return f"<span style='color:{colour}'><b>{what}</b></span><ul style='margin:2px 0'>{items}</ul>"
 
 
 class MediumSelector(QFrame):
@@ -52,13 +71,15 @@ class MediumSelector(QFrame):
         for choice in (node.choices if node and node.choices else ["water", "layered", "phantom"]):
             ic = icons.for_choice(node, choice)
             if ic is not None:
-                self.combo.addItem(ic, str(choice), choice)
+                self.combo.addItem(ic, labels.choice(node, choice), choice)
             else:
-                self.combo.addItem(str(choice), choice)
+                self.combo.addItem(labels.choice(node, choice), choice)
+            self.combo.setItemData(self.combo.count() - 1, choice_tip(node, choice), Qt.ItemDataRole.ToolTipRole)
         if node is not None:
             from .fields import display_text
             from .tooltip import html_for
             self.combo.setToolTip(html_for(node, title, display_text(node.default)))
+        self._help_tip = self.combo.toolTip()       # the key's help; the choice's note goes above it
         self.combo.activated.connect(self._picked)
         h.addWidget(self.combo)
         self.reset = QToolButton(text="↺")
@@ -94,14 +115,24 @@ class MediumSelector(QFrame):
         self.label.setText(f"{self.title} <span style='color:{style.active()['accent']}'>●</span>"
                            if modified else self.title)
         self.reset.setVisible(self.model.is_overridden(self.key))
-        note = self.notes.get(str(value), "")
+        # what the choice means: on hover over the drop-down; only its status is shown
+        desc = self.notes.get(str(value), "")
+        self.combo.setToolTip((f"<p>{desc}</p>" if desc else "") + self._help_tip)
+        note = ""
         if self.status is not None:
             st = self._mark(self.status(self.model), value)
-            if st is not None and st.state != "ready" and st.reason:
-                colour = style.active()["red" if st.state == "unavailable" else "amber"]
-                what = "Cannot run yet" if st.state == "unavailable" else "Still to set up"
-                note = f"{note}<br><span style='color:{colour}'>{what}:</span> {st.reason}"
+            tip = setup_note(st)
+            if tip:
+                colour, what = _what(st)
+                sub = PLACEMENT_SUBTAB.get(str(value)) if self.key == PLACEMENT_KEY else None
+                if sub and st.state == "pending":     # details on the sub-tab: one sentence here
+                    note = f"See the {sub} tab for necessary settings."
+                else:
+                    where = f" (see the {sub} tab)" if sub else f": {st.reason}"
+                    note = f"<span style='color:{colour}'>{what}</span>{where}"
+            self.note.setToolTip(tip)
         self.note.setText(note)
+        self.note.setVisible(bool(note))
 
     def _mark(self, status: dict, current):
         """Choices marked by availability, as the form's choice fields do (fields.set_item_status):
@@ -114,10 +145,11 @@ class MediumSelector(QFrame):
             item = model.item(i) if hasattr(model, "item") else None
             if st is None or item is None:
                 continue
-            label = str(v) + {"unavailable": "  (unavailable)", "pending": "  (needs setup)"}.get(st.state, "")
+            node = self.model.schema.get(self.key)
+            label = labels.choice(node, v) + {"unavailable": "  (unavailable)", "pending": "  (needs setup)"}.get(st.state, "")
             item.setEnabled(st.state != "unavailable" or v == current)
             item.setText(label)
-            item.setToolTip(st.reason or "All inputs found")
+            item.setToolTip(choice_tip(node, v, st.reason or "All inputs found"))
         return status.get(current) if isinstance(current, str) else None
 
     def focus_key(self, path: str, ti: int | None = None) -> None:

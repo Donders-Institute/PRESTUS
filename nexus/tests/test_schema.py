@@ -148,7 +148,7 @@ def test_overlay_entries_have_known_attributes(schema):
     from prestus_nexus import yamlio
     from prestus_nexus.schema import OVERLAY_PATH
     overlay = yamlio.load(OVERLAY_PATH.read_text())
-    known = {"label", "advanced", "group", "group_first", "help", "kind", "choices", "choice_labels",
+    known = {"label", "advanced", "group", "group_first", "help", "kind", "choices",
              "choice_math", "unit", "visible_if", "derived", "min", "max", "default", "locked", "doc"}
     for section in ("fields", "display", "extra"):
         for key, rule in (overlay.get(section) or {}).items():

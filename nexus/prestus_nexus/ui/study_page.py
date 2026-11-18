@@ -5,20 +5,25 @@ stay in tooltips."""
 
 from __future__ import annotations
 
+import contextlib
+import copy
 import re
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QUrl, pyqtSignal
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (QAbstractItemView, QFileDialog, QFrame, QHBoxLayout, QInputDialog, QLabel,
                              QLineEdit, QMenu, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem,
                              QToolButton, QVBoxLayout, QWidget)
 
+from ..labels import plural
 from .. import launcher
-from ..study import Manifest, from_neuronav_summary, parse_subject_ids, resolve_manifest
+from ..study import (Manifest, from_neuronav_summary, parse_subject_ids, resolve_manifest, study_report_path,
+                     subject_list_report_path)
 from . import icons, style
 from .empty_state import EmptyStack
 
-LEAD = ("Simulate many subjects, or several targets per subject, in one go. Each row of the table "
+LEAD = ("Simulate multiple subjects, or several targets per subject, in one go. Each row of the table "
         "is one simulation run; everything not in the table comes from this study config. "
         "For a single subject you do not need this: use the <b>Start</b> tab.")
 
@@ -42,10 +47,10 @@ HOW_TO = (
 
 # Hover help for the reserved columns; config-key columns show their config_default.yaml help
 RESERVED_HELP = {
-    "subject_id": "Required. The subject: 3, 003 or sub-003.",
+    "subject_id": "Required. The subject: 3, 003, or sub-003.",
     "condition": "Optional run label, e.g. the target or protocol. It is added to the output names "
                  "(_desc-<condition>) and groups the group report. Leave empty with one run per subject.",
-    "include": "Optional. 1/0, yes/no or true/false; empty = include. Set 0 to skip a run without deleting it.",
+    "include": "Optional. 1/0, yes/no, or true/false; empty = include. Set 0 to skip a run without deleting it.",
     "config": "Optional YAML file merged over the study config for this run only (path relative to "
               "the manifest's folder). Use it when a run differs in many settings.",
     "notes": "Free text; ignored by PRESTUS.",
@@ -155,7 +160,11 @@ class StudyPage(QFrame):
         self.b_report = QPushButton("Build group report")
         self.b_report.setToolTip("After the runs finished: group MNI maps + group report from their outputs")
         self.b_report.clicked.connect(self.group_report)
-        for b in (self.b_dry, self.b_run, self.b_launcher, self.b_report):
+        self.b_open_report = QPushButton("Open group report")
+        self.b_open_report.setToolTip("Open the study's group report (path.sim/group/<study>/"
+                                      "group_<study>_report.html) in the web browser")
+        self.b_open_report.clicked.connect(self.open_group_report)
+        for b in (self.b_dry, self.b_run, self.b_launcher, self.b_report, self.b_open_report):
             run.addWidget(b)
         run.addStretch(1)
         v.addLayout(run)
@@ -168,6 +177,20 @@ class StudyPage(QFrame):
     @property
     def model(self):
         return self.window.model
+
+    # edit history (MainWindow.history tracks this page: the table undoes with the config)
+    def snapshot(self) -> tuple:
+        m = self.manifest
+        return (m.path, list(m.columns), copy.deepcopy(m.rows))
+
+    def restore(self, snap: tuple) -> None:
+        path, columns, rows = snap
+        self.manifest = Manifest(columns=list(columns), rows=copy.deepcopy(rows), path=path)
+
+    def _edit(self, label: str):
+        """One undo step for the table changes made inside."""
+        history = getattr(self.window, "history", None)
+        return history.group(label) if history is not None else contextlib.nullcontext()
 
     def manifest_path(self) -> Path | None:
         return resolve_manifest(self.model.path, self.model.get("study.manifest") or None)
@@ -225,10 +248,11 @@ class StudyPage(QFrame):
         if not m.rows:
             self.summary.setText("")
             return
-        text = (f"<b>{len(m.rows)}</b> row(s), <b>{n_inc}</b> included · "
-                f"{len(m.subjects())} subject(s) · conditions: {', '.join(conds) or '—'}")
+        # counts on the first line, the conditions on their own, then the check result
+        text = (f"{plural(len(m.rows), 'row')}, {n_inc} included, {plural(len(m.subjects()), 'subject')}"
+                f"<br>Conditions: {', '.join(conds) or '—'}")
         if not issues:
-            text += f" · <span style='color:{style.active()['green']}'>no problems found</span>"
+            text += f"<br><span style='color:{style.active()['green']}'>No problems found</span>"
         for iss in issues:
             colour = style.active()["red"] if iss.level == "error" else style.active()["amber"]
             text += f"<br><span style='color:{colour}'>{iss.level}: {iss.where()}: {iss.message}</span>"
@@ -238,24 +262,26 @@ class StudyPage(QFrame):
         if self._loading:
             return
         col = self.manifest.columns[item.column()]
-        self.manifest.rows[item.row()][col] = item.text().strip()
+        with self._edit("Edit run"):
+            self.manifest.rows[item.row()][col] = item.text().strip()
         self._update_summary()
 
     def _path_edited(self) -> None:
         text = self.path.text().strip()
         if text == (self.model.get("study.manifest") or ""):
             return
-        if text:
-            self.model.set("study.manifest", text)
-        else:
-            self.model.reset("study.manifest")
+        with self._edit("Change runs table file"):        # the path and the table it loads
+            if text:
+                self.model.set("study.manifest", text)
+            else:
+                self.model.reset("study.manifest")
+            mp = self.manifest_path()
+            if mp is not None and mp.is_file():
+                self.manifest = Manifest.load(mp)
+            else:
+                # A new file: the runs entered so far are saved there
+                self.manifest.path = mp
         self.changed.emit()
-        mp = self.manifest_path()
-        if mp is not None and mp.is_file():
-            self.manifest = Manifest.load(mp)
-        else:
-            # A new file: the runs entered so far are saved there
-            self.manifest.path = mp
         self._fill_table()
 
     def _set_manifest_path(self, path: Path) -> None:
@@ -277,14 +303,15 @@ class StudyPage(QFrame):
 
     # ── editing ─────────────────────────────────────────────────────────
     def add_row(self, values: dict[str, str] | None = None) -> None:
-        self.manifest.add_row(values)
+        with self._edit("Add run"):
+            self.manifest.add_row(values)
         self._fill_table()
 
     def add_subjects(self, text: str | None = None) -> None:
         """One run per subject ID ('1-12, 15'); the condition column is left empty to fill in."""
         if text is None:
             text, ok = QInputDialog.getText(self, "Add subjects",
-                                            "Subject IDs (ranges, commas or spaces), e.g. 1-12, 15, sub-020:")
+                                            "Subject IDs (ranges, commas, or spaces), e.g. 1-12, 15, sub-020:")
             if not ok:
                 return
         try:
@@ -293,16 +320,18 @@ class StudyPage(QFrame):
             QMessageBox.warning(self, "Add subjects", str(e))
             return
         first = not self.manifest.rows
-        for sid in ids:
-            self.manifest.add_row({"subject_id": sid})
+        with self._edit("Add subjects"):
+            for sid in ids:
+                self.manifest.add_row({"subject_id": sid})
         self._fill_table()
         if ids:
-            self.window.statusBar().showMessage(f"Added {len(ids)} run(s). " + (FIRST_ADD if first else ""), 8000)
+            self.window.statusBar().showMessage(f"Added {plural(len(ids), 'run')}. " + (FIRST_ADD if first else ""), 8000)
 
     def remove_rows(self) -> None:
         rows = sorted({i.row() for i in self.table.selectedIndexes()}, reverse=True)
-        for r in rows:
-            del self.manifest.rows[r]
+        with self._edit("Remove runs"):
+            for r in rows:
+                del self.manifest.rows[r]
         self._fill_table()
 
     def add_column(self, key: str | None = None) -> None:
@@ -317,14 +346,16 @@ class StudyPage(QFrame):
                 0, True)
             if not ok or not key:
                 return
-        self.manifest.add_column(key.strip())
+        with self._edit("Add column"):
+            self.manifest.add_column(key.strip())
         self._fill_table()
 
     def remove_column(self) -> None:
         cols = sorted({i.column() for i in self.table.selectedIndexes()})
-        for c in [self.manifest.columns[j] for j in cols]:
-            if c != "subject_id":
-                self.manifest.remove_column(c)
+        with self._edit("Remove column"):
+            for c in [self.manifest.columns[j] for j in cols]:
+                if c != "subject_id":
+                    self.manifest.remove_column(c)
         self._fill_table()
 
     def import_neuronav(self, summary: str | Path | None = None) -> None:
@@ -347,12 +378,13 @@ class StudyPage(QFrame):
         if not imported.rows:
             QMessageBox.information(self, "Import", "No ingested targets to import.")
             return
-        if replace:
-            self.manifest.rows = []
-        for r in imported.rows:
-            self.manifest.add_row(r)
+        with self._edit("Import runs from Localite"):
+            if replace:
+                self.manifest.rows = []
+            for r in imported.rows:
+                self.manifest.add_row(r)
         self._fill_table()
-        self.window.statusBar().showMessage(f"Imported {len(imported.rows)} run(s) from the Localite ingestion", 6000)
+        self.window.statusBar().showMessage(f"Imported {plural(len(imported.rows), 'run')} from the Localite ingestion", 6000)
 
     def default_path(self) -> Path | None:
         """<config name>_runs.tsv next to the study config (None while the config is unsaved)."""
@@ -418,6 +450,25 @@ class StudyPage(QFrame):
         run = self._run_page()
         if run._ready():
             run._start("Study run", launcher.run_command(run.matlab.text(), path), path.parent)
+
+    def group_report_path(self) -> Path | None:
+        """The study's group report; for a config without a study (no study.name nor
+        manifest), the report over the subjects in path.sim."""
+        sim = self.model.get("path.sim") or None
+        name, manifest = self.model.get("study.name") or None, self.manifest_path()
+        if name or manifest is not None:
+            return study_report_path(sim, name, manifest)
+        return subject_list_report_path(sim, self.model.get("simulation.medium") or None,
+                                        self.model.get("io.output_affix") or None)
+
+    def open_group_report(self) -> None:
+        path = self.group_report_path()
+        if path is not None and path.is_file():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        else:
+            QMessageBox.information(self, "Group report", "No group report yet" +
+                                    (f" ({path})" if path is not None else " (set path.sim)") +
+                                    ". Build it once the runs have finished.")
 
     def group_report(self) -> None:
         run = self._run_page()

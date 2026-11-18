@@ -42,7 +42,7 @@ def test_new_study_edit_and_save(app, schema, prestus_root, tmp_path, monkeypatc
     window.goto("placement.manual.coordinate_space")
     page = window.pages["placement"]
     row = next(r for r in page.rows if r.node.path == "placement.manual.coordinate_space")
-    row.editor.combo.setCurrentText("ras")                       # user picks RAS
+    row.editor.combo.setCurrentText("Subject RAS (mm)")          # user picks RAS (writes 'ras')
     assert not any(r.node.path == "transducer.trans_pos" for r in window._page("transducer").rows)
     row = next(r for r in page.rows if r.node.path == "transducer.trans_pos")   # on Placement
     row.editor.edit.setText("-62.1, 12.4, 48")

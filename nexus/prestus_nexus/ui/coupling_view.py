@@ -1,5 +1,6 @@
 """Multi-transducer coupling card (Sonication tab): an optional analytic prediction of the
-coherent and independent fields (coupling.py), from the placement viewer's positions."""
+coherent and independent fields (coupling.py), from the placement viewer's positions. Hidden
+for a sonication sequence (sequence.py), whose stances fire one after another."""
 
 from __future__ import annotations
 
@@ -75,7 +76,7 @@ class CouplingPrediction(QWidget):
             bowl = viewer._bowl_for(i)
             f = _num(t.get("freq_hz"))
             if trans is None or focus is None or bowl is None or f is None or not isppas[i]:
-                return [], (f"transducer {i + 1}: position, geometry, frequency or target ISPPA missing "
+                return [], (f"transducer {i + 1}: position, geometry, frequency, or target ISPPA missing "
                             "(Placement and Transducer tabs)")
             if np.linalg.norm(np.asarray(focus) - np.asarray(trans)) <= 0:
                 return [], f"transducer {i + 1}: transducer and focus positions coincide"
@@ -85,12 +86,15 @@ class CouplingPrediction(QWidget):
 
     # ── drawing ─────────────────────────────────────────────────────────
     def refresh(self) -> None:
+        from ..sequence import is_sequence
         n = self.model.n_transducers
-        self.setVisible(n > 1)
+        # a sonication sequence fires its stances one after another: no coupling to predict
+        relevant = n > 1 and not is_sequence(self.model)
+        self.setVisible(relevant)
         on = self.toggle.isChecked()
         if self.stack is not None:
             self.stack.setVisible(on)
-        if n < 2 or not on:
+        if not relevant or not on:
             self.text.setText("")
             return
         txs = self.model.effective_transducers()

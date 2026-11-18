@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QLabel, QMessa
                              QTableWidget,
                              QTableWidgetItem, QTabWidget, QTextBrowser, QVBoxLayout, QWidget)
 
+from ..labels import plural
 from .. import focal_widths as fwm
 from .. import followup as fu
 from .. import itrusst_report as ir
@@ -34,6 +35,7 @@ from .. import placement as pl
 from .. import results as rs
 from ..model import is_empty
 from ..outputs import dir_output
+from .tabbar import EmphasisTabBar, fit_to_width
 from . import style
 from .empty_state import EmptyStack
 from .heat_view import HeatPanel
@@ -193,11 +195,11 @@ class OverviewPanel(QWidget):
         if r.verdict == "within":
             head = status("Within ITRUSST non-significant-risk limits", "ok")
         elif r.verdict == "review":
-            head = status(f"{len(r.above)} metric(s) above their ITRUSST NSR reference level: "
+            head = status(f"{plural(len(r.above), 'metric')} above their ITRUSST NSR reference level: "
                           f"{escape(', '.join(r.above))}. Inspect NSR adherence.", "bad")
         else:
             head = status("No ITRUSST-limited metric in this run's outputs", "muted")
-        self.summary.setText(f"<b>{escape(r.run_label)}</b> ({escape(r.medium)}) · {head}")
+        self.summary.setText(f"<b>{escape(r.run_label)}</b> ({escape(r.medium)})<br>{head}")   # verdict on its own line
         self.view.setHtml(self.html(r))
 
     def html(self, r: ir.Report) -> str:
@@ -314,6 +316,8 @@ class ResultsPage(QWidget):
         v.addWidget(self.lineage)
 
         self.subtabs = QTabWidget()
+        self.subtabs.setTabBar(EmphasisTabBar(self.subtabs))
+        fit_to_width(self.subtabs.tabBar())
         self.stack = EmptyStack(self.subtabs)
         v.addWidget(self.stack, 1)
         self.overview = OverviewPanel()
@@ -321,7 +325,9 @@ class ResultsPage(QWidget):
         acoustic = tuple(k for k in rs.MAPS if k not in rs.THERMAL_MAPS)
         set_t1 = (lambda: window.goto("path.anat")) if hasattr(window, "goto") else None
         self.spatial = QTabWidget()                 # the maps on the T1
+        self.spatial.setTabBar(EmphasisTabBar(self.spatial))
         self.spatial.setDocumentMode(True)
+        fit_to_width(self.spatial.tabBar())
         self.acoustic = _OverlayPanel(acoustic, "acoustic", set_t1)
         self.spatial.addTab(self.acoustic, "Acoustic")
         self.thermal = _OverlayPanel(rs.THERMAL_MAPS, "thermal", set_t1)
@@ -354,8 +360,8 @@ class ResultsPage(QWidget):
         row = QHBoxLayout()
         row.addWidget(QLabel("Report"))
         combo = QComboBox()
-        combo.setToolTip("The selected run's report, or any other report in the folder "
-                         "(e.g. the sequential or multi-ISPPA summary)")
+        combo.setToolTip("The selected run's report, or any other report of the subject (e.g. the "
+                         "placement, sequential, or multi-ISPPA report), or a group report in path.sim")
         combo.currentIndexChanged.connect(self._load_report)
         row.addWidget(combo, 1)
         self.pdf_btn = QPushButton("Export report as PDF…")
@@ -476,7 +482,7 @@ class ResultsPage(QWidget):
         self.run_combo.setCurrentIndex(idx)
         self.run_combo.blockSignals(False)
         self._show_run(idx)
-        self.status.setText(f"{len(self.runs)} run(s) in {base}")
+        self.status.setText(f"{plural(len(self.runs), 'run')} in {base}")
 
     def _show_empty(self, base: Path | None) -> None:
         """No runs to show: one panel that says so and leads to the Run tab."""
@@ -485,7 +491,7 @@ class ResultsPage(QWidget):
         where = f" PRESTUS writes them to {base}." if base is not None else \
             " Set path.sim (where PRESTUS writes its outputs) on Setup ▸ Paths."
         self.stack.show_empty(f"No results for {sub} yet",
-                              "Run the pipeline on the Run tab; its maps, report and tables "
+                              "Run the pipeline on the Run tab; its maps, report, and tables "
                               "appear here." + where, "Go to Run", self._goto_run)
         for w in self._run_controls:
             w.hide()
@@ -549,7 +555,7 @@ class ResultsPage(QWidget):
             items = ", ".join(f"{escape(rs.describe_affix(d.child_affix)[0])} ({escape(d.child_config.name)})"
                               for d in down)
             parts.append(f"Follow-ups of this run: {items}")
-        self.lineage.setText(" · ".join(parts))
+        self.lineage.setText("<br>".join(parts))      # parent and children on separate lines
         self.lineage.setVisible(bool(parts))
 
     def open_followup(self, ftype: str | None = None, pose: dict | None = None):

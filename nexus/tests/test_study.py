@@ -9,7 +9,7 @@ import pytest
 from prestus_nexus import launcher
 from prestus_nexus.model import ConfigModel
 from prestus_nexus.study import (Manifest, from_neuronav_summary, parse_subject_ids, resolve_manifest,
-                                 sanitize_affix)
+                                 sanitize_affix, study_report_path, subject_list_report_path)
 
 
 def test_manifest_roundtrip_tsv_and_csv(tmp_path):
@@ -135,7 +135,7 @@ def test_study_page_edit_save_and_dry_run(schema, prestus_root, tmp_path):
     saved = page.save_manifest()
     assert saved == tmp_path / "study.tsv"
     assert Manifest.load(saved).rows[1]["transducer.target_isppa_wcm2"] == "20"
-    assert "2</b> row(s)" in page.summary.text()
+    assert "2 rows, 2 included" in page.summary.text()
 
     # dry run through the Run page with a fake MATLAB that records its arguments
     fake = tmp_path / "matlab"
@@ -200,3 +200,88 @@ def test_study_dry_run_in_matlab(schema, prestus_root, tmp_path):
     out = proc.stdout + proc.stderr
     assert proc.returncode == 0 and launcher.OK_SENTINEL in out, out[-3000:]
     assert "Dry run: 2 run(s) ready, 0 with config errors" in out
+
+
+@pytest.mark.parametrize("name,manifest,expected", [
+    ("", "runs.tsv", "group/runs/group_runs_report.html"),           # manifest file name
+    ("pilot study", "runs.tsv", "group/pilot_study/group_pilot_study_report.html"),
+    (None, None, None),                                               # no name at all
+])
+def test_study_report_path(tmp_path, name, manifest, expected):
+    # study_setup.m: <path.sim>/group/<name>/, generate_group_report.m: group_<name>_report.html
+    mp = tmp_path / manifest if manifest else None
+    got = study_report_path(str(tmp_path / "sims"), name, mp)
+    assert got == (tmp_path / "sims" / expected if expected else None)
+    assert study_report_path(None, "x", mp) is None
+
+
+def test_study_page_open_group_report(schema, prestus_root, tmp_path, monkeypatch):
+    pytest.importorskip("PyQt6")
+    from PyQt6.QtGui import QDesktopServices
+    from PyQt6.QtWidgets import QApplication, QMessageBox
+
+    from prestus_nexus.session import Session
+    from prestus_nexus.ui.main_window import STUDY, MainWindow
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    m = ConfigModel(schema)
+    m.set("path.sim", str(tmp_path / "sims"))
+    m.set("study.manifest", "runs.tsv")
+    m.save(tmp_path / "config_g.yaml")
+    window = MainWindow(m, Session(tmp_path / "s.yaml"), prestus_root)
+    page = window.show_special(STUDY)
+    opened, told = [], []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()))
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: told.append(a[2]))
+    page.open_group_report()                                 # not built yet: says so
+    assert not opened and told and "No group report yet" in told[0]
+    report = tmp_path / "sims" / "group" / "runs" / "group_runs_report.html"
+    report.parent.mkdir(parents=True)
+    report.write_text("<html></html>")
+    page.open_group_report()
+    assert opened == [str(report)]
+
+
+@pytest.mark.parametrize("medium,affix,expected", [
+    ("layered", None, "group_layered_report.html"),
+    ("water", "_desc-pilot", "group_water_report_desc-pilot.html"),
+    (None, None, None),                                               # no medium
+])
+def test_subject_list_report_path(tmp_path, medium, affix, expected):
+    # generate_group_report.m without a study: <path.sim>/group_<medium>_report<affix>.html
+    got = subject_list_report_path(str(tmp_path), medium, affix)
+    assert got == (tmp_path / expected if expected else None)
+    assert subject_list_report_path(None, "layered", None) is None
+
+
+@pytest.mark.parametrize("study_config", [False, True])
+def test_study_page_group_report_without_a_study(schema, prestus_root, tmp_path, monkeypatch, study_config):
+    # a config without study.name / manifest opens the report over the subjects in path.sim;
+    # a study config never falls back to it (negative control)
+    pytest.importorskip("PyQt6")
+    from PyQt6.QtGui import QDesktopServices
+    from PyQt6.QtWidgets import QApplication, QMessageBox
+
+    from prestus_nexus.session import Session
+    from prestus_nexus.ui.main_window import STUDY, MainWindow
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    m = ConfigModel(schema)
+    m.set("path.sim", str(tmp_path / "sims"))
+    m.set("simulation.medium", "layered")
+    if study_config:
+        m.set("study.name", "pilot")
+    m.save(tmp_path / "config_g.yaml")
+    report = tmp_path / "sims" / "group_layered_report.html"
+    report.parent.mkdir(parents=True)
+    report.write_text("<html></html>")
+    window = MainWindow(m, Session(tmp_path / "s.yaml"), prestus_root)
+    page = window.show_special(STUDY)
+    opened, told = [], []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()))
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: told.append(a[2]))
+    page.open_group_report()
+    if study_config:
+        assert not opened and "No group report yet" in told[0]
+    else:
+        assert opened == [str(report)] and not told
+    window.dirty = False
+    window.close()

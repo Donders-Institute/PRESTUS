@@ -1,6 +1,6 @@
 """MATLAB bridge: one persistent MATLAB session (functions/gui/nexus_bridge.m) that serves
 the Nexus's interactive MATLAB steps -- Localite detect/write, transducer calibration
-predict/fit/save -- without a MATLAB start-up per click.
+predict/fit/save, pseudo-CT -- without a MATLAB start-up per click.
 
 Protocol (all in one bridge folder; see nexus_bridge.m):
 
@@ -31,7 +31,7 @@ from typing import Any, Callable
 
 from .fsio import write_text_atomic
 
-ALLOWED = ("nexus_calibration", "nexus_neuronav", "nexus_pct", "nexus_ping")
+ALLOWED = ("nexus_calibration", "nexus_equipment", "nexus_neuronav", "nexus_pct", "nexus_ping")
 IDLE_TIMEOUT_S = 1800          # MATLAB ends after this long without requests (it holds a licence)
 HEARTBEAT_TIMEOUT_S = 60       # ... or when the Nexus has not touched the heartbeat for this long
 HEARTBEAT_EVERY_S = 10

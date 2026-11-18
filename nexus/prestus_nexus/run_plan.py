@@ -127,7 +127,7 @@ def _water_baseline(model: ConfigModel, backend: str) -> Stage:
         return Stage("Free-water baseline", SKIP, "no target ISPPA: results stay at the configured drive")
     differs = calib is None or abs(target - calib) > 0.01 * max(abs(calib), 1e-9)
     if mode in (0, False, "0") and calib is None:
-        return Stage("Free-water baseline", STOP, "target set, no calibration ISPPA and run_water_baseline: 0")
+        return Stage("Free-water baseline", STOP, "target set, no calibration ISPPA, and run_water_baseline: 0")
     if differs:
         why = "no calibration ISPPA recorded" if calib is None else f"calibration is {calib:g} W/cm²"
         return Stage("Free-water baseline", RUN, f"to scale to {target:g} W/cm² ({why})")
@@ -213,7 +213,7 @@ def _plan(model: ConfigModel) -> RunPlan:
                         f"{backend}" + (f", {g('simulation.code_type')}" if backend.startswith("kwave")
                                         and not is_empty(g("simulation.code_type")) else "")))
     st.append(Stage("Acoustic analysis", RUN if _on(g("modules.run_acoustic_analysis")) else SKIP,
-                    "intensity, pressure and MI metrics"))
+                    "intensity, pressure, and MI metrics"))
     nifti = _on(g("modules.run_nifti_creation"))
     st.append(Stage("NIfTI maps", RUN if nifti else SKIP, "maps in T1w and MNI space"))
     if head:
@@ -232,7 +232,7 @@ def _plan(model: ConfigModel) -> RunPlan:
         st.append(Stage("Post-hoc free-water run", RUN if water else SKIP,
                         "the same setup in water, as a separate run" if water else ""))
     st.append(Stage("Report", RUN if _on(g("modules.generate_report"), False) else SKIP,
-                    f"HTML report ({g('modules.report_style') or 'instrument'})"))
+                    f"HTML report ({g('report.style') or 'instrument'})"))
     if _on(g("modules.generate_group_report"), False):
         st.append(Stage("Group report", RUN, "updated after the run"))
     return out

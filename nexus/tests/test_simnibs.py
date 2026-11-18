@@ -277,3 +277,20 @@ def test_panel_relinks_on_environment_change(schema, tmp_path):
     assert m.get("startup.simnibs_bin_path") == str(b)
     assert m.get("hpc.ld_library_path") in ("", None)
     assert m.get("placement.plantus.env_path") == "/somewhere/custom"
+
+
+def test_segmentation_card_has_no_rerun_switch(schema, tmp_path):
+    """Segment again is the button (segmentation_panel); io.overwrite_simnibs, set elsewhere,
+    is flagged on the card instead of being a second switch."""
+    pytest.importorskip("PyQt6")
+    from PyQt6.QtWidgets import QApplication, QCheckBox
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    from prestus_nexus.ui.simnibs_panel import SimnibsPanel
+    m = _layered(schema, tmp_path, _conda_env(tmp_path, "simnibs_v4.6.0", "4.6.0"), m2m_version="4.6.0")
+    p = SimnibsPanel(m)
+    assert not [c for c in p.findChildren(QCheckBox) if "segment" in c.text().lower()]
+    p.refresh()
+    off = p.state.text()
+    m.set("io.overwrite_simnibs", 1)
+    p.refresh()
+    assert "segments again" in p.state.text() and "segments again" not in off

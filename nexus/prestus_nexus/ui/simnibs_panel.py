@@ -1,8 +1,9 @@
 """SimNIBS environment, version and existing segmentation, on the Segmentation card.
 
 The environment is startup.simnibs_bin_path (also on Setup › Environment); its
-version follows from it and is shown read-only. Re-running the segmentation is
-io.overwrite_simnibs (also on Setup › Input / output). The custom charm settings
+version follows from it and is shown read-only. Segmenting again is the card's
+'Segment again…' button (segmentation_panel); io.overwrite_simnibs stays on Setup ›
+Input / output and is flagged here when on. The custom charm settings
 file (segmentation.settings_file) starts as a copy of the install's charm.ini.
 
 When runs are submitted over SSH (Run tab), *Scan cluster* lists the installs on the
@@ -16,7 +17,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QProcess, Qt, QUrl, pyqtSignal
 from PyQt6.QtGui import QDesktopServices
-from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
+from PyQt6.QtWidgets import (QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
                              QMessageBox, QPushButton, QSizePolicy, QToolButton, QVBoxLayout, QWidget)
 
 from .. import remote as rmt
@@ -60,6 +61,7 @@ class SimnibsPanel(QWidget):
         g.setHorizontalSpacing(14)
         g.setVerticalSpacing(8)
         g.setColumnMinimumWidth(0, label_width)
+        g.setProperty("label_inset", 290 - label_width)   # follows the card (section.mark_label_grid)
         g.setColumnStretch(1, 1)
 
         def label(text: str, tip: str) -> QLabel:
@@ -77,7 +79,7 @@ class SimnibsPanel(QWidget):
             return w
 
         env_tip = ("The SimNIBS 4 install whose charm segments the T1 (startup.simnibs_bin_path, also on "
-                   "Setup › Environment). Found on PATH, in conda environments and in the default install "
+                   "Setup › Environment). Found on PATH, in conda environments, and in the default install "
                    "folders; '…' picks another bin folder.")
         self.env = QComboBox()
         self.env.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
@@ -91,7 +93,7 @@ class SimnibsPanel(QWidget):
         browse.clicked.connect(self._browse)
         self.scan_remote = QToolButton(text="Scan cluster")
         self.scan_remote.setToolTip("List the SimNIBS installs on the cluster runs are submitted to (Run tab, "
-                                    "over SSH): conda environments, ~/SimNIBS*, /opt/simnibs* and the "
+                                    "over SSH): conda environments, ~/SimNIBS*, /opt/simnibs*, and the "
                                     "'simnibs' environment modules")
         self.scan_remote.clicked.connect(self.scan_cluster)
         self.scan_note = QLabel()
@@ -140,17 +142,6 @@ class SimnibsPanel(QWidget):
         g.addWidget(label("Existing segmentation", seg_tip), 2, 0)
         g.addWidget(row([(self.state, 1), (self.report, 0)]), 2, 1)
 
-        rerun_tip = ("io.overwrite_simnibs (also on Setup › Input / output): run charm again with the "
-                     "selected SimNIBS and settings. charm deletes the m2m folder first.")
-        self.rerun = QCheckBox("Re-run SimNIBS segmentation")
-        self.rerun.setToolTip(rerun_tip)
-        self.rerun.toggled.connect(self._rerun_toggled)
-        self.rerun_note = QLabel()
-        self.rerun_note.setObjectName("CardSub")
-        self.rerun_note.setWordWrap(True)
-        g.addWidget(label("Segment again", rerun_tip), 3, 0)
-        g.addWidget(row([(self.rerun, 0), (self.rerun_note, 1)]), 3, 1)
-
         set_tip = ("Advanced: change charm's settings (e.g. denoising, atlas initialisation, threads). "
                    "Starts from a copy of the install's charm.ini, which you then edit; charm reads it "
                    "with --usesettings. Report the settings you changed.")
@@ -161,8 +152,8 @@ class SimnibsPanel(QWidget):
         self.edit_settings.clicked.connect(self._edit_settings)
         self.settings_label = label("charm settings", set_tip)
         self.settings_row = row([(self.custom, 0), (self.edit_settings, 0), (QWidget(), 1)])
-        g.addWidget(self.settings_label, 4, 0)
-        g.addWidget(self.settings_row, 4, 1)
+        g.addWidget(self.settings_label, 3, 0)
+        g.addWidget(self.settings_row, 3, 1)
 
     # ── state ───────────────────────────────────────────────────────────
     def _host(self) -> rmt.RemoteHost | None:
@@ -265,10 +256,6 @@ class SimnibsPanel(QWidget):
         self.refresh()
         self.changed.emit()
 
-    def _rerun_toggled(self, on: bool) -> None:
-        if not self._updating:
-            self._set(RERUN, 1 if on else 0)
-
     def _open_report(self) -> None:
         m2m = self._m2m()
         st = sn.segmentation_state(m2m) if m2m else None
@@ -342,7 +329,7 @@ class SimnibsPanel(QWidget):
                 parts.append(f"{name}: {'follow the environment' if derived else 'none found'}")
                 full.append(f"{key} (empty) → {derived or 'none found'}")
         self.linked.setToolTip("Settings that follow the SimNIBS environment while empty:\n" + "\n".join(full))
-        return " · ".join(parts)
+        return "<br>".join(parts)                    # one linked setting per line
 
     def refresh(self) -> None:
         c = style.active()
@@ -403,19 +390,16 @@ class SimnibsPanel(QWidget):
                 diffs = sn.differences(st, inst, None if is_empty(settings) else str(settings))
                 text = f"{st.folder.name}: {made}{used}."
                 if diffs:
-                    hint = "it will be replaced" if rerun else "reused as is unless re-run"
+                    hint = "it will be replaced" if rerun else "reused as is; Segment again… replaces it"
                     text += (f"<br><span style='color:{c['amber']}'>Differs from the selection: "
                              f"{'; '.join(diffs)} ({hint}).</span>")
+                if rerun:
+                    text += (f"<br><span style='color:{c['amber']}'>Re-run SimNIBS segmentation is on "
+                             "(Setup › Input / output): every run of this config deletes "
+                             f"{st.folder.name} and segments again.</span>")
                 self.state.setText(text)
             self.report.setEnabled(bool(st and st.report))
             self.report.setVisible(bool(st and st.exists))
-
-            self.rerun.setChecked(rerun)
-            if rerun and st is not None and st.exists:
-                self.rerun_note.setText(f"charm deletes {st.folder.name} and segments again "
-                                        "(Setup › Input / output has the same switch).")
-            else:
-                self.rerun_note.setText("Same switch as Setup › Input / output.")
 
             show_settings = bool(self.page is not None and self.page.show_advanced) or not is_empty(settings)
             self.settings_label.setVisible(show_settings)

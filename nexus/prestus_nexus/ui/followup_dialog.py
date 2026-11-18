@@ -22,7 +22,7 @@ from .pose_table import PoseTable
 # timing.* keys of config_default.yaml (#------------ Timing) shown for 'new_timing', in [s]
 TIMING_KEYS = (("pd", "Pulse duration"), ("pri", "Pulse repetition interval"),
                ("ptd", "Pulse train duration"), ("ptri", "Pulse train repetition interval"),
-               ("ptrd", "Pulse train repetition duration"), ("post_ptri_dur", "Cooling after the trains"))
+               ("ptrd", "Pulse train repetition duration"), ("post_ptri_dur", "Steady-state after the trains"))
 
 AIMS = (("corrected", "Aberration-corrected aim point (recommended)"),
         ("geometric", "Geometric aim at the target"),

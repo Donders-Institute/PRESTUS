@@ -17,7 +17,8 @@ a = Analysis(
     [str(here / "packaging" / "run_nexus.py")],
     pathex=[str(here)],
     datas=[(str(pkg / "overlay.yaml"), "prestus_nexus"),
-           (str(pkg / "run_presets.yaml"), "prestus_nexus")],
+           (str(pkg / "run_presets.yaml"), "prestus_nexus"),
+           (str(pkg / "throughput.yaml"), "prestus_nexus")],
     hiddenimports=["nibabel", "matplotlib.backends.backend_qtagg"],
     excludes=["tkinter"],
 )

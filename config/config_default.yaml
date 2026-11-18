@@ -337,6 +337,8 @@ placement:
   report: true      # Write a stand-alone placement report (sub-XXX_placement_<mode>.html in
                     #   io.dir_reports) after placement: target, positions, T1 overlay and, for
                     #   'plantus', the criteria evaluation (placement.plantus.evaluate).
+  export_formats: []  # Also write the placed poses for other tools, to io.dir_output: any of 'brainsight'
+                      #   (trajectory .txt), 'slicer' (ITK .tfm) and 'kplan' (images without rotation, .kps, entry sheet)
   reuse: 'auto'     # Reuse a recorded heuristic/plantus/tus_entry run (placement_run.json in its run folder):
                     #   'auto'   reuse it when its settings match, else run the placement again |
                     #   'always' require it (mismatch handled per io.cache_signature_check) |

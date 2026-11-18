@@ -269,6 +269,7 @@ class Schema:
         self.deprecated: dict[str, dict] = overlay.get("deprecated", {}) or {}
         self.tune_goals: dict[str, dict] = overlay.get("tune_goals", {}) or {}
         self.tuning_rules: dict[str, list] = overlay.get("tuning", {}) or {}
+        self.choice_label_rules: dict[str, dict] = overlay.get("choice_labels", {}) or {}
         self.choice_icon_rules: dict[str, dict] = overlay.get("choice_icons", {}) or {}
         self.choice_figure_rules: dict[str, dict] = overlay.get("choice_figures", {}) or {}
         self.workflow_keys = self._calibration_keys()
@@ -353,8 +354,6 @@ class Schema:
                 node.kind = rule["kind"]
             if "choices" in rule:
                 node.choices = list(rule["choices"])
-            if "choice_labels" in rule:
-                node.choice_labels = dict(rule["choice_labels"])
             if "choice_math" in rule:
                 node.choice_math = dict(rule["choice_math"])
             if "unit" in rule:
@@ -380,6 +379,7 @@ class Schema:
         for pat, goals in self.tuning_rules.items():
             if fnmatch.fnmatchcase(node.path, pat):
                 node.tune = list(goals or [])
+        node.choice_labels = dict(self.choice_label_rules.get(node.path) or {})
         node.choice_icons = dict(self.choice_icon_rules.get(node.path) or {})
         node.choice_figures = {c: list(v) for c, v in (self.choice_figure_rules.get(node.path) or {}).items()}
         if node.choices and node.kind == "yaml":

@@ -123,7 +123,7 @@ def _wavefront_figure(coherent: bool) -> str:
     return b
 
 
-# ── Grid orientation (grid.mode, simulation.async_grid_mode) ──────────
+# ── Grid orientation (grid.mode, grid.async_layout) ──────────
 # preproc_head.m: focal_axis rotates the mean beam axis onto grid z, transducer_axis
 # transducer(1)'s beam, ras_plus does not rotate. The grid box is drawn upright (z up);
 # the accent marks what lies on z. Transducers sit above their focus.
@@ -234,7 +234,7 @@ GLYPHS: dict[str, str] = {
         f'<circle class="f" cx="{_f((1 - u) ** 2 * 3 + 2 * u * (1 - u) * 12 + u * u * 21)}" '
         f'cy="{_f((1 - u) ** 2 * 16 + 2 * u * (1 - u) * 2 + u * u * 16)}" r="1.35"/>'
         for u in [0.06 + 0.88 * k / 8 for k in range(9)]),
-    # simulation.async_grid_mode
+    # grid.async_layout
     "asyncgrid_shared": '<rect x="2.5" y="4.5" width="19" height="15" rx="1.2"/><path d="M6 8L12 15M18 8L12 15"/>'
                         '<circle class="af" cx="12" cy="15" r="1.4"/>',
     "asyncgrid_per_transducer": '<rect x="2" y="4.5" width="9" height="15" rx="1.2"/>'
@@ -325,7 +325,8 @@ FIGURES: dict[str, tuple[str, str]] = {
     "gridmode_ras_plus_fig": (
         _gridmode_figure("ras_plus"),
         "No rotation: the grid keeps the T1's R and S axes (blue), so every beam is oblique. "
-        "Not for axisymmetric grids."),
+        "Cannot be combined with 2-D axisymmetric simulations (grid.axisymmetric), which need "
+        "the beam along the grid z axis."),
     "asyncgrid_shared_fig": (
         _asyncgrid_figure(False),
         "One grid for all transducers, oriented by grid.mode and cropped to hold every beam; "

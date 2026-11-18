@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PyQt6")
 
 from PyQt6.QtCore import QObject, Qt, pyqtSignal  # noqa: E402
-from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox  # noqa: E402
+from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox, QSplitter  # noqa: E402
 
 from prestus_nexus.equipment import EquipmentLibrary  # noqa: E402
 from prestus_nexus.model import ConfigModel  # noqa: E402
@@ -90,13 +90,14 @@ def test_calibration_page_opens_the_config_transducer_and_fits(window):
     page = window.show_special(CALIBRATION)
     calls = window.fake.calls
     assert calls == [] and page.depths.text() == "47.5"         # MATLAB starts on the first action
-    assert "CTX_250_001_SC_105_010" in page.coverage.text() and page.entry_plot.arrays["cal_range"]
+    assert page.coverage.text().startswith("Library entry: empirical") and page.entry_plot.arrays["cal_range"]
+    assert "CTX_250_001" not in page.coverage.text()            # the selector names the device
     page.evaluate_measured()
     assert calls[0][1]["action"] == "open" and calls[0][1]["serial"] == "CTX_250_001"
     assert calls[0][1]["driving_system"] == "SC_105_010" and calls[0][1]["library_path"] == ""
     assert calls[1][1]["action"] == "view" and calls[1][1]["predicted"] is False   # profiles loaded
     assert page.depths.text() == "47.5"                         # the study's own depth
-    assert page.measured.count() == 12 and "CTX_250_001_SC_105_010" in page.coverage.text()
+    assert page.measured.count() == 12 and page.coverage.text().startswith("Library entry:")
     assert page.table.rowCount() == 0                           # no fit yet, measured view
     assert page.ax_r2.get_ylabel().startswith("R²")
 
@@ -161,6 +162,62 @@ def test_calibration_save_sets_library_path_and_k_wave_script(window, tmp_path, 
     assert "calibration_save_entry(lib, fit" in text
 
 
+def test_calibration_report_opens_the_entry_report(window, tmp_path, monkeypatch):
+    # Report: enabled with a library entry; asks nexus_calibration for the entry's HTML
+    # report and opens it; disabled, saying why, without an entry
+    from PyQt6.QtGui import QDesktopServices
+    page = window.show_special(CALIBRATION)
+    page.refresh()
+    assert page.entry is not None and page.report_btn.isEnabled()
+    html = tmp_path / "CTX_250_001_SC_105_010_report.html"
+    html.write_text("<html></html>")
+    opened = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()))
+    calls = window.fake.calls
+    fake_call = window.fake.call
+
+    def call(fn, args=None, on_done=None, on_error=None, on_progress=None):
+        if (args or {}).get("action") == "report":
+            calls.append((fn, args))
+            return on_done({"file": str(html), "library_file": "entry.yaml"})
+        return fake_call(fn, args, on_done, on_error, on_progress)
+    monkeypatch.setattr(window.fake, "call", call)
+    page.open_report()
+    assert calls[-1] == ("nexus_calibration", {"action": "report", "session": page.session_id})
+    assert opened == [str(html)] and html.name in page.log.toPlainText()
+
+    page.entry, page.info = None, {}                    # negative control: no entry
+    page._update_buttons()
+    assert not page.report_btn.isEnabled() and "save a fit first" in page.report_btn.toolTip()
+
+
+def test_calibration_steps_sit_below_the_plots_and_fit_the_minimum_width(window):
+    page = window.show_special(CALIBRATION)
+    window.show()
+    split = page.findChild(QSplitter)
+    assert split.orientation() == Qt.Orientation.Vertical
+    assert page.canvas.minimumHeight() >= 400               # two axes never squash
+    window.resize(window.minimumWidth(), 700)
+    QApplication.processEvents()
+    for b in (page.load_btn, page.predict_btn, page.fit_btn, page.save_btn, page.kw_btn):
+        right = b.mapTo(page, b.rect().topRight()).x()
+        assert right <= page.width(), b.text()              # nothing clipped at the narrowest window
+
+
+def test_cards_named_by_their_tab_drop_their_title(window):
+    cards = {p.title.text(): p for tab in window.tab_pages.values() for p in tab.sections}
+    assert cards["Study"].headless                              # same name as the Study tab
+    assert cards["Where to run"].headless                       # same name as its sub-tab
+    assert not cards["Pipeline stages"].headless                # shares Run ▸ Stages with Report
+    assert not cards["Report"].headless
+    assert not cards["Targeting analysis"].headless             # shares the Study tab
+    assert not cards["Calibration conventions"].headless        # sits inside the Calibration page
+    study = cards["Study"]
+    assert study.title.isHidden() and study.toggle.isHidden() and not study.doc_button.isHidden()
+    study.set_auto_collapse(lambda: True)                       # nothing to collapse to
+    assert not study.body.isHidden()
+
+
 def test_calibration_page_reopens_after_matlab_restart(window):
     page = window.show_special(CALIBRATION)
     window.fake.fail["view"] = ("No calibration session", "nexus_calibration:noSession")
@@ -188,7 +245,7 @@ def test_localite_page_detect_write_and_use(window, monkeypatch):
     page.write()
     tm = window.fake.calls[-1][1]["target_map"]
     assert tm == [{"series_index": 1, "transducer_id": 0, "target_name": "L_PUL", "color": ""}]
-    assert "Wrote 2 target(s)" in page.status.text()            # the recorded answer wrote both
+    assert "Wrote 2 targets" in page.status.text()            # the recorded answer wrote both
 
     page.use_in_study()
     assert window.model.get("placement.localite.session") == "ses-01"
@@ -333,3 +390,33 @@ def test_pct_flow_steps_and_curves(window, tmp_path, monkeypatch):
     m.set("path.ct_pattern", "sub-%1$03d_CT.nii.gz")
     flow.refresh()
     assert "Measured CT" in flow.steps[0].text.text() and not flow.steps[2].isVisibleTo(flow)
+
+
+def test_calibration_any_library_transducer(window, tmp_path, monkeypatch):
+    """calibration_gui's lists: any library transducer and driving system, saved to a chosen
+    folder without changing the config; the k-Wave check with its own simulation config."""
+    page = window.show_special(CALIBRATION)
+    page.any_lib.setChecked(True)
+    assert page.lib_serial.isVisibleTo(page) and not page.tx.isVisibleTo(page)
+    page.lib_serial.setCurrentIndex(page.lib_serial.findData("CTX_250_001"))
+    page.lib_ds.setCurrentIndex(page.lib_ds.findData("SC_105_010"))
+    assert page.current() == (-1, "CTX_250_001", "SC_105_010")
+    assert page.depths.text() == ""                              # no study depths for a library device
+    page.fit()
+    calls = window.fake.calls
+    assert calls[0][1]["action"] == "open" and calls[0][1]["serial"] == "CTX_250_001"
+    lib = tmp_path / "own_cal"
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *a, **k: str(lib))
+    page.save()
+    assert calls[-1][1]["action"] == "save" and calls[-1][1]["out_dir"] == str(lib)
+    assert window.model.get("transducer.library_path") in (None, "", [])    # config unchanged
+    assert page.library_path() == str(lib)
+
+    monkeypatch.setattr(type(page), "_library_sim_config", lambda self: "")
+    monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
+    monkeypatch.setattr(QMessageBox, "clickedButton", lambda self: None)
+    page.kwave_check()
+    script = lib / "calibration" / "kwave_drive_CTX_250_001_SC_105_010.m"
+    assert script.is_file() and "SimConfig" not in script.read_text()  # PRESTUS defaults
+    page.any_lib.setChecked(False)
+    assert page.tx.isVisibleTo(page) and page.current()[0] == 0
