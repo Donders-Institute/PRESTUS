@@ -123,8 +123,10 @@ end
 
         if any(needs_t1w(1:n_cont))
             stack = cat(4, cont_vols{:});
-            backtransf = affine_resample_3d(stack, planimg.inv_transf, ...
-                size(planimg.t1_image_orig), 'linear', 0);
+            % Cubic keeps focal peaks (linear underestimates them by up to a
+            % few % for narrow foci); clip its small undershoot below zero.
+            backtransf = max(affine_resample_3d(stack, planimg.inv_transf, ...
+                size(planimg.t1_image_orig), 'cubic', 0), 0);
         end
 
         for k = 1:n_cont

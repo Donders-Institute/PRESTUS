@@ -19,6 +19,12 @@ function nifti_to_t1w(data, orig_file, parameters, planimg, opts)
 %   opts       - name-value options (see arguments block)
 %
 % Options:
+%   IsLayered    - true (default): resample to the T1 grid; false: write on
+%                  the simulation grid with the phantom's transform
+%   Datatype     - output NIfTI datatype (default: 'single')
+%   BitsPerPixel - output bits per voxel (default: [] = keep the header value)
+%   Resampler    - 'nearest', 'linear', or 'cubic' (default), passed to
+%                  AFFINE_RESAMPLE_3D
 %   FillMethod   - 'constant' (default) or 'nearest'.
 %                  'constant': out-of-grid voxels get FillValue.
 %                  'nearest':  out-of-grid voxels are filled with the value

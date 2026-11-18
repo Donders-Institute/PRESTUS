@@ -2,11 +2,11 @@ function nifti_thermal(parameters, planimg, results_heating, kwave_medium)
 % NIFTI_THERMAL  Export thermal-stage data to NIfTI in T1 and MNI space
 %
 % Writes heating maps, heat-rise maps, and CEM43 maps back-transformed to T1
-% space, with edge-artefact correction applied to the temperature map.
+% space. Non-positive CEM43 voxels are set to a small floor value.
 % Optionally converts all outputs to MNI space.
 %
 % The T1w back-transform (affine_resample_3d) is batched by fill-value group, and the
-% MNI transform (subject2mni) is run in parallel across all volumes.
+% MNI transform (convert_final_to_MNI_simnibs) is one call for all volumes.
 %
 % Use as:
 %   nifti_thermal(parameters, planimg, results_heating, kwave_medium)
@@ -100,10 +100,10 @@ end
         if any(needs_t1w(grp_a))
             stack_a = cat(4, single(results_heating.maxT), single(results_heating.heating_endT));
             backtransf_a = affine_resample_3d(stack_a, planimg.inv_transf, ...
-                t1_size, 'linear', fill_water);
+                t1_size, 'cubic', fill_water);
         end
 
-        % Group B — temperature rises use linear interpolation; CEM43 volumes use
+        % Group B — temperature rises use cubic interpolation; CEM43 volumes use
         % nearest-neighbour to preserve spatial peaks across sequential-run adoption
         % (linear smoothing would reduce peak values causing a visible drop at the
         % run boundary when the file is re-imported by thermal_simulation.m).
@@ -114,7 +114,7 @@ end
                 single(results_heating.maxT - kwave_medium.temp_0), ...
                 single(results_heating.heating_endT - kwave_medium.temp_0));
             backtransf_hrise = affine_resample_3d(stack_hrise, planimg.inv_transf, ...
-                t1_size, 'linear', 0);
+                t1_size, 'cubic', 0);
 
             stack_cem = cat(4, ...
                 single(results_heating.CEM43), ...
@@ -138,7 +138,8 @@ end
             if ~needs_t1w(k); continue; end
             if ismember(ki, cem_local_idx)
                 v = backtransf_cem(:,:,:,ki - 2);
-                v(v <= 0) = 0.0000001;
+                cem43_floor = 1e-7;            % [min] written for CEM43 <= 0
+                v(v <= 0) = cem43_floor;
             else
                 v = backtransf_hrise(:,:,:,ki);
             end
@@ -166,7 +167,7 @@ end
     end
 
     % -------------------------------------------------------------------------
-    % MNI transform — batch all volumes into a single parallel subject2mni run
+    % MNI transform: all volumes in one convert_final_to_MNI_simnibs call
     % -------------------------------------------------------------------------
     if ~is_layered || ~should_save_output(parameters.io, 'save_MNI')
         return

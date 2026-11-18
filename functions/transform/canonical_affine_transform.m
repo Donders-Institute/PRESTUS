@@ -3,11 +3,13 @@ function nii_out = canonical_affine_transform(nii_in_path, output_path)
 %
 % Removes rotations and shear from the NIfTI affine, replacing it with a
 % pure diagonal scaling matrix whose diagonal entries equal the voxel
-% dimensions in mm. The origin is fixed at [0 0 0] (LPI corner). This
+% dimensions in mm. The origin is fixed at [0 0 0] (first voxel). This
 % prevents k-Wave grid-padding issues caused by rotated affines and ensures
 % Localite neuronavigation can import the image using simple voxel scaling
 % (world_pos = voxel_pos * voxel_size) without a rotation matrix.
-% Equivalent to Python: nib.as_closest_canonical() + custom diagonal affine.
+% The voxel array is first reoriented to RAS+ (ENSURE_RAS_PLUS: axis
+% permutation and flips, no interpolation), so the first voxel is the LPI
+% corner and left stays left for any storage order of the input.
 %
 % Use as:
 %   nii_out = canonical_affine_transform(nii_in_path, output_path)
@@ -21,24 +23,21 @@ function nii_out = canonical_affine_transform(nii_in_path, output_path)
 %   nii_out     - modified niftiinfo struct with diagonal affine
 %                 (also saved to output_path and output_path.gz)
 %
-% See also: NIFTIINFO, NIFTIREAD, NIFTIWRITE, RAS_TO_GRID
+% See also: ENSURE_RAS_PLUS, NIFTIINFO, NIFTIWRITE, RAS_TO_GRID
 
 arguments
     nii_in_path (1,:) char
     output_path (1,:) char
 end
 
-%% Load input NIfTI
+%% Load input NIfTI and store it RAS+ (first voxel = LPI corner)
 nii_in = niftiinfo(nii_in_path);
 img_data = niftiread(nii_in);
+[img_data, nii_in] = ensure_ras_plus(img_data, nii_in);
 
 fprintf('Original affine:\n'); disp(nii_in.Transform.T);
 fprintf('Shape: [%d %d %d]\n', size(img_data));
 fprintf('LOCALITE NOTE: Original affine may contain rotations causing coordinate mismatches\n');
-
-%% Print original affine
-nii_original = niftiinfo(nii_in_path);
-fprintf('Original affine:\n'); disp(nii_original.Transform.T);
 
 %% Create new diagonal affine matrix for Localite compatibility
 % [sx 0  0  0 ]    LOCALITE: world_x = voxel_x * sx   (0-based voxel; MATLAB index - 1)
@@ -46,9 +45,9 @@ fprintf('Original affine:\n'); disp(nii_original.Transform.T);
 % [0  0  sz 0 ]    LOCALITE: world_z = voxel_z * sz
 % [0  0  0  1 ]
 affine_new = eye(4);
-affine_new(1,1) = nii_original.PixelDimensions(1);   % X scaling (mm/voxel)
-affine_new(2,2) = nii_original.PixelDimensions(2);   % Y scaling (mm/voxel)  
-affine_new(3,3) = nii_original.PixelDimensions(3);   % Z scaling (mm/voxel)
+affine_new(1,1) = nii_in.PixelDimensions(1);   % X scaling (mm/voxel)
+affine_new(2,2) = nii_in.PixelDimensions(2);   % Y scaling (mm/voxel)  
+affine_new(3,3) = nii_in.PixelDimensions(3);   % Z scaling (mm/voxel)
 
 fprintf('New LOCALITE-compatible diagonal affine:\n'); disp(affine_new);
 fprintf('Mapping: [voxel_x, voxel_y, voxel_z] → [%.1f*vx, %.1f*vy, %.1f*vz] mm\n', ...

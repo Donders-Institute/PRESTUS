@@ -154,6 +154,30 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_transf
         end
 
     end
+
+    methods (Test, TestTags = {'deformation'})
+
+        function test_deformation_edge_of_field(tc)
+            % Coordinate field = identity map (target RAS = source RAS) inside a block,
+            % zero ("no mapping") outside. Points within one voxel of the block edge,
+            % and in its interior, must map onto themselves.
+            dims = [20 20 20];
+            [i, j, k] = ndgrid(0:dims(1) - 1, 0:dims(2) - 1, 0:dims(3) - 1);   % 0-based index = RAS (identity affine)
+            field = cat(4, i, j, k);
+            inside = i >= 5 & i <= 14 & j >= 5 & j <= 14 & k >= 5 & k <= 14;
+            field(repmat(~inside, 1, 1, 1, 3)) = 0;
+            A = eye(4);
+            nearest = neuronav_build_deformation_cache(field);
+            pts = [9.5 9.5 9.5; 14.4 9.2 9.7; 5.0 5.0 5.0; 14.0 14.0 14.0; 4.7 10 10];
+            out = neuronav_apply_deformation(pts, field, A, nearest);
+            tc.verifyEqual(out([1 3 4], :), pts([1 3 4], :), 'AbsTol', 1e-9);   % interior and on the edge
+            % Between the last mapped voxel and an unmapped one: within that voxel, not pulled
+            % towards the origin (zero-weighted interpolation gave errors of several mm)
+            err = vecnorm(out([2 5], :) - pts([2 5], :), 2, 2);
+            tc.verifyLessThanOrEqual(err, [0.5; 0.5]);
+        end
+
+    end
 end
 
 function f = write_nii_1mm(base, vol, origin_mm)

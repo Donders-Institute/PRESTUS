@@ -60,7 +60,7 @@ mni2sub_bin = fullfile(parameters.startup.simnibs_bin_path, 'mni2subject_coords'
 [status, result] = run_command({mni2sub_bin, '-m', subdir, '-s', fn_in, '-o', fn_out, '-t', transformation_type}, ...
     'Env', env_overrides);
 
-% Check if call was successefull
+% Check if call was successful
 if status ~= 0
     delete(fn_in);
     delete(fn_out);
@@ -69,6 +69,14 @@ end
 
 % Read output
 coords_sub = csvread(fn_out, 0, 1);
+% SimNIBS returns [0 0 0] for a point it cannot map (outside the warp field):
+% NaN, so callers cannot silently use the coordinate origin
+unmapped = all(coords_sub == 0, 2);
+if any(unmapped)
+    coords_sub(unmapped, :) = NaN;
+    warning('PRESTUS:coords:noMapping', 'MNI -> subject: %d of %d points could not be mapped (SimNIBS returned 0 0 0); returned as NaN.', ...
+        nnz(unmapped), numel(unmapped));
+end
 delete(fn_in);
 delete(fn_out);
 

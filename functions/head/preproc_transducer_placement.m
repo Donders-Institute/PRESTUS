@@ -404,7 +404,7 @@ function parameters = run_heuristic_placement(parameters)
     parameters = resolve_io_dirs(parameters);
 
     % Build mni_targets struct expected by transducer_positioning
-    % transducer_positioning.m:69 does: target_mni = mni_targets.(target_name)
+    % (it reads mni_targets.(target_name))
     mni_targets.(target_name) = mni_coords;
 
     % Build pn path-names struct from parameters.path
@@ -444,8 +444,8 @@ function parameters = run_heuristic_placement(parameters)
                  'Re-run the pipeline with placement.mode = ''manual'' after the job\n' ...
                  'completes and update trans_pos / focus_pos from:\n  %s\n'], tpos_file);
         transducer_positioning_start(parameters, pn, target_name, mni_targets);
-        error(['PRESTUS:placement:hpcHeuristic', ...
-               'Pipeline halted: re-run after heuristic positioning job completes.']);
+        error('PRESTUS:placement:hpcHeuristic', ...
+              'Pipeline halted: re-run after heuristic positioning job completes.');
     end
 end
 
@@ -529,6 +529,12 @@ function parameters = run_mni_placement(parameters)
 
     % Focus -> NONLINEAR nonl, identical to the heuristic target.
     focus_pos = transform_coordinates(parameters, mni.focus_pos_mm(:)', 'mni', 'grid', img_header);
+    if any(~isfinite(trans_vox)) || any(~isfinite(focus_pos))
+        error('PRESTUS:placement:mniUnmapped', ['MNI placement: SimNIBS could not map %s to this subject ' ...
+            '(outside the warp field of %s). Check the MNI coordinate.'], ...
+            strjoin([repmat({'placement.mni.trans_pos_mm'}, 1, any(~isfinite(trans_vox))), ...
+                     repmat({'placement.mni.focus_pos_mm'}, 1, any(~isfinite(focus_pos)))], ' and '), m2m);
+    end
 
     % ── Snap transducer to scalp, then apply standoff geometry ────────────
     scalp  = tp_scalp_boundary(img);                 % [N x 3] outer-boundary voxels

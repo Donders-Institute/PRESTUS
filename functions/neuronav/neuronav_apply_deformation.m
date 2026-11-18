@@ -47,10 +47,32 @@ function mni_ras = neuronav_apply_deformation(ras_seg, warp_field, warp_affine, 
 
         is_valid = any(squeeze(warp_field(vox_r(1), vox_r(2), vox_r(3), :)) ~= 0);
 
-        if is_valid
+        % Trilinear interpolation uses the 8 surrounding voxels. Next to the edge
+        % of the field some have no mapping (all zero) and would pull the result
+        % towards the origin: interpolate over the voxels with a mapping only.
+        lo8 = min(max(floor(vox_c), 1), max(dims - 1, 1));
+        fr  = vox_c - lo8;
+        acc = zeros(1, 3); wsum = 0;
+        for cx = 0:1
+            for cy = 0:1
+                for cz = 0:1
+                    c  = [cx cy cz];
+                    ix = min(lo8 + c, dims);
+                    v  = double(squeeze(warp_field(ix(1), ix(2), ix(3), :))');
+                    if any(v ~= 0)
+                        w = prod(c .* fr + (1 - c) .* (1 - fr));
+                        acc = acc + w * v; wsum = wsum + w;
+                    end
+                end
+            end
+        end
+
+        if wsum >= 1 - 1e-9
             mni_ras(i,:) = [Fx(vox_c(1), vox_c(2), vox_c(3)), ...
                              Fy(vox_c(1), vox_c(2), vox_c(3)), ...
                              Fz(vox_c(1), vox_c(2), vox_c(3))];
+        elseif is_valid && wsum > 0
+            mni_ras(i,:) = acc / wsum;
         else
             lin = sub2ind(dims, vox_r(1), vox_r(2), vox_r(3));
             [vx, vy, vz] = ind2sub(dims, nearest_idx(lin));

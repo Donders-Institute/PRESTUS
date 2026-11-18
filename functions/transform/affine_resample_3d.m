@@ -24,7 +24,9 @@ function out = affine_resample_3d(vol, M, out_size, method, fill)
 %   vol      - numeric array [D1 x D2 x D3] or [D1 x D2 x D3 x C]
 %   M        - 4×4 forward affine (row-vector convention) or maketform struct
 %   out_size - [1×3] output dimensions
-%   method   - 'nearest', 'linear', or 'cubic' (default: 'linear')
+%   method   - 'nearest', 'linear' (default), or 'cubic' (griddedInterpolant
+%              cubic convolution; needs >= 4 voxels per dimension; can
+%              overshoot the input range near sharp edges)
 %   fill     - scalar fill value for out-of-bounds voxels (default: 0)
 %
 % Output:
@@ -38,12 +40,6 @@ function out = affine_resample_3d(vol, M, out_size, method, fill)
     % Accept legacy maketform struct
     if isstruct(M) && isfield(M, 'tdata') && isfield(M.tdata, 'T')
         M = M.tdata.T;
-    end
-
-    % griddedInterpolant only supports 'nearest' and 'linear' natively;
-    % fall back to 'cubic' via interp3 but map 'cubic' → 'linear' here.
-    if strcmp(method, 'cubic')
-        method = 'linear';
     end
 
     Minv = inv(M);

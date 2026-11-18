@@ -141,7 +141,7 @@ end
     if isfield(acoustic_provenance, 'full_ac_dims') && ~isempty(acoustic_provenance.full_ac_dims)
         full_dims = acoustic_provenance.full_ac_dims;
     end
-    p = abs(single(affine_resample_3d(vol, planimg.transf, full_dims, 'linear', 0)));
+    p = max(single(affine_resample_3d(vol, planimg.transf, full_dims, 'cubic', 0)), 0);
     clear vol
     if ~isequal(full_dims(:)', parameters.grid.dims(:)')
         o = planimg.fov_offset_ac;

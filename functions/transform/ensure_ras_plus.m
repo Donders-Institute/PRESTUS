@@ -13,8 +13,8 @@ function [img_out, hdr_out, vox_map] = ensure_ras_plus(img_in, hdr_in)
 %   dim 3 increases toward Superior (+Z world)
 %
 % The function does NOT interpolate — it only permutes axes and flips them
-% (equivalent to fslreorient2std for data whose affine has no off-diagonal
-% shear terms beyond axis permutation).
+% (as fslreorient2std). Every voxel keeps its world position: an oblique
+% affine keeps its rotation, in the new axis order.
 %
 % Use as:
 %   [img_out, hdr_out, vox_map] = ensure_ras_plus(img_in, hdr_in)
@@ -88,15 +88,14 @@ end
     end
 
     % --- Step 3: rebuild affine ---
-    % After permutation + flip the rotation is the identity (pure isotropic RAS+).
     % Pixel dimensions in the new axis order.
     new_pixdims = hdr_in.PixelDimensions(perm);
 
-    % Build new column-vector affine: diagonal scale + origin at voxel (1,1,1)
-    % We cannot recover the original world origin faithfully here (it depended
-    % on the full rotation), so we set origin to zero — same convention as
-    % canonical_affine_transform.
-    new_R = diag(new_pixdims);   % 3x3 diagonal, always positive after flips
+    % Build new column-vector affine: the old axis vectors, permuted and with
+    % flipped axes negated, so an oblique image keeps its rotation (diagonal,
+    % positive for an image without one); origin from the old affine
+    new_R = R;
+    new_R(:, flip_dims) = -new_R(:, flip_dims);
 
     % Origin: RAS of the new array's first voxel. The NIfTI affine takes
     % 0-based indices, so find that voxel's 0-based index in the old array.
