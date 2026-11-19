@@ -40,6 +40,7 @@ class Consent:
     state: str                  # 'undecided' | 'opted_in' | 'opted_out' | 'unreadable'
     decided_on: str = ""
     prestus_ver: str = ""
+    notice: int = 1             # notice version the decision was made under (1 when absent)
 
     @property
     def opted_in(self) -> bool:
@@ -61,7 +62,10 @@ def read_consent(path: Path | None = None) -> Consent:
     v = cfg.get("opt_in")              # isequal(cfg.opt_in, true): true, or the number 1
     yes = v is True or (isinstance(v, (int, float)) and not isinstance(v, bool) and v == 1)
     state = "opted_in" if yes else "opted_out"
-    return Consent(state, str(cfg.get("decided_on") or ""), str(cfg.get("prestus_ver") or ""))
+    n = cfg.get("notice")              # track_usage.m: a numeric scalar, else version 1
+    notice = int(n) if isinstance(n, (int, float)) and not isinstance(n, bool) else 1
+    return Consent(state, str(cfg.get("decided_on") or ""), str(cfg.get("prestus_ver") or ""),
+                   notice)
 
 
 def prestus_hash(prestus_root: Path | None) -> str:
@@ -79,6 +83,8 @@ def prestus_hash(prestus_root: Path | None) -> str:
 
 
 NOTICE_VERSION = 2   # telemetry_notice_version.m: 2 adds the skull property medians (2026-11-17)
+# what each notice version added (telemetry_notice_version.m), shown when consent predates it
+NOTICE_ADDS = {2: "the medians of the modelled skull sound speed, density, and attenuation"}
 
 
 def encode_record(opt_in: bool, decided_on: str, prestus_ver: str) -> str:
@@ -115,55 +121,125 @@ def env_override() -> str:
     return {"on": "on", "1": "on", "true": "on", "off": "off", "0": "off", "false": "off"}.get(v, "")
 
 
-NOTICE = (
-    "PRESTUS can optionally collect anonymous usage statistics to help the developers "
-    "understand which features are used and on which platforms. One event is sent per "
-    "pipeline run, from MATLAB; the Nexus itself sends nothing.\n\n"
-    "Collected (examples): PRESTUS, MATLAB, and k-Wave versions, OS platform; CPU model, core "
-    "count, RAM, GPU model, installed toolboxes, HPC name; which pipeline modules are enabled; "
-    "transducer type, frequency, and element count; simulation medium, layer names, whether "
-    "pCT is used; grid resolution, grid size, time steps, simulation stage durations and peak "
-    "RAM; the median sound speed, density, and attenuation of the modelled skull (all skull "
-    "voxels, and on the beam path); requested job resources, queue wait, and solver settings; "
-    "run start, duration, success or failure, the error type and failing stage (no message "
-    "text); a random local ID.\n\n"
-    "Never collected: subject IDs, file paths, coordinates, or any free text; IP addresses or "
-    "host names; pressure values, simulation results, or tissue property maps.")
+def outdated(c: Consent) -> bool:
+    """Allowed under an earlier notice: fields the later notices add are not sent."""
+    return c.opted_in and c.notice < NOTICE_VERSION
 
 
-def _state_text(c: Consent, path: Path) -> str:
+def status(c: Consent, env: str | None = None) -> tuple[str, str, str]:
+    """(short text, tooltip, colour role) for the status-bar indicator: 'green' when runs
+    started from this Nexus send events, 'amber' when they do not."""
+    env = env_override() if env is None else env
+    since = f" since {c.decided_on}" if c.decided_on else ""
+    click = " Click to change."
+    if env == "off":
+        return ("Not sharing usage statistics",
+                f"{ENV}=off is set, so runs started here send nothing." + click, "amber")
     if c.state == "opted_in":
-        text = f"Current decision: <b>allowed</b> (since {c.decided_on or '?'})."
-    elif c.state == "opted_out":
-        text = f"Current decision: <b>declined</b> (since {c.decided_on or '?'})."
-    elif c.state == "unreadable":
-        text = "Current decision: the record cannot be read, so nothing is sent."
-    else:
-        text = "No decision recorded: nothing is sent."
+        if outdated(c):
+            return ("Sharing usage statistics · notice updated",
+                    f"You allowed{since}. The notice has changed since; "
+                    "click to read what is new and confirm." , "green")
+        return "Sharing usage statistics", f"You allowed{since}." + click, "green"
+    if c.state == "undecided" and env == "on":
+        return ("Sharing usage statistics (this session)",
+                f"{ENV}=on is set; no decision is recorded." + click, "green")
+    if c.state == "undecided":
+        return ("Not sharing usage statistics · choose", "You have not decided yet; "
+                "nothing is sent until you allow it." + click, "amber")
+    if c.state == "unreadable":
+        return ("Not sharing usage statistics",
+                "The saved decision cannot be read, so nothing is sent." + click, "amber")
+    return "Not sharing usage statistics", f"You declined{since}." + click, "amber"
+
+
+def should_prompt(c: Consent, env: str | None = None, asked_notice: int = 0) -> bool:
+    """Ask at launch? As telemetry_setup.m with a GUI: no decision recorded and no
+    PRESTUS_TELEMETRY set (asked at every launch until answered: 'Ask me later'). In
+    addition, an Allow given under an earlier notice is asked again, once per notice
+    version (asked_notice: the version last asked about, remembered in the session)."""
+    env = env_override() if env is None else env
+    if env == "off":
+        return False
+    if c.state == "undecided":
+        return env != "on"
+    return outdated(c) and asked_notice < NOTICE_VERSION
+
+
+NOTICE = (
+    "With your permission, each simulation run sends one anonymous record from MATLAB, so "
+    "the developers can see which features and platforms PRESTUS is used on. The Nexus "
+    "itself sends nothing.<br><br>"
+    "<b>Sent:</b> software versions and hardware; which modules, transducer, and medium "
+    "were used; grid size and run times; skull property medians; whether the run "
+    "succeeded; a random ID.<br>"
+    "<b>Never sent:</b> subject IDs, file paths, coordinates, free text, IP addresses, "
+    "host names, or simulation results.")
+
+def _home_short(path: Path) -> str:
+    try:
+        return "~/" + path.relative_to(Path.home()).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _headline(c: Consent) -> str:
+    """The one bold line: the decision as it stands."""
+    since = f" (since {c.decided_on})" if c.decided_on else ""
+    return {"opted_in": f"You share usage statistics{since}.",
+            "opted_out": f"You do not share usage statistics{since}.",
+            "unreadable": "Your saved decision cannot be read, so nothing is shared.",
+            "undecided": "Share anonymous usage statistics?"}[c.state]
+
+
+def _notes(c: Consent, path: Path) -> str:
+    """Lines above the notice: what changed, overrides, and where the decision is kept."""
+    out = []
+    if outdated(c):
+        adds = "; ".join(NOTICE_ADDS[v] for v in sorted(NOTICE_ADDS) if v > c.notice)
+        out.append(f"<b>New since you allowed:</b> {adds}. These are sent only once you "
+                   "allow again.")
     env = env_override()
     if env == "off":
-        text += f"<br>{ENV}=off is set: runs started from this Nexus send nothing."
+        out.append(f"{ENV}=off is set, so runs started here send nothing.")
     elif env == "on" and c.state == "undecided":
-        text += f"<br>{ENV}=on is set: runs started from this Nexus send events."
-    return text + f"<br>Stored in <tt>{path}</tt>."
+        out.append(f"{ENV}=on is set, so runs started here send records.")
+    return "".join(f"{line}<br><br>" for line in out)
 
 
-def show_consent_dialog(parent=None, prestus_root: Path | None = None) -> Consent:
-    """Tools ▸ Usage statistics…: show the notice and the recorded decision; record what
-    the user picks (Allow / Decline / Forget my decision). Closing changes nothing."""
-    from PyQt6.QtWidgets import QMessageBox
+def _footer(c: Consent, path: Path) -> str:
+    kept = "" if c.state == "undecided" else f"Saved in {_home_short(path)}. "
+    return (f"<br><br><span style='color:gray'>{kept}"
+            f"<a href='{DOC_URL}'>Full details</a></span>")
+
+
+def show_consent_dialog(parent=None, prestus_root: Path | None = None,
+                        at_launch: bool = False) -> Consent:
+    """Tools ▸ Usage statistics… (and the launch prompt, at_launch): show the notice and
+    the recorded decision; record what the user picks (Allow / Decline / Forget my
+    decision). Closing ('Ask me later' at launch) changes nothing."""
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtWidgets import QLabel, QMessageBox
     path = consent_file()
     current = read_consent(path)
     box = QMessageBox(parent)
     box.setWindowTitle("PRESTUS usage statistics")
     box.setIcon(QMessageBox.Icon.Question)
-    box.setText(_state_text(current, path))
-    box.setInformativeText(NOTICE + f"\n\nFull details: {DOC_URL}")
+    box.setTextFormat(Qt.TextFormat.RichText)
+    box.setText(f"<b>{_headline(current)}</b>")
+    box.setInformativeText(_notes(current, path) + NOTICE + _footer(current, path))
+    for label in box.findChildren(QLabel):
+        label.setOpenExternalLinks(True)
     allow = box.addButton("Allow", QMessageBox.ButtonRole.AcceptRole)
     decline = box.addButton("Decline", QMessageBox.ButtonRole.RejectRole)
-    forget = box.addButton("Forget my decision", QMessageBox.ButtonRole.ResetRole)
-    close = box.addButton(QMessageBox.StandardButton.Close)
-    forget.setEnabled(current.state != "undecided")
+    forget = None
+    if not at_launch:
+        forget = box.addButton("Forget my decision", QMessageBox.ButtonRole.ResetRole)
+        forget.setEnabled(current.state != "undecided")
+    if at_launch:
+        close = box.addButton("Ask me later", QMessageBox.ButtonRole.RejectRole)
+    else:
+        close = box.addButton(QMessageBox.StandardButton.Close)
     box.setDefaultButton(close)
     box.setEscapeButton(close)
     box.exec()
@@ -173,7 +249,7 @@ def show_consent_dialog(parent=None, prestus_root: Path | None = None) -> Consen
             set_consent(True, prestus_root, path)
         elif clicked is decline:
             set_consent(False, prestus_root, path)
-        elif clicked is forget:
+        elif forget is not None and clicked is forget:
             reset_consent(path)
     except OSError as exc:
         from .ui.errors import show_error

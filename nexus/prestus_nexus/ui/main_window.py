@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QF
 
 from .. import checks
 from ..fsio import copy_atomic
-from ..telemetry import show_consent_dialog
+from .. import telemetry
 from ..undo import History
 from ..labels import plural
 from ..model import TX, ConfigModel, is_empty, iter_leaves
@@ -501,6 +501,7 @@ class MainWindow(QMainWindow):
         self._issue_timer.timeout.connect(self._refresh_issues)
         self._refresh_issues()
         self._update_title()
+        self._build_usage_status()
 
     # ── construction ────────────────────────────────────────────────────
     def _header(self) -> QWidget:
@@ -550,6 +551,39 @@ class MainWindow(QMainWindow):
         save.clicked.connect(self.save)
         h.addWidget(save)
         return bar
+
+    def _build_usage_status(self) -> None:
+        """The usage-statistics decision, always in view at the right of the status bar;
+        a click opens Tools ▸ Usage statistics…."""
+        self.usage_status = QLabel()
+        self.usage_status.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.usage_status.linkActivated.connect(lambda _link: self.usage_statistics())
+        self.statusBar().addPermanentWidget(self.usage_status)
+        self.refresh_usage_status()
+
+    def refresh_usage_status(self) -> None:
+        text, tip, role = telemetry.status(telemetry.read_consent())
+        colour = style.active()[role]      # green: records are sent; amber: nothing is sent
+        self.usage_status.setText(f'<a href="usage" style="color:{colour}; '
+                                  f'text-decoration:none;">● {text}</a>')
+        self.usage_status.setToolTip(tip)
+
+    def usage_statistics(self, at_launch: bool = False) -> None:
+        """Tools ▸ Usage statistics…: the notice and the recorded decision."""
+        telemetry.show_consent_dialog(self, self.prestus_root, at_launch=at_launch)
+        self.refresh_usage_status()
+
+    def ask_usage_consent(self) -> None:
+        """At launch: ask for a decision when none is recorded (every launch until one is
+        made, as PRESTUS's MATLAB GUIs), or once per notice version when an Allow
+        predates the current notice (telemetry.should_prompt)."""
+        consent = telemetry.read_consent()
+        asked = int(self.session.get("telemetry_asked_notice", 0) or 0)
+        if not telemetry.should_prompt(consent, asked_notice=asked):
+            return
+        if telemetry.outdated(consent):
+            self.session.set("telemetry_asked_notice", telemetry.NOTICE_VERSION)
+        self.usage_statistics(at_launch=True)
 
     def _issue_popup(self) -> QFrame:
         """The issues list, opened from the header counts. A popup rather than a dock: it
@@ -627,7 +661,7 @@ class MainWindow(QMainWindow):
                            (None, None),
                            ("Update project defaults…", self.update_project_defaults),
                            (None, None),
-                           ("Usage statistics…", lambda: show_consent_dialog(self, self.prestus_root))]:
+                           ("Usage statistics…", self.usage_statistics)]:
             if text is None:
                 tools.addSeparator()
                 continue
@@ -721,6 +755,7 @@ class MainWindow(QMainWindow):
                 page.retint()
         if hasattr(self, "charm_report_card"):
             self.charm_report_card.retint()
+        self.refresh_usage_status()                  # its green/amber follow the theme
 
     def update_context(self) -> None:
         """Facts about this computer that visibility rules read (ConfigModel.context):

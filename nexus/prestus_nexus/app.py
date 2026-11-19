@@ -77,6 +77,8 @@ def main(argv: list[str] | None = None) -> int:
 
     window = MainWindow(model, session, root)
     window.show()
+    from PyQt6.QtCore import QTimer
+    QTimer.singleShot(0, window.ask_usage_consent)   # once the window is on screen
     return app.exec()
 
 
