@@ -143,6 +143,19 @@ def plantus_major_version(plantus_root):
     return 2 if "def convert_simnibs_mesh_to_surfaces(" in src else 1
 
 
+def deprecation_notice(version):
+    """Warning text for PlanTUS 1.x, else ''.
+
+    PlanTUS 1.x is deprecated and undocumented: its code paths (wb_command,
+    position_matrix_* files, convert_simnibs_mesh_to_surface) are kept so
+    existing installs keep working, but the docs describe PlanTUS 2.0 only.
+    """
+    if version >= 2:
+        return ""
+    return ("WARNING: PlanTUS 1.x is deprecated and may be removed in a later "
+            "PRESTUS release; update the PlanTUS installation to 2.0 or later.")
+
+
 def check_dependencies(version=1, need_wb_view=False):
     """Return a list of missing PlanTUS runtime dependencies (empty if none).
 

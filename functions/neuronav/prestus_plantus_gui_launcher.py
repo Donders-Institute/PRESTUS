@@ -203,8 +203,10 @@ def main():
         # Prepend to PATH so wb_view / wb_command are found
         os.environ["PATH"] = s["connectome_wb_path"] + os.pathsep + os.environ.get("PATH", "")
 
-    missing = pc.check_dependencies(pc.plantus_major_version(plantus_main_folder),
-                                    need_wb_view=True)
+    plantus_version = pc.plantus_major_version(plantus_main_folder)
+    if pc.deprecation_notice(plantus_version):
+        log(pc.deprecation_notice(plantus_version))
+    missing = pc.check_dependencies(plantus_version, need_wb_view=True)
     if missing:
         sys.exit("[prestus_plantus_gui_launcher] Missing PlanTUS dependencies "
                  f"(python: {sys.executable}):\n  " + "\n  ".join(missing))

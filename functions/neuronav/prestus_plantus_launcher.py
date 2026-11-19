@@ -92,6 +92,11 @@ def main():
         output_path = os.path.join(os.path.split(mesh_path)[0],
                                    "PlanTUS", target_name)
     os.makedirs(output_path, exist_ok=True)
+    # Before any exit, so a run that fails (missing PlanTUS or dependencies)
+    # cannot leave an earlier run's metrics behind as if they were its own.
+    # The --do_only_trajectory path reuses the maps, not these files.
+    if args.do_only_trajectory < 0:
+        pc.remove_stale_metrics(output_path, log)
 
     plantus_root, tried = pc.resolve_plantus_root(args.plantus_root, __file__)
     if plantus_root is None:
@@ -99,6 +104,8 @@ def main():
                  "\n  ".join(os.path.join(t, "code") for t in tried))
     version = pc.plantus_major_version(plantus_root)
     log(f"PlanTUS {version}.x at {plantus_root}")
+    if pc.deprecation_notice(version):
+        log(pc.deprecation_notice(version))
     missing = pc.check_dependencies(version)
     if missing:
         sys.exit("[prestus_plantus_launcher] Missing PlanTUS dependencies "
@@ -151,7 +158,6 @@ def main():
         log("Done.")
         return
 
-    pc.remove_stale_metrics(output_path, log)
     mask_path = pc.stage_mask(mask_path, output_path)
 
     # ------------------------------------------------------------------ #

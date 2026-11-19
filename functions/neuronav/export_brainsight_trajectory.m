@@ -1,4 +1,4 @@
-function out_path = export_brainsight_trajectory(trans_pos_ras, focus_pos_ras, target_name, out_path)
+function out_path = export_brainsight_trajectory(trans_pos_ras, focus_pos_ras, target_name, out_path, opts)
 % EXPORT_BRAINSIGHT_TRAJECTORY  Write a Brainsight version-14 trajectory file.
 %
 % Exports a tab-delimited Brainsight trajectory file (version 15 as BabelBrain writes it, NIfTI:S:<sform code>
