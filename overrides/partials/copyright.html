@@ -1,0 +1,21 @@
+{#- Theme copyright partial plus "Last edited: <date>" from extra.page_dates
+    (filled at build time by .github/scripts/docs_page_dates.py; without it,
+    e.g. a plain local preview, the line is left out). -#}
+{%- set page_key = (page.url or "") | replace("index.html", "") | replace(".html", "") | trim("./") if page else none -%}
+{%- set page_date = config.extra.page_dates[page_key] if (config.extra.page_dates and page_key is not none and page_key in config.extra.page_dates) else none -%}
+<div class="md-copyright">
+  {% if config.copyright %}
+    <div class="md-copyright__highlight">
+      {{ config.copyright }}
+    </div>
+  {% endif %}
+  {% if page_date %}
+    <div class="md-copyright__last-edited">Last edited: {{ page_date }}</div>
+  {% endif %}
+  {% if not config.extra.generator == false %}
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  {% endif %}
+</div>

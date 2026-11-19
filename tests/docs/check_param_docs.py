@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Check that every key of config/config_default.yaml is documented in doc/doc_parameters.md.
+"""Check that every key of config/config_default.yaml is documented in doc/doc_parameters*.md.
 
 A key counts as documented when its dotted path (e.g. `io.overwrite_files`), or
 a trailing part of it in backticks (e.g. `overwrite_files`, `subset.random_seed`),
-appears in doc/doc_parameters.md. Keys of list entries (transducer elements) are checked
+appears in doc/doc_parameters.md or one of its subpages (doc_parameters_*.md). Keys of list entries (transducer elements) are checked
 through the first entry.
 
 The Default column of the parameter tables is also compared with the value in
@@ -27,7 +27,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT = ROOT / "config" / "config_default.yaml"
-DOC = ROOT / "doc" / "doc_parameters.md"
+DOCS = sorted((ROOT / "doc").glob("doc_parameters*.md"))   # overview + one page per topic
 
 
 def leaf_keys(node, prefix: str = "") -> list[str]:
@@ -136,14 +136,14 @@ def default_mismatches(config, doc: str) -> list[str]:
 
 def main() -> int:
     config = yaml.safe_load(DEFAULT.read_text(encoding="utf-8"))
-    doc = DOC.read_text(encoding="utf-8")
+    doc = "\n".join(p.read_text(encoding="utf-8") for p in DOCS)
     status = 0
     ticked = set(re.findall(r"`([\w.]+)`", doc))
     missing = [k for k in leaf_keys(config)
                if k not in doc and not any(".".join(k.split(".")[i:]) in ticked
                                            for i in range(len(k.split("."))))]
     if missing:
-        print(f"{len(missing)} key(s) of config_default.yaml are not documented in doc/doc_parameters.md:")
+        print(f"{len(missing)} key(s) of config_default.yaml are not documented in doc/doc_parameters*.md:")
         for k in missing:
             print(f"  {k}")
         status = 1

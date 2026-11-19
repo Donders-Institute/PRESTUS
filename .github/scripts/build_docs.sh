@@ -29,6 +29,7 @@ else echo "no mkdocs.yaml in $src" >&2; exit 1; fi
 mkdir -p _version_overrides
 cp "$here/version_banner.html" _version_overrides/main.html
 python3 "$here/docs_version_config.py" "$cfg" "$version" "$banner"
+python3 "$here/docs_page_dates.py" "$cfg"   # extra.page_dates: "Last edited" in the page footer
 
 if grep -qi zensical requirements-docs.txt 2>/dev/null; then
   zensical build --clean -f "$cfg"       # writes site/ inside the checkout

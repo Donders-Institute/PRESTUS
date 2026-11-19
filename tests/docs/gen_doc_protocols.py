@@ -107,6 +107,13 @@ def interleaved(schema):
     return m
 
 
+def partial(schema):
+    """The interleaved pulses with T2 only 10 ms behind T1: the 20 ms pulses overlap by half."""
+    m = interleaved(schema)
+    m.set("transducer.timing_offset_s", 0.01, 1)
+    return m
+
+
 def strip_svg(m: ConfigModel, path: Path) -> None:
     card = SequenceCard(m)
     card.refresh()
@@ -146,6 +153,7 @@ FIGURES = {
     "fig_protocol-together_diagram.svg": (together, strip_svg),
     "fig_protocol-mixed_diagram.svg": (mixed, strip_svg),
     "fig_protocol-interleaved_diagram.svg": (interleaved, timing_svg),
+    "fig_protocol-partial_diagram.svg": (partial, timing_svg),
 }
 
 

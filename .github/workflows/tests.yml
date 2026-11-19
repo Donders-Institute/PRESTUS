@@ -32,13 +32,35 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install
-        run: pip install "mkdocs<2" mkdocs-material pymdown-extensions pyyaml
+        run: pip install -r requirements-docs.txt
       - name: Function index is up to date
         run: python tests/docs/gen_function_index.py --check
+      - name: Option icons match the Nexus drawings
+        run: python tests/docs/gen_doc_icons.py --check
+      - name: Load calculator data matches throughput.yaml
+        run: python tests/docs/gen_load_data.py --check
       - name: Every config key is documented, defaults match
         run: python tests/docs/check_param_docs.py
       - name: Relative links resolve
         run: python tests/docs/check_links.py
+      - name: Images and PRESTUS_bin files exist
+        run: python tests/docs/check_images.py
+      - name: Site builds without warnings (Zensical, as deployed)
+        run: zensical build --strict -f mkdocs.yaml
+
+  docs-mkdocs:
+    # The same mkdocs.yaml built with MkDocs + Material, which the versioned (mike) deploy
+    # still uses. Non-blocking; a failure flags a feature only Zensical supports.
+    name: Docs build with MkDocs (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install -r requirements-docs.txt
       - name: Site builds without warnings
         run: mkdocs build --strict -d "$RUNNER_TEMP/site"
 

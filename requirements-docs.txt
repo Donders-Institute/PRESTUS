@@ -1,0 +1,9 @@
+# Documentation site (mkdocs.yaml), built with Zensical (needs Python >= 3.11):  pip install -r requirements-docs.txt
+# Local preview:  zensical serve -f mkdocs.yaml   strict build (writes site/, gitignored):  zensical build --strict -f mkdocs.yaml
+zensical==0.1.1
+pyyaml
+# MkDocs + Material: only for the non-blocking CI build (the versioned deploy builds release tags up to v0.6.x with it: .github/scripts/build_docs.sh)
+mkdocs<2
+mkdocs-material
+mkdocs-redirects
+pymdown-extensions

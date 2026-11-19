@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{#- Browser tab: "<page> - PRESTUS" (home: "PRESTUS"); the header keeps the full site_name. -#}
+{% block htmltitle %}
+  {#- Home: is_homepage (MkDocs) or an empty page URL (Zensical) -#}
+  {% if page.is_homepage or page.url in ["", "./", "index.html"] %}
+    <title>PRESTUS</title>
+  {% elif page.meta and page.meta.title %}
+    <title>{{ page.meta.title }} - PRESTUS</title>
+  {% elif page.title %}
+    <title>{{ page.title | striptags }} - PRESTUS</title>
+  {% else %}
+    <title>PRESTUS</title>
+  {% endif %}
+{% endblock %}
+
+{#- Banner on every version other than extra.version.default (main): the text of
+    extra.version_banner (set by .github/scripts/build_docs.sh for release tags),
+    else the development text. -#}
+{% block outdated %}
+  {{ config.extra.version_banner or "These pages describe the development branch: changes that are not released yet." }}
+  <a href="{{ '../' ~ base_url }}"><strong>Go to the default documentation (main).</strong></a>
+{% endblock %}

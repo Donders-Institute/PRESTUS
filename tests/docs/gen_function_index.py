@@ -2,11 +2,10 @@
 """Generate doc/doc_functions.md from the MATLAB sources in functions/.
 
 One table per subsystem folder (functions/<folder>/, recursively), one row per
-function file. A row keeps the description already written in
-doc/doc_functions.md for that function; functions without one get the first
-help line of their file ('% NAME  Description'). Entries for functions that no
-longer exist are dropped. Only the intro block (everything before the first
-'#### ' heading) is meant to be edited by hand.
+function file. Each row's description is the first help line of its file
+('% NAME  Description'), so a description is edited in the source, never in
+doc/doc_functions.md. Only the intro block (everything before the first
+'#### ' heading) is edited by hand.
 
 Usage:
     python tests/docs/gen_function_index.py           # rewrite doc/doc_functions.md
@@ -27,20 +26,10 @@ DOC = ROOT / "doc" / "doc_functions.md"
 TITLES = {"pct": "PSEUDO-CT", "babelbrain": "BABELBRAIN", "jwave": "JWAVE"}
 # Files at the top of functions/ are listed under this section
 TOP_LEVEL_SECTION = "core"
-ROW = re.compile(r"^\|\s*`([A-Za-z0-9_]+)`\s*\|\s*(.*?)\s*\|\s*$")
 HEADER = ("| **Function Name**                       | **Description**"
           "                                                                                 |\n"
           "|-----------------------------------------|-------------------------------------"
           "------------------------------------------------------------|")
-
-
-def existing_descriptions(text: str) -> dict[str, str]:
-    out: dict[str, str] = {}
-    for line in text.splitlines():
-        m = ROW.match(line)
-        if m and m.group(2):
-            out.setdefault(m.group(1), m.group(2))
-    return out
 
 
 def help_line(path: Path) -> str:
@@ -83,7 +72,7 @@ def collect() -> dict[str, list[Path]]:
     return groups
 
 
-def render(intro: str, descriptions: dict[str, str]) -> str:
+def render(intro: str) -> str:
     parts = [intro.rstrip("\n"), ""]
     for group, paths in sorted(collect().items()):
         parts.append(f"#### {TITLES.get(group, group.upper())}")
@@ -91,7 +80,7 @@ def render(intro: str, descriptions: dict[str, str]) -> str:
         parts.append(HEADER)
         for path in sorted(paths, key=lambda p: p.stem.lower()):
             name = path.stem
-            desc = descriptions.get(name) or help_line(path)
+            desc = help_line(path)
             parts.append(f"| `{name}`".ljust(42) + f"| {desc} |")
         parts.append("")
     return "\n".join(parts).rstrip("\n") + "\n"
@@ -105,7 +94,7 @@ def main() -> int:
     text = DOC.read_text(encoding="utf-8")
     first = text.find("\n#### ")
     intro = text if first < 0 else text[: first + 1]
-    new = render(intro, existing_descriptions(text))
+    new = render(intro)
     if args.check:
         if new != text:
             print("doc/doc_functions.md is out of date; run: python tests/docs/gen_function_index.py")
