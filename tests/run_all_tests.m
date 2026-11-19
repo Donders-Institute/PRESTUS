@@ -40,6 +40,12 @@
 %
 %   results = run_all_tests(...) also returns the TestResult array.
 %
+%   Resources: every test and test class is timed and its memory recorded
+%   (PRESTUS_TEST_RESOURCES). The table is written to
+%   <dir>/prestus_test_resources_<level>_<SLURM job id or time stamp>.csv, where
+%   <dir> is PRESTUS_TEST_RESOURCES_DIR (default: tempdir); the run prints
+%   the path and the slowest and most memory-hungry tests.
+%
 % See also: PRESTUS_TEST_LEVELS, PRESTUS_PATHS, TEST_SUITE_WIRING
 
 function results = run_all_tests(level)
@@ -79,9 +85,12 @@ function results = run_all_tests(level)
 
     runner = TestRunner.withNoPlugins();
     runner.addPlugin(DiagnosticsRecordingPlugin());
+    resources = prestus_test_resources();
+    runner.addPlugin(resources);
     results = runner.run(suite);
 
     print_summary(results, level);
+    write_resources(resources.Rows, results, level);
 
     n_fail = sum([results.Failed]);
     if n_fail > 0
@@ -119,6 +128,56 @@ function print_summary(results, level)
     fprintf('  Passed: %d   Failed: %d   Skipped: %d\n', sum([results.Passed]), ...
             sum([results.Failed]), sum([results.Incomplete] & ~[results.Failed]));
     fprintf('========================================\n\n');
+end
+
+function write_resources(rows, results, level)
+% Join the outcome to each test row, write the CSV, print the heaviest tests
+    if isempty(rows); return; end
+    T = struct2table(rows, 'AsArray', true);
+    T.kind = string(T.kind); T.name = string(T.name);
+    T.outcome = repmat("", height(T), 1);
+    [is_test, at] = ismember(T.name, string({results.Name}));
+    for k = find(is_test)'
+        r = results(at(k));
+        if r.Failed
+            T.outcome(k) = "fail";
+        elseif r.Incomplete
+            T.outcome(k) = "skip";
+        else
+            T.outcome(k) = "pass";
+        end
+    end
+    T.cores_busy = T.cpu_s ./ max(T.wall_s, eps);
+
+    out_dir = getenv('PRESTUS_TEST_RESOURCES_DIR');
+    if isempty(out_dir); out_dir = tempdir; end
+    run_id = getenv('SLURM_JOB_ID');
+    if isempty(run_id); run_id = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss')); end
+    f = fullfile(out_dir, sprintf('prestus_test_resources_%s_%s.csv', level, run_id));
+    try
+        if ~isfolder(out_dir); mkdir(out_dir); end
+        writetable(T, f);
+    catch err
+        warning('run_all_tests:resources', 'Resource table not written (%s): %s', f, err.message);
+        f = '';
+    end
+
+    tests = T(T.kind == "test", :);
+    fprintf('Resources (%d tests): %.1f min wall, %.1f min CPU, MATLAB peak %s MB\n', ...
+        height(tests), sum(tests.wall_s) / 60, sum(tests.cpu_s) / 60, num2str(max(T.peak_mb), '%.0f'));
+    print_top(tests, 'wall_s', 'Slowest tests', '%7.1f s');
+    if any(isfinite(tests.peak_delta_mb))
+        print_top(tests, 'peak_delta_mb', 'Most memory above the test''s start', '%7.0f MB');
+    end
+    if ~isempty(f); fprintf('Resource table: %s\n\n', f); end
+end
+
+function print_top(T, col, title, fmt)
+    [~, order] = sort(T.(col), 'descend', 'MissingPlacement', 'last');
+    fprintf('%s:\n', title);
+    for k = order(1:min(10, numel(order)))'
+        fprintf(['  ' fmt '  %s\n'], T.(col)(k), T.name(k));
+    end
 end
 
 function s = indent(txt)
