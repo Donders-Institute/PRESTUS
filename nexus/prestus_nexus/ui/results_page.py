@@ -24,7 +24,7 @@ from html import escape
 from PyQt6.QtCore import QUrl, pyqtSignal
 from PyQt6.QtGui import QDesktopServices, QGuiApplication
 from PyQt6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton,
-                             QTableWidget,
+                             QSizePolicy, QTableWidget,
                              QTableWidgetItem, QTabWidget, QTextBrowser, QVBoxLayout, QWidget)
 
 from ..labels import plural
@@ -307,7 +307,9 @@ class ResultsPage(QWidget):
         tb.addStretch(1)
         self.status = QLabel("No output loaded.")
         self.status.setObjectName("CardSub")
-        tb.addWidget(self.status)
+        self.status.setMinimumWidth(0)
+        self.status.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        tb.addWidget(self.status, 1)
         v.addLayout(tb)
         self.lineage = QLabel()
         self.lineage.setObjectName("CardSub")
@@ -482,7 +484,10 @@ class ResultsPage(QWidget):
         self.run_combo.setCurrentIndex(idx)
         self.run_combo.blockSignals(False)
         self._show_run(idx)
-        self.status.setText(f"{plural(len(self.runs), 'run')} in {base}")
+        # the subject folder on the toolbar (the full path, in the tooltip, does not fit there)
+        short = f"…/{Path(base).name}" if Path(base).parent.name else str(base)
+        self.status.setText(f"{plural(len(self.runs), 'run')} in {short}")
+        self.status.setToolTip(str(base))
 
     def _show_empty(self, base: Path | None) -> None:
         """No runs to show: one panel that says so and leads to the Run tab."""

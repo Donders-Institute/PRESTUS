@@ -65,3 +65,29 @@ def test_canvas_passes_wheel_to_page_unless_it_scrolls():
     ev = wheel()
     canvas.wheelEvent(ev)
     assert ev.isAccepted()                           # slice / zoom views keep the wheel
+
+
+@pytest.mark.parametrize("facecolor", [None, "surface"])     # matplotlib's white, or the card colour set
+@pytest.mark.parametrize("in_card", [False, True])
+def test_figure_background_follows_its_container_and_exports_white(facecolor, in_card):
+    """On the page a figure takes the page colour (no white block); in a card it stays card
+    white; a download is white either way."""
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PyQt6")
+    from PyQt6.QtWidgets import QApplication, QFrame, QVBoxLayout
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+    host = QFrame()
+    if in_card:
+        host.setObjectName("Card")
+    fig = Figure(facecolor=style.active()["surface"]) if facecolor else Figure()
+    fig.add_subplot(111).plot([0, 1], [0, 1])
+    canvas = mpl_theme.ThemedCanvas(fig)
+    QVBoxLayout(host).addWidget(canvas)
+    canvas.draw()
+    expected = style.active()["surface"] if in_card else style.active()["bg"]
+    assert to_hex(fig.patch.get_facecolor()) == expected.lower()
+    if canvas.export_button is not None:
+        from prestus_nexus.ui.export import MplExporter
+        img = MplExporter(canvas).image()
+        assert img.pixelColor(1, 1).name() == "#ffffff"           # downloads: white

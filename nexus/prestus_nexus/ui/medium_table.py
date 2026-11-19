@@ -177,7 +177,12 @@ class MediumPanel(QWidget):
             # the volume is in the tooltip; the header names only why a tissue is not modelled
             sub = {"modelled": "", "remainder": "rest", "absent": "no voxels",
                    "merged": "→ skull (pCT)", "no_layer": "no layer"}[use.state]
-            item.setText(name.replace(" (", "\n(") + ("\n" + sub if sub else ""))   # 'Skull (single layer)' fits
+            # 'Skull (single layer)' and long names ('Skull trabecular') wrap to fit equal columns
+            head = name.replace(" (", "\n(")
+            first, _, rest = head.partition("\n")
+            if len(first) > 12 and " " in first:
+                first = first.replace(" ", "\n", 1)
+            item.setText(first + ("\n" + rest if rest else "") + ("\n" + sub if sub else ""))
             item.setForeground(QColor(c["ink"] if used else c["ink4"]))
             state = ("Modelled" if used else "<b>Not modelled</b> for this subject")
             item.setToolTip(f"<b>{name}</b>: {state}. {use.note}"
@@ -189,7 +194,9 @@ class MediumPanel(QWidget):
         return use if use is not None and not use.modelled else None
 
     def _fit_height(self) -> None:
-        h = self.table.horizontalHeader().height() + 2 * self.table.frameWidth()
+        header = self.table.horizontalHeader()
+        # the size hint follows header text changed this refresh (height() only after a layout pass)
+        h = max(header.height(), header.sizeHint().height()) + 2 * self.table.frameWidth()
         h += sum(self.table.rowHeight(r) for r in range(self.table.rowCount()))
         self.table.setFixedHeight(h + 2)
 

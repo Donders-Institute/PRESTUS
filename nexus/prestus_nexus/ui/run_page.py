@@ -7,6 +7,7 @@ from __future__ import annotations
 import copy
 import html
 import shlex
+import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
@@ -18,6 +19,7 @@ from PyQt6.QtWidgets import (QCheckBox, QFileDialog, QFormLayout, QHBoxLayout, Q
 
 from .. import jobs as hpc_jobs
 from .. import launcher
+from .. import progress as prog
 from .. import proctree
 from .. import remote as rmt
 from .. import sequence as sq
@@ -25,6 +27,8 @@ from ..labels import plural
 from ..model import ConfigModel
 from . import icons, style
 from .jobs_view import JobsView, JobsWindow
+from .notify import notify
+from .progress_panel import LiveViewPage, ProgressPanel
 from .run_plan_card import RunPlanCard
 
 
@@ -53,6 +57,7 @@ class Relay(QObject):
 class RunPage(QWidget):
     finished = pyqtSignal(str, bool)          # task, success
     jobs_changed = pyqtSignal()
+    job_completed = pyqtSignal(str)           # job id of a cluster job that ended COMPLETED
 
     def __init__(self, window, parent: QWidget | None = None):
         super().__init__(parent)
@@ -183,6 +188,20 @@ class RunPage(QWidget):
         self.status = QLabel()
         self.status.setWordWrap(True)
         v.addWidget(self.status)
+        # Progress of the run in MATLAB here (progress.py), from its output as it arrives
+        self.progress = prog.RunProgress()
+        self.progress_panel = ProgressPanel()
+        self.progress_panel.live_requested.connect(self.open_live_view)
+        v.addWidget(self.progress_panel)
+        # simulation.live_view frames: the Run section's 'Live view' sub-tab (main_window adds
+        # it, hidden until a run has frames), for this local run or a cluster job (jobs view)
+        self.live_page = LiveViewPage()
+        self._expected: dict | None = None        # predicted seconds per stage of the local run
+        self._submit_expected: dict | None = None # ... of a whole-pipeline submission
+        self._live_switched = False           # switched to 'Live view' for this local run
+        self.progress_timer = QTimer(self)
+        self.progress_timer.setInterval(1000)  # time-based estimates move between log lines
+        self.progress_timer.timeout.connect(self._show_progress)
         self.log = QTextEdit(readOnly=True)
         mono = style.mono_font()
         self.log.setFont(mono)
@@ -202,6 +221,8 @@ class RunPage(QWidget):
         # Shown in the Run section's "Jobs" side tab (main_window) and, on demand, a window
         self.jobs_view = JobsView(self)
         self.jobs_window: JobsWindow | None = None
+        # Jobs submitted earlier (also from an earlier session) are followed again
+        self._restore_jobs()
 
     @property
     def model(self) -> ConfigModel:
@@ -436,12 +457,21 @@ class RunPage(QWidget):
             safe = html.escape(line) or "&nbsp;"
             # Always a span: a bare escaped line is taken as plain text and keeps its
             # entities (&quot;), which breaks parse_submissions on the log
-            self.log.append(f"<span style='color:{c}'>{safe}</span>" if c else f"<span>{safe}</span>")
+            # pre-wrap keeps runs of spaces (k-Wave's progress table stays aligned)
+            css = f"white-space:pre-wrap;color:{c}" if c else "white-space:pre-wrap"
+            self.log.append(f"<span style='{css}'>{safe}</span>")
         self.log.moveCursor(QTextCursor.MoveOperation.End)
 
     def _start(self, task: str, argv: list[str], cwd: Path, env: dict[str, str] | None = None) -> None:
         self.task, self._ok, self._program = task, False, argv[0]
+        self._expected = None
         self.log.clear()
+        self.progress = prog.RunProgress()
+        self.progress_panel.clear()
+        self._live_switched = False
+        if self.live_page.source == "local":     # the last run's frames are gone with it
+            self.live_page.source = None
+            self._set_live_tab(False)
         shown = argv[:2] if argv[0] != "ssh" else ["ssh", rmt.host_of(argv)]
         self._append("$ " + " ".join(shown) + " …", "#777")
         self.proc = QProcess(self)
@@ -458,11 +488,55 @@ class RunPage(QWidget):
         proctree.new_session(self.proc)       # Stop ends the program and what it started
         self.status.setText(f"<b>{task}</b> running…")
         self.proc.start(argv[0], argv[1:])
+        self.progress_timer.start()
         self.refresh()
 
     def _read(self) -> None:
         if self.proc is not None:
-            self._append(bytes(self.proc.readAllStandardOutput()).decode(errors="replace"))
+            text = bytes(self.proc.readAllStandardOutput()).decode(errors="replace")
+            self.progress.feed(text, time.time())
+            self._append(text)
+
+    def _show_progress(self) -> None:
+        """The local run's progress bar (Submit only submits: its jobs show theirs in Jobs)."""
+        if self.task == "Submit":
+            self.progress_panel.clear()
+            return
+        self.progress_panel.show_progress(self.progress, time.time(), expected=self._expected)
+        has_frames = bool(self.progress_panel.frames or self.progress_panel.missing)
+        # a running local run takes the Live view tab; else it keeps the job it shows
+        if has_frames and (self.proc is not None or self.live_page.source in (None, "local")):
+            self._show_local_live()
+            if not self._live_switched:            # once per run: switch to it
+                self._live_switched = True
+                self._set_live_tab(True, select=True)
+
+    def _show_local_live(self) -> None:
+        name = self.model.path.name if self.model.path is not None else "run"
+        self.live_page.show_run("local", self.progress, time.time(), f"Local run · {name}")
+        self._set_live_tab(True)
+
+    def open_live_view(self) -> None:
+        """The card's Live view button: this local run's fields, in the Live view tab."""
+        self._show_local_live()
+        self._set_live_tab(True, select=True)
+
+    def show_job_live(self, job, p, to_local=None, select: bool = False) -> None:
+        """A cluster job's fields in the Live view tab (jobs view). A running local run keeps
+        the tab unless the user asked for the job (select)."""
+        if self.live_page.source == "local" and self.proc is not None and not select:
+            return
+        self.live_page.show_run(job.job_id, p, time.time(), f"Job {job.job_id} · {job.name}", to_local)
+        self._set_live_tab(True, select)
+
+    def _set_live_tab(self, visible: bool, select: bool = False) -> None:
+        side = getattr(self.window, "run_side", None)
+        i = side.indexOf(self.live_page) if side is not None else -1
+        if i < 0:
+            return
+        side.setTabVisible(i, visible)
+        if visible and select:
+            side.setCurrentWidget(self.live_page)
 
     def _error(self, err) -> None:
         if err == QProcess.ProcessError.FailedToStart:
@@ -473,6 +547,14 @@ class RunPage(QWidget):
         if self.proc is None:
             return
         self._read()
+        self.progress.flush(time.time())
+        self.progress_timer.stop()
+        if self.progress.has_news() and not (self.progress.finished or self.progress.failed):
+            if code == 0:
+                self.progress.finished, self.progress.open_stages = True, []
+            else:
+                self.progress.failed = True
+        self._show_progress()
         if self.task == "Test connection":
             self._ok = code == 0
             self._probe_summary()
@@ -496,6 +578,9 @@ class RunPage(QWidget):
         if self.task == "Submit":
             self._collect_jobs()
         self.refresh()
+        if self.task not in ("Validate", "Submit", "Connect", "Disconnect", "Test connection"):
+            notify(self.window, f"{self.task} {'finished' if ok else 'failed'}",
+                   self.model.path.name if self.model.path is not None else "")
         self.finished.emit(self.task, ok)
 
     # ── actions ─────────────────────────────────────────────────────────
@@ -532,6 +617,7 @@ class RunPage(QWidget):
         if path is None or not self._ready():
             return
         self._start("Run", launcher.run_command(self.matlab.text(), path), path.parent)
+        self._expected = self._predict_expected()
 
     def run_script(self, task: str, script: Path) -> bool:
         """Run a generated MATLAB script (Localite batch ingestion, k-Wave drive check)
@@ -558,6 +644,7 @@ class RunPage(QWidget):
                 self, "Submit", f"{plural(len(errors), 'error')} in the Issues panel. Submit anyway?") \
                 != QMessageBox.StandardButton.Yes:
             return
+        self._submit_expected = self._predict_expected()      # the whole pipeline
         if self._remote_on():
             self._submit_remote()
             return
@@ -581,6 +668,7 @@ class RunPage(QWidget):
         computer's scheduler, or over SSH when remote is given (script written with the host's
         paths). The job submits one simulation per depth and waits for them on a compute node.
         Returns whether it started."""
+        self._submit_expected = None           # not a whole pipeline: no whole-run prediction
         if self.proc is not None:
             QMessageBox.warning(self, "Submit", f"“{self.task}” is still running on the Run tab.")
             return False
@@ -629,6 +717,7 @@ class RunPage(QWidget):
         """Submit part of the pipeline (launcher.partial_script: ``overrides`` on the config,
         ``extra`` statements) as a job, the way Submit does: to this computer's scheduler, or
         over SSH. Returns whether it started."""
+        self._submit_expected = None           # part of the pipeline: no whole-run prediction
         if self.proc is not None:
             QMessageBox.warning(self, "Submit", f"“{self.task}” is still running on the Run tab.")
             return False
@@ -673,10 +762,60 @@ class RunPage(QWidget):
             self.job_kind = rmt.scheduler_from_log(self.log.toPlainText()) or "slurm"
         else:
             self.job_kind = self.scheduler
+        for j in new:
+            j.submitted = time.time()
+        if len(new) == 1 and self._submit_expected:     # one job runs the whole pipeline
+            new[0].expected = dict(self._submit_expected)
+        self._submit_expected = None
         self.jobs.extend(new)
+        self._store_jobs()
         self.refresh_jobs()
         if new:
             self.show_jobs_tab(new[0].job_id)
+
+    def _predict_expected(self) -> dict | None:
+        """Predicted seconds per stage of a pipeline run of this config (workload.py), for
+        the whole-run progress; None when the prediction is incomplete."""
+        try:
+            from .. import workload
+            pred = workload.predict(self.model)
+            if pred.total() is None:
+                return None
+            return workload.expected_seconds(pred) or None
+        except Exception:                 # the prediction is a convenience, never a blocker
+            return None
+
+    # ── the job list across sessions ────────────────────────────────────
+    def _store_jobs(self) -> None:
+        self.window.session.set(hpc_jobs.STORE_KEY, hpc_jobs.to_store(
+            self.jobs, self.job_kind, self.job_remote is not None))
+        self.window.session.save()
+
+    def _restore_jobs(self) -> None:
+        jobs, kind, remote = hpc_jobs.from_store(self.window.session.get(hpc_jobs.STORE_KEY))
+        if not jobs:
+            return
+        self.jobs, self.job_kind = jobs, kind or self.job_kind
+        self.job_remote = self._remote_from_session() if remote else None
+        if any(not j.finished for j in self.jobs):
+            QTimer.singleShot(0, self.refresh_jobs)
+
+    def _remote_from_session(self) -> rmt.RemoteHost | None:
+        """The SSH host of the session's settings, without asking (None when not set)."""
+        sess = self.window.session
+        host = (sess.get("remote_host") or "").strip()
+        if not host:
+            return None
+        local, remote = sess.get("remote_local_prefix") or "", sess.get("remote_remote_prefix") or ""
+        return rmt.RemoteHost(host=host, path_map=[(local, remote)] if local and remote else [],
+                              setup=sess.get("remote_setup") or "", matlab=sess.get("remote_matlab") or "matlab",
+                              prestus_root=sess.get("remote_prestus_root") or "")
+
+    def clear_finished_jobs(self) -> None:
+        """Forget the jobs that have ended (the Jobs tab's 'Clear finished')."""
+        self.jobs = [j for j in self.jobs if not j.finished]
+        self._store_jobs()
+        self.jobs_changed.emit()
 
     def refresh_jobs(self) -> None:
         """Ask the scheduler for the jobs' state in the background (one query at a time);
@@ -687,7 +826,7 @@ class RunPage(QWidget):
             self._jobs_polled([])
             return
         snapshot = copy.deepcopy(self.jobs)       # the worker updates copies, never the shown jobs
-        self._jobs_poll = submit_background(hpc_jobs.query, snapshot, self.job_kind, self.job_remote)
+        self._jobs_poll = submit_background(hpc_jobs.poll, snapshot, self.job_kind, self.job_remote)
         self._relay.deliver("query", self._jobs_poll)
 
     def jobs_busy(self) -> bool:
@@ -715,10 +854,30 @@ class RunPage(QWidget):
 
     def _jobs_polled(self, updated: list[hpc_jobs.Job]) -> None:
         fresh = {j.job_id: j for j in updated}
+        completed, ended = [], []
         for job in self.jobs:                     # jobs added meanwhile keep their state
             if job.job_id in fresh:
+                was_open = not job.finished
                 job.__dict__.update(fresh[job.job_id].__dict__)
+                if was_open and job.finished:
+                    ended.append(job)
+                    if job.state.startswith("COMPLETED"):
+                        completed.append(job.job_id)
+        # jobs that the followed jobs submitted themselves (drive check, pipeline stages)
+        children = hpc_jobs.child_jobs(self.jobs)
+        self.jobs.extend(children)
+        if updated or children:
+            self._store_jobs()
         self.jobs_changed.emit()
+        for job_id in completed:                  # Results tab: read the new outputs
+            self.job_completed.emit(job_id)
+        if ended:
+            failed = [j for j in ended if not j.state.startswith("COMPLETED")]
+            text = ", ".join(f"{j.job_id} {j.state.split()[0].lower()}" for j in ended[:6])
+            notify(self.window, f"{plural(len(ended), 'cluster job')} ended"
+                   + (f" ({len(failed)} not completed)" if failed else ""), text)
+        if children:
+            QTimer.singleShot(0, self.refresh_jobs)   # their state and logs now
         if any(not j.finished for j in self.jobs):
             self.jobs_timer.start()
         else:

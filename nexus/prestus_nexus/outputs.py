@@ -126,12 +126,11 @@ def existing_outputs(model: ConfigModel) -> dict[str, bool] | None:
 
 def placement_record_path(model: ConfigModel) -> Path | None:
     """<dir_output>/sub-XXX_placement<affix>.json, without touching the disk."""
-    from .study import sanitize_affix
+    from .study import affix_path
     base, sid = dir_output(model), _subject_id(model)
     if base is None or sid is None:
         return None
-    affix = sanitize_affix(model.get("io.output_affix") or "")
-    return base / f"sub-{sid:03d}_placement{affix}.json"
+    return affix_path(lambda a: base / f"sub-{sid:03d}_placement{a}.json", model.get("io.output_affix") or "")
 
 
 def placement_record(model: ConfigModel) -> dict | None:
@@ -157,14 +156,14 @@ def read_placement_record(path: Path) -> dict | None:
 def axial_profile_paths(model: ConfigModel) -> tuple[Path, Path] | None:
     """(axial profile CSV, targeting CSV) the last run would have written, without touching
     the disk; None without path.sim or a subject."""
-    from .study import sanitize_affix
+    from .study import affix_path
     base, sid = dir_output(model), _subject_id(model)
     if base is None or sid is None:
         return None
     medium = str(model.get("simulation.medium") or "layered")
-    affix = sanitize_affix(model.get("io.output_affix") or "")
-    return (base / "img" / f"sub-{sid:03d}_{medium}_axial_profile{affix}.csv",
-            base / f"sub-{sid:03d}_{medium}{affix}_targeting.csv")
+    raw = model.get("io.output_affix") or ""
+    return (affix_path(lambda a: base / "img" / f"sub-{sid:03d}_{medium}_axial_profile{a}.csv", raw),
+            affix_path(lambda a: base / f"sub-{sid:03d}_{medium}{a}_targeting.csv", raw))
 
 
 def axial_profile(model: ConfigModel) -> dict | None:

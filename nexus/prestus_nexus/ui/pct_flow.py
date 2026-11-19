@@ -203,7 +203,8 @@ class PctFlow(QFrame):
             u = np.linspace(0, 1.2, 50)
             ax.plot(u, line.slope * u + line.intercept, lw=1.6, label="skull")
         else:
-            ax.text(0.5, 0.5, "fitted per subject when the pseudo-CT is made", ha="center", va="center",
+            # in the upper part: with only the soft-tissue line, the axis centres on that line
+            ax.text(0.5, 0.75, "fitted per subject when the pseudo-CT is made", ha="center", va="center",
                     transform=ax.transAxes, fontsize=fs["small"])
         if consts.get("soft") is not None:
             ax.axhline(consts["soft"], ls="--", lw=1, color="0.5", label=f"soft tissue {consts['soft']:g} HU")

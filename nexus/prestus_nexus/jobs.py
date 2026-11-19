@@ -20,11 +20,14 @@ from __future__ import annotations
 
 import os
 import re
+import time
 import shlex
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from . import progress as prog
 
 SUBMITTED = re.compile(r'Job "([^"]*)" \(ID: ([^)\s]+)\) submitted successfully')
 
@@ -37,6 +40,7 @@ LOG_PATTERNS = {"output": "*_slurm_output_{id}.log",
                 "error": "*_slurm_error_{id}.log",
                 "report": "*_job{id}_report.txt"}
 TAIL_BYTES = 200_000
+PROGRESS_TAIL_BYTES = 2_000_000   # local reads: the filter keeps a few kB of it
 
 
 @dataclass
@@ -52,6 +56,10 @@ class Job:
     max_rss: str = ""          # peak memory, e.g. '12.3 GB'
     exit_code: str = ""
     work_dir: str = ""         # on the scheduler's side (remote path for SSH submissions)
+    progress_log: str = ""     # the output log's progress lines (progress.RELEVANT), read_progress
+    submitted: float = 0.0     # epoch [s] the Nexus learnt of the job
+    parent: str = ""           # id of the job that submitted it (pipelines that submit from a job)
+    expected: dict = field(default_factory=dict)   # predicted seconds per stage (whole-run progress)
 
     @property
     def finished(self) -> bool:
@@ -316,3 +324,144 @@ def read_log(job: Job, which: str, remote=None) -> tuple[str, str]:
     out = _run(remote.ssh(script), timeout=45)
     path, _, text = out.partition("\n")
     return path.strip(), text
+
+
+# ── progress (progress.py) ──────────────────────────────────────────────
+
+def read_progress(jobs: list[Job], remote=None) -> list[Job]:
+    """Set progress_log of the running jobs (and of jobs that ended since the last read)
+    to the progress lines of their output log.
+
+    Local folders (or folders mapped from the cluster) are read from the file system, the
+    last PROGRESS_TAIL_BYTES of each log; the others in one SSH call that greps all logs.
+    Jobs whose log cannot be read keep their last progress_log.
+    """
+    wanted = [j for j in jobs if j.work_dir and (j.running or (j.finished
+                                                                and not j.progress_log.endswith("\n#end")))]
+    over_ssh: list[Job] = []
+    for job in wanted:
+        pattern = LOG_PATTERNS["output"].format(id=job.job_id)
+        local_dir = job.work_dir if remote is None else remote.to_local_or_none(job.work_dir)
+        if local_dir and Path(local_dir).is_dir():
+            hits = sorted(Path(local_dir).glob(pattern))
+            if hits:
+                try:
+                    _set_progress(job, prog.relevant_lines(_tail_file(hits[-1], PROGRESS_TAIL_BYTES)))
+                except OSError:
+                    pass
+        elif remote is not None:
+            over_ssh.append(job)
+    if over_ssh:
+        out = _run(remote.ssh(progress_script(over_ssh)), timeout=45)
+        for job_id, text in parse_progress_output(out).items():
+            for job in over_ssh:
+                if job.job_id == job_id:
+                    _set_progress(job, text)
+    return jobs
+
+
+def _set_progress(job: Job, text: str) -> None:
+    # '#end' marks the read after the job ended: it is not read again
+    job.progress_log = text + ("\n#end" if job.finished else "")
+
+
+PROGRESS_MARK = "@@prestus-job "
+
+
+def progress_script(jobs: list[Job]) -> str:
+    """Shell script printing, per job, a marker line and the progress lines of its output log."""
+    parts = []
+    for job in jobs:
+        pattern = LOG_PATTERNS["output"].format(id=job.job_id)
+        parts.append(f"echo {shlex.quote(PROGRESS_MARK + job.job_id)}; "
+                     f"f=$(ls -1 {shlex.quote(job.work_dir)}/{pattern} 2>/dev/null | tail -n 1); "
+                     f"[ -n \"$f\" ] && grep -a -E {shlex.quote(prog.RELEVANT_ERE)} \"$f\" | tail -n 2000")
+    return "; ".join(parts) + "; true"
+
+
+def parse_progress_output(text: str) -> dict[str, str]:
+    """progress_script output -> {job id: progress lines}."""
+    out: dict[str, list[str]] = {}
+    current = None
+    for line in text.splitlines():
+        if line.startswith(PROGRESS_MARK):
+            current = line[len(PROGRESS_MARK):].strip()
+            out[current] = []
+        elif current is not None:
+            out[current].append(line)
+    return {k: "\n".join(v) for k, v in out.items()}
+
+
+def poll(jobs: list[Job], kind: str | None = None, remote=None) -> list[Job]:
+    """query, then read_progress for the SLURM jobs (their logs are where PRESTUS writes them)."""
+    jobs = query(jobs, kind, remote)
+    if (kind or (None if remote else scheduler())) == "slurm":
+        try:
+            read_progress(jobs, remote)
+        except Exception:                # progress must never stop the job polling
+            pass
+    return jobs
+
+
+def job_progress(job: Job) -> "prog.RunProgress | None":
+    """The job's parsed progress; None before anything was read."""
+    if not job.progress_log:
+        return None
+    p = prog.RunProgress.from_text(job.progress_log.removesuffix("\n#end"))
+    if job.finished and not (p.finished or p.failed):
+        if job.state.startswith("COMPLETED"):
+            p.finished, p.open_stages = True, []
+        else:
+            p.failed = True
+    return p
+
+
+# ── time limit, child jobs, keeping the list ────────────────────────────
+
+def timeout_risk(job: Job, eta_s: float | None) -> bool:
+    """A running job whose time left (eta_s, from its progress) exceeds the time it has left
+    before the scheduler's limit: it will probably end in TIMEOUT."""
+    left = slurm_seconds(job.time_left)
+    return job.running and eta_s is not None and left is not None and eta_s > left
+
+
+def child_jobs(jobs: list[Job], now: float | None = None) -> list[Job]:
+    """Jobs that the listed jobs submitted themselves (their logs print PRESTUS' 'submitted
+    successfully' line: e.g. the k-Wave drive check, uncertainty and multi-ISPPA stages), not
+    yet in the list."""
+    known = {j.job_id for j in jobs}
+    new: list[Job] = []
+    for job in jobs:
+        p = job_progress(job)
+        for name, job_id in (p.children if p is not None else []):
+            if job_id not in known:
+                known.add(job_id)
+                new.append(Job(job_id=job_id, name=name, submitted=now or time.time(), parent=job.job_id))
+    return new
+
+
+STORE_KEY = "cluster_jobs"
+STORE_MAX = 50
+
+
+def to_store(jobs: list[Job], kind: str | None, remote: bool) -> dict:
+    """The job list for the session (newest STORE_MAX, without their logs)."""
+    keep = sorted(jobs, key=lambda j: j.submitted)[-STORE_MAX:]
+    rows = []
+    for j in keep:
+        d = dict(j.__dict__)
+        d.pop("progress_log", None)
+        rows.append(d)
+    return {"kind": kind, "remote": bool(remote), "jobs": rows}
+
+
+def from_store(data) -> tuple[list[Job], str | None, bool]:
+    """(jobs, scheduler kind, submitted over SSH) from to_store's dict; empty when unreadable."""
+    if not isinstance(data, dict):
+        return [], None, False
+    fields = set(Job.__dataclass_fields__) - {"progress_log"}
+    out = []
+    for row in data.get("jobs") or []:
+        if isinstance(row, dict) and row.get("job_id"):
+            out.append(Job(**{k: v for k, v in row.items() if k in fields}))
+    return out, data.get("kind"), bool(data.get("remote"))

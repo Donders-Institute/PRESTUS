@@ -19,10 +19,19 @@ LABEL_MIN_WIDTH = 170
 LABEL_SHARE = 0.3       # of the card width
 
 def _label_html(node: Node) -> str:
-    """The field label with its unit after it: 'Time step within a train (s)'."""
+    """The field label with its unit after it: 'Time step within a train (s)'. A label whose
+    last bracket the unit repeats takes the unit there: 'Focus (MNI)' + 'MNI mm' ->
+    'Focus (MNI mm)', not 'Focus (MNI) (MNI mm)'."""
     import html
+    import re
     name = labels.rich_label(node)
-    return f"{name} ({html.escape(node.unit, quote=False)})" if node.unit else name
+    if not node.unit:
+        return name
+    unit = html.escape(node.unit, quote=False)
+    m = re.search(r"\(([^()]*)\)\s*$", name)
+    if m and m.group(1).strip() and unit.split()[0] == m.group(1).strip():
+        return f"{name[:m.start()]}({unit})"
+    return f"{name} ({unit})"
 CHECK_FIRST = {"modules"}   # sections whose checkboxes sit before the label (a list of stages to tick)
 # an icon per pipeline stage, between its checkbox and its label (icons.names())
 STAGE_ICONS = {

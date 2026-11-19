@@ -244,12 +244,12 @@ class BeamPage(QWidget):
     def _medium_path(self) -> Path | None:
         """Where the last layered run writes its medium_masks in T1 space
         (nifti_medium_masks.m); not checked on disk."""
-        from ..study import sanitize_affix
+        from ..study import affix_path
         base, sid = dir_output(self.model), self.model.get("subject_id")
         if base is None or not self._layered():
             return None
-        affix = sanitize_affix(self.model.get("io.output_affix") or "")
-        return base / "nii" / f"sub-{int(sid):03d}_layered_T1w{affix}_medium_masks.nii.gz"
+        return affix_path(lambda a: base / "nii" / f"sub-{int(sid):03d}_layered_T1w{a}_medium_masks.nii.gz",
+                          self.model.get("io.output_affix") or "")
 
     def _read_outputs(self) -> None:
         """Look for the run's medium and profile: at once while the window is not shown
@@ -464,7 +464,9 @@ class BeamPage(QWidget):
         ax.plot(R - np.sqrt(np.maximum(R * R - r * r, 0)), r, color="#e53935", lw=2.5,
                 solid_capstyle="butt")
         ax.plot([bowl.offset, bowl.offset], [-a * 1.1, a * 1.1], color="#e53935", lw=1, ls=":")
-        ax.text(bowl.offset, a * 1.1, " exit plane", fontsize=style.PLOT_PT["small"], color="#e53935", va="bottom")
+        # at the top edge, at the exit plane's depth: clear of the bowl's rim
+        ax.text(bowl.offset, 0.99, " exit plane", fontsize=style.PLOT_PT["small"], color="#e53935", va="top",
+                transform=ax.get_xaxis_transform())
         ax.plot([R], [0], "x", color="#757575", ms=6)
         ax.plot([dist], [0], "+", color="#1e88e5", ms=11, mew=2)
         if exp is not None:
@@ -478,9 +480,11 @@ class BeamPage(QWidget):
                 ax.plot([scalp_depth] * 2, [-a * 0.6, a * 0.6], color="#ff9800", lw=1.4)
                 ax.annotate("", xy=(scalp_depth, -a * 0.75), xytext=(bowl.offset, -a * 0.75),
                             arrowprops=dict(arrowstyle="<->", color="#ff9800", lw=0.9))
-                ax.text((scalp_depth + bowl.offset) / 2, -a * 0.8,
+                # beyond the scalp line, on a light box: clear of the bowl and the exit plane
+                ax.text(max(scalp_depth, bowl.offset) + 1.5, -a * 0.75,
                         f"{scalp_depth - bowl.offset:+.1f} mm", fontsize=style.PLOT_PT["small"], color="#b26a00",
-                        ha="center", va="top")
+                        ha="left", va="center", zorder=6,
+                        bbox=dict(boxstyle="round,pad=0.2", fc=style.active()["surface"], ec="none", alpha=0.85))
                 self._rows["contact"].append(("Exit plane → scalp", _mm_status(scalp_depth - bowl.offset)
                                               + muted(" on the axis")))
         mode, gap = self.model.get("placement.mode"), self.model.get("placement.skin_gap_mm")
@@ -611,8 +615,13 @@ class BeamPage(QWidget):
         shown = [c for c in curves if c["absolute"] or not absolute]
 
         def note(text: str) -> None:
+            # on a box of the plot's background: the depth lines behind it do not run through it;
+            # broken into lines here (matplotlib's wrap follows the figure, not this narrow plot)
+            import textwrap
+            text = "\n".join(textwrap.fill(part, 55) for part in text.split("\n"))
             ax.text(0.5, 0.5, text, ha="center", va="center", fontsize=style.PLOT_PT["normal"], color=style.active()["ink3"],
-                    transform=ax.transAxes, wrap=True)
+                    transform=ax.transAxes, zorder=6,
+                    bbox=dict(boxstyle="round,pad=0.5", fc=style.active()["surface"], ec="none"))
 
         ax.axvline(bowl.offset, color="#e53935", lw=1, ls=":")
         ax.axvline(float(np.linalg.norm(focus - trans)), color="#1e88e5", lw=1.3)

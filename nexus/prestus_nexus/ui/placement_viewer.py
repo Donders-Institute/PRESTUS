@@ -505,8 +505,14 @@ class PlacementPage(QWidget):
                 self.seg = vol
 
     def _load_done(self, key) -> None:
-        if self._pending_load is None or self._pending_load[0] != key:
-            return                                # applied already, or superseded
+        if self._pending_load is None:
+            # applied already by a caller that waited (target depth, positions): the page
+            # may still show 'Loading' from the refresh that started this read
+            if self._loading_shown and self._loaded_for == key:
+                self.refresh()
+            return
+        if self._pending_load[0] != key:
+            return                                # superseded
         if all(f.done() for _p, f in self._pending_load[1].values()):
             self._apply_load()
             self.refresh()
@@ -515,6 +521,8 @@ class PlacementPage(QWidget):
         """Wait for a T1 / segmentation read refresh() started (positions need the T1)."""
         if self._pending_load is not None:
             self._load_images()
+
+    _loading_shown = False      # refresh() last showed 'Loading the T1 image…'
 
     def images_loading(self) -> bool:
         """A T1 / segmentation read is still running (refresh shows 'Loading')."""
@@ -776,7 +784,8 @@ class PlacementPage(QWidget):
             self.grid_z_action.blockSignals(False)
 
         self._restyle()
-        if self.images_loading():
+        self._loading_shown = self.images_loading()
+        if self._loading_shown:
             path = next(iter(self._pending_load[1].values()))[0]
             self.stack.show_empty("Loading the T1 image…", str(path))
             self._slice_ratio = None

@@ -113,14 +113,14 @@ class TransducerSchematic(PaintedExportable, QWidget):
         qp.setPen(QPen(QColor(C["line2"]), 1, Qt.PenStyle.DashLine))
         qp.drawLine(QPointF(X(0) - 8, yc), QPointF(W - 8, yc))
 
-        # focal range of the device
+        # focal range of the device (its label is drawn below the focus label, further down)
+        box_top = box_bottom = yc
+        steer = None
         if geo["min_foc"] is not None and geo["max_foc"] is not None:
             r = QRectF(QPointF(X(z_ep + geo["min_foc"]), Y(a * 0.35)), QPointF(X(z_ep + geo["max_foc"]), Y(-a * 0.35)))
             qp.fillRect(r, QColor(C["accent_soft"]))
-            qp.setPen(QColor(C["ink3"]))
-            label = f"steering range {geo['min_foc']:g}–{geo['max_foc']:g} mm"
-            tw = qp.fontMetrics().horizontalAdvance(label) + 4
-            qp.drawText(QRectF(min(r.left(), W - 8 - tw), r.bottom() + 2, tw, 14), Qt.AlignmentFlag.AlignLeft, label)
+            box_top, box_bottom = r.top(), r.bottom()
+            steer = (r, f"steering range {geo['min_foc']:g}–{geo['max_foc']:g} mm")
 
         # bowl and elements (both sides)
         # alternate rings: the accent and a lighter tint of it, in either theme
@@ -147,14 +147,24 @@ class TransducerSchematic(PaintedExportable, QWidget):
         if R:
             qp.setPen(QPen(QColor(C["ink3"]), 1))
             qp.drawEllipse(QPointF(X(R), yc), 3, 3)
-            qp.drawText(QPointF(X(R) - 20, yc - 14), "geometric")   # clear of the focus marker
+            # above the steering box, clear of the focus marker and its label below
+            qp.drawText(QPointF(X(R) - 20, min(yc - 14, box_top - 4)), "geometric")
         if geo["fd"]:
             zf = z_ep + geo["fd"]
             qp.setPen(QPen(QColor(C["thermal"]), 2))
             qp.drawLine(QPointF(X(zf) - 6, yc - 6), QPointF(X(zf) + 6, yc + 6))
             qp.drawLine(QPointF(X(zf) - 6, yc + 6), QPointF(X(zf) + 6, yc - 6))
             qp.setPen(QColor(C["thermal"]))
-            qp.drawText(QPointF(X(zf) - 30, yc + 22), f"focus {geo['fd']:g} mm")
+            focus_base = max(yc + 22, box_bottom + 14)     # below the steering box
+            qp.drawText(QPointF(X(zf) - 30, focus_base), f"focus {geo['fd']:g} mm")
+            label_top = focus_base + 6
+        else:
+            label_top = box_bottom + 2
+        if steer is not None:
+            r, label = steer
+            qp.setPen(QColor(C["ink3"]))
+            tw = qp.fontMetrics().horizontalAdvance(label) + 4
+            qp.drawText(QRectF(min(r.left(), W - 8 - tw), label_top, tw, 14), Qt.AlignmentFlag.AlignLeft, label)
 
         qp.setPen(QColor(C["ink2"]))
         # On screen the device selector above names the device; an exported figure names it

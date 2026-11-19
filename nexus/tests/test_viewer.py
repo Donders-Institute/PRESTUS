@@ -335,6 +335,27 @@ def test_standalone_viewer_keeps_its_own_history(app, schema):
     assert not m.is_overridden("transducer.focus_pos") and v.redo_btn.isEnabled()
 
 
+def test_loading_card_goes_when_a_waiting_caller_applied_the_read(app, schema, prestus_root, subject):
+    """A caller that waits for the read (the Issues check asks for the target depth) applies
+    it before the background relay arrives; the page must still swap 'Loading' for the slices."""
+    import time
+    m = ConfigModel(schema, EquipmentLibrary(prestus_root))
+    for k, v in {"subject_id": 4, "path.anat": str(subject), "transducer.serial": "CTX_500_026",
+                 "placement.manual.coordinate_space": "ras",
+                 "transducer.trans_pos": [-30.0, 0.0, 40.0], "transducer.focus_pos": [0.0, 0.0, 0.0]}.items():
+        m.set(k, v)
+    page = PlacementPage(m)
+    page.refresh()                                   # shows 'Loading', read runs in the background
+    assert page.images_loading() and page.stack.is_empty()
+    page.target_depth_ep(0)                          # waits for and applies the read, no redraw
+    assert not page.images_loading()
+    deadline = time.time() + 20
+    while page.stack.is_empty() and time.time() < deadline:
+        app.processEvents()                          # the relay's late signal redraws
+        time.sleep(0.01)
+    assert not page.stack.is_empty()
+
+
 def test_images_load_in_the_background_and_grid_z_shows_with_two_transducers(
         app, schema, prestus_root, subject):
     import time

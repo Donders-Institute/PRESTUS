@@ -54,7 +54,8 @@ SUBTAB_ICONS = {
     "Localite": "place_localite", "Heuristic": "place_heuristic",
     "PlanTUS": "place_plantus", "TUS entry": "place_tus_entry", "Head model": "segmentation",
     "Acoustic properties": "table", "Uncertainty": "range", "Skull CT": "ct", "Stages": "stages", "Where to run": "server",
-    "Plan": "report", "Review YAML": "file", "Launch": "play", "Jobs": "jobs", "Results": "chart",
+    "Plan": "report", "Review YAML": "file", "Launch": "play", "Jobs": "jobs", "Live view": "wave",
+    "Results": "chart",
 }
 # Main tab key -> icon, shown instead of the label when the window is too narrow for all labels
 TAB_ICONS = {"setup": "wrench", "transducer": "tx_annular", "placement": "target", "medium": "layers",
@@ -344,6 +345,21 @@ class TabPage(QWidget):
         self.split.setChildrenCollapsible(False)
         self.split.setSizes([1000 * stretch[0], 1000 * stretch[1]])
 
+    def _show_settings_tab(self) -> None:
+        """The 'Settings' sub-tab only while it shows something (a visible section or a card);
+        e.g. Results has no settings unless Advanced brings some in."""
+        if self.subtabs is None or self.settings_page is None:
+            return
+        i = self.subtabs.indexOf(self.settings_page)
+        if i < 0:
+            return
+        has = bool(self.cards) or any(not page.isHidden() for page in self.sections)
+        self.subtabs.setTabVisible(i, has)
+        if not has and self.subtabs.currentIndex() == i:
+            nxt = next((j for j in range(self.subtabs.count()) if j != i and self.subtabs.isTabVisible(j)), None)
+            if nxt is not None:
+                self.subtabs.setCurrentIndex(nxt)
+
     def set_full_tab(self, widget: QWidget, label: str) -> None:
         """Give `widget` its own full-width sub-tab, next to the settings cards as 'Settings'
         (the same nested-tab pattern the Run tab already uses for Run log / Review YAML), rather
@@ -442,6 +458,7 @@ class TabPage(QWidget):
         for card in [*self.cards, *self.headers]:
             if hasattr(card, "refresh"):
                 card.refresh()
+        self._show_settings_tab()
         if self.load_footer is not None:
             self.load_footer.refresh()
         if self.on_refresh is not None:
@@ -537,6 +554,8 @@ class MainWindow(QMainWindow):
         self.header_issues.setFlat(True)
         self._header_dots = QLabel(self.header_issues)
         self._header_dots.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        # the header is always light (style.C): its counts too, not the theme's (pale in dark) ink
+        self._header_dots.setStyleSheet(f"color: {style.C['ink']};")
         dots_row = QHBoxLayout(self.header_issues)
         dots_row.setContentsMargins(8, 0, 8, 0)
         dots_row.addWidget(self._header_dots)
@@ -841,7 +860,7 @@ class MainWindow(QMainWindow):
                     # the cross-section right under the device spec, once a transducer is chosen
                     from .transducer_view import TransducerSchematic
                     self.schematic = TransducerSchematic(self.model)
-                    self.schematic.setMinimumHeight(260)
+                    self.schematic.setMinimumHeight(290)   # labels below the steering box
                     self.schematic_card = self._card(
                         "Transducer geometry", self.schematic,
                         "Cross-section along the beam: elements, exit plane, geometric focus, the "
@@ -1049,7 +1068,9 @@ class MainWindow(QMainWindow):
                 tab.add_subtab(review, "Review YAML")
                 tab.add_subtab(run, "Launch")
                 tab.add_subtab(run.jobs_view, "Jobs")
+                tab.add_subtab(run.live_page, "Live view")   # shown once a run has frames (RunPage)
                 self.run_side = tab.subtabs         # RunPage.show_jobs_tab and show_special select in it
+                run._set_live_tab(False)
             elif key == "results":
                 from .results_page import ResultsPage
                 results = ResultsPage(self)
@@ -1068,6 +1089,7 @@ class MainWindow(QMainWindow):
         if RUN in self.pages and RESULTS in self.pages:
             self.pages[RUN].finished.connect(
                 lambda _task, ok: self.pages[RESULTS].refresh() if ok else None)
+            self.pages[RUN].job_completed.connect(lambda _id: self.pages[RESULTS].refresh())
 
     @staticmethod
     def _card(title: str, widget: QWidget, sub: str = "") -> QFrame:

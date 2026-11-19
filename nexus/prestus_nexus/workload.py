@@ -295,6 +295,7 @@ class Fixed:
     lo: float
     hi: float
     basis: str
+    labels: tuple[str, ...] = ()    # its log_timer labels (STAGE_TIMERS)
 
     def seconds(self) -> tuple[float, float, float]:
         return self.s, self.lo, self.hi
@@ -372,6 +373,26 @@ class Prediction:
             bits.append(f"GPU ~{mem:.0f} GB" if mem >= 10 else f"GPU ~{mem:.1f} GB" if mem >= 0.1
                         else "GPU <0.1 GB")
         return " · ".join(bits)
+
+# Prediction parts -> the log_timer label their simulations run under
+PART_TIMERS = {"Acoustic sim": "acoustic", "Free-water baseline": "freefield_baseline",
+               "Thermal sim": "thermal"}
+
+
+def expected_seconds(pred: Prediction) -> dict[str, float]:
+    """Predicted seconds per log_timer label of one pipeline run (the Nexus' whole-run
+    progress, progress.RunProgress.overall); a stage of several labels is split evenly.
+    Labels without a prediction are left out."""
+    out: dict[str, float] = {}
+    for p in pred.parts:
+        label, s = PART_TIMERS.get(p.label), p.seconds()
+        if label and s is not None:
+            out[label] = out.get(label, 0.0) + s[0]
+    for st in pred.stages:
+        for label in st.labels:
+            out[label] = out.get(label, 0.0) + st.s / len(st.labels)
+    return out
+
 
 def _m(n: float) -> str:
     return f"{n / 1e6:.1f} M" if n >= 1e6 else f"{n / 1e3:.0f} k"
@@ -837,7 +858,7 @@ def predict(model: ConfigModel, records: list[dict] | None = None,
             continue
         k = [repeats.get(lb, 1) for lb, _ in est]
         s = tuple(sum(n * e[i] for n, (_, e) in zip(k, est)) for i in range(3))
-        pred.stages.append(Fixed(name, *s, est[0][1][3]))
+        pred.stages.append(Fixed(name, *s, est[0][1][3], labels))
     if grid.approx:
         pred.notes.append("Head size assumed: the subject's own grid replaces it after its first run.")
     if no_local_gpu(model):

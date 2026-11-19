@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import html
+import time
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QBrush, QColor
@@ -20,17 +21,52 @@ from PyQt6.QtWidgets import (QAbstractItemView, QCheckBox, QHBoxLayout, QLabel, 
 
 from .. import jobs as hpc_jobs
 from . import style
+from .progress_panel import ProgressPanel
 from .tabbar import EmphasisTabBar
 
-JOB_COLUMNS = ["Job ID", "Name", "State", "Elapsed / limit", "Left", "Where", "Peak memory", "Exit"]
+JOB_COLUMNS = ["Job ID", "Name", "State", "Progress", "Elapsed / limit", "Left", "Where", "Peak memory", "Exit"]
+PROGRESS_COL = 3
 LOG_TABS = (("output", "Output"), ("error", "Errors"), ("report", "Report"))
 FONT_PT = 11                      # default log font size; A-/A+ change it (session: job_log_font_pt)
+
+
+def progress_cell(j: hpc_jobs.Job, now: float | None = None) -> str:
+    """'acoustic 45 %, 3 min left' style summary of the job's progress ('' if none)."""
+    p = hpc_jobs.job_progress(j)
+    if p is None or not j.running:
+        return ""
+    now = time.time() if now is None else now
+    est = p.estimate(now)
+    whole = p.overall(j.expected, now)
+    warn = " · exceeds time limit" if hpc_jobs.timeout_risk(j, whole[1] if whole else est.eta_s) else ""
+    stage = p.solver.stage if p.solver is not None else p.stage
+    if not stage:
+        return est.outer.split(" · ")[0] if est.outer else ""     # e.g. a drive check: 'Depth 2 of 5'
+    if est.outer:
+        stage = f"{est.outer.split(' · ')[0]}: {stage}"
+    text = stage.replace("_", " ")
+    if est.fraction is not None:
+        text += f" {'~' if est.estimated else ''}{100 * est.fraction:.0f} %"
+    if est.eta_s is not None:
+        from ..progress import format_duration
+        text += f", {format_duration(est.eta_s)} left"
+    return text + warn
+
+
+def timeout_text(j: hpc_jobs.Job, eta_s: float | None) -> str:
+    """The card's warning for a job that will probably not finish in its time limit."""
+    if not hpc_jobs.timeout_risk(j, eta_s):
+        return ""
+    from ..progress import format_duration
+    return (f"About {format_duration(eta_s)} of work left, but only {j.time_left} before the time "
+            "limit: the job will probably end in TIMEOUT. Raise hpc.timelimit for the next run.")
 
 
 def job_row(j: hpc_jobs.Job) -> list[str]:
     timing = f"{j.elapsed} / {j.time_limit}" if j.time_limit else j.elapsed
     where = f"{j.partition}: {j.where}" if j.partition and j.where else (j.where or j.partition)
-    return [j.job_id, j.name, j.state, timing, j.time_left, where, j.max_rss, j.exit_code]
+    name = f"↳ {j.name}" if j.parent else j.name        # submitted by another job (its parent)
+    return [j.job_id, name, j.state, progress_cell(j), timing, j.time_left, where, j.max_rss, j.exit_code]
 
 
 class JobsView(QWidget):
@@ -50,8 +86,13 @@ class JobsView(QWidget):
         self.b_refresh.clicked.connect(page.refresh_jobs)
         self.b_cancel = QPushButton("Cancel selected")
         self.b_cancel.clicked.connect(self.cancel)
+        self.b_clear = QPushButton("Clear finished")
+        self.b_clear.setToolTip("Remove the jobs that have ended from this list (the jobs and their "
+                                "outputs are not touched)")
+        self.b_clear.clicked.connect(page.clear_finished_jobs)
         head.addWidget(self.b_refresh)
         head.addWidget(self.b_cancel)
+        head.addWidget(self.b_clear)
         if not popout:
             self.b_popout = QPushButton("Pop out ↗")
             self.b_popout.setToolTip("Open the jobs and their logs in a separate window "
@@ -65,7 +106,7 @@ class JobsView(QWidget):
         self.tree.setHeaderLabels(JOB_COLUMNS)
         self.tree.setRootIsDecorated(False)
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.tree.setMinimumHeight(70)
+        self.tree.setMinimumHeight(110)       # about four jobs
         self.tree.itemSelectionChanged.connect(self._selected)
         if not popout:
             self.tree.itemDoubleClicked.connect(lambda item, _c: page.pop_out_jobs(item.text(0)))
@@ -78,6 +119,10 @@ class JobsView(QWidget):
         self.path_label.setWordWrap(True)
         self.path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         lv.addWidget(self.path_label)
+        # The selected job's progress (and live frame) from its output log (progress.py)
+        self.progress_panel = ProgressPanel()
+        self.progress_panel.live_requested.connect(lambda: self._show_selected_progress(select_live=True))
+        lv.addWidget(self.progress_panel)
         self.tabs = QTabWidget()
         self.tabs.setTabBar(EmphasisTabBar(self.tabs))     # the Nexus's tab dividers
         self.views: dict[str, QPlainTextEdit] = {}
@@ -117,6 +162,10 @@ class JobsView(QWidget):
         from .run_page import Relay
         self._relay = Relay(self)
         self._relay.done.connect(self._log_done, Qt.ConnectionType.QueuedConnection)
+        # Estimates move between the 30 s polls: refresh the progress once a second
+        self.tick = QTimer(self)
+        self.tick.setInterval(1000)
+        self.tick.timeout.connect(self._tick)
         page.jobs_changed.connect(self.show_jobs)
         self.show_jobs()
 
@@ -132,14 +181,18 @@ class JobsView(QWidget):
         self.tree.clear()
         for j in jobs:
             item = QTreeWidgetItem(job_row(j))
-            item.setToolTip(5, j.work_dir and f"Logs in {j.work_dir}")
+            item.setToolTip(6, j.work_dir and f"Logs in {j.work_dir}")
             if j.time_warning():
-                for col in (3, 4):
+                for col in (4, 5):
                     item.setForeground(col, QBrush(QColor(style.active()["red"])))
-                item.setToolTip(4, "Little time left: the job may be stopped (TIMEOUT). "
+                item.setToolTip(5, "Little time left: the job may be stopped (TIMEOUT). "
                                    "Raise hpc.timelimit for the next run.")
             if j.finished and not j.state.startswith("COMPLETED"):
                 item.setForeground(2, QBrush(QColor(style.active()["red"])))
+            if "exceeds time limit" in item.text(PROGRESS_COL):
+                item.setForeground(PROGRESS_COL, QBrush(QColor(style.active()["red"])))
+            if j.parent:
+                item.setToolTip(1, f"Submitted by job {j.parent}")
             self.tree.addTopLevelItem(item)
             item.setSelected(j.job_id in selected)
         for col in range(len(JOB_COLUMNS)):
@@ -151,6 +204,43 @@ class JobsView(QWidget):
         has = bool(jobs) and self.page.job_kind is not None
         self.b_refresh.setEnabled(has)
         self.b_cancel.setEnabled(has)
+        self.b_clear.setEnabled(any(j.finished for j in jobs))
+        self._show_selected_progress()
+        if any(j.running and j.progress_log for j in jobs):
+            self.tick.start()
+        else:
+            self.tick.stop()
+
+    # ── progress ────────────────────────────────────────────────────────
+    def _tick(self) -> None:
+        jobs = {j.job_id: j for j in self.page.jobs}
+        for i in range(self.tree.topLevelItemCount()):
+            item = self.tree.topLevelItem(i)
+            j = jobs.get(item.text(0))
+            if j is not None and j.running:
+                item.setText(PROGRESS_COL, progress_cell(j))
+        self._show_selected_progress()
+
+    def _to_local(self):
+        remote = self.page.job_remote
+        return remote.to_local_or_none if remote is not None else None
+
+    def _show_selected_progress(self, select_live: bool = False) -> None:
+        job = self.selected_job()
+        p = hpc_jobs.job_progress(job) if job is not None else None
+        self.progress_panel.show_progress(p, time.time(), self._to_local(),
+                                          job.expected if job is not None else None)
+        if job is not None and p is not None:
+            whole = self.progress_panel.overall
+            eta = whole[1] if whole is not None else p.estimate(time.time()).eta_s
+            self.progress_panel.set_warning(timeout_text(job, eta))
+        if job is not None and (self.progress_panel.frames or self.progress_panel.missing):
+            self.page.show_job_live(job, p, self._to_local(), select=select_live)
+        else:                            # keep following the job the Live view tab shows
+            source = self.page.live_page.source
+            shown = next((j for j in self.page.jobs if j.job_id == source), None)
+            if shown is not None:
+                self.page.show_job_live(shown, hpc_jobs.job_progress(shown), self._to_local())
 
     def selected_id(self) -> str | None:
         items = self.tree.selectedItems()
@@ -176,6 +266,8 @@ class JobsView(QWidget):
     def _selected(self) -> None:
         for view in self.views.values():
             view.clear()
+        self.progress_panel.clear()
+        self._show_selected_progress()
         self.refresh_log()
 
     def refresh_log(self) -> None:

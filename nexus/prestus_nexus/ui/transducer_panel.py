@@ -92,6 +92,8 @@ class DevicePanel(QGroupBox):
             self.rb_lib.setEnabled(False)
             self.rb_lib.setToolTip("No equipment library found (config/equipment)")
 
+        # custom geometry: no device shown (index -1), not the list's first entry
+        self.device.setPlaceholderText("(custom geometry: no library device)")
         self.rb_lib.toggled.connect(self._source_changed)
         self.device.currentIndexChanged.connect(self._device_changed)
         self.ds.currentIndexChanged.connect(self._ds_changed)
@@ -125,6 +127,8 @@ class DevicePanel(QGroupBox):
                     self.device.addItem(f"{serial}  ({note})", str(serial))
                 idx = self.device.count() - 1
             self.device.setCurrentIndex(idx)
+        else:
+            self.device.setCurrentIndex(-1)
         self._fill_ds(dev)
         self._setting = False
         self._update_info()
@@ -235,7 +239,10 @@ class DevicePanel(QGroupBox):
         if self._setting:
             return
         if library:
-            self._device_changed(self.device.currentIndex())
+            if self.device.currentIndex() < 0 and self.device.count():
+                self.device.setCurrentIndex(0)             # emits: _device_changed sets the serial
+            else:
+                self._device_changed(self.device.currentIndex())
         else:
             self.model.reset(f"{TX}.serial", self.ti)
             self.model.reset(f"{TX}.combo.ds_serial", self.ti)

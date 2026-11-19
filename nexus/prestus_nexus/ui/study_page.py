@@ -25,7 +25,7 @@ from .empty_state import EmptyStack
 
 LEAD = ("Simulate multiple subjects, or several targets per subject, in one go. Each row of the table "
         "is one simulation run; everything not in the table comes from this study config. "
-        "For a single subject you do not need this: use the <b>Start</b> tab.")
+        "For a single subject you do not need this: use the <b>QuickStart</b> tab.")
 
 HOW_TO = (
     "<ol style='margin-left:-20px'>"

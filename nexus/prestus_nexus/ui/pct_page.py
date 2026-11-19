@@ -120,13 +120,17 @@ def outside_share(prop: dict, lo: float, hi: float) -> float | None:
 def stats_candidates(cache: Path, subject_id: int, medium: str, affix: str) -> tuple[Path | None, Path | None]:
     """(default run's medium_stats, pct prediction) in a cache folder, either None if absent.
 
-    The default variant's own file (sub-XXX_<medium>_medium_stats<affix>.json, medium_setup.m) is
-    preferred; else the newest sub-XXX_*_medium_stats*.json. The prediction is matched exactly
-    (pct_predict_skull_properties.m)."""
+    affix: io.output_affix as written. The default variant's own file
+    (sub-XXX_<medium>_medium_stats<affix>.json, medium_setup.m; affix as load_parameters writes
+    it, else as written: study.affix_path) is preferred; else the newest
+    sub-XXX_*_medium_stats*.json, another run's (stats_title says so). The prediction is matched
+    exactly (pct_predict_skull_properties.m)."""
+    from ..study import affix_path
     if not cache.is_dir():
         return None, None
     sub = f"sub-{subject_id:03d}"
-    real = cache / f"{sub}_{medium}_medium_stats{affix}.json"
+    real = affix_path(lambda a: cache / f"{sub}_{medium}_medium_stats{a}.json", affix)
+    affix = sanitize_affix(affix)
     if not real.is_file():
         matches = sorted(cache.glob(f"{sub}_*_medium_stats*.json"), key=lambda p: p.stat().st_mtime)
         real = matches[-1] if matches else None
@@ -134,9 +138,12 @@ def stats_candidates(cache: Path, subject_id: int, medium: str, affix: str) -> t
     return real, pred if pred.is_file() else None
 
 
-def stats_title(stats: dict, path: Path) -> str:
-    """Title line: whether the histograms are the default run's mapped skull or a prediction."""
+def stats_title(stats: dict, path: Path, own: bool = True) -> str:
+    """Title line: whether the histograms are the default run's mapped skull or a prediction;
+    own=False: the file is another run's (no stats file for this config's affix)."""
     n = stats.get("n_voxels", "?")
+    if isinstance(n, float) and n.is_integer():
+        n = int(n)                                     # JSON from MATLAB: 1606731.0
     if stats.get("predicted"):
         source = stats.get("source", "")
         what = f"predicted from the CT ({SOURCE_TEXT.get(source, f'{source} voxels')})"
@@ -144,7 +151,9 @@ def stats_title(stats: dict, path: Path) -> str:
         what = "layered skull of the default run"
     else:
         what = "mapped skull of the default run"
-    return f"In-skull properties, {what} · {path.name} (n={n} skull voxels)"
+    if not own and not stats.get("predicted"):
+        what += ", from another run (none for this config's output affix)"
+    return f"In-skull properties, {what} (n={n} skull voxels)"      # the file: the tooltip
 
 
 class PctPage(QWidget):
@@ -203,7 +212,8 @@ class PctPage(QWidget):
         self.stats_note.setWordWrap(True)
         v.addWidget(self.stats_note)
         if HAVE_MPL:
-            self.fig = Figure(figsize=(9, 3.2), tight_layout=True)
+            # constrained: the legend placed 'outside' above the panels gets its own room
+            self.fig = Figure(figsize=(9, 3.2), layout="constrained")
             self.canvas = FigureCanvasQTAgg(self.fig, export_name="pct_properties",
                                             filename_hint=subject_stem(lambda: self.model, "pct_properties"))
             self.axes = [self.fig.add_subplot(1, 4, i + 1) for i in range(4)]
@@ -354,8 +364,7 @@ class PctPage(QWidget):
         if base is None or not isinstance(sid, (int, float)) or isinstance(sid, bool):
             return None, None
         medium = str(self.model.get("simulation.medium") or "")
-        affix = sanitize_affix(self.model.get("io.output_affix") or "")
-        return stats_candidates(base / "cache", int(sid), medium, affix)
+        return stats_candidates(base / "cache", int(sid), medium, self.model.get("io.output_affix") or "")
 
     def _bounds(self) -> dict[str, dict]:
         """{variant: medium_properties of its bounds, edits included} for each readable variant."""
@@ -395,7 +404,7 @@ class PctPage(QWidget):
         reference = stats.get("reference", {}).get("skull", {})
         for ax, (key, label, bound_key) in zip(self.axes, PROPERTIES):
             prop = stats.get("properties", {}).get(key)
-            ax.set_title(label, fontsize=style.PLOT_PT["title"])
+            ax.set_title(label.replace(" [", "\n[", 1), fontsize=style.PLOT_PT["title"])   # unit below: narrow panels
             bars = histogram_bars(prop) if isinstance(prop, dict) else None
             if bars is None:
                 ax.set_xticks([]); ax.set_yticks([])
@@ -412,7 +421,7 @@ class PctPage(QWidget):
                 lo_x = min(value, band[0]) if band else value
                 hi_x = max(value, band[1]) if band else value
                 ax.set_xlim(lo_x - span * 0.25, hi_x + span * 0.25)
-                ax.text(0.02, 0.96, f"constant {value:g}", ha="left", va="top",
+                ax.text(0.02, 0.84, f"constant {value:g}", ha="left", va="top",   # below 'outside' 
                         transform=ax.transAxes, fontsize=style.PLOT_PT["normal"], color=style.active()["ink2"])
             ax.bar(centers, counts, width=widths, color="#8d9db6", edgecolor="none")
             if bound_key is not None:
@@ -431,9 +440,18 @@ class PctPage(QWidget):
                     label_, role, ls = RUN_STYLE
                     ax.axvline(run, color=style.active()[role], linestyle=ls, linewidth=1.2, label=label_)
             ax.tick_params(labelsize=style.PLOT_PT["small"])
+            # four panels share a narrow pane: the shape counts, not the voxel counts, and at
+            # most three values per axis (no run-together tick labels or 1e6 offsets)
+            from matplotlib.ticker import MaxNLocator
+            ax.set_yticks([])
+            ax.xaxis.set_major_locator(MaxNLocator(3))
         handles, labels = self.axes[1].get_legend_handles_labels()
         if handles:
-            self.fig.legend(handles, labels, loc="upper center", ncol=len(handles), fontsize=style.PLOT_PT["normal"],
-                            bbox_to_anchor=(0.5, 1.08))
+            self.fig.legend(handles, labels, loc="outside upper center", ncol=len(handles),
+                            fontsize=style.PLOT_PT["small"])
         self.canvas.draw_idle()
-        self.stats_title.setText(stats_title(stats, stats_file))
+        raw = self.model.get("io.output_affix") or ""
+        own_names = {f"_medium_stats{a}.json" for a in (sanitize_affix(raw), raw) if isinstance(a, str)}
+        own = stats_file is not real or any(stats_file.name.endswith(n) for n in own_names)
+        self.stats_title.setText(stats_title(stats, stats_file, own))
+        self.stats_title.setToolTip(str(stats_file))

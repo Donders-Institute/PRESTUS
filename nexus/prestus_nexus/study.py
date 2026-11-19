@@ -182,6 +182,21 @@ def sanitize_affix(label: str) -> str:
     return "_desc-" + affix if affix else ""
 
 
+def affix_path(make, label) -> Path:
+    """make(affix) for the affix a run's files carry: as load_parameters writes it
+    (sanitize_affix), else, when that file is missing, io.output_affix as written (outputs of
+    scripts that set the affix after load_parameters, e.g. '_kosciessa_k-plan'). The disk is
+    only checked when the two differ."""
+    affix = sanitize_affix(label)
+    path = make(affix)
+    raw = label if isinstance(label, str) else ""
+    if raw and raw != affix and not path.exists():
+        other = make(raw)
+        if other.exists():
+            return other
+    return path
+
+
 def resolve_manifest(config_path: Path | None, value: str | None) -> Path | None:
     """study.manifest resolved against the study config's folder."""
     if not value:

@@ -20,6 +20,8 @@ from matplotlib.colors import to_hex, to_rgba
 from . import style
 
 _BG, _INK = "_nexus_bg", "_nexus_ink"
+# containers drawn as cards (style.py: a surface background); a canvas elsewhere is on the page
+CARD_NAMES = {"Card", "SubGroup", "LoadFooter"}
 
 # hex colour -> palette role, for colours a plot took from either Nexus palette
 _ROLES: dict[str, str] = {}
@@ -171,6 +173,15 @@ class ThemedCanvas(FigureCanvasQTAgg):
             from .export import ExportButton, MplExporter
             self.export_button = ExportButton(self, MplExporter(self), export_name, filename_hint)
 
+    def _in_card(self) -> bool:
+        """Whether a card (white panel) holds this canvas: then the figure stays card white."""
+        w = self.parentWidget()
+        while w is not None:
+            if w.objectName() in CARD_NAMES:
+                return True
+            w = w.parentWidget()
+        return False
+
     def wheelEvent(self, event) -> None:
         """Scroll the page under a plot: matplotlib accepts every wheel event, so a canvas inside
         a scroll area stops it scrolling. Only canvases with a scroll_event handler (slice and
@@ -188,6 +199,11 @@ class ThemedCanvas(FigureCanvasQTAgg):
     def draw(self) -> None:
         try:
             apply(self.figure)
+            # a figure on the page itself (not inside a card) takes the page's colour instead of
+            # the card white; exports keep the card colour (export.MplExporter: white)
+            # (role True: matplotlib's default white; 'surface': the card colour set on purpose)
+            if getattr(self.figure.patch, _BG, None) in (True, "surface") and not self._in_card():
+                self.figure.patch.set_facecolor(style.active()["bg"])
         except Exception:               # noqa: BLE001 — theming must never stop a plot
             pass
         super().draw()

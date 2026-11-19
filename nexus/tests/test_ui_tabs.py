@@ -436,7 +436,8 @@ def test_run_tab_subtabs(window):
     from prestus_nexus.ui.main_window import REVIEW, RUN
     tab = window.tab_pages["run"]
     assert [tab.subtabs.tabText(i) for i in range(tab.subtabs.count())] == \
-        ["Stages", "Where to run", "Plan", "Review YAML", "Launch", "Jobs"]
+        ["Stages", "Where to run", "Plan", "Review YAML", "Launch", "Jobs", "Live view"]
+    assert not tab.subtabs.isTabVisible(6)          # Live view: only once a run has frames
     assert tab.subtab_of(window.pages["modules"]) is tab.subtabs.widget(0)
     assert tab.subtab_of(window.pages["hpc"]) is tab.subtabs.widget(1)
     assert window.show_special(RUN) is tab.subtabs.currentWidget()
@@ -674,3 +675,22 @@ def test_find_setting_opens_the_field(window):
     dlg._open(item)
     assert not dlg.isVisible()
     assert window.tabs.currentWidget().key == window.model.schema.tab_of(window.display_section("grid.water_baseline_grid"))
+
+
+def test_settings_subtab_only_while_it_shows_something(window):
+    """Every tab: the 'Settings' sub-tab is shown exactly when it has a visible section or a card;
+    Results has none, so it opens on its results."""
+    checked = 0
+    for key, tab in window.tab_pages.items():
+        if tab.subtabs is None or tab.settings_page is None:
+            continue
+        tab.refresh()
+        i = tab.subtabs.indexOf(tab.settings_page)
+        has = bool(tab.cards) or any(not p.isHidden() for p in tab.sections)
+        assert tab.subtabs.isTabVisible(i) == has, key
+        if not has:
+            assert tab.subtabs.currentIndex() != i, key
+        checked += 1
+    assert checked
+    results = window.tab_pages["results"]
+    assert not results.subtabs.isTabVisible(results.subtabs.indexOf(results.settings_page))
