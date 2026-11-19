@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, QObject, QSize, Qt
 from PyQt6.QtGui import QColor, QFont, QFontDatabase, QIcon, QPainter, QPainterPath, QPalette, QPixmap
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QComboBox, QStyle, QStyleOptionComboBox
 
 from ..paths import package_dir
 
@@ -201,10 +201,63 @@ def apply(app: QApplication, prestus_root: Path | None = None, dark: bool = Fals
                       (QPalette.ColorRole.ButtonText, "ink"), (QPalette.ColorRole.Highlight, "brand"),
                       (QPalette.ColorRole.ToolTipBase, "ink"), (QPalette.ColorRole.PlaceholderText, "ink4")]:
         pal.setColor(role, QColor(c[key]))
+    # links (QLabel rich text): Qt's default dark blue is hard to read on the dark theme
+    pal.setColor(QPalette.ColorRole.Link, QColor(c["info"]))
+    pal.setColor(QPalette.ColorRole.LinkVisited, QColor(c["info"]))
     pal.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
     pal.setColor(QPalette.ColorRole.ToolTipText, QColor("#ffffff"))
     app.setPalette(pal)
     app.setStyleSheet(_stylesheet(c))
+    global _combo_fit
+    if _combo_fit is None:                    # once per process; apply() reruns on a theme switch
+        _combo_fit = _ComboFit(app)
+        app.installEventFilter(_combo_fit)
     icon = app_icon(prestus_root)
     if icon is not None:
         app.setWindowIcon(icon)
+
+
+COMBO_SLACK = 8            # px beyond the exact fit: platform fonts render wider than the estimate
+COMBO_MAX_FIT = 560        # px: longer items (paths) may clip rather than widen the whole page
+_combo_fit = None
+
+
+def combo_fit_width(combo: QComboBox) -> int:
+    """Width at which a non-editable combo shows its longest item whole: the item text and icon
+    sized through the active style (so stylesheet padding, border and arrow count), plus
+    COMBO_SLACK."""
+    fm = combo.fontMetrics()
+    n = combo.count()
+    text = max((fm.horizontalAdvance(combo.itemText(i)) for i in range(n)), default=0)
+    if any(not combo.itemIcon(i).isNull() for i in range(n)):
+        text += combo.iconSize().width() + 4
+    opt = QStyleOptionComboBox()
+    combo.initStyleOption(opt)
+    size = combo.style().sizeFromContents(QStyle.ContentsType.CT_ComboBox, opt,
+                                          QSize(text, fm.height()), combo)
+    return size.width() + COMBO_SLACK
+
+
+def fit_combo(combo: QComboBox) -> None:
+    """Raise a non-editable combo's minimum width to combo_fit_width (capped at COMBO_MAX_FIT),
+    so a stretching neighbour or a tight estimate never clips an item; refits when items change."""
+    if combo.isEditable() or combo.count() == 0:
+        return
+    want = min(combo_fit_width(combo), COMBO_MAX_FIT)
+    if combo.minimumWidth() < want:
+        combo.setMinimumWidth(want)
+
+
+class _ComboFit(QObject):
+    """App-wide event filter: every QComboBox is fitted when first shown and whenever its items
+    change (labels such as '(needs setup)' are set after construction)."""
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.Show and isinstance(obj, QComboBox):
+            if not obj.property("_nexus_fit"):
+                obj.setProperty("_nexus_fit", True)
+                m = obj.model()
+                for sig in (m.rowsInserted, m.dataChanged, m.modelReset):
+                    sig.connect(lambda *_a, c=obj: fit_combo(c))
+            fit_combo(obj)
+        return False
