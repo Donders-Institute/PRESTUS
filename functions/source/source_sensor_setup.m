@@ -308,7 +308,10 @@ end
         trans_pos = trans_pos_final;
         focus_pos = focus_pos_final;
     end
-    if confirm_overwriting(parameters.io.filename_kwave_source, parameters)
+    % A cached source holds the drive signal sampled at the time step it was built
+    % with. With a time-step override (stability retry) the cache of the first
+    % call no longer fits, so the source is rebuilt whatever io.overwrite_files says.
+    if ~isempty(grid_time_step) || confirm_overwriting(parameters.io.filename_kwave_source, parameters)
         % Create the source matrix
         [source, source_labels, ~, src_weights] = source_create(parameters, kgrid, trans_pos, focus_pos);
         % Save the source matrix (controlled by io.save_source_matrices,
