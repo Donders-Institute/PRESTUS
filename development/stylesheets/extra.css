@@ -1,0 +1,227 @@
+/* Content images: never wider than the text column, never taller than the viewport. */
+.md-typeset img {
+  max-width: 100%;
+  max-height: 70vh;
+  height: auto;
+}
+.md-typeset img.logo {
+  display: block;
+  max-width: 260px;
+  margin: 0 0 1rem 0;
+}
+/* Glossary definition lists: term in bold, definition indented, compact spacing. */
+.md-typeset dl dt {
+  font-weight: 600;
+  margin-top: 0.6em;
+}
+.md-typeset dl dd {
+  margin: 0.15em 0 0 1.25em;
+}
+
+/* Sidebars: narrower and denser than the Material default (screens >= 960px). */
+@media screen and (min-width: 60em) {
+  .md-sidebar--primary {
+    width: 11rem;
+  }
+  .md-sidebar--secondary {
+    width: 10rem;
+  }
+  /* The site title is already in the header; don't repeat it above the nav. */
+  .md-nav--primary > .md-nav__title {
+    display: none;
+  }
+  .md-sidebar .md-nav,
+  .md-nav--primary :is(.md-nav__title, .md-nav__item) {
+    font-size: 0.64rem;
+    line-height: 1.25;
+  }
+  .md-sidebar .md-nav__item .md-nav__link {
+    margin-top: 0.4em;
+  }
+  /* Section headings: clear break above, tight to their items below. */
+  .md-nav--primary .md-nav__item--section {
+    margin: 1.1em 0 0;
+  }
+  .md-nav--primary .md-nav__item--section:first-child {
+    margin-top: 0;
+  }
+  .md-nav--primary .md-nav__item--section > .md-nav__link {
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 0.1em;
+  }
+}
+
+/* Material only shows the navigation sidebar from 1220px and uses the mobile
+   drawer below that. Keep the sidebar layout down to 960px (tablet breakpoint),
+   undoing the drawer styles. The theme's JS sizes the sidebar only from 1220px,
+   so the scroll height is set here. */
+@media screen and (min-width: 60em) and (max-width: 76.1875em) {
+  .md-header__button[for="__drawer"] {
+    display: none;
+  }
+  .md-header__button.md-logo {
+    display: inline-block;
+  }
+  [dir] .md-sidebar--primary,
+  [data-md-toggle="drawer"]:checked ~ .md-container .md-sidebar--primary {
+    position: sticky;
+    top: 2.4rem;
+    left: auto;
+    right: auto;
+    height: auto;
+    transform: none;
+    transition: none;
+    box-shadow: none;
+    background-color: transparent;
+    z-index: auto;
+  }
+  .md-sidebar--primary .md-sidebar__scrollwrap {
+    position: static;
+    margin: 0 0.2rem;
+    max-height: calc(100vh - 4.8rem);
+    overflow-y: auto;
+  }
+  .md-sidebar--primary:not([hidden]) ~ .md-content > .md-content__inner {
+    margin-left: 1.2rem;
+  }
+  .md-nav--primary,
+  .md-nav--primary .md-nav {
+    position: static;
+    display: block;
+    height: auto;
+    background-color: transparent;
+    z-index: auto;
+  }
+  .md-nav--primary .md-nav__toggle ~ .md-nav {
+    display: block;
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .md-nav--primary .md-nav__item--nested > .md-nav > .md-nav__title {
+    display: none;
+  }
+  .md-nav--primary .md-nav__title ~ .md-nav__list {
+    overflow: visible;
+    box-shadow: none;
+    background-color: transparent;
+    scroll-snap-type: none;
+  }
+  [dir] .md-nav--primary .md-nav__item {
+    border-top: 0;
+    padding: 0 0 0 0.6rem;
+  }
+  .md-nav--primary .md-nav__item--section > .md-nav > .md-nav__list > .md-nav__item {
+    padding: 0;
+  }
+  .md-nav--primary .md-nav__link {
+    padding: 0;
+  }
+  .md-nav--primary .md-nav__link .md-nav__icon {
+    display: none;
+  }
+  .md-nav--primary .md-nav__item--section > .md-nav__link {
+    pointer-events: none;
+  }
+  .md-nav--primary .md-nav__item--section.md-nav__item--active > .md-nav__link {
+    color: inherit;
+  }
+}
+
+/* Developer details: `??? developer` / `!!! developer` boxes and the Developers
+   nav section show only with the header switch on (javascripts/developer_details.js). */
+:root {
+  --prestus-dev-color: #6f42c1;
+  --md-admonition-icon--developer: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.6 16.6 19.2 12l-4.6-4.6L16 6l6 6-6 6zm-5.2 0L4.8 12l4.6-4.6L8 6l-6 6 6 6z"/></svg>');
+}
+.md-typeset .admonition.developer,
+.md-typeset details.developer,
+.md-typeset .prestus-dev-notice {
+  border-color: var(--prestus-dev-color);
+}
+.md-typeset .developer > .admonition-title,
+.md-typeset .developer > summary,
+.md-typeset .prestus-dev-notice > .admonition-title {
+  background-color: rgba(111, 66, 193, 0.1);
+}
+.md-typeset .developer > .admonition-title::before,
+.md-typeset .developer > summary::before,
+.md-typeset .prestus-dev-notice > .admonition-title::before {
+  background-color: var(--prestus-dev-color);
+  -webkit-mask-image: var(--md-admonition-icon--developer);
+  mask-image: var(--md-admonition-icon--developer);
+}
+html:not([data-dev="on"]) .md-typeset .developer,
+html:not([data-dev="on"]) .prestus-dev-nav {
+  display: none;
+}
+.md-header__button.prestus-dev-toggle {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+  width: auto;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.8rem;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+.md-header__button.prestus-dev-toggle[aria-pressed="true"] {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.18);
+}
+.prestus-dev-toggle__label {
+  font-size: 0.65rem;
+}
+
+/* PRESTUS look: tokens of the HTML report skin (functions/report/css_styles_base.m). */
+:root {
+  --p-ink: #10161d; --p-ink-2: #3d4956; --p-ink-3: #6b7886;
+  --p-line: #dde3ea; --p-surface: #ffffff; --p-brand: #097b9a; --p-brand-soft: #e2f0f3;
+  --md-text-font: system-ui;
+  --md-code-font: ui-monospace;
+}
+[data-md-color-scheme="slate"] {
+  --p-ink: #e9eff5; --p-ink-2: #aebdcc; --p-ink-3: #7d8c9d;
+  --p-line: #243140; --p-surface: #141b24; --p-brand: #46c2d9; --p-brand-soft: #0f262b;
+  --md-default-bg-color: #0a0e13;
+}
+[data-md-color-scheme][data-md-color-primary] {
+  --md-typeset-a-color: var(--p-brand);
+  --md-accent-fg-color: var(--p-brand);
+  --md-primary-fg-color: var(--p-surface);
+  --md-primary-bg-color: var(--p-ink);
+}
+.md-header { border-bottom: 1px solid var(--p-line); box-shadow: none; }
+.md-header .md-search__input { background-color: var(--p-brand-soft); color: var(--p-ink); }
+.md-header .md-search__input::placeholder, .md-header .md-search__icon { color: var(--p-ink-3); }
+.md-typeset h1 { font-weight: 600; color: var(--p-ink); }
+.md-typeset h2 { font-weight: 600; color: var(--p-ink); }
+.md-typeset h3 { font-weight: 600; color: var(--p-ink-2); }
+
+/* Section breaks: a hairline above each H2. */
+.md-typeset h2 {
+  border-top: 1px solid var(--p-line);
+  padding-top: 0.7em;
+  margin-top: 1.6em;
+}
+
+/* Compact link lists (home page): one row per entry, hairline between rows. */
+.md-typeset .p-list > :is(ul, ol) { margin: 0.4em 0 1em; padding: 0; list-style-position: inside; }
+.md-typeset .p-list > ul { list-style: none; }
+.md-typeset .p-list li {
+  margin: 0; padding: 0.35em 0;
+  border-bottom: 1px solid var(--p-line);
+  color: var(--p-ink-3);
+}
+.md-typeset .p-list li:first-child { border-top: 1px solid var(--p-line); }
+.md-typeset .p-list li > strong a { color: var(--p-brand); font-weight: 600; }
+.md-typeset .p-list li::marker { color: var(--p-ink-3); }
+
+/* Choice icons in option tables (same drawings as the Nexus drop-downs, PRESTUS_bin/img/icons) */
+.md-typeset img.choice-icon { width: 20px; height: 20px; vertical-align: -5px; margin-right: 4px; }
+[data-md-color-scheme="slate"] .md-typeset img.choice-icon { filter: invert(1) hue-rotate(180deg); }
+
+/* "You are here" strip under the title of each pipeline-stage page */
+.md-typeset img.stage-strip { display: block; width: 100%; max-width: 760px; margin: 0 0 1.2em; border-radius: 6px; }

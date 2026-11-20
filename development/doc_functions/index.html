@@ -1,0 +1,5981 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="PREprocessing &amp; Simulations Toolbox for transcranial Ultrasound neuromodulation">
+      
+      
+        <meta name="author" content="Donders Institute for Brain, Cognition and Behaviour">
+      
+      
+        <link rel="canonical" href="https://donders-institute.github.io/PRESTUS/development/doc_functions/">
+      
+      
+      
+        <link rel="prev" href="../doc_parameters/">
+      
+      
+        <link rel="next" href="../doc_coordinate_systems/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.1.1">
+    
+    
+      
+        <title>Functions - PRESTUS - Ultrasound Simulation Toolbox</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.ebb7f775.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.b60ce83d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../stylesheets/usage_statistics.css">
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  This is not the default documentation.
+  <a href="../.."><strong>Go to the default documentation (main).</strong></a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("..",location),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="PRESTUS - Ultrasound Simulation Toolbox" class="md-header__button md-logo" aria-label="PRESTUS - Ultrasound Simulation Toolbox" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33m0-6h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2V6h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0C17.22 5.53 18.61 6 20 6m0 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PRESTUS - Ultrasound Simulation Toolbox
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Functions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/Donders-Institute/PRESTUS" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Donders-Institute/PRESTUS
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="PRESTUS - Ultrasound Simulation Toolbox" class="md-nav__button md-logo" aria-label="PRESTUS - Ultrasound Simulation Toolbox" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33m0-6h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2V6h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0C17.22 5.53 18.61 6 20 6m0 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33"/></svg>
+
+    </a>
+    PRESTUS - Ultrasound Simulation Toolbox
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Donders-Institute/PRESTUS" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Donders-Institute/PRESTUS
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🏠 Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🧭 Get Started
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_2">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🧭 Get Started
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Concepts
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Installation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Your First Simulation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Reading Your Results
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuring a Study
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  PRESTUS Nexus (GUI)
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_2_6">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  PRESTUS Nexus (GUI)
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_nexus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_nexus_tabs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Tabs and Pages
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_nexus_calibration-localite/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Calibration and Localite Pages
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🧠 Head Model
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🧠 Head Model
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_preproc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Segmentation & Preprocessing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_medium/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Medium Setup
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  (pseudo-)CT
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  (pseudo-)CT
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_pseudoCT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_pseudoCT_generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  From UTE to Pseudo-HU
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_pseudoCT_property-mappings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Skull Property Mappings
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🔧 Transducer
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🔧 Transducer
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_transducer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Transducer Definition
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Transducer Library
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4_2">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Transducer Library
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_transducer_library/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_transducer_library_maintenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Adding & Maintaining Entries
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Calibration
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Calibration
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_calibration_refinement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Refining With Your Hydrophone Profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_calibration_matrix-steering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Matrix Arrays: Steering Correction
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🎯 Placement
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🎯 Placement
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview & Manual
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_mni/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  MNI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_heuristic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Heuristic
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_plantus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  PlanTUS
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_tus_entry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  TUS_entry
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Localite
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_6">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Localite
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_neuronav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_neuronav_recorded-pose/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Placing from a Recorded Pose
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_neuronav_coordinates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Files, Offset and Coordinates
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_neuronav_workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Ingestion (GUI & Script)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_neuronav_targets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Named Target Coordinates
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🖥️ Simulation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_6">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🖥️ Simulation
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_simulations-acoustic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Acoustic
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_simulations-thermal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Thermal
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_limited_fov/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Limited Acoustic FOV
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_time_reversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Time Reversal
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ▶️ Running & Outputs
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  ▶️ Running & Outputs
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_hpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Running on a Cluster
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Partial Runs (Modules)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Outputs & Reports
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Outputs & Reports
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_outputs_metrics-table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Metrics Table Columns
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_outputs_reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Reusing Earlier Outputs and Caches
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_group/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Studies & Group Analysis
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  📊 Advanced Modes
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_8">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  📊 Advanced Modes
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_multiintensity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Multi-Intensity
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Multi-Transducer
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_8_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Multi-Transducer
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_multitransducer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_multitransducer_async/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Async Firing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_sequential/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Sequential
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Uncertainty Analysis
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ⚙️ Backends
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_9">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  ⚙️ Backends
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_kwave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  k-Wave (Default)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_babelbrain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  BabelBrain
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_jwave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  jwave
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  📚 Reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_10">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  📚 Reference
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Glossary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_parameters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Parameters
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Functions
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Functions
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#acoustic" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ACOUSTIC
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#babelbrain" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BABELBRAIN
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CALIBRATION
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#core" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CORE
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        GROUP
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        GUI
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#head" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        HEAD
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        HELPER
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hpc" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        HPC
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#jwave" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        JWAVE
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#legacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        LEGACY
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#medium" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        MEDIUM
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#neuronav" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NEURONAV
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nifti" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NIFTI
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pseudo-ct" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PSEUDO-CT
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PLOT
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#report" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        REPORT
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SOURCE
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TELEMETRY
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#thermal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        THERMAL
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transducer" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TRANSDUCER
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transform" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TRANSFORM
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uncertainty" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        UNCERTAINTY
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_coordinate_systems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Coordinate Systems
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  How PRESTUS Works
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🛟 Help
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🛟 Help
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Troubleshooting
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Changelog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🛠️ Developers
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_12">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🛠️ Developers
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Developer Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Contributing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_babelbrain_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  BabelBrain Internals
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Telemetry
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_usage_statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Usage Statistics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CODE_OF_CONDUCT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Code of Conduct
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#acoustic" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ACOUSTIC
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#babelbrain" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BABELBRAIN
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CALIBRATION
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#core" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CORE
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#group" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        GROUP
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gui" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        GUI
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#head" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        HEAD
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        HELPER
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hpc" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        HPC
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#jwave" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        JWAVE
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#legacy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        LEGACY
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#medium" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        MEDIUM
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#neuronav" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NEURONAV
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nifti" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NIFTI
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pseudo-ct" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PSEUDO-CT
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PLOT
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#report" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        REPORT
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SOURCE
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telemetry" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TELEMETRY
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#thermal" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        THERMAL
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transducer" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TRANSDUCER
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transform" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TRANSFORM
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uncertainty" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        UNCERTAINTY
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+  
+  
+
+
+<h1 id="prestus-functions">PRESTUS Functions<a class="headerlink" href="#prestus-functions" title="Permanent link">&para;</a></h1>
+<p>This page lists every MATLAB function under <code>functions/</code> with a one-line description, so that you can find the function behind a stage, a setting or a message.</p>
+<p>On this page:</p>
+<ul>
+<li>One table per folder of <code>functions/</code>, in folder order from <a href="#acoustic">ACOUSTIC</a> to <a href="#uncertainty">UNCERTAINTY</a>: each function's name and what it does. Files at the top of <code>functions/</code> are listed under <a href="#core">CORE</a>.</li>
+</ul>
+<h4 id="acoustic">ACOUSTIC<a class="headerlink" href="#acoustic" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>acoustic_analysis</code></td>
+<td>Compute acoustic safety metrics (Isppa, MI, max pressure) from sensor data, extract tissue-specific maxima, focal distances, and generate overlaid ISPPA plots on segmentation.</td>
+</tr>
+<tr>
+<td><code>acoustic_convert_axisymmetry</code></td>
+<td>Expand axisymmetric simulation fields to 3D or the mirrored 2D plane in the form chosen by <code>axisymmetric_output_mode</code>, after a simulation and on acoustic cache reload</td>
+</tr>
+<tr>
+<td><code>acoustic_fov_crop</code></td>
+<td>Resolve FOV settings and crop the acoustic grid if active.</td>
+</tr>
+<tr>
+<td><code>acoustic_grid_fov</code></td>
+<td>Crop the acoustic simulation domain to a beam-axis FOV box.</td>
+</tr>
+<tr>
+<td><code>acoustic_input_file</code></td>
+<td>Pressure map a run starts from instead of simulating ('' if none)</td>
+</tr>
+<tr>
+<td><code>acoustic_simulation</code></td>
+<td>Set up acoustic simulation</td>
+</tr>
+<tr>
+<td><code>acoustic_simulation_elastic</code></td>
+<td>Run a k-Wave elastic (shear-wave) simulation via pstdElastic2D/3D</td>
+</tr>
+<tr>
+<td><code>acoustic_stage</code></td>
+<td>Run or load the acoustic pressure simulation (Stage 6).</td>
+</tr>
+<tr>
+<td><code>acoustic_water_baseline</code></td>
+<td>Decide and run the free-water baseline simulation.</td>
+</tr>
+<tr>
+<td><code>acoustic_wrapper</code></td>
+<td>Set up acoustic simulation</td>
+</tr>
+<tr>
+<td><code>assemble_limited_fov_fields</code></td>
+<td>Back-project and combine N limited-FOV acoustic results.</td>
+</tr>
+<tr>
+<td><code>axisymmetric_output_mode</code></td>
+<td>Form into which axisymmetric results are expanded</td>
+</tr>
+<tr>
+<td><code>cache_acoustic</code></td>
+<td>Save or load the slim acoustic results cache.</td>
+</tr>
+<tr>
+<td><code>coherent_drive_calibration</code></td>
+<td>Set each transducer's drive to its own ISPPA target (coherent runs)</td>
+</tr>
+<tr>
+<td><code>compute_focal_fwhm</code></td>
+<td>Axial and lateral −3 dB focal widths (FWHM) through the focal peak, along and across the transducer axis.</td>
+</tr>
+<tr>
+<td><code>compute_focal_metrics</code></td>
+<td>Compute focal-zone metrics (ITRUSST −3 dB/−6 dB volumes, FLHM span/centre) from a 3D intensity field; FLHM centre threshold is configurable via <code>focal_reference</code> (see <a href="../doc_calibration/">doc_calibration.md</a>).</td>
+</tr>
+<tr>
+<td><code>fov_backproject_volume</code></td>
+<td>Zero-pad a FOV sub-grid volume back to the full acoustic grid.</td>
+</tr>
+<tr>
+<td><code>fov_restore_transducers</code></td>
+<td>Put every transducer back at its full-grid position after an FOV crop.</td>
+</tr>
+<tr>
+<td><code>fov_to_grid_pos</code></td>
+<td>Convert FOV-grid voxel indices to full sim-grid indices.</td>
+</tr>
+<tr>
+<td><code>is_acoustic_dry_run</code></td>
+<td>True when the configured acoustic backend only writes inputs</td>
+</tr>
+<tr>
+<td><code>load_acoustic_input</code></td>
+<td>Start a run from a prior pressure map instead of simulating</td>
+</tr>
+<tr>
+<td><code>needs_water_baseline</code></td>
+<td>Decide whether a free-water baseline simulation must run</td>
+</tr>
+<tr>
+<td><code>plot_axial_profile</code></td>
+<td>Plot and save pressure and intensity along the beam axis (depth from the exit plane) with tissue shading and the free-water O'Neil / k-Wave baseline intensity of the simulated transducer.</td>
+</tr>
+<tr>
+<td><code>predict_focal_shift</code></td>
+<td>Focus near the target predicted from the reverse field over an aperture</td>
+</tr>
+<tr>
+<td><code>prepare_thermal_domain</code></td>
+<td>Restore full-grid state or adjust planimg for thermal FOV.</td>
+</tr>
+<tr>
+<td><code>resolve_acoustic_fov_params</code></td>
+<td>Resolve 'auto' FOV settings and check readiness.</td>
+</tr>
+<tr>
+<td><code>reverse_point_source_field</code></td>
+<td>Complex CW field of a point source at the target, at the sensor points</td>
+</tr>
+<tr>
+<td><code>superpose_complex_fields</code></td>
+<td>Coherent sum of complex pressure fields from separate runs.</td>
+</tr>
+<tr>
+<td><code>targeting_analysis</code></td>
+<td>Targeting accuracy of one run from its focal-mask NIfTIs: simulated focus vs planned focus (axial/lateral), vs MNI target and ROI; writes <code>sub-XXX_&lt;medium&gt;&lt;affix&gt;_targeting.csv</code>.</td>
+</tr>
+<tr>
+<td><code>time_reversal_pose_metrics</code></td>
+<td>Target intensity and focus position of one pose-verification run</td>
+</tr>
+<tr>
+<td><code>time_reversal_pose_parameters</code></td>
+<td>Run parameters that place the transducer at a pose of a pose search</td>
+</tr>
+<tr>
+<td><code>time_reversal_refocus</code></td>
+<td>Element transfers, refocusing phases and aberration metrics of one transducer</td>
+</tr>
+<tr>
+<td><code>time_reversal_stage</code></td>
+<td>Refocusing phases, aberration metrics and pose search from one reverse run per target</td>
+</tr>
+<tr>
+<td><code>write_acoustic_sidecar</code></td>
+<td>Describe the T1w pressure NIfTI so a later run can start from it</td>
+</tr>
+</tbody>
+</table>
+<h4 id="babelbrain">BABELBRAIN<a class="headerlink" href="#babelbrain" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>babelbrain_check_geometry</code></td>
+<td>Error for geometries the BabelBrain backend cannot simulate (several transducers, beam off the grid z axis)</td>
+</tr>
+<tr>
+<td><code>babelbrain_insitu_isppa</code></td>
+<td>In-brain peak ISPPA of the scaled acoustic field: the <code>Isppa</code> BabelBrain's thermal solver normalises to.</td>
+</tr>
+<tr>
+<td><code>babelbrain_placement_correction</code></td>
+<td>Mechanical Tx offset that puts BabelBrain's apex at trans_pos</td>
+</tr>
+<tr>
+<td><code>babelbrain_preset</code></td>
+<td>Resolve a BabelBrain preset from BabelBrain's transducer registry</td>
+</tr>
+<tr>
+<td><code>babelbrain_thermal_timing</code></td>
+<td>Convert PRESTUS timing to BabelBrain thermal parameters</td>
+</tr>
+<tr>
+<td><code>babelbrain_thermal_wrapper</code></td>
+<td>Run BabelBrain thermal simulation and read results</td>
+</tr>
+<tr>
+<td><code>babelbrain_tx_geometry</code></td>
+<td>Transducer geometry BabelBrain simulates for a PRESTUS transducer</td>
+</tr>
+<tr>
+<td><code>babelbrain_wrapper</code></td>
+<td>Run BabelBrain acoustic simulation as PRESTUS backend</td>
+</tr>
+<tr>
+<td><code>export_babelbrain_inputs</code></td>
+<td>Write all BabelBrain input files from a PRESTUS run</td>
+</tr>
+<tr>
+<td><code>export_babelbrain_weights</code></td>
+<td>Pack PRESTUS per-element phases and particle velocity into a BabelBrain OptimizedWeightsFile (HDF5 complex64 phasors).</td>
+</tr>
+<tr>
+<td><code>import_babelbrain_weights</code></td>
+<td>Read per-element phase weights from a BabelBrain OptimizedWeightsFile (.h5), derive hardware correction relative to geometric phases, and write the correction into the transducer equipment YAML.</td>
+</tr>
+<tr>
+<td><code>read_babelbrain_output</code></td>
+<td>Read BabelBrain DataForSim.h5 into PRESTUS sensor_data</td>
+</tr>
+<tr>
+<td><code>read_babelbrain_thermal</code></td>
+<td>Read BabelBrain thermal HDF5 into PRESTUS results_heating</td>
+</tr>
+<tr>
+<td><code>resample_babelbrain_vol</code></td>
+<td>Resample a BabelBrain volume onto the PRESTUS acoustic grid</td>
+</tr>
+<tr>
+<td><code>resolve_bb_backend</code></td>
+<td>Resolve 'auto' BabelBrain computing_backend / device_name</td>
+</tr>
+<tr>
+<td><code>write_babelbrain_input</code></td>
+<td>Write BabelViscoInput NIfTI from PRESTUS medium masks</td>
+</tr>
+</tbody>
+</table>
+<h4 id="calibration">CALIBRATION<a class="headerlink" href="#calibration" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>axial_transfer_matrix</code></td>
+<td>On-axis complex pressure per unit element drive</td>
+</tr>
+<tr>
+<td><code>build_steering_correction</code></td>
+<td>Steering correction of a matrix array from hydrophone measurements</td>
+</tr>
+<tr>
+<td><code>calibrate_babelbrain_phase_profile</code></td>
+<td>Whole-profile Rayleigh fit of annular drive phases for BabelBrain</td>
+</tr>
+<tr>
+<td><code>calibrate_focal_steering</code></td>
+<td>Analytical steer that lands the FWHM/peak at a target</td>
+</tr>
+<tr>
+<td><code>calibrate_library_entry</code></td>
+<td>Calibration core: profiles at requested depths (measured or interpolated), per-depth fits, refinements, optional k-Wave drive calibration, report (no file I/O)</td>
+</tr>
+<tr>
+<td><code>calibration_desired_profiles</code></td>
+<td>Profiles on a desired-depth grid, for prediction and fitting</td>
+</tr>
+<tr>
+<td><code>calibration_evaluate</code></td>
+<td>Geometric, library, fitted and k-Wave profiles on one set of depths</td>
+</tr>
+<tr>
+<td><code>calibration_fit</code></td>
+<td>Interactive calibration fit: per-depth refinements</td>
+</tr>
+<tr>
+<td><code>calibration_fit_depths</code></td>
+<td>One <code>fit_transducer_model</code> fit per depth of a profile set (shared by library build, refinement, GUI, <code>calibration_transducer</code>)</td>
+</tr>
+<tr>
+<td><code>calibration_fit_entry</code></td>
+<td>Library entry from the current entry and a CALIBRATION_FIT result</td>
+</tr>
+<tr>
+<td><code>calibration_fit_options</code></td>
+<td>Per-depth fit presets: <code>rayleigh_phase_gain</code> (default) and <code>oneil_phase_only</code> (former global-search settings)</td>
+</tr>
+<tr>
+<td><code>calibration_focus_beyond</code></td>
+<td>FLHM centre of each axial profile, ignoring the near field</td>
+</tr>
+<tr>
+<td><code>calibration_pipeline_start</code></td>
+<td>Universal launcher for calibration_transducer (MATLAB / SLURM / qsub)</td>
+</tr>
+<tr>
+<td><code>calibration_save_entry</code></td>
+<td>Write a fitted library entry to a user library folder</td>
+</tr>
+<tr>
+<td><code>calibration_setup</code></td>
+<td>Run CALIBRATION_TRANSDUCER for every equipment combination in the calibration config</td>
+</tr>
+<tr>
+<td><code>calibration_transducer</code></td>
+<td>Config-driven calibration at chosen depths and intensities; writes a library entry and a calibration output folder</td>
+</tr>
+<tr>
+<td><code>check_equipment_config</code></td>
+<td>Validate equipment configuration YAML files</td>
+</tr>
+<tr>
+<td><code>compute_flhm_center</code></td>
+<td>Compute the FLHM (Focal Length at Half Maximum) centre/span of an axial intensity profile at a configurable threshold fraction of peak (0.5 = −3 dB default, 0.25 = −6 dB).</td>
+</tr>
+<tr>
+<td><code>compute_phases</code></td>
+<td>Calculate per-element transducer phases (degrees) for electronic focusing by computing fractional wavelength delays to steer waves constructively to a target point relative to the exit plane.</td>
+</tr>
+<tr>
+<td><code>equipment_geometry_fingerprint</code></td>
+<td>Short hash of the transducer geometry a calibration was fitted for</td>
+</tr>
+<tr>
+<td><code>evaluate_library_entry</code></td>
+<td>Model the axial profiles a study gets from a library entry, at any depths</td>
+</tr>
+<tr>
+<td><code>extract_real_intensity_profile</code></td>
+<td>Extract or spline-interpolate axial intensity profiles between available measured focal depths (wrt exit plane), aligns peaks, skips near-field for max, and plots/saves results.</td>
+</tr>
+<tr>
+<td><code>field_transfer_matrix</code></td>
+<td>Complex pressure per unit element drive at points off the axis</td>
+</tr>
+<tr>
+<td><code>fit_ring_profile</code></td>
+<td>Fit a within-ring velocity profile shared by all focal depths</td>
+</tr>
+<tr>
+<td><code>fit_steering_correction</code></td>
+<td>Fit measured / modelled focal peak over a matrix array's steering range</td>
+</tr>
+<tr>
+<td><code>fit_transducer_model</code></td>
+<td>Fit a static annular-array model to hydrophone axial profiles</td>
+</tr>
+<tr>
+<td><code>focal_reference_to_frac</code></td>
+<td>Map a <code>focal_reference</code> config value (<code>flhm_3db</code>/<code>flhm_6db</code>) to its FLHM threshold fraction of peak; errors on <code>peak</code> (no associated fraction) or an unknown value.</td>
+</tr>
+<tr>
+<td><code>generate_calibration_report</code></td>
+<td>Write an HTML summary of a library entry: provenance, fit quality, settings at the fitted depths, amplitude lookup.</td>
+</tr>
+<tr>
+<td><code>interpolate_axial_profiles</code></td>
+<td>Axial intensity profiles at desired focal depths from measured ones</td>
+</tr>
+<tr>
+<td><code>kwave_calibrate_drive</code></td>
+<td>Calibrate the drive of per-depth refinements in free-water k-Wave (rescale to the simulated ISPPA) and report agreement with the measured profiles</td>
+</tr>
+<tr>
+<td><code>kwave_drive_metrics</code></td>
+<td>Absolute agreement of a simulated free-water profile with its target</td>
+</tr>
+<tr>
+<td><code>library_add_conditions</code></td>
+<td>Add dephased drive conditions to a library entry [EXPERIMENTAL]</td>
+</tr>
+<tr>
+<td><code>library_add_refinements</code></td>
+<td>Merge depth-specific phase offsets (and drives) into a library entry</td>
+</tr>
+<tr>
+<td><code>library_condition</code></td>
+<td>Phases, gains and drive of a dephased library condition [EXPERIMENTAL]</td>
+</tr>
+<tr>
+<td><code>library_entry_file</code></td>
+<td>Path of a calibration-library entry in a flat or nested library.</td>
+</tr>
+<tr>
+<td><code>library_entry_from_model</code></td>
+<td>Write a FIT_TRANSDUCER_MODEL result into a library struct</td>
+</tr>
+<tr>
+<td><code>library_ingest_conditions</code></td>
+<td>Add dephased conditions from a profile CSV + sidecar [EXPERIMENTAL]</td>
+</tr>
+<tr>
+<td><code>library_model_at_depth</code></td>
+<td>Phases, gains and drive of a library entry at any focal depth</td>
+</tr>
+<tr>
+<td><code>library_refinement_from_fits</code></td>
+<td>Write per-depth FIT_TRANSDUCER_MODEL results as library refinements</td>
+</tr>
+<tr>
+<td><code>library_set_ring_profile</code></td>
+<td>Set or remove the within-ring velocity profile of a library entry</td>
+</tr>
+<tr>
+<td><code>library_settings_table</code></td>
+<td>Per-depth transducer settings a library entry resolves to, as a table / CSV</td>
+</tr>
+<tr>
+<td><code>library_static_model</code></td>
+<td>Global model of a library entry (geometric, or a legacy static offset) in FIT_TRANSDUCER_MODEL form; the prior of per-depth fits</td>
+</tr>
+<tr>
+<td><code>library_transducer</code></td>
+<td>Transducer geometry a library entry was calibrated with</td>
+</tr>
+<tr>
+<td><code>load_equipment_config</code></td>
+<td>Load equipment configuration from individual YAML files</td>
+</tr>
+<tr>
+<td><code>load_transducer_from_library</code></td>
+<td>Load calibrated transducer parameters from library</td>
+</tr>
+<tr>
+<td><code>matrix_element_layout</code></td>
+<td>Matrix-array elements in the transducer frame (no grid)</td>
+</tr>
+<tr>
+<td><code>matrix_focal_peak</code></td>
+<td>Modelled free-field focal peak of a matrix array per steering target</td>
+</tr>
+<tr>
+<td><code>matrix_rayleigh_pressure</code></td>
+<td>Free-field complex pressure of a matrix array (Rayleigh integral)</td>
+</tr>
+<tr>
+<td><code>perform_global_search</code></td>
+<td>Globally optimize transducer element phases (rad) and particle velocity via FEXminimize or GlobalSearch to minimize error fitting O’Neil analytical intensity to measured axial profiles.</td>
+</tr>
+<tr>
+<td><code>phase_optimization_annulus_full_curve</code></td>
+<td>Optimizes the phase profile for an annular transducer by matching intensity curves.</td>
+</tr>
+<tr>
+<td><code>plot_calibration_report</code></td>
+<td>Measured vs library vs calibrated axial profiles per depth (PNG)</td>
+</tr>
+<tr>
+<td><code>plot_ring_profile</code></td>
+<td>Show a fitted within-ring velocity profile and what it changes</td>
+</tr>
+<tr>
+<td><code>plot_transducer_library</code></td>
+<td>Plot the ring phases, drive and ring gains a library entry resolves to across focal depths (as at run time; all library schemas).</td>
+</tr>
+<tr>
+<td><code>rayleigh_axial_intensity</code></td>
+<td>On-axis intensity via the Rayleigh–Sommerfeld integral</td>
+</tr>
+<tr>
+<td><code>read_axial_profiles</code></td>
+<td>Read a hydrophone axial-profile CSV (one column per focal depth)</td>
+</tr>
+<tr>
+<td><code>read_offaxis_scans</code></td>
+<td>Hydrophone plane and volume scans as off-axis data for FIT_RING_PROFILE</td>
+</tr>
+<tr>
+<td><code>read_steering_measurements</code></td>
+<td>Read hydrophone focal peaks of a steered matrix array</td>
+</tr>
+<tr>
+<td><code>refine_transducer_library</code></td>
+<td>Optional refinement of a library entry to your own hydrophone profiles</td>
+</tr>
+<tr>
+<td><code>resolve_profile_file</code></td>
+<td>Hydrophone-profile CSV named by an equipment entry's char_data_path</td>
+</tr>
+<tr>
+<td><code>resolve_transducer_from_serial</code></td>
+<td>Populate transducer struct from equipment and calibration library</td>
+</tr>
+<tr>
+<td><code>ring_profile_drive</code></td>
+<td>Simulation drive of an annular transducer with a ring profile</td>
+</tr>
+<tr>
+<td><code>ring_profile_transducer</code></td>
+<td>Annular transducer with a within-ring velocity profile</td>
+</tr>
+<tr>
+<td><code>save_elem_correction</code></td>
+<td>Compute and persist per-element phase correction into the equipment YAML</td>
+</tr>
+<tr>
+<td><code>save_library_entry</code></td>
+<td>Write a user-calibrated library entry with provenance</td>
+</tr>
+<tr>
+<td><code>save_optimized_values</code></td>
+<td>Append optimized transducer phases and amplitudes into a CSV table (indexed by intensity/focus) and save parameters as YAML for PRESTUS config integration.</td>
+</tr>
+<tr>
+<td><code>scan_and_ingest_calibrations</code></td>
+<td>Scan a folder and ingest all calibration YAMLs</td>
+</tr>
+<tr>
+<td><code>set_real_phases</code></td>
+<td>Load or compute manufacturer-specific (Sonic Concepts/Imasonic) transducer element phases for given focal depth (wrt exit plane), interpolate/unwrap for virtual elements, and return phase degrees.</td>
+</tr>
+<tr>
+<td><code>steering_correction_factor</code></td>
+<td>Measured / modelled focal peak at steering targets</td>
+</tr>
+<tr>
+<td><code>steering_path_lengths</code></td>
+<td>Ring-centre to target distances used for geometric steering</td>
+</tr>
+<tr>
+<td><code>steering_quad_terms</code></td>
+<td>Design matrix of a full quadratic surface in three coordinates</td>
+</tr>
+<tr>
+<td><code>transducer_library_folders</code></td>
+<td>Your own transducer libraries, most specific first</td>
+</tr>
+<tr>
+<td><code>update_transducer_library</code></td>
+<td>Add depth-specific refinements to a library YAML</td>
+</tr>
+<tr>
+<td><code>validate_transducer_library</code></td>
+<td>Validate calibration library against equipment configs</td>
+</tr>
+<tr>
+<td><code>water_baseline</code></td>
+<td>Measure free-water ISPPA at the current source amplitude</td>
+</tr>
+<tr>
+<td><code>water_baseline_box</code></td>
+<td>Grid, source and sensor of the free-water baseline cropped to the beam</td>
+</tr>
+<tr>
+<td><code>write_axial_profiles</code></td>
+<td>Write axial profiles as a profile CSV plus YAML sidecar</td>
+</tr>
+</tbody>
+</table>
+<h4 id="core">CORE<a class="headerlink" href="#core" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apply_isppa_scaling</code></td>
+<td>Scale the simulated pressure field so the free-water</td>
+</tr>
+<tr>
+<td><code>async_transducer_pipeline</code></td>
+<td>Simulate N asynchronously firing transducers</td>
+</tr>
+<tr>
+<td><code>combine_async_intensity</code></td>
+<td>Scale and combine N independent acoustic results</td>
+</tr>
+<tr>
+<td><code>grid_stage</code></td>
+<td>Build or load the head model grid cache (Stage 3).</td>
+</tr>
+<tr>
+<td><code>is_async_mode</code></td>
+<td>Return true when async multi-transducer mode is active.</td>
+</tr>
+<tr>
+<td><code>is_multi_isppa_mode</code></td>
+<td>True when any transducer carries more than one ISPPA target.</td>
+</tr>
+<tr>
+<td><code>is_pose_workflow_mode</code></td>
+<td>True when time_reversal.pose_workflow.enabled is set</td>
+</tr>
+<tr>
+<td><code>isppa_baseline</code></td>
+<td>Free-water ISPPA an acoustic field was produced at, and its origin</td>
+</tr>
+<tr>
+<td><code>isppa_intent</code></td>
+<td>One-line statement of the free-water ISPPA a run will model</td>
+</tr>
+<tr>
+<td><code>isppa_scale_factor</code></td>
+<td>Pressure scale factor that brings a field to a target free-water ISPPA</td>
+</tr>
+<tr>
+<td><code>load_grid_cache_file</code></td>
+<td>Load a PRESTUS grid cache and restore pipeline state.</td>
+</tr>
+<tr>
+<td><code>load_parameters</code></td>
+<td>Loads and merges configuration files for simulation parameters; a trailing <code>{key, value}</code> cell applies overrides before validation.</td>
+</tr>
+<tr>
+<td><code>load_transducer_parameters</code></td>
+<td>Validate, normalize, and derive transducer parameters from config</td>
+</tr>
+<tr>
+<td><code>medium_stage</code></td>
+<td>Build or load the acoustic/thermal medium property cache (Stage 4).</td>
+</tr>
+<tr>
+<td><code>multi_isppa_pipeline</code></td>
+<td>Run acoustic simulation once, then thermal analysis at</td>
+</tr>
+<tr>
+<td><code>path_log_setup</code></td>
+<td>Set up internal paths and logging, filename for output table</td>
+</tr>
+<tr>
+<td><code>pose_workflow_pipeline</code></td>
+<td>Transducer pose search, forward verification and final run in one call</td>
+</tr>
+<tr>
+<td><code>posthoc_water_parameters</code></td>
+<td>Parameters of one post-hoc free-water re-entry run</td>
+</tr>
+<tr>
+<td><code>prestus_config_init</code></td>
+<td>Bootstrap a project-specific PRESTUS configuration folder</td>
+</tr>
+<tr>
+<td><code>prestus_config_upgrade</code></td>
+<td>Refresh a project's config_default.yaml from the toolbox</td>
+</tr>
+<tr>
+<td><code>prestus_group_report_start</code></td>
+<td>Entry point for the group HTML report and group MNI maps: study mode (runs from <code>study.manifest</code>) or subject mode (auto-discovered / listed subjects).</td>
+</tr>
+<tr>
+<td><code>prestus_group_start</code></td>
+<td>DEPRECATED entry point for group-level MNI-space analysis</td>
+</tr>
+<tr>
+<td><code>prestus_pipeline</code></td>
+<td>End-to-end transcranial focused ultrasound simulation pipeline</td>
+</tr>
+<tr>
+<td><code>prestus_pipeline_start</code></td>
+<td>Universal PRESTUS pipeline launcher for MATLAB, SLURM, and qsub</td>
+</tr>
+<tr>
+<td><code>prestus_study_start</code></td>
+<td>Run the pipeline for every row of a study manifest (subjects × conditions with per-run settings), locally or on HPC, then build the study report; <code>DryRun</code> checks all rows without running.</td>
+</tr>
+<tr>
+<td><code>print_parameter_summary</code></td>
+<td>Print a structured PRESTUS configuration summary to the console</td>
+</tr>
+<tr>
+<td><code>sequential_pipeline</code></td>
+<td>Dispatch follow-up simulations that chain thermal state</td>
+</tr>
+<tr>
+<td><code>uncertainty_medium_config</code></td>
+<td>Medium-property YAML of one uncertainty variant.</td>
+</tr>
+<tr>
+<td><code>uncertainty_pipeline</code></td>
+<td>Run the full PRESTUS uncertainty quantification workflow</td>
+</tr>
+</tbody>
+</table>
+<h4 id="group">GROUP<a class="headerlink" href="#group" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>changem_vectorized</code></td>
+<td>Replace multiple old values in array A with corresponding new values.</td>
+</tr>
+<tr>
+<td><code>combine_plots_by_suffix</code></td>
+<td>Combines subject-specific plots into a single montage image.</td>
+</tr>
+<tr>
+<td><code>create_group_maps</code></td>
+<td>Group MNI maps per condition from the per-run MNI NIfTIs: −3 dB focal-volume overlap, mean/SD intensity, mean heating, plus overlap figures.</td>
+</tr>
+<tr>
+<td><code>create_group_MNI_plots</code></td>
+<td>Deprecated (older output layout): group plots in MNI space; use <code>create_group_maps</code>.</td>
+</tr>
+<tr>
+<td><code>discover_group_subjects</code></td>
+<td>Auto-discover completed subjects by scanning <code>path.sim</code> for folders with a matching per-subject CSV.</td>
+</tr>
+<tr>
+<td><code>study_read_manifest</code></td>
+<td>Read a study manifest (.tsv/.csv): one row per run with reserved columns and dotted config-key columns.</td>
+</tr>
+<tr>
+<td><code>study_row_parameters</code></td>
+<td>Load the full config of one study run (study config &lt; row config &lt; manifest columns &lt; overrides).</td>
+</tr>
+<tr>
+<td><code>study_run_descriptors</code></td>
+<td>Per-run settings that differ between subjects (placement mode, target, transducer, depth, target intensity).</td>
+</tr>
+<tr>
+<td><code>study_run_files</code></td>
+<td>Output file names of one run (CSV, targeting sidecar, report, NIfTIs) for the group tools.</td>
+</tr>
+<tr>
+<td><code>study_run_table</code></td>
+<td>Resolve manifest rows to output locations (subject, affix from condition, medium, path.sim); rejects rows that would overwrite each other.</td>
+</tr>
+<tr>
+<td><code>study_setup</code></td>
+<td>Load a study config, read its manifest and resolve the runs and study output folder.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="gui">GUI<a class="headerlink" href="#gui" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>calibration_gui</code></td>
+<td>Standalone GUI to fit transducer library entries to hydrophone profiles, predict profiles at any depth and add transducers.</td>
+</tr>
+<tr>
+<td><code>gui_run_worker</code></td>
+<td>Run the PRESTUS pipeline from a YAML config file</td>
+</tr>
+<tr>
+<td><code>neuronav_gui</code></td>
+<td>Stand-alone GUI for Localite marker ingestion: detect and review series, QC, name targets, batch ingestion, MNI view.</td>
+</tr>
+<tr>
+<td><code>nexus_bridge</code></td>
+<td>Persistent MATLAB session that serves the PRESTUS Nexus</td>
+</tr>
+<tr>
+<td><code>nexus_calibration</code></td>
+<td>Transducer calibration for the PRESTUS Nexus (through NEXUS_BRIDGE)</td>
+</tr>
+<tr>
+<td><code>nexus_neuronav</code></td>
+<td>Localite marker ingestion for the PRESTUS Nexus (through NEXUS_BRIDGE)</td>
+</tr>
+<tr>
+<td><code>nexus_pct</code></td>
+<td>Pseudo-CT steps of the PRESTUS Nexus, served by NEXUS_BRIDGE</td>
+</tr>
+<tr>
+<td><code>nexus_ping</code></td>
+<td>Answer a NEXUS_BRIDGE health check</td>
+</tr>
+<tr>
+<td><code>nexus_progress</code></td>
+<td>Report progress of the current NEXUS_BRIDGE request to the Nexus</td>
+</tr>
+<tr>
+<td><code>prestus_gui</code></td>
+<td>Point-and-click GUI to review and edit a PRESTUS config and start runs [DEPRECATED: use <code>prestus_nexus</code>].</td>
+</tr>
+<tr>
+<td><code>prestus_nexus</code></td>
+<td>Open the PRESTUS Nexus (standalone PyQt6 config builder; see <a href="../doc_nexus/">doc_nexus.md</a>).</td>
+</tr>
+</tbody>
+</table>
+<h4 id="head">HEAD<a class="headerlink" href="#head" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>autopad_grid_for_transducers</code></td>
+<td>Expand grid if any transducer/focus position falls outside</td>
+</tr>
+<tr>
+<td><code>head_model_load_or_build</code></td>
+<td>Pose-independent head model of one subject, built once and cached</td>
+</tr>
+<tr>
+<td><code>head_model_place</code></td>
+<td>Simulation grid of one transducer placement from the shared head model</td>
+</tr>
+<tr>
+<td><code>head_smooth_and_crop</code></td>
+<td>Convert and smooth segmentations into medium map &amp; crop grid for effiency</td>
+</tr>
+<tr>
+<td><code>mean_beam_axis</code></td>
+<td>Mean axis of several transducer beams, averaged as axes (opposed beams do not cancel)</td>
+</tr>
+<tr>
+<td><code>placement_run_dir</code></td>
+<td>Folder of one placement run (one mode, one target)</td>
+</tr>
+<tr>
+<td><code>placement_signature</code></td>
+<td>Settings a placement run's result depends on</td>
+</tr>
+<tr>
+<td><code>preproc_align_to_focal_axis</code></td>
+<td>Rotate input image and its grid coordinates to the transducer-focal axis (+Z)</td>
+</tr>
+<tr>
+<td><code>preproc_align_to_mean_focal_axis</code></td>
+<td>Rotate a 3D image so the mean focal axis aligns with z</td>
+</tr>
+<tr>
+<td><code>preproc_crop_eCSF</code></td>
+<td>Expand CSF to define outer edges of layered medium.</td>
+</tr>
+<tr>
+<td><code>preproc_crop_grid</code></td>
+<td>Crop grid to head + transducer + PML.</td>
+</tr>
+<tr>
+<td><code>preproc_deface_m2m</code></td>
+<td>Create a defaced copy of a SimNIBS m2m folder</td>
+</tr>
+<tr>
+<td><code>preproc_head</code></td>
+<td>Preprocesses structural brain data for simulations (segmentation, alignment, cropping).</td>
+</tr>
+<tr>
+<td><code>preproc_medium_mask</code></td>
+<td>Map segmentation indices onto the medium labels (in the config) [layered only]</td>
+</tr>
+<tr>
+<td><code>preproc_rescale_only</code></td>
+<td>Rescale a 3D image to grid resolution without rotation</td>
+</tr>
+<tr>
+<td><code>preproc_segmentation</code></td>
+<td>Setup SimNIBS segmentation</td>
+</tr>
+<tr>
+<td><code>preproc_transducer_placement</code></td>
+<td>Resolve transducer and focus positions</td>
+</tr>
+<tr>
+<td><code>read_placement_record</code></td>
+<td>Read the run record of a placement run folder</td>
+</tr>
+<tr>
+<td><code>segmentation_check_existing</code></td>
+<td>How an existing segmentation differs from the selected SimNIBS</td>
+</tr>
+<tr>
+<td><code>segmentation_run</code></td>
+<td>Submit SimNIBS segmentation</td>
+</tr>
+<tr>
+<td><code>skull_fill_holes</code></td>
+<td>Fill holes in skull segmentation and between skull and skin</td>
+</tr>
+<tr>
+<td><code>skull_rubber_wrap</code></td>
+<td>Fill skull holes where brain meets skin, as a rubber sheet around the skull would</td>
+</tr>
+<tr>
+<td><code>skull_rubber_wrap_visualize</code></td>
+<td>Visualize results of skull rubber expansion</td>
+</tr>
+<tr>
+<td><code>smooth_img</code></td>
+<td>Apply 3D smoothing</td>
+</tr>
+<tr>
+<td><code>write_placement_positions</code></td>
+<td>Write the resolved transducer positions as a JSON sidecar</td>
+</tr>
+<tr>
+<td><code>write_placement_record</code></td>
+<td>Write the run record (placement_run.json) of a placement run</td>
+</tr>
+</tbody>
+</table>
+<h4 id="helper">HELPER<a class="headerlink" href="#helper" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apply_config_overrides</code></td>
+<td>Set config values by dotted key (<code>placement.localite.target</code>, <code>transducer(2).serial</code>); warns on unknown keys.</td>
+</tr>
+<tr>
+<td><code>bb_tissuemask_binary</code></td>
+<td>Build per-tissue binary masks from a BabelBrain material map</td>
+</tr>
+<tr>
+<td><code>bwconncomp_3d</code></td>
+<td>Find connected components in a 3-D binary volume</td>
+</tr>
+<tr>
+<td><code>cache_signature</code></td>
+<td>Settings that determine a cached pipeline stage's output</td>
+</tr>
+<tr>
+<td><code>cast_struct</code></td>
+<td>Recursively cast all numeric fields in a struct to a given type</td>
+</tr>
+<tr>
+<td><code>charm_seg_labels</code></td>
+<td>Return the fixed SimNIBS charm tissue label indices</td>
+</tr>
+<tr>
+<td><code>check_availability</code></td>
+<td>Check file availability.</td>
+</tr>
+<tr>
+<td><code>check_cache_signature</code></td>
+<td>Refuse to reuse a cache built from different settings</td>
+</tr>
+<tr>
+<td><code>check_layers</code></td>
+<td>Match requested layers to those available in the segmentation. For (p)CT, homogenize multi-skull layer into a single <code>skull</code>layer.</td>
+</tr>
+<tr>
+<td><code>check_sidecar_signature</code></td>
+<td>Compare a sidecar's recorded settings with the current run's</td>
+</tr>
+<tr>
+<td><code>check_tool_availability</code></td>
+<td>Check that the external tools the requested stages need exist</td>
+</tr>
+<tr>
+<td><code>compute_ramp_factor</code></td>
+<td>Pulse-average / temporal-peak intensity ratio for a ramped pulse</td>
+</tr>
+<tr>
+<td><code>conda_env_dirs</code></td>
+<td>Folders of the conda environments on this computer</td>
+</tr>
+<tr>
+<td><code>config_known_extra_keys</code></td>
+<td>Config keys PRESTUS reads that config_default.yaml omits</td>
+</tr>
+<tr>
+<td><code>config_unknown_keys</code></td>
+<td>Dotted keys of a user config that PRESTUS does not know</td>
+</tr>
+<tr>
+<td><code>confirm_overwriting</code></td>
+<td>Check overwriting (manual).</td>
+</tr>
+<tr>
+<td><code>confirmation_dlg</code></td>
+<td>Present confirmation dialogue.</td>
+</tr>
+<tr>
+<td><code>default_log_file</code></td>
+<td>Timestamped pipeline log (diary) path for a run</td>
+</tr>
+<tr>
+<td><code>distribution_stats</code></td>
+<td>Summary statistics and histogram of a numeric vector</td>
+</tr>
+<tr>
+<td><code>ensure_hdf5_plugin_path</code></td>
+<td>Set HDF5_PLUGIN_PATH so MATLAB's h5read/h5write don't fail</td>
+</tr>
+<tr>
+<td><code>find_min_factor</code></td>
+<td>Find the number with the smallest maximum factor in a range.</td>
+</tr>
+<tr>
+<td><code>find_nexus_python</code></td>
+<td>A Python that can start the PRESTUS Nexus</td>
+</tr>
+<tr>
+<td><code>find_pseudoct_dir</code></td>
+<td>Folder holding this subject's existing pseudoCT.nii.gz</td>
+</tr>
+<tr>
+<td><code>find_sidecar</code></td>
+<td>JSON sidecar of a data file: same name with .json (BIDS convention)</td>
+</tr>
+<tr>
+<td><code>get_crop_dims</code></td>
+<td>Computes cropping dimensions for a 3D image with a margin.</td>
+</tr>
+<tr>
+<td><code>get_field</code></td>
+<td>Value of a (nested) struct field, or a default when it is missing</td>
+</tr>
+<tr>
+<td><code>get_flhm_center_position</code></td>
+<td>Calculates the center position of the focal length at half maximum (FLHM).</td>
+</tr>
+<tr>
+<td><code>get_nonempty_field</code></td>
+<td>Value of a (nested) struct field, or a default when it is missing or empty</td>
+</tr>
+<tr>
+<td><code>get_output_dir</code></td>
+<td>Derive the simulation output directory from parameters</td>
+</tr>
+<tr>
+<td><code>get_pct_dir</code></td>
+<td>Per-subject pseudo-CT folder</td>
+</tr>
+<tr>
+<td><code>get_placement_dir</code></td>
+<td>Per-subject root of the placement outputs</td>
+</tr>
+<tr>
+<td><code>get_prestus_path</code></td>
+<td>GET_PRESTUSPATH  Return the absolute path to the PRESTUS toolbox root</td>
+</tr>
+<tr>
+<td><code>get_slice_by_label</code></td>
+<td>Extracts a specific slice from a 3D image based on axis label and slice number.</td>
+</tr>
+<tr>
+<td><code>get_xyz_mesh</code></td>
+<td>Generates a mesh of 3D coordinates for a given image.</td>
+</tr>
+<tr>
+<td><code>getidx</code></td>
+<td>Retrieves indices for requested tissues from a parameter structure.</td>
+</tr>
+<tr>
+<td><code>iff</code></td>
+<td>Inline conditional: return a if cond is true, else b.</td>
+</tr>
+<tr>
+<td><code>imfill_holes_3d</code></td>
+<td>Fill interior holes in a 3-D binary volume</td>
+</tr>
+<tr>
+<td><code>kwave_version</code></td>
+<td>Display k-Wave version number and (if available) git hash.</td>
+</tr>
+<tr>
+<td><code>log_memory_usage</code></td>
+<td>Print this MATLAB process's RSS and the enclosing cgroup's usage.</td>
+</tr>
+<tr>
+<td><code>log_timer</code></td>
+<td>Start or stop logs for benchmarking time, RAM, and disk space use.</td>
+</tr>
+<tr>
+<td><code>manual_coordinate_space</code></td>
+<td>Coordinate space of transducer.trans_pos / focus_pos</td>
+</tr>
+<tr>
+<td><code>masked_max_3d</code></td>
+<td>Computes the maximum intensity within a masked 3D region.</td>
+</tr>
+<tr>
+<td><code>matlab_escape_quotes</code></td>
+<td>Escapes text for a single-quoted MATLAB literal in generated job scripts (doubles <code>'</code>).</td>
+</tr>
+<tr>
+<td><code>mergestruct</code></td>
+<td>Recursively merge fields and subfields of two structures; treats <code>yaml.Null</code> as empty so YAML-loaded null values are always overwritten.</td>
+</tr>
+<tr>
+<td><code>morph_close_sphere</code></td>
+<td>Morphological closing of a 3-D mask by a sphere of radius r</td>
+</tr>
+<tr>
+<td><code>nearest_fill_nan</code></td>
+<td>Replace NaN voxels with the value of the nearest non-NaN voxel</td>
+</tr>
+<tr>
+<td><code>outputs_follow_recompute</code></td>
+<td>Let a recomputed stage replace its existing output files</td>
+</tr>
+<tr>
+<td><code>parse_memory_tags</code></td>
+<td>Extract peak memory figures from [memory]/[memory_bb] log lines.</td>
+</tr>
+<tr>
+<td><code>predict_outputs</code></td>
+<td>Predict the pipeline mode and the CSV/HTML files a run will write, before submission (read-only).</td>
+</tr>
+<tr>
+<td><code>prestus_check_install</code></td>
+<td>Report what a PRESTUS installation has and what it lacks</td>
+</tr>
+<tr>
+<td><code>prestus_version</code></td>
+<td>Print PRESTUS version info and optionally return the git hash.</td>
+</tr>
+<tr>
+<td><code>print_predicted_outputs</code></td>
+<td>Print <code>predict_outputs</code>' plan to the console.</td>
+</tr>
+<tr>
+<td><code>r_quote_string</code></td>
+<td>Escape a string for safe embedding in a generated R string literal.</td>
+</tr>
+<tr>
+<td><code>read_ini_file</code></td>
+<td>Read an INI file into MATLAB</td>
+</tr>
+<tr>
+<td><code>read_sidecar</code></td>
+<td>Read a stage-output JSON sidecar</td>
+</tr>
+<tr>
+<td><code>resolve_chained_overwrite</code></td>
+<td>Map io.overwrite_files onto the stages of a</td>
+</tr>
+<tr>
+<td><code>resolve_io_dirs</code></td>
+<td>Fill missing io path fields from path.sim + subject_id</td>
+</tr>
+<tr>
+<td><code>resolve_jwave_pml_size</code></td>
+<td>Resolve grid.pml_size 'auto' to a wavelength-based scalar PML thickness for jwave</td>
+</tr>
+<tr>
+<td><code>resolve_pml_size</code></td>
+<td>Resolve grid.pml_size to a numeric array for k-Wave</td>
+</tr>
+<tr>
+<td><code>resolve_python_env</code></td>
+<td>Locate a Python executable inside a venv/conda environment.</td>
+</tr>
+<tr>
+<td><code>reuse_upstream_cache</code></td>
+<td>True when an existing upstream cache must be loaded</td>
+</tr>
+<tr>
+<td><code>round_if_integer</code></td>
+<td>Rounds values if they are sufficiently close to integers; otherwise raises an error.</td>
+</tr>
+<tr>
+<td><code>run_command</code></td>
+<td>Execute an external program via java.lang.ProcessBuilder.</td>
+</tr>
+<tr>
+<td><code>run_shell_script</code></td>
+<td>Execute a shell script string via ProcessBuilder, with only ONE shell in the loop.</td>
+</tr>
+<tr>
+<td><code>run_stats</code></td>
+<td>Collect a run's simulation size, duration and peak memory</td>
+</tr>
+<tr>
+<td><code>safe_addpath</code></td>
+<td>Add a directory tree to the MATLAB path, skipping hidden directories</td>
+</tr>
+<tr>
+<td><code>sample_beam_axis</code></td>
+<td>Interpolate a 2D/3D field along the beam axis from the bowl apex to the grid edge (distances from the apex).</td>
+</tr>
+<tr>
+<td><code>sanitize_output_affix</code></td>
+<td>Normalise <code>io.output_affix</code> to the BIDS <code>_desc-&lt;label&gt;</code> form.</td>
+</tr>
+<tr>
+<td><code>segmentation_file</code></td>
+<td>The SimNIBS segmentation of this subject (final_tissues.nii.gz)</td>
+</tr>
+<tr>
+<td><code>segmentation_fingerprint</code></td>
+<td>Content identity of the SimNIBS segmentation a stage reads</td>
+</tr>
+<tr>
+<td><code>shell_quote_arg</code></td>
+<td>Quote a string as a single literal argument for system().</td>
+</tr>
+<tr>
+<td><code>should_save_output</code></td>
+<td>Decide whether an output is saved: per-step <code>io</code> flag, else <code>io.save_matrices</code> (matrix outputs), else the built-in default.</td>
+</tr>
+<tr>
+<td><code>simnibs_env_overrides</code></td>
+<td>Environment for a SimNIBS tool run with RUN_COMMAND</td>
+</tr>
+<tr>
+<td><code>simnibs_install_info</code></td>
+<td>Version and default charm settings of a SimNIBS install</td>
+</tr>
+<tr>
+<td><code>simnibs_ld_library_path</code></td>
+<td>LD_LIBRARY_PATH prefix for SimNIBS tools (charm, mni2subject, ...)</td>
+</tr>
+<tr>
+<td><code>simnibs_version</code></td>
+<td>Get SimNIBS version of segmentation from HTML, print, allocate to <code>parameters</code>.</td>
+</tr>
+<tr>
+<td><code>subset_fields</code></td>
+<td>Copy designated structure field to new structure.</td>
+</tr>
+<tr>
+<td><code>tissuemask_binary</code></td>
+<td>Extract binary tissue segmentation masks (for indexing)</td>
+</tr>
+<tr>
+<td><code>trans_suffix</code></td>
+<td>Return '_trans-XX' when n_trans &gt; 1, otherwise ''.</td>
+</tr>
+<tr>
+<td><code>upsample_to_grid</code></td>
+<td>Upsamples a 3D image to a higher resolution grid.</td>
+</tr>
+<tr>
+<td><code>validate_any_required_field</code></td>
+<td>Error clearly unless at least one candidate field is set.</td>
+</tr>
+<tr>
+<td><code>validate_required_fields</code></td>
+<td>Error clearly unless every required field is set.</td>
+</tr>
+<tr>
+<td><code>warn</code></td>
+<td>Wrapper around warning() that suppresses the stack-trace printout.</td>
+</tr>
+<tr>
+<td><code>write_sidecar</code></td>
+<td>Write a JSON sidecar describing a stage output later runs can start from</td>
+</tr>
+<tr>
+<td><code>zip_fields</code></td>
+<td>Convert a structure's fields and values into a cell array.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="hpc">HPC<a class="headerlink" href="#hpc" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hpc_add_dependency</code></td>
+<td>Add scheduler job IDs to the jobs a submission waits for</td>
+</tr>
+<tr>
+<td><code>hpc_detect_system</code></td>
+<td>Detect SLURM or qsub HPC system.</td>
+</tr>
+<tr>
+<td><code>hpc_job_info</code></td>
+<td>Generate formatted job display information.</td>
+</tr>
+<tr>
+<td><code>hpc_job_name</code></td>
+<td>Generate standardized HPC job name.</td>
+</tr>
+<tr>
+<td><code>hpc_job_report</code></td>
+<td>Query scheduler for post-job resource usage and carbon metrics</td>
+</tr>
+<tr>
+<td><code>hpc_setup_temp_files</code></td>
+<td>Setup directories and generate temporary files.</td>
+</tr>
+<tr>
+<td><code>hpc_submit_job</code></td>
+<td>Submit HPC batch job (SLURM or qsub).</td>
+</tr>
+<tr>
+<td><code>hpc_submit_report_job</code></td>
+<td>Submit a lightweight dependent job to generate the post-run report</td>
+</tr>
+<tr>
+<td><code>hpc_validate_parameters</code></td>
+<td>Validate HPC job parameters.</td>
+</tr>
+<tr>
+<td><code>hpc_wait_for_completion</code></td>
+<td>Poll an HPC job until it completes or times out</td>
+</tr>
+<tr>
+<td><code>parse_sbatch_job_id</code></td>
+<td>Job ID from the output of sbatch</td>
+</tr>
+</tbody>
+</table>
+<h4 id="jwave">JWAVE<a class="headerlink" href="#jwave" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>jwave_wrapper</code></td>
+<td>Run acoustic simulation via jwave (JAX-based Python backend)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="legacy">LEGACY<a class="headerlink" href="#legacy" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config_deprecations</code></td>
+<td>Config keys renamed or removed since PRESTUS v0.5.0</td>
+</tr>
+<tr>
+<td><code>upgrade_config_keys</code></td>
+<td>Convert config keys from PRESTUS v0.5.0 onwards to their current names</td>
+</tr>
+</tbody>
+</table>
+<h4 id="medium">MEDIUM<a class="headerlink" href="#medium" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>db_cm_mhz_to_np_m</code></td>
+<td>Convert an attenuation or absorption coefficient to nepers per metre</td>
+</tr>
+<tr>
+<td><code>fitPowerLawParamsMulti</code></td>
+<td>Fit power law absorption parameters for highly absorbing media.</td>
+</tr>
+<tr>
+<td><code>get_alpha_coeff</code></td>
+<td>Computes the amplitude attenuation coefficient for a given medium and frequency.</td>
+</tr>
+<tr>
+<td><code>medium_absorption_layer</code></td>
+<td>Keep one absorption field per tissue when merging a config layer</td>
+</tr>
+<tr>
+<td><code>medium_elastic_properties</code></td>
+<td>Build the k-Wave elastic medium (compressional + shear) from a fluid medium</td>
+</tr>
+<tr>
+<td><code>medium_pct_attenuation</code></td>
+<td>Skull: pCT-informed attenuation mapping</td>
+</tr>
+<tr>
+<td><code>medium_pct_density</code></td>
+<td>Skull: pCT-informed density mapping</td>
+</tr>
+<tr>
+<td><code>medium_pct_density_calibration</code></td>
+<td>CT-&gt;density calibration table for pct.mapping_density 'k-plan'</td>
+</tr>
+<tr>
+<td><code>medium_pct_pichardo_load</code></td>
+<td>Load and cache Pichardo 2D interpolant from BabelBrain</td>
+</tr>
+<tr>
+<td><code>medium_pct_soundspeed</code></td>
+<td>Skull: pCT-informed sound speed mapping</td>
+</tr>
+<tr>
+<td><code>medium_setup</code></td>
+<td>Set up medium</td>
+</tr>
+</tbody>
+</table>
+<h4 id="neuronav">NEURONAV<a class="headerlink" href="#neuronav" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>export_brainsight_trajectory</code></td>
+<td>Write a Brainsight version-14 trajectory file.</td>
+</tr>
+<tr>
+<td><code>grid_to_localite_mm</code></td>
+<td>Voxel indices to coordinates in the Localite planning image</td>
+</tr>
+<tr>
+<td><code>localite_matrix_to_positions</code></td>
+<td>Convert a Localite 4×4 matrix to voxel positions.</td>
+</tr>
+<tr>
+<td><code>neuronav_apply_deformation</code></td>
+<td>Map segmentation-space RAS coordinates through a SimNIBS coordinate field</td>
+</tr>
+<tr>
+<td><code>neuronav_build_deformation_cache</code></td>
+<td>Precompute nearest-valid-voxel lookup for a SimNIBS coordinate field</td>
+</tr>
+<tr>
+<td><code>neuronav_build_target_map</code></td>
+<td>Expand a coil_map spec into a flat target_map.</td>
+</tr>
+<tr>
+<td><code>neuronav_check_target_map</code></td>
+<td>Check a target_map before NEURONAV_INGEST_MARKERS writes it</td>
+</tr>
+<tr>
+<td><code>neuronav_compute_series_statistics</code></td>
+<td>Compute mean position and variability over stimulus train</td>
+</tr>
+<tr>
+<td><code>neuronav_compute_series_statistics_sequential</code></td>
+<td>NEURONAV_COMPUTE_SERIES_STATISTICS  Compute per-series position and orientation statistics</td>
+</tr>
+<tr>
+<td><code>neuronav_convert_MNI_to_native</code></td>
+<td>Transform coordinates from MNI space to native subject space</td>
+</tr>
+<tr>
+<td><code>neuronav_convert_native_to_MNI</code></td>
+<td>Convert native RAS coordinates to MNI space</td>
+</tr>
+<tr>
+<td><code>neuronav_convert_trigger_to_voxels</code></td>
+<td>Convert Localite trigger positions to voxel (image) coordinates.</td>
+</tr>
+<tr>
+<td><code>neuronav_detect_series</code></td>
+<td>Detect the recorded series of one session (QC, suggested names) without writing.</td>
+</tr>
+<tr>
+<td><code>neuronav_export_session_csv</code></td>
+<td>Export per-session coordinate arrays to CSV with labeled voxel and RAS (mm) positions.</td>
+</tr>
+<tr>
+<td><code>neuronav_find_mni_template</code></td>
+<td>SimNIBS' MNI152_T1_1mm.nii.gz, for head outlines in MNI views</td>
+</tr>
+<tr>
+<td><code>neuronav_find_planning_t1</code></td>
+<td>Find the planning T1 loaded into Localite (<code>path.localite_t1</code>, else <code>path.localite_raw</code>).</td>
+</tr>
+<tr>
+<td><code>neuronav_get_group_mean_mni</code></td>
+<td>Compute group-level average MNI coordinates (both mm and voxel).</td>
+</tr>
+<tr>
+<td><code>neuronav_head_surface</code></td>
+<td>Outer head surface of an MNI-space NIfTI, for plots</td>
+</tr>
+<tr>
+<td><code>neuronav_ingest_batch</code></td>
+<td>Ingest and export Localite targets for many subjects/sessions; writes <code>neuronav_ingest_summary.csv</code>.</td>
+</tr>
+<tr>
+<td><code>neuronav_ingest_markers</code></td>
+<td>Ingest raw Localite markers and write normalised outputs.</td>
+</tr>
+<tr>
+<td><code>neuronav_label_map_from_scan</code></td>
+<td>Build a <code>neuronav.target_labels</code> map from a label scan.</td>
+</tr>
+<tr>
+<td><code>neuronav_localite_pose</code></td>
+<td>Resolve the recorded Localite instrument pose for placement (file mode, or ingested markers; ingests on first use).</td>
+</tr>
+<tr>
+<td><code>neuronav_map_label</code></td>
+<td>Map a Localite target label to the study target name (<code>neuronav.target_labels</code>).</td>
+</tr>
+<tr>
+<td><code>neuronav_match_entry_targets</code></td>
+<td>Match Localite EntryTarget entries to a target map.</td>
+</tr>
+<tr>
+<td><code>neuronav_name_series</code></td>
+<td>Name the detected series of a session (coil table, planned target, default; shared GUI/script rule).</td>
+</tr>
+<tr>
+<td><code>neuronav_plot_placement</code></td>
+<td>Visualise transducer placements on a segmented head.</td>
+</tr>
+<tr>
+<td><code>neuronav_read_entry_target</code></td>
+<td>Read planned target positions from Localite EntryTarget XML.</td>
+</tr>
+<tr>
+<td><code>neuronav_read_label_candidates</code></td>
+<td>Collect the named planned targets of a session (EntryTarget, GUMMarkers).</td>
+</tr>
+<tr>
+<td><code>neuronav_read_target_lookup</code></td>
+<td>Look up pre-specified target coordinates from</td>
+</tr>
+<tr>
+<td><code>neuronav_resolve_paths</code></td>
+<td>Resolve the Localite raw/ingested/T1/export folders from <code>path.localite_*</code> (with <code>path.localite</code> fallback).</td>
+</tr>
+<tr>
+<td><code>neuronav_resolve_target</code></td>
+<td>Resolve each target_map entry's brain-target</td>
+</tr>
+<tr>
+<td><code>neuronav_scan_sessions</code></td>
+<td>Inventory raw Localite data and planned-target labels.</td>
+</tr>
+<tr>
+<td><code>neuronav_select_localite</code></td>
+<td>Select most recent Localite XML for a session.</td>
+</tr>
+<tr>
+<td><code>neuronav_series_qc_flag</code></td>
+<td>Tracking problem of one detected series, as text</td>
+</tr>
+<tr>
+<td><code>neuronav_suggest_target_names</code></td>
+<td>Heuristic target names for ingested series (planned target nearest the beam axis).</td>
+</tr>
+<tr>
+<td><code>neuronav_summary_to_mni</code></td>
+<td>Add MNI coordinates to a neuronav ingest summary.</td>
+</tr>
+<tr>
+<td><code>position_transducer_localite</code></td>
+<td>Determines transducer and focus positions in voxel space using Localite data and MRI header.</td>
+</tr>
+<tr>
+<td><code>position_transducer_plantus</code></td>
+<td>Optimise transducer placement using PlanTUS.</td>
+</tr>
+<tr>
+<td><code>position_transducer_tus_entry</code></td>
+<td>Determine transducer placement using TUS_entry.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="nifti">NIFTI<a class="headerlink" href="#nifti" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nifti_acoustic</code></td>
+<td>Export acoustic-stage data to NIfTI in T1 and MNI space</td>
+</tr>
+<tr>
+<td><code>nifti_medium</code></td>
+<td>Export medium-stage data to NIfTI</td>
+</tr>
+<tr>
+<td><code>nifti_medium_masks</code></td>
+<td>Write medium_masks pipeline output to NIfTI</td>
+</tr>
+<tr>
+<td><code>nifti_medium_properties</code></td>
+<td>Write medium acoustic/thermal property maps to NIfTI</td>
+</tr>
+<tr>
+<td><code>nifti_pct</code></td>
+<td>Write pseudo-CT pipeline output to NIfTI</td>
+</tr>
+<tr>
+<td><code>nifti_thermal</code></td>
+<td>Export thermal-stage data to NIfTI in T1 and MNI space</td>
+</tr>
+<tr>
+<td><code>nifti_to_mni</code></td>
+<td>Convert a T1-space NIfTI to MNI space via SimNIBS</td>
+</tr>
+<tr>
+<td><code>nifti_to_t1w</code></td>
+<td>Back-transform one volume to T1 space and write NIfTI</td>
+</tr>
+<tr>
+<td><code>phantom_voxel_order</code></td>
+<td>Return a non-layered output volume to the voxel order of its input</td>
+</tr>
+<tr>
+<td><code>simnibs_t1_to_mni</code></td>
+<td>Register subject T1 to MNI space if not already done</td>
+</tr>
+</tbody>
+</table>
+<h4 id="pseudo-ct">PSEUDO-CT<a class="headerlink" href="#pseudo-ct" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>check_pct_sidecar</code></td>
+<td>Refuse an existing pseudo-CT made with other settings</td>
+</tr>
+<tr>
+<td><code>fit_pairwiselinear</code></td>
+<td>Perform a pairwise linear fit between HU and density values with optional plot.</td>
+</tr>
+<tr>
+<td><code>pct_create_pCT_run</code></td>
+<td>Submit a pseudoCT generation job</td>
+</tr>
+<tr>
+<td><code>pct_ct_file</code></td>
+<td>This subject's measured CT, or '' when the pseudo-CT is used</td>
+</tr>
+<tr>
+<td><code>pct_load_ct</code></td>
+<td>The CT image the skull mapping reads, with its tissue labels</td>
+</tr>
+<tr>
+<td><code>pct_map_properties</code></td>
+<td>Skull density, sound speed and attenuation from HU, as MEDIUM_SETUP maps them</td>
+</tr>
+<tr>
+<td><code>pct_mapping_curves</code></td>
+<td>Skull properties as functions of HU, for the configured mappings</td>
+</tr>
+<tr>
+<td><code>pct_predict_skull_properties</code></td>
+<td>Skull properties a pseudo-CT run will model, without simulating</td>
+</tr>
+<tr>
+<td><code>pct_signature</code></td>
+<td>Settings a pseudo-CT depends on, and the resolved skull mapping</td>
+</tr>
+<tr>
+<td><code>pct_skull_mapped</code></td>
+<td>True when the skull layer's properties come from the pseudo-CT</td>
+</tr>
+<tr>
+<td><code>pct_skullexpand</code></td>
+<td>Load SimNIBS NIfTIs + headers, run skull rubber wrap, save output.</td>
+</tr>
+<tr>
+<td><code>pct_skullmapping</code></td>
+<td>Computes pseudo-CT mapping for cortical and trabecular bone using UTE histograms. [deprecated, debug]</td>
+</tr>
+<tr>
+<td><code>pct_skullmapping_fit</code></td>
+<td>Subject-specific UTE-&gt;HU line from cortical / trabecular UTE histograms</td>
+</tr>
+<tr>
+<td><code>pct_soft_tissue_peak</code></td>
+<td>Identifies the soft tissue peak from UTE intensity distribution histograms.</td>
+</tr>
+<tr>
+<td><code>pct_tissues_mask</code></td>
+<td>Tissue labels for a CT-mapped skull, from the SimNIBS segmentation</td>
+</tr>
+</tbody>
+</table>
+<h4 id="plot">PLOT<a class="headerlink" href="#plot" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>deface_volume</code></td>
+<td>Remove face voxels in a volume using the SimNIBS segmentation</td>
+</tr>
+<tr>
+<td><code>nifti_slice_orientation</code></td>
+<td>Compute display transforms for a NIfTI orthogonal slice.</td>
+</tr>
+<tr>
+<td><code>plot_coronal_slices</code></td>
+<td>(DEPRECATED) Visualizes coronal slices of a 3D image with optional legends for labeled images.</td>
+</tr>
+<tr>
+<td><code>plot_intensity_t1_overlay</code></td>
+<td>Overlay back-transformed intensity on T1 image</td>
+</tr>
+<tr>
+<td><code>plot_median_montage</code></td>
+<td>(DEPRECATED) Creates a montage of central slices from a 3D T1 image.</td>
+</tr>
+<tr>
+<td><code>plot_overlay</code></td>
+<td>Visualizes map overlaid on a 2D slice of a 3D background image with advanced options.</td>
+</tr>
+<tr>
+<td><code>plot_overlay_2d</code></td>
+<td>Overlays map on a background image slice with key positions highlighted.</td>
+</tr>
+<tr>
+<td><code>plot_placement_t1_overlay</code></td>
+<td>Quick placement QC figure on the native T1</td>
+</tr>
+<tr>
+<td><code>plot_t1_with_transducer</code></td>
+<td>Creates a plot of a T1 slice oriented along the transducer's axis with overlays.</td>
+</tr>
+<tr>
+<td><code>plot_transducer_overlay</code></td>
+<td>Visualize curved transducer geometry with exit plane.</td>
+</tr>
+<tr>
+<td><code>show_3d_head</code></td>
+<td>Visualizes segmented brain images in 3D with transducer placement and target location.</td>
+</tr>
+<tr>
+<td><code>show_binary_mask_transducer</code></td>
+<td>Visualise the binary mask of a matrix transducer on the simulation grid</td>
+</tr>
+<tr>
+<td><code>show_positioning_plots</code></td>
+<td>Visualizes transducer positioning before and after preprocessing using segmented images.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="report">REPORT<a class="headerlink" href="#report" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>build_config_dump</code></td>
+<td>Searchable HTML block of the full parameters struct.</td>
+</tr>
+<tr>
+<td><code>compute_tic</code></td>
+<td>Cranial Thermal Index (TIC) after IEC 62359 / AIUM-NEMA ODS.</td>
+</tr>
+<tr>
+<td><code>css_styles_base</code></td>
+<td>Shared design system for all PRESTUS HTML reports.</td>
+</tr>
+<tr>
+<td><code>generate_group_report</code></td>
+<td>Assemble the self-contained group HTML report (exposure dashboard, study design, condition comparison, targeting accuracy, group maps, outliers, roster, box plots, per-run cards) and a one-row-per-run CSV.</td>
+</tr>
+<tr>
+<td><code>generate_multi_isppa_report</code></td>
+<td>Generate an HTML report comparing multiple ISPPA levels</td>
+</tr>
+<tr>
+<td><code>generate_placement_report</code></td>
+<td>Stand-alone HTML placement report written after the placement stage (positions, T1 overlay, PlanTUS criteria evaluation); <code>placement.report</code>.</td>
+</tr>
+<tr>
+<td><code>generate_sequential_report</code></td>
+<td>HTML summary report for a chain of sequential simulations</td>
+</tr>
+<tr>
+<td><code>generate_simulation_report</code></td>
+<td>Generate a self-contained HTML simulation report</td>
+</tr>
+<tr>
+<td><code>generate_uncertainty_report</code></td>
+<td>Generate an uncertainty-range HTML simulation report</td>
+</tr>
+<tr>
+<td><code>get_risk_limits</code></td>
+<td>Return ITRUSST consensus non-significant risk limits</td>
+</tr>
+<tr>
+<td><code>html_utils</code></td>
+<td>Static HTML utility methods for PRESTUS report generation</td>
+</tr>
+<tr>
+<td><code>preview_report_styles</code></td>
+<td>Report test mode: re-render an existing subject output folder in every skin (no re-simulation) into a sandbox folder with a side-by-side index.html.</td>
+</tr>
+<tr>
+<td><code>read_metrics_table</code></td>
+<td>Read a per-run metrics CSV with current column names</td>
+</tr>
+<tr>
+<td><code>report_scripts</code></td>
+<td>Shared inline JavaScript for PRESTUS HTML reports.</td>
+</tr>
+<tr>
+<td><code>report_styles</code></td>
+<td>Alternative visual skins for the HTML reports (instrument / classic / compact / paper), selected via <code>modules.report_style</code>.</td>
+</tr>
+<tr>
+<td><code>risk_color</code></td>
+<td>Return a colour string based on a value relative to an ITRUSST risk limit</td>
+</tr>
+<tr>
+<td><code>table2html</code></td>
+<td>Convert a MATLAB table to an HTML table element</td>
+</tr>
+</tbody>
+</table>
+<h4 id="source">SOURCE<a class="headerlink" href="#source" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create_clover_array</code></td>
+<td>Replicate a single matrix sub-array into a multi-leaf clover configuration</td>
+</tr>
+<tr>
+<td><code>create_matrix_karray</code></td>
+<td>Add matrix transducer elements to a kWaveArray object</td>
+</tr>
+<tr>
+<td><code>CWSourceMatrix</code></td>
+<td>Lazy rank-2 factored CW source signal matrix for k-Wave.</td>
+</tr>
+<tr>
+<td><code>grid_axisymmetry</code></td>
+<td>Convert grid to axisymmetry</td>
+</tr>
+<tr>
+<td><code>grid_tissue_setup</code></td>
+<td>Set up grid dimensions, preprocess head (if modeled), and place in grid</td>
+</tr>
+<tr>
+<td><code>grid_transducer_location</code></td>
+<td>Position transducer (and target) in simulation grid</td>
+</tr>
+<tr>
+<td><code>source_create</code></td>
+<td>Creates ultrasound source signals and masks for k-Wave simulations based on transducer geometry.</td>
+</tr>
+<tr>
+<td><code>source_sensor_setup</code></td>
+<td>Configure a k-Wave simulation grid, transducer sources, and sensor mask based on input parameters for recording pressure fields in 2D or 3D ultrasonic neuromodulation setups.</td>
+</tr>
+<tr>
+<td><code>water_grid_dims</code></td>
+<td>Free-water grid size from the transducer aperture and focal depth</td>
+</tr>
+</tbody>
+</table>
+<h4 id="telemetry">TELEMETRY<a class="headerlink" href="#telemetry" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>generate_run_id</code></td>
+<td>Generate a random UUID v4 string for telemetry.</td>
+</tr>
+<tr>
+<td><code>prefdir_prestus</code></td>
+<td>Return (and create) the PRESTUS per-user preferences directory.</td>
+</tr>
+<tr>
+<td><code>telemetry_env_override</code></td>
+<td>Read the PRESTUS_TELEMETRY environment variable.</td>
+</tr>
+<tr>
+<td><code>telemetry_has_display</code></td>
+<td>True when MATLAB can render a figure/dialog window.</td>
+</tr>
+<tr>
+<td><code>telemetry_is_headless_cluster</code></td>
+<td>True for compiled apps and SLURM/PBS jobs.</td>
+</tr>
+<tr>
+<td><code>telemetry_is_noninteractive</code></td>
+<td>True when no telemetry prompt may be shown.</td>
+</tr>
+<tr>
+<td><code>telemetry_run_type</code></td>
+<td>Resolve whether this run is 'technical' or 'deployment'.</td>
+</tr>
+<tr>
+<td><code>telemetry_set_consent</code></td>
+<td>Record a telemetry opt-in or opt-out decision.</td>
+</tr>
+<tr>
+<td><code>telemetry_setup</code></td>
+<td>Show the opt-in prompt for anonymous usage statistics.</td>
+</tr>
+<tr>
+<td><code>telemetry_setup_reset</code></td>
+<td>Remove the telemetry consent file so the opt-in</td>
+</tr>
+<tr>
+<td><code>track_usage</code></td>
+<td>Send anonymous usage statistics to the PRESTUS telemetry endpoint.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="thermal">THERMAL<a class="headerlink" href="#thermal" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cem43_iso_increment</code></td>
+<td>ISO thermal-dose (CEM43) increment for one time step</td>
+</tr>
+<tr>
+<td><code>thermal_absorption_model</code></td>
+<td>Resolve how acoustic heat deposition is specified</td>
+</tr>
+<tr>
+<td><code>thermal_absorption_properties</code></td>
+<td>Absorption model, coefficient and fraction of one tissue</td>
+</tr>
+<tr>
+<td><code>thermal_analysis</code></td>
+<td>Analyze output of thermal simulations</td>
+</tr>
+<tr>
+<td><code>thermal_grid_setup</code></td>
+<td>Build an independent k-Wave grid for thermal simulation</td>
+</tr>
+<tr>
+<td><code>thermal_parameters</code></td>
+<td>Checks and converts protocol timing setup for thermal estimation</td>
+</tr>
+<tr>
+<td><code>thermal_plot_protocol</code></td>
+<td>Visualize the requested protocol timing</td>
+</tr>
+<tr>
+<td><code>thermal_plot_sim</code></td>
+<td>Visualizes heating simulation results over time (temperature, rise, CEM43). Optional video</td>
+</tr>
+<tr>
+<td><code>thermal_simulation</code></td>
+<td>Simulate ultrasound-induced heating and thermal dose (CEM43) using k-Wave’s kWaveDiffusion from acoustic pressure data across pulsed train repetitions.</td>
+</tr>
+<tr>
+<td><code>thermal_stage</code></td>
+<td>Run or load the bio-heat thermal simulation (Stage 8).</td>
+</tr>
+<tr>
+<td><code>thermal_update_timeseries</code></td>
+<td>Track max T/CEM43 per tissue layer.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="transducer">TRANSDUCER<a class="headerlink" href="#transducer" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>annular_aperture_points</code></td>
+<td>Sample points on the radiating surface of a curved annular array</td>
+</tr>
+<tr>
+<td><code>annular_bowl_depth_mm</code></td>
+<td>Distance from the transducer position (bowl apex) to the exit plane</td>
+</tr>
+<tr>
+<td><code>annular_geometric_phases</code></td>
+<td>Ring phases that steer a curved annular array to a point, in water</td>
+</tr>
+<tr>
+<td><code>convert_to_element_pos</code></td>
+<td>Generate element positions for matrix transducers</td>
+</tr>
+<tr>
+<td><code>exit_plane_depth_mm</code></td>
+<td>Distance from the bowl apex to the exit plane used for placement</td>
+</tr>
+<tr>
+<td><code>extract_element_pos</code></td>
+<td>Read matrix transducer element positions from file</td>
+</tr>
+<tr>
+<td><code>fill_annular_drive</code></td>
+<td>Steering phases and drive of an annular transducer from its depth setting</td>
+</tr>
+<tr>
+<td><code>focal_distance_calculation</code></td>
+<td>Compute expected focal distances for (multi-)transducer setup.</td>
+</tr>
+<tr>
+<td><code>get_arc</code></td>
+<td>Generates the coordinates of an arc in 2D space.</td>
+</tr>
+<tr>
+<td><code>get_trans_pos_from_trigger_markers</code></td>
+<td>Determines transducer and target positions using Localite trigger marker files.</td>
+</tr>
+<tr>
+<td><code>get_transducer_box</code></td>
+<td>Computes transducer box dimensions and positions for simulations.</td>
+</tr>
+<tr>
+<td><code>is_flat_matrix</code></td>
+<td>True for a flat matrix array (is_curved false or infinite radius)</td>
+</tr>
+<tr>
+<td><code>matrix_elem_diameter</code></td>
+<td>Aperture diameter of a disc/bowl matrix element (equal-area or <code>elem_diameter_mm</code>).</td>
+</tr>
+<tr>
+<td><code>matrix_element_aim</code></td>
+<td>Point each matrix element faces (its normal), curved or flat</td>
+</tr>
+<tr>
+<td><code>reciprocity_pose_candidates</code></td>
+<td>Transducer poses around the planned one, for scoring on one reverse field</td>
+</tr>
+<tr>
+<td><code>reciprocity_score_poses</code></td>
+<td>Score transducer poses on one reverse field (acoustic reciprocity)</td>
+</tr>
+<tr>
+<td><code>tp_candidate_mesh</code></td>
+<td>Build coordinate mesh and candidate transducer geometry.</td>
+</tr>
+<tr>
+<td><code>tp_evaluate_candidate_positions</code></td>
+<td>Evaluate candidate transducer positions.</td>
+</tr>
+<tr>
+<td><code>tp_find_initial_candidate</code></td>
+<td>Find candidate transducer positions on skull surface.</td>
+</tr>
+<tr>
+<td><code>tp_plot_candidate_positions</code></td>
+<td>Plot transducer candidate positions on skull surface slice.</td>
+</tr>
+<tr>
+<td><code>tp_plot_geometry_overlay</code></td>
+<td>Visualize transducer geometry on skin segmentation slice.</td>
+</tr>
+<tr>
+<td><code>tp_plot_heuristic_position</code></td>
+<td>Create visualization of heuristic transducer placement.</td>
+</tr>
+<tr>
+<td><code>tp_remove_ear_locations</code></td>
+<td>Exclude ear entries from heuristic transducer positions.</td>
+</tr>
+<tr>
+<td><code>tp_scalp_boundary</code></td>
+<td>Outer (scalp) boundary voxels of a segmented head volume</td>
+</tr>
+<tr>
+<td><code>tp_select_heuristic_position</code></td>
+<td>Select optimal transducer position and export Localite coordinates.</td>
+</tr>
+<tr>
+<td><code>transducer_analyze_position</code></td>
+<td>Computes geometric and statistical measures for a transducer position.</td>
+</tr>
+<tr>
+<td><code>transducer_analyze_position_fast</code></td>
+<td>Analyzes the transducer position relative to the skull and skin.</td>
+</tr>
+<tr>
+<td><code>transducer_positioning</code></td>
+<td>Determines heuristic transducer placement for a given target.</td>
+</tr>
+<tr>
+<td><code>transducer_positioning_start</code></td>
+<td>Dispatch transducer positioning to MATLAB or HPC</td>
+</tr>
+<tr>
+<td><code>transducer_scalp_geometry</code></td>
+<td>Place a transducer on the scalp with a standoff gap</td>
+</tr>
+<tr>
+<td><code>transducer_setup</code></td>
+<td>Create a transducer mask and label matrix for a computational grid.</td>
+</tr>
+<tr>
+<td><code>validate_annular_transducer</code></td>
+<td>Validate configuration fields of an annular transducer</td>
+</tr>
+<tr>
+<td><code>validate_matrix_transducer</code></td>
+<td>Validate and normalise configuration of a matrix transducer</td>
+</tr>
+</tbody>
+</table>
+<h4 id="transform">TRANSFORM<a class="headerlink" href="#transform" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>affine_apply_pts</code></td>
+<td>Apply a 4×4 affine to a set of 3-D points (row-vector convention)</td>
+</tr>
+<tr>
+<td><code>affine_bounds</code></td>
+<td>Compute output bounding box after applying an affine transform</td>
+</tr>
+<tr>
+<td><code>affine_resample_3d</code></td>
+<td>Resample a 3D (or 4D) volume under an affine transform</td>
+</tr>
+<tr>
+<td><code>canonical_affine_transform</code></td>
+<td>Set NIfTI affine to a diagonal voxel-scaling matrix (LPI origin)</td>
+</tr>
+<tr>
+<td><code>convert_2d_to_axisymmetric</code></td>
+<td>Converts 2D k-Wave simulation grid, medium properties, and source to axisymmetric form by halving the shorter dimension (right half from center).</td>
+</tr>
+<tr>
+<td><code>convert_axisymmetric_to_2d</code></td>
+<td>Mirrors axisymmetric simulation data (sensor, medium, masks, source) left-right to full 2D, doubles radial dimension, transposes axes, and updates kgrid/positions.</td>
+</tr>
+<tr>
+<td><code>convert_axisymmetric_to_3d</code></td>
+<td>Expands 2D axisymmetric data (via radialExpand2DTo3D) to full 3D grid by duplicating radial dimension, updates positions/grid/kgrid for cubic symmetry.</td>
+</tr>
+<tr>
+<td><code>convert_final_to_MNI_matlab</code></td>
+<td>Converts an image from subject space to MNI space using MATLAB.</td>
+</tr>
+<tr>
+<td><code>convert_final_to_MNI_simnibs</code></td>
+<td>Converts an image to MNI space using SimNIBS.</td>
+</tr>
+<tr>
+<td><code>ensure_ras_plus</code></td>
+<td>Reorient a NIfTI volume to RAS+ if needed</td>
+</tr>
+<tr>
+<td><code>grid_mm_to_voxel</code></td>
+<td>Grid position in mm to a 1-based voxel index</td>
+</tr>
+<tr>
+<td><code>grid_to_ras</code></td>
+<td>Converts 1-based voxel indices to RAS coordinates (inverse of <code>ras_to_grid</code>).</td>
+</tr>
+<tr>
+<td><code>grid_to_ras_affine</code></td>
+<td>Build the acoustic-grid-voxel -&gt; RAS-mm affine</td>
+</tr>
+<tr>
+<td><code>mni2subject_coords_LDfix</code></td>
+<td>Transforms a set of coordinates in MNI space to subject space.</td>
+</tr>
+<tr>
+<td><code>nifti_affine_from_1based</code></td>
+<td>Turns an affine on 1-based voxel indices into a NIfTI header affine (0-based indices).</td>
+</tr>
+<tr>
+<td><code>radialExpand2DTo3D</code></td>
+<td>Radially expands 2D axisymmetric data into 3D Cartesian volume.</td>
+</tr>
+<tr>
+<td><code>ras_to_grid</code></td>
+<td>Converts RAS coordinates to 1-based voxel (grid) indices using the NIfTI header affine.</td>
+</tr>
+<tr>
+<td><code>sample_volume_at_world</code></td>
+<td>Nearest-neighbour values of a NIfTI volume at world (RAS/MNI mm) positions; NaN outside.</td>
+</tr>
+<tr>
+<td><code>subject2mni_coords_LDfix</code></td>
+<td>Transforms a set of coordinates in MNI space to subject space.</td>
+</tr>
+<tr>
+<td><code>transform_coordinates</code></td>
+<td>Transform input coordinates between coordinate systems (wrapper) space.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="uncertainty">UNCERTAINTY<a class="headerlink" href="#uncertainty" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><strong>Function Name</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cleanup_uncertainty_intermediates</code></td>
+<td>Delete large intermediate cache files after uncertainty analysis</td>
+</tr>
+<tr>
+<td><code>uncertainty_variants</code></td>
+<td>The simulation variants of the uncertainty pipeline</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["navigation.sections","navigation.expand","content.code.copy"],"redirect":null,"search":"../assets/javascripts/workers/search.719e0d91.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"main","provider":"mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.3cb411a8.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+        <script src="../javascripts/header_home_link.js"></script>
+      
+        <script src="../javascripts/developer_details.js"></script>
+      
+        <script src="../javascripts/usage_statistics.js"></script>
+      
+    
+  </body>
+</html>
