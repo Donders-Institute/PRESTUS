@@ -19,7 +19,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_shell_
 % Run with:   results = runtests('tests/test_shell_quote_arg.m');
 
     properties
-        TmpDir
+        TmpDir = ''   % stays '' when setup skips the test (Windows)
     end
 
     methods (TestMethodSetup)

@@ -130,6 +130,7 @@ def test_coordinate_entry_ras_and_voxel(app, schema, prestus_root, subject):
     np.testing.assert_allclose(page.cursor, pl.prestus_voxel_to_ras(page.t1, [61, 61, 61]))
 
 
+@pytest.mark.posix
 def test_mni_entry_uses_nonl_for_focus_and_affine_for_transducer(app, schema, prestus_root,
                                                                  subject, tmp_path, monkeypatch):
     from PyQt6.QtWidgets import QMessageBox
@@ -152,6 +153,7 @@ def test_mni_entry_uses_nonl_for_focus_and_affine_for_transducer(app, schema, pr
     np.testing.assert_allclose(m.get("transducer.trans_pos"), [5.0, 5.0, 5.0])
 
 
+@pytest.mark.posix
 def test_mni_entry_falls_back_to_affine_when_nonlinear_fails(app, schema, prestus_root, subject,
                                                               tmp_path, monkeypatch):
     from PyQt6.QtWidgets import QMessageBox

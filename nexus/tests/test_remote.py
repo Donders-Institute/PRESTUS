@@ -48,8 +48,8 @@ def test_remote_root(tmp_path):
 def test_ssh_argv():
     r = rmt.RemoteHost("me@login", setup="module load slurm")
     argv = r.wrap(["squeue", "-o", "%i %T"])
-    assert argv[:-2] == ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
-                         "-o", f"ControlPath={rmt.control_path()}"]
+    shared = ["-o", f"ControlPath={rmt.control_path()}"] if rmt.sharing_supported() else []
+    assert argv[:-2] == ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15"] + shared
     assert rmt.host_of(argv) == "me@login"
     assert argv[-2] == "me@login"
     assert argv[-1] == "bash -lc 'module load slurm && squeue -o '\"'\"'%i %T'\"'\"''"
@@ -80,6 +80,7 @@ def test_askpass_wrapper_starts_the_nexus_askpass(tmp_path, monkeypatch):
     assert seen == ["me@login's password:"]
 
 
+@pytest.mark.posix
 def test_submit_command_survives_both_shells(tmp_path, prestus_root):
     """Run the remote command string as sshd would (the login shell parses it once) with a
     fake matlab that prints its -batch argument: the MATLAB statement must arrive intact."""
@@ -190,6 +191,7 @@ def test_query_and_cancel_over_ssh(monkeypatch):
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
+@pytest.mark.posix
 def test_run_page_submits_over_ssh(schema, prestus_root, tmp_path, monkeypatch):
     pytest.importorskip("PyQt6")
     from PyQt6.QtCore import QEventLoop, QTimer
@@ -240,6 +242,7 @@ def test_run_page_submits_over_ssh(schema, prestus_root, tmp_path, monkeypatch):
     page.jobs_timer.stop()
 
 
+@pytest.mark.posix
 def test_run_page_connects_with_askpass(schema, prestus_root, tmp_path, monkeypatch):
     """Connect… runs the ControlMaster login with SSH_ASKPASS pointing at the Nexus helper."""
     pytest.importorskip("PyQt6")

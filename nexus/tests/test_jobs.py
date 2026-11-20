@@ -89,7 +89,7 @@ def test_query_updates_open_jobs_only(monkeypatch):
 
 
 def test_read_log_from_folder(tmp_path):
-    (tmp_path / "sub-001_slurm_output_77.log").write_text("line 1\nline 2\n")
+    (tmp_path / "sub-001_slurm_output_77.log").write_text("line 1\nline 2\n", newline="\n")  # as on the cluster
     job = jobs.Job("77", work_dir=str(tmp_path))
     path, text = jobs.read_log(job, "output")
     assert path.endswith("sub-001_slurm_output_77.log") and text == "line 1\nline 2\n"
@@ -100,7 +100,7 @@ def test_read_log_from_folder(tmp_path):
 def test_read_log_through_folder_mapping(tmp_path):
     from prestus_nexus.remote import RemoteHost
     (tmp_path / "log_hpc").mkdir()
-    (tmp_path / "log_hpc" / "sub-001_job77_report.txt").write_text("Wall time: 1 h\n")
+    (tmp_path / "log_hpc" / "sub-001_job77_report.txt").write_text("Wall time: 1 h\n", newline="\n")
     r = RemoteHost("h", path_map=[(str(tmp_path), "/project/x")])
     path, text = jobs.read_log(jobs.Job("77", work_dir="/project/x/log_hpc"), "report", r)
     assert text == "Wall time: 1 h\n" and path.startswith(str(tmp_path))

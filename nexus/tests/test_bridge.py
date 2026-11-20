@@ -21,7 +21,8 @@ FAKE = Path(__file__).with_name("fake_bridge.py")
 def test_bridge_command_starts_nexus_bridge(tmp_path):
     argv = br.bridge_command("/m/matlab", Path("/opt/PRESTUS"), tmp_path / "b")
     assert argv[:2] == ["/m/matlab", "-batch"]
-    assert "addpath('/opt/PRESTUS/functions/helper', '/opt/PRESTUS/functions/gui')" in argv[2]
+    fn = Path("/opt/PRESTUS") / "functions"          # the platform's separators
+    assert f"addpath('{fn / 'helper'}', '{fn / 'gui'}')" in argv[2]
     assert f"nexus_bridge('{tmp_path / 'b'}', IdleTimeout=" in argv[2]
 
 

@@ -6,7 +6,9 @@ document$.subscribe(function () {
   if (!logo || !title || title.dataset.homeLink) return;
   title.dataset.homeLink = "1";
   title.style.cursor = "pointer";
-  title.addEventListener("click", function () {
+  title.addEventListener("click", function (event) {
+    // the version selector sits inside the title: its clicks switch versions
+    if (event.target.closest(".md-version")) return;
     window.location.href = logo.href;
   });
 });

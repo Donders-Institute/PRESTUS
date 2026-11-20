@@ -105,7 +105,11 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_nexus_
             tc.verifyEqual(o.measured_depths, dm);
             tc.verifyNotEmpty(o.default_depths);
             v = nexus_calibration(struct('action', 'view', 'session', 't', 'predicted', false, 'settings', st));
-            tc.verifyEqual(fieldnames(v.results), {'geometric'});
+            expected = {'geometric'};
+            if ~isempty(o.library_file)                % a shipped entry for this transducer
+                expected{end + 1, 1} = 'library';
+            end
+            tc.verifyEqual(fieldnames(v.results), expected);
             tc.verifyEqual(numel(v.results.geometric.Imod), 3);           % one cell per column
             f = nexus_calibration(struct('action', 'fit', 'session', 't', 'settings', st, ...
                 'mode', 'per_depth', 'free_params', {{'phase'; 'amp'}}, 'calibrate_at', 'measured', ...

@@ -22,8 +22,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_comman
 % Run with:   results = runtests('tests/test_command_injection.m');
 
     properties
-        TmpDir
-        OrigDir
+        TmpDir = ''   % both stay '' when setup skips the test (Windows)
+        OrigDir = ''
         SentinelName  % bare filename (no path separators — must be embeddable
                       % inside a single hostile path *component*)
         Sentinel      % full path a successful injection would create; must never appear
@@ -50,6 +50,9 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_comman
 
     methods (TestMethodTeardown)
         function cleanup(tc)
+            if isempty(tc.OrigDir)          % setup skipped the test (Windows)
+                return
+            end
             cd(tc.OrigDir);
             if isfolder(tc.TmpDir)
                 rmdir(tc.TmpDir, 's');

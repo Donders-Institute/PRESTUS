@@ -82,8 +82,10 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_neuron
             p = tc.params();
             neuronav_ingest_batch(p);
             neuronav_ingest_batch(p, {'sub-001', 'ses-01'});
-            T = readtable(fullfile(p.path.localite_post, 'neuronav_ingest_summary.csv'), 'TextType', 'char');
-            tc.verifyEqual(height(T), 8, 'Re-running one session must not duplicate its rows');
+            f = fullfile(p.path.localite_post, 'neuronav_ingest_summary.csv');
+            T = readtable(f, 'TextType', 'char');
+            tc.verifyEqual(height(T), 8, sprintf( ...
+                'Re-running one session must not duplicate its rows. Summary file:\n%s', fileread(f)));
         end
 
         function test_named_mode_and_defaults(tc)

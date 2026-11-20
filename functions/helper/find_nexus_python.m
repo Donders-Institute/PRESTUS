@@ -27,8 +27,9 @@ function [python, tried] = find_nexus_python()
     end
     envs = conda_env_dirs();
     [~, names] = cellfun(@fileparts, envs, 'UniformOutput', false);
-    for env = envs(strcmp(names, 'prestus-nexus'))
-        candidates{end + 1} = env_python(env{1}); %#ok<AGROW>
+    hits = envs(strcmp(names, 'prestus-nexus'));
+    for k = 1:numel(hits)                  % by index: a 0x1 selection must not loop
+        candidates{end + 1} = env_python(hits{k}); %#ok<AGROW>
     end
     candidates = [candidates, {'python3', 'python'}];
     candidates = candidates(~cellfun(@isempty, candidates));

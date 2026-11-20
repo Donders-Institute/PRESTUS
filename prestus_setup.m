@@ -83,12 +83,31 @@ function fetch_submodules(root, missing)
         return
     end
     fprintf('Fetching required submodules: %s\n', strjoin(missing, ', '));
+    [env, extra_path] = git_environment();
     [status, out] = run_command([{'git', '-C', root, 'submodule', 'update', ...
-        '--init', '--'}, missing], 'Echo', true);
+        '--init', '--'}, missing], 'Echo', true, 'Env', env, 'ExtraPath', extra_path);
     if status == 127
         fprintf('git was not found; install git or download the submodules by hand.\n');
     elseif status ~= 0
         warning('prestus:submodules', 'git submodule update failed (exit %d):\n%s', ...
             status, strtrim(out));
+    end
+end
+
+function [env, extra_path] = git_environment()
+% Environment for git started from MATLAB. Linux: MATLAB's LD_LIBRARY_PATH makes git's
+% https helper load MATLAB's own libssh2/libcurl, which lack symbols the system libcurl
+% needs. Windows: 'git submodule' is a shell script that sources git-sh-setup from git's
+% exec path, which must be on PATH.
+    env = struct();
+    extra_path = {};
+    if isunix && ~ismac
+        env.LD_LIBRARY_PATH = '';
+    elseif ispc
+        [status, exec_path] = run_command({'git', '--exec-path'});
+        exec_path = strtrim(exec_path);
+        if status == 0 && isfolder(exec_path)
+            extra_path = {exec_path};
+        end
     end
 end

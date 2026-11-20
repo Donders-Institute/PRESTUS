@@ -30,4 +30,5 @@ prestus_nexus = ["overlay.yaml", "run_presets.yaml", "throughput.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["matlab: needs a local MATLAB installation (set PRESTUS_MATLAB or have matlab on PATH)"]
+markers = ["matlab: needs a local MATLAB installation (set PRESTUS_MATLAB or have matlab on PATH)",
+           "posix: uses shell-script stand-ins for programs or the Linux cluster layout; skipped on Windows"]

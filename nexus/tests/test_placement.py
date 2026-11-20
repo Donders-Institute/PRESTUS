@@ -226,6 +226,7 @@ def _fake_mni2subject_coords(bin_dir, offset=(1.0, 2.0, 3.0)):
     return exe
 
 
+@pytest.mark.posix
 def test_mni_to_subject(tmp_path):
     bin_dir, m2m = tmp_path / "bin", tmp_path / "m2m_sub-001"
     bin_dir.mkdir()

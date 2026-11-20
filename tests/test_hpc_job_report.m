@@ -55,6 +55,7 @@ classdef (SharedTestFixtures = {prestus_paths}) test_hpc_job_report < matlab.uni
             % The script uses $@ to detect which format flags were passed:
             %   --allocations → emit alloc_output
             %   otherwise     → emit rss_output (MaxRSS query)
+            tc.assumeFalse(ispc, 'The mock sacct is a shell script (SLURM runs on Linux).');
             mock_path = fullfile(tc.MockBinDir, 'sacct');
             fid = fopen(mock_path, 'w');
             fprintf(fid, '#!/bin/sh\n');

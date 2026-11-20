@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -8,6 +9,16 @@ PRESTUS_ROOT = NEXUS_DIR.parent
 sys.path.insert(0, str(NEXUS_DIR))
 
 from prestus_nexus.schema import Schema  # noqa: E402
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip tests marked posix on Windows: their stand-in programs are shell scripts."""
+    if os.name != "nt":
+        return
+    skip = pytest.mark.skip(reason="POSIX only: shell-script stand-ins or the Linux cluster layout")
+    for item in items:
+        if "posix" in item.keywords:
+            item.add_marker(skip)
 
 
 @pytest.fixture(scope="session")

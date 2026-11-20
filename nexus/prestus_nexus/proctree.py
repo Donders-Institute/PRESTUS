@@ -125,4 +125,16 @@ def alive(pid: int) -> bool:
         return False
     except OSError:
         return True
-    return True
+    return not _zombie(pid)
+
+
+def _zombie(pid: int) -> bool:
+    """pid has ended but its parent has not collected it yet (POSIX): it still answers
+    kill(pid, 0), but nothing is running. Qt collects its children only while its event
+    loop runs."""
+    try:
+        out = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True,
+                             text=True, timeout=5, check=False).stdout
+    except Exception:
+        return False
+    return out.strip().startswith("Z")

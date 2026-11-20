@@ -16,7 +16,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_run_co
 % Run with:   results = runtests('tests/test_run_command.m');
 
     properties
-        TmpDir
+        TmpDir = ''   % stays '' when setup skips the test (Windows)
     end
 
     methods (TestMethodSetup)

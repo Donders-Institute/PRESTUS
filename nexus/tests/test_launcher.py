@@ -90,6 +90,7 @@ def fake_matlab(tmp_path):
     return make
 
 
+@pytest.mark.posix
 @pytest.mark.parametrize("ok", [True, False])
 def test_run_page_streams_and_reports(schema, prestus_root, tmp_path, fake_matlab, ok):
     pytest.importorskip("PyQt6")

@@ -141,6 +141,7 @@ def _run_scan(home: Path) -> str:
                           text=True, timeout=60).stdout
 
 
+@pytest.mark.posix
 @pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
 def test_remote_scan_script_finds_installs(tmp_path):
     from prestus_nexus import remote
@@ -211,6 +212,7 @@ def _with_python(bin_dir: Path) -> Path:
     return py
 
 
+@pytest.mark.posix
 def test_install_python_and_libraries(tmp_path):
     b = _conda_env(tmp_path, "simnibs_v4.6.0", "4.6.0")
     py = _with_python(b)
@@ -240,6 +242,7 @@ def test_owns_and_linked_mismatches(tmp_path):
     assert [k for k, _ in sn.linked_mismatches(values.get, a)] == ["placement.plantus.env_path"]
 
 
+@pytest.mark.posix
 @pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
 def test_remote_scan_reports_python_and_libraries(tmp_path):
     from prestus_nexus import remote

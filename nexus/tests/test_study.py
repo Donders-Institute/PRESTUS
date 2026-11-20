@@ -87,7 +87,7 @@ def test_import_neuronav_summary(tmp_path):
 def test_resolve_manifest(tmp_path):
     cfg = tmp_path / "cfg" / "config_s.yaml"
     assert resolve_manifest(cfg, "study.tsv") == tmp_path / "cfg" / "study.tsv"
-    assert resolve_manifest(cfg, "/abs/m.tsv").as_posix() == "/abs/m.tsv"
+    assert resolve_manifest(cfg, str(tmp_path / "abs" / "m.tsv")) == tmp_path / "abs" / "m.tsv"
     assert resolve_manifest(cfg, "") is None
 
 
@@ -109,6 +109,7 @@ def test_study_launcher_and_commands(tmp_path, prestus_root):
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
+@pytest.mark.posix
 def test_study_page_edit_save_and_dry_run(schema, prestus_root, tmp_path):
     pytest.importorskip("PyQt6")
     from PyQt6.QtCore import QEventLoop, QTimer
