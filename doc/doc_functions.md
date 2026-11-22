@@ -435,8 +435,10 @@ On this page:
 | `nifti_thermal`                         | Export thermal-stage data to NIfTI in T1 and MNI space |
 | `nifti_to_mni`                          | Convert a T1-space NIfTI to MNI space via SimNIBS |
 | `nifti_to_t1w`                          | Back-transform one volume to T1 space and write NIfTI |
+| `nifti_transducer`                      | Export a model of the planned transducer in T1 space |
 | `phantom_voxel_order`                   | Return a non-layered output volume to the voxel order of its input |
 | `simnibs_t1_to_mni`                     | Register subject T1 to MNI space if not already done |
+| `write_transducer_nifti`                | Write a transducer model on the exact voxel grid of a T1 |
 
 #### PSEUDO-CT
 

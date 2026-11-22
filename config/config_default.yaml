@@ -102,6 +102,8 @@ io:
   save_thermal_matrices: []   # [1] heating_res.mat — temperature timeseries and field maps
   save_heatingvideo: 0      # Save a video of incremental heating?
   save_property_maps: 0    # Save per-property NIfTIs to nii/properties/ (layered medium only)
+  save_transducer_nii: 1   # Save a model of the planned transducer (emitting face 1, thickness behind it 0.5) as a T1-space NIfTI, for placement checks (layered medium, annular transducers)
+  transducer_nii_back_mm: 3 # Thickness added behind the emitting face in that NIfTI (value 0.5), for display [mm]; 0 = face only
   save_MNI: 1              # Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)
   deface_plots: 1          # Remove facial anatomy from QC figures (cut plane anchored at the SimNIBS eye label); saved NIfTIs are not changed (see segmentation.deface)
   save_Ipa: 1              # Save pulse-average intensity (Ipa) NIfTI map; suppressed automatically when timing.pd absent
