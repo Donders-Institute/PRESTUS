@@ -12,6 +12,9 @@ def main(argv: list[str] | None = None) -> int:
     if argv[:1] == ["--askpass"]:                 # ssh's password prompt (remote.askpass_env)
         from .askpass import run
         return run(" ".join(argv[1:]))
+    if argv[:1] == ["--update"]:                  # headless: check for / move to a release
+        from .update import main as update_main
+        return update_main(argv[1:])
     from .localcopy import local_main     # from a network drive: start from a local copy
     local = local_main()
     if local is not None:
@@ -19,6 +22,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="prestus-nexus", description=__doc__)
     parser.add_argument("config", nargs="?", help="study config YAML to open directly")
     parser.add_argument("--prestus-root", help="PRESTUS checkout (default: auto-detect)")
+    parser.epilog = ("Updating PRESTUS without the window: prestus-nexus --update [--check] "
+                     "[--to TAG]  (see prestus-nexus --update --help)")
     args = parser.parse_args(argv)
 
     from PyQt6.QtCore import QCoreApplication, Qt

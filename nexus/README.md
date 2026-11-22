@@ -76,6 +76,7 @@ PRESTUS itself is found automatically, as the checkout this folder lives in. You
 | `quickstart.py` | QuickStart tab logic without Qt: config keys from one T1 file (pattern, subject, T2, segmentation folder), default results folder, SimNIBS discovery on macOS/Windows/Linux. |
 | `fsio.py` | Atomic file writes: a temporary file in the same folder replaces the target only once complete. |
 | `undo.py` | *Edit ▸ Undo / Redo*: the history of model changes; typing in one field forms one step. |
+| `update.py` | *Help ▸ Check for updates…* (`ui/update_dialog.py`) and `prestus-nexus --update`: compares the checkout with the latest release tag and moves to it. Standard library only, so it also runs as a plain script. |
 | `telemetry.py` | *Tools ▸ Usage statistics…*: reads and writes the consent record `~/.prestus/telemetry.json` that MATLAB uses; sends nothing. |
 | `docs.py` | Links into the documentation (published pages or local `doc/*.md`) and the Help menu. |
 | `multitransducer.py` | Grid orientation of a multi-transducer run under `grid.mode` and each beam's tilt (ports of `mean_beam_axis.m` and `preproc_head.m`). |

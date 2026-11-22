@@ -748,6 +748,17 @@ class MainWindow(QMainWindow):
         help_menu = self.menuBar().addMenu("&Help")
         tab_docs = docs.build_help_menu(help_menu, self._current_tab, parent=self, session=self.session)
         tab_docs.setShortcut(QKeySequence("F1"))
+        updates = QAction("Check for updates…", self)
+        updates.setToolTip("Compare this PRESTUS with the latest release and update to it")
+        updates.triggered.connect(self.check_for_updates)
+        about = help_menu.actions()[-1]                  # keep About last
+        help_menu.insertAction(about, updates)
+        help_menu.insertSeparator(about)
+
+    def check_for_updates(self) -> None:
+        """Help ▸ Check for updates…: contacts the release repository only when asked."""
+        from .update_dialog import show_update_dialog
+        show_update_dialog(self.prestus_root, self)
 
     def _build_shortcuts(self) -> None:
         """Ctrl+1…9 jump to the workflow tabs; Ctrl+Shift+V validates, Ctrl+R runs locally."""
