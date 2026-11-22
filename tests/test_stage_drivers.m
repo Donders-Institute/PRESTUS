@@ -337,8 +337,15 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
             tc.verifyEqual(r.maxT, ref.results_heating.maxT, 'AbsTol', 1e-9);
             tc.verifyEqual(r.CEM43, ref.results_heating.CEM43, 'AbsTol', 1e-9);
             tc.verifyGreaterThan(max(r.maxT - plus_crop.temp_0, [], 'all'), 0);
-            % Far corner, unheated: the cropped baseline, not the full grid's corner
-            tc.verifyEqual(r.maxT(1, 1, 1), plus_full.temp_0(offset(1), offset(2), offset(3)), 'AbsTol', 1e-3);
+            % Far corner, unheated: it starts from the cropped baseline (temp_0
+            % at the FOV offset, 37.21), not the full grid's corner (37.06). Its
+            % maximum lies a little above its start, as the warmer gradient
+            % diffuses into it (about 0.1 degC, also without a heat source), so
+            % it never falls below the cropped start; a wrong crop, starting
+            % from 37.06, stays below it.
+            tc.assertGreaterThan(plus_crop.temp_0(1, 1, 1) - plus_full.temp_0(1, 1, 1), 0.1);
+            tc.verifyGreaterThanOrEqual(r.maxT(1, 1, 1), plus_crop.temp_0(1, 1, 1) - 1e-6);
+            tc.verifyLessThan(r.maxT(1, 1, 1), plus_crop.temp_0(1, 1, 1) + 0.5);
         end
 
         function test_thermal_simulation_rejects_pressure_off_thermal_grid(tc)

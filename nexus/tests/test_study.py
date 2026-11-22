@@ -239,7 +239,7 @@ def test_study_page_open_group_report(schema, prestus_root, tmp_path, monkeypatc
     report.parent.mkdir(parents=True)
     report.write_text("<html></html>")
     page.open_group_report()
-    assert opened == [str(report)]
+    assert opened == [report.as_posix()]
 
 
 @pytest.mark.parametrize("medium,affix,expected", [
@@ -283,6 +283,6 @@ def test_study_page_group_report_without_a_study(schema, prestus_root, tmp_path,
     if study_config:
         assert not opened and "No group report yet" in told[0]
     else:
-        assert opened == [str(report)] and not told
+        assert opened == [report.as_posix()] and not told
     window.dirty = False
     window.close()

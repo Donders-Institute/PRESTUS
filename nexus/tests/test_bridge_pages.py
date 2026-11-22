@@ -184,7 +184,7 @@ def test_calibration_report_opens_the_entry_report(window, tmp_path, monkeypatch
     monkeypatch.setattr(window.fake, "call", call)
     page.open_report()
     assert calls[-1] == ("nexus_calibration", {"action": "report", "session": page.session_id})
-    assert opened == [str(html)] and html.name in page.log.toPlainText()
+    assert opened == [html.as_posix()] and html.name in page.log.toPlainText()
 
     page.entry, page.info = None, {}                    # negative control: no entry
     page._update_buttons()

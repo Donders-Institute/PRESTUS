@@ -552,7 +552,7 @@ def test_charm_report_card(window, tmp_path, monkeypatch):
     monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()))
     window.simnibs_panel.refresh()
     window.simnibs_panel.report.click()               # 'Open charm report': the browser
-    assert opened == [str(m2m / "charm_report.html")]
+    assert opened == [(m2m / "charm_report.html").as_posix()]
     window.model.set("simulation.medium", "water")
     tab.refresh()
     assert card.isHidden()

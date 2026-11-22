@@ -141,7 +141,7 @@ def test_shipped_targets(tmp_path):
     (shipped / "model-CTX_500").mkdir(parents=True)
     entry = {"serial": "CTX_500_099", "model": "CTX_500"}
     files = ed.target_files(entry, tmp_path / "own", None, [ed.NewDrivingSystem("D1")], shipped=shipped)
-    assert sorted(str(p.relative_to(shipped)) for p in files) == ["ds/ds-D1_driver.yaml",
+    assert sorted(p.relative_to(shipped).as_posix() for p in files) == ["ds/ds-D1_driver.yaml",
                                                                     "model-CTX_500/tran-CTX_500_099_transducer.yaml"]
     files = ed.target_files({"serial": "NEW_X"}, tmp_path / "own", None, [], shipped=shipped)
     assert list(files) == [shipped / "NEW_X.yaml"]

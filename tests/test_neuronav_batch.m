@@ -86,6 +86,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_neuron
             T = readtable(f, 'TextType', 'char');
             tc.verifyEqual(height(T), 8, sprintf( ...
                 'Re-running one session must not duplicate its rows. Summary file:\n%s', fileread(f)));
+            tc.verifyFalse(any(contains(T.status, {char(10), char(13)})), 'a status spans lines');
         end
 
         function test_named_mode_and_defaults(tc)

@@ -97,6 +97,11 @@ function summary = neuronav_ingest_batch(parameters, selection, varargin)
     end
 
     summary = cell2table(rows, 'VariableNames', summary_vars());
+    if height(summary) > 0              % one line per field: a message with line breaks
+        for v = text_vars()             % (e.g. the T1 search) would split its CSV row
+            summary.(v{1}) = regexprep(summary.(v{1}), '\s*[\r\n]+\s*', '; ');
+        end
+    end
     if ~isempty(opt.summary_file)
         [summary_all, ok] = merge_summary(opt.summary_file, summary);
         out_file = opt.summary_file;

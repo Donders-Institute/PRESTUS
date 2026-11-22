@@ -694,15 +694,18 @@ class CalibrationPage(QWidget):
         self.report_btn.clicked.connect(self.open_report)
         s_row.addWidget(self.report_btn, 1)
         v.addLayout(s_row)
+        # grid choice on its own row: beside the button, the pair was the widest row of the step
         k_row = QHBoxLayout()
-        self.kw_btn = QPushButton("k-Wave drive check…")
-        self.kw_btn.clicked.connect(self.kwave_check)
-        k_row.addWidget(self.kw_btn, 1)
+        k_row.addWidget(QLabel("k-Wave grid"))
         self.kw_grid = QComboBox()
         self.kw_grid.addItems(["3D", "axisymmetric"])
         self.kw_grid.setToolTip("Free-water grid, unless the study config sets grid.axisymmetric")
         k_row.addWidget(self.kw_grid)
+        k_row.addStretch(1)
         v.addLayout(k_row)
+        self.kw_btn = QPushButton("k-Wave drive check…")
+        self.kw_btn.clicked.connect(self.kwave_check)
+        v.addWidget(self.kw_btn)
         self._tips = {
             self.load_btn: "Read the profiles in MATLAB (starts MATLAB on first use)",
             self.predict_btn: self.predict_btn.toolTip(),

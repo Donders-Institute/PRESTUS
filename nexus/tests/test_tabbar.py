@@ -66,7 +66,8 @@ def test_stretched_tab_keeps_icon_beside_label(app, with_icons):
         assert tab.width() > 300                              # stretched well beyond its contents
         if with_icons:
             # the icon + label group is narrow and centred, not spread over the whole tab
-            assert label.width() < tab.width() / 2
+            assert label.width() < tab.width() - 50               # its natural width, not the tab's
+            assert label.width() == bar._width_as(i, bar.tabText(i), bar.tabIcon(i))
             assert abs(label.center().x() - tab.center().x()) <= 1
         else:
             assert label == tab                               # negative control: text-only tabs as before
