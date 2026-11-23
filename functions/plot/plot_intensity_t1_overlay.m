@@ -179,7 +179,7 @@ if isstruct(inv_transf) && isfield(inv_transf, 'tdata')
     inv_transf = inv_transf.tdata.T;
 end
 [xi, zi] = ndgrid(1:t1_dims(1), 1:t1_dims(3));
-sim_pts  = affine_apply_pts([xi(:), repmat(y_slice, numel(xi), 1), zi(:)], inv(inv_transf));
+sim_pts  = affine_apply_pts([xi(:), repmat(y_slice, numel(xi), 1), zi(:)], affine_inverse(inv_transf));
 lo = fov_offset - 0.5;
 hi = fov_offset + fov_dims - 0.5;
 mask = reshape(all(sim_pts >= lo & sim_pts <= hi, 2), t1_dims([1 3]));

@@ -42,7 +42,7 @@ function out = affine_resample_3d(vol, M, out_size, method, fill)
         M = M.tdata.T;
     end
 
-    Minv = inv(M);
+    Minv = affine_inverse(M);
 
     [xi, yi, zi] = ndgrid(1:out_size(1), 1:out_size(2), 1:out_size(3));
     N = prod(out_size);

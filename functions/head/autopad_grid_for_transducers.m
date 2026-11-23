@@ -137,7 +137,7 @@ end
 
 % Update grid dimensions and inverse transform.
 parameters.grid.dims = size(medium_masks);
-planimg.inv_transf   = inv(planimg.transf);
+planimg.inv_transf   = affine_inverse(planimg.transf);
 
 fprintf('[autopad] Grid expanded: [%d %d %d] → [%d %d %d]\n', ...
     dims, parameters.grid.dims);

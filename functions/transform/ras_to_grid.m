@@ -25,13 +25,11 @@ arguments
     nii_header (1,1) struct
 end
 
-    if size(ras_pos, 2) == 3 && size(ras_pos, 1) == 1
-        ras_pos = ras_pos';  % Convert 1x3 → 3x1
+    if numel(ras_pos) ~= 3
+        error('PRESTUS:transform:onePoint', ...
+            'ras_to_grid takes one [3x1] or [1x3] position; use RAS_TO_VOXEL for several.');
     end
 
     % Inverse NIfTI affine gives the 0-based voxel; MATLAB arrays are 1-based
-    grid_pos = round(nii_header.Transform.T' \ [ras_pos; 1]) + 1;
-
-    % Extract x, y, z components (ignore homogeneous coordinate)
-    grid_pos = grid_pos(1:3)';
+    grid_pos = ras_to_voxel(reshape(ras_pos, 1, 3), nii_header, Round=true);
 end

@@ -216,7 +216,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
                 final_transformation_matrix, crop_translation_matrix] = ...
                 head_model_place(parameters, hm, trans_pos_grid, focus_pos_grid, preproc_fn, grid_mode);
             clear hm
-            inv_final_transformation_matrix = inv(final_transformation_matrix);
+            inv_final_transformation_matrix = affine_inverse(final_transformation_matrix);
             save(filename_cropped_smoothed_skull_data, 'medium_masks', 'segmentation_crop', 'bone_mask_crop', ...
                 'pseudoCT_crop', 'trans_pos_final', 'focus_pos_final', 'crop_translation_matrix', ...
                 'final_transformation_matrix', 'inv_final_transformation_matrix')
@@ -474,7 +474,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 
         % Combine transformations from focal axis alignment with crop
         final_transformation_matrix = scale_rotate_recenter_matrix*crop_translation_matrix';
-        inv_final_transformation_matrix = inv(final_transformation_matrix);
+        inv_final_transformation_matrix = affine_inverse(final_transformation_matrix);
 
         % Diagnostic NIfTIs: medium_masks, segmentation, and skull_mask
         % back-projected to T1 space. Written to io.dir_debug_preproc only

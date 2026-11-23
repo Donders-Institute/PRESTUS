@@ -40,8 +40,7 @@ function mni_ras = neuronav_apply_deformation(ras_seg, warp_field, warp_affine, 
     Fz = griddedInterpolant({1:dims(1), 1:dims(2), 1:dims(3)}, warp_field(:,:,:,3), 'linear', 'nearest');
 
     for i = 1:N
-        vox = (warp_affine' \ [ras_seg(i,:)'; 1])';
-        vox = vox(1:3) + 1;                                % 0-based -> 1-based (MATLAB) offset
+        vox = ras_to_voxel(ras_seg(i,:), warp_affine);     % 1-based, not rounded
         vox_c = max(min(vox, dims), [1 1 1]);              % keep in-bounds for indexing
         vox_r = round(vox_c);
 

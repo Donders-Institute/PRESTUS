@@ -43,7 +43,7 @@ M_1based_to_0based(4, 1:3) = -1;
 
 T = M_crop_to_full * planimg.inv_transf * M_1based_to_0based * planimg.t1_header.Transform.T;
 
-% Chaining matrix products (incl. an inv() inside planimg.inv_transf) leaves
+% Chaining matrix products leaves
 % floating-point noise (~1e-14) in what must be an exact [0;0;0;1] last
 % column for affine3d to accept the matrix — clean it up.
 T(1:3, 4) = 0;
