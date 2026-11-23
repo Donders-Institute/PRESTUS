@@ -104,3 +104,10 @@ core.*
 # Local unit-test coverage (tests/coverage_unit_job.m) #
 #################################################
 /tests/coverage/
+
+###########################################
+# Local builds and documentation drafts   #
+###########################################
+/build/
+/doc_drafts*/
+/mkdocs_drafts.yaml
