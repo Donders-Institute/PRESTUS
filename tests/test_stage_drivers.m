@@ -6,7 +6,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
 % zero source, temperature rise linear in intensity, analytic early-time rise,
 % k-Plan skull density on skull labels only), THERMAL_PLOT_SIM (heating video
 % with two transducers), THERMAL_STAGE (module/acoustics gating, run -> cache -> reload, missing cache
-% with overwrite 'never', separate thermal resolution / FOV, heating on the acoustic FOV), CACHE_ACOUSTIC (save/load round trip, ISPPA rescaling
+% with overwrite 'never', separate thermal resolution / FOV, heating on the acoustic FOV, heat source from
+% absorption_np), smoothed absorption within the tissue range at every tissue pair, CACHE_ACOUSTIC (save/load round trip, ISPPA rescaling
 % on load, stale-grid and corrupt-cache errors, kwave_medium flag) and
 % ACOUSTIC_STAGE's cache paths (no simulation requested, cache
 % hit, baseline taken from the live run, stale cache without a source, source
@@ -110,9 +111,10 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
 
         function test_thermal_kplan_skull_density_on_skull_labels_only(tc)
             % Pseudo-CT with k-Plan density mapping: every skull label gets
-            % 1850 kg/m^3, no other label does. Label values index
-            % medium_properties, so the result must not depend on the order
-            % or subset of p.layers.
+            % 1850 kg/m^3 in the heat equation (heat capacity, diffusion), no
+            % other label does; the heat source keeps the acoustic density, as
+            % k-Plan. Label values index medium_properties, so the result must
+            % not depend on the order or subset of p.layers.
             p = stage_params(tc.Dir);
             skull_names = {'skull', 'skull_cortical', 'skull_trabecular'};
             for n = skull_names
@@ -130,13 +132,22 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
             kgrid = kWaveGrid(p.grid.dims(1), d, p.grid.dims(2), d, p.grid.dims(3), d);
             pr = gaussian_p(p, 1e6);
 
-            % Reference: density 1850 set by hand on the skull labels, no pseudo-CT
+            % Reference, no pseudo-CT: density 1850 set by hand on the skull
+            % labels; the pressure there scaled by sqrt(1850 / 1500), so that
+            % Q = alpha p^2 / (rho c) equals the heat source with the acoustic
+            % density 1500
+            skull_vox = ismember(masks, cellfun(idx, skull_names));
             expected = kwave_medium;
-            expected.density(ismember(masks, cellfun(idx, skull_names))) = 1850;
-            [~, ~, ref] = run_thermal(p, pr, kgrid, expected, masks);
-            % Negative control: without the override the result differs
+            expected.density(skull_vox) = 1850;
+            pr_ref = pr;
+            pr_ref(skull_vox) = pr(skull_vox) * sqrt(1850 / 1500);
+            [~, ~, ref] = run_thermal(p, pr_ref, kgrid, expected, masks);
+            % Negative controls: without the override, and with 1850 also in
+            % the heat source (behaviour before 2026-11-20), the result differs
             [~, ~, plain] = run_thermal(p, pr, kgrid, kwave_medium, masks);
             tc.verifyGreaterThan(max(abs(plain.maxT(:) - ref.maxT(:))), 1e-6);
+            [~, ~, both] = run_thermal(p, pr, kgrid, expected, masks);
+            tc.verifyGreaterThan(max(abs(both.maxT(:) - ref.maxT(:))), 1e-6);
 
             q = p;
             q.pct.enabled = 1;
@@ -218,6 +229,62 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
             tc.verifyEqual(out2.parameters.state.heating_available, 1);
             tc.verifyEqual(out2.results_heating.maxT, out1.results_heating.maxT);
             tc.verifyEqual([out2.time_status_seq.time], [out1.time_status_seq.time]);
+        end
+
+        function test_thermal_stage_heats_from_absorption_np(tc)
+            % Fraction-only media: the heat source comes from absorption_np
+            % (smoothed as one map), not from the attenuation x fraction product.
+            % A zero absorption_np next to a non-zero fraction tells them apart;
+            % the negative control (no absorption_np, older caches) heats.
+            p = stage_params(tc.Dir);
+            p.modules.run_heating_sims = 1;
+            p.state.acoustics_available = 1;
+            [kgrid, med, masks, plus] = brain_medium(p);
+            tc.assertFalse(plus.absorption_from_coeff);
+            tc.assertGreaterThan(max(plus.absorption_fraction(:)), 0);
+            sd = struct('p_max_all', gaussian_p(p, 1e6));
+
+            plus_np = plus;
+            plus_np.absorption_np = zeros(p.grid.dims);
+            out = call_thermal_stage(p, sd, kgrid, med, plus_np, masks);
+            tc.verifyLessThan(max(abs(out.results_heating.maxT(:) - 37)), 1e-6);
+
+            plus_frac = rmfield(plus, 'absorption_np');
+            p.io.output_affix = '_frac';
+            out_frac = call_thermal_stage(p, sd, kgrid, med, plus_frac, masks);
+            tc.verifyGreaterThan(max(out_frac.results_heating.maxT(:)) - 37, 1e-3);
+        end
+
+        function test_smoothed_absorption_stays_within_tissue_range(tc)
+            % Every pair of tissues across a plane interface, properties
+            % smoothed: the heat-source absorption medium_setup hands the
+            % thermal stage (absorption_np) never exceeds the larger tissue
+            % value. Negative control: the product of the separately smoothed
+            % attenuation and fraction maps overshoots for at least one pair
+            % (skin/bone: attenuation rises where the fraction falls).
+            p = stage_params(tc.Dir);
+            p.headmodel.smooth_properties = true;
+            p.headmodel.smooth_fwhm_mm = 2;
+            labels = fieldnames(p.medium_properties);
+            tissues = intersect(fieldnames(p.layers), labels, 'stable');
+            w = 2 * pi * p.transducer.freq_hz;
+            old_overshoots = false;
+            for i = 1:numel(tissues)
+                for j = i + 1:numel(tissues)
+                    masks = find(strcmp(labels, tissues{i})) * ones(p.grid.dims);
+                    masks(:, :, 9:end) = find(strcmp(labels, tissues{j}));
+                    p_crisp = p;
+                    p_crisp.headmodel.smooth_properties = false;
+                    [~, crisp] = medium_setup(p_crisp, masks, struct());
+                    [med, plus] = medium_setup(p, masks, struct());
+                    top = max(crisp.absorption_np(:));
+                    tc.verifyLessThanOrEqual(max(plus.absorption_np(:)), top * (1 + 1e-6) + 1e-12, ...
+                        sprintf('%s -> %s: smoothed absorption exceeds the tissue values', tissues{i}, tissues{j}));
+                    old = db2neper(med.alpha_coeff .* plus.absorption_fraction, med.alpha_power) .* w .^ med.alpha_power;
+                    old_overshoots = old_overshoots || max(old(:)) > top * 1.05;
+                end
+            end
+            tc.verifyTrue(old_overshoots, 'negative control: no pair overshoots with the old product');
         end
 
         function test_thermal_stage_never_without_cache_simulates(tc)
@@ -610,7 +677,7 @@ function [obj, tss, res] = run_thermal(p, pr, kgrid, kwave_medium, masks, p_th)
     if nargin < 6; p_th = p; end
     [~, plus] = medium_setup(p, masks, struct());
     kwave_medium.temp_0 = plus.temp_0;
-    if plus.absorption_from_coeff   % as thermal_stage
+    if isfield(plus, 'absorption_np')   % as thermal_stage
         kwave_medium.absorption_np = plus.absorption_np;
     else
         kwave_medium.absorption_fraction = plus.absorption_fraction;

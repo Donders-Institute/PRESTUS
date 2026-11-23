@@ -141,12 +141,13 @@ if run_new_sim
     end
 
     kwave_medium.temp_0              = medium_plus.temp_0;
-    % absorption_np when any tissue uses an absorption coefficient; runs with
-    % fractions only keep the fraction x attenuation path (a medium cache
-    % without absorption_from_coeff holds one of the two maps)
-    if isfield(medium_plus, 'absorption_np') && ...
-            (~isfield(medium_plus, 'absorption_fraction') || ...
-             (isfield(medium_plus, 'absorption_from_coeff') && medium_plus.absorption_from_coeff))
+    % Heat source from absorption_np [Np/m]: fraction x attenuation formed per
+    % tissue and smoothed as one map (medium_setup). Multiplying the separately
+    % smoothed attenuation and fraction maps overshoots both tissues where one
+    % rises and the other falls (skin -> bone: up to 8x in the last skin voxel
+    % at 1 mm FWHM). The fraction path is kept for medium caches without
+    % absorption_np.
+    if isfield(medium_plus, 'absorption_np')
         kwave_medium.absorption_np = medium_plus.absorption_np;
     else
         kwave_medium.absorption_fraction = medium_plus.absorption_fraction;

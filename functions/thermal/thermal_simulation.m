@@ -121,9 +121,15 @@ end
 % Transducer position in grid coordinates
 tr = parameters.transducer(1);
 
+% Heat source density: the acoustic medium's (Q = alpha p^2 / (rho c) below)
+rho_source = kwave_medium.density;
+
 % [(pseudo-)CT] if 'k-plan' mapping is used for density:
-% skull bone density is fixed for thermal simulation
-% (note that downstream metrics such as sound speed contribute to pressure, but are not input to kWaveDiffusion)
+% skull bone density is fixed at 1850 kg/m^3 in the heat equation (heat
+% capacity rho * cp and diffusion) only. The heat source keeps the CT-mapped
+% density and sound speed of the acoustic medium, as k-Plan: a replay on
+% k-Plan's own pressure field reproduces its temperature only this way
+% (code/report/07_thermal/kplan_thermal_replay.m, 2026-11-20).
 % https://dispatch.k-plan.io/static/docs/simulation-pipeline.html
 if pct_skull_mapped(parameters) && ...
     (~isfield(parameters, 'pct') || ~isfield(parameters.pct, 'mapping_density') || strcmp(parameters.pct.mapping_density, 'k-plan'))
@@ -138,9 +144,9 @@ end
 % etc.); temp_0 and the absorption map were stored separately in medium_plus
 % and were not expanded at that point.
 if isfield(kwave_medium, 'absorption_np')
-    absorption_field = 'absorption_np';         % any tissue with absorption model 'coefficient'
+    absorption_field = 'absorption_np';         % absorption [Np/m] (THERMAL_STAGE passes it when the medium cache has it)
 else
-    absorption_field = 'absorption_fraction';   % all tissues with absorption model 'fraction'
+    absorption_field = 'absorption_fraction';   % fraction x attenuation (medium caches without absorption_np)
 end
 if isfield(parameters.grid, 'axisymmetric') && parameters.grid.axisymmetric == 1
     Nlateral  = parameters.grid.axisym_bilateral_dims(2);
@@ -263,11 +269,11 @@ if size(p, 4) > 1 && numel(unique(freqs_tx)) > 1
     clear alpha_tx y
 end
 % Heat delivered to the system per source [W/m3]: Q_src(:,:,:,i)
-Q_src = (alpha_np .* p.^2) ./ (kwave_medium.density .* kwave_medium.sound_speed);
+Q_src = (alpha_np .* p.^2) ./ (rho_source .* kwave_medium.sound_speed);
 n_src = size(Q_src, 4);
 source.Q = sum(Q_src, 4);
 source.T0 = kwave_medium.temp_0; %parameters.thermal.temp_0; % Initial temperature distribution
-clear alpha_np p;
+clear alpha_np p rho_source;
 
 % remove unexpected fields from kWave_medium
 kwave_medium = rmfield(kwave_medium, 'temp_0');
