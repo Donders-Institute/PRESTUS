@@ -42,11 +42,11 @@ Levels are attributed per `methods (Test, TestTags = ...)` block (its own plus t
 | [source](#source) | 10 | 7 | 3 | 0 | 0 | 0 |
 | [telemetry](#telemetry) | 15 | 10 | 4 | 0 | 0 | 1 |
 | [thermal](#thermal) | 15 | 10 | 5 | 0 | 0 | 0 |
-| [transducer](#transducer) | 33 | 14 | 17 | 0 | 0 | 2 |
+| [transducer](#transducer) | 33 | 13 | 18 | 0 | 0 | 2 |
 | [transform](#transform) | 23 | 16 | 5 | 0 | 0 | 2 |
 | [uncertainty](#uncertainty) | 7 | 6 | 1 | 0 | 0 | 0 |
 | [(top level)](#top-level) | 1 | 1 | 0 | 0 | 0 | 0 |
-| **all** | **564** | **344** | **182** | **0** | **1** | **37** |
+| **all** | **564** | **343** | **183** | **0** | **1** | **37** |
 
 Nexus modules (120): direct 100, indirect only 19, MATLAB-marked tests only 0, none 1.
 
@@ -295,7 +295,7 @@ direct-unit: 24 | indirect-unit only: 10
 | `head/head_model_place.m` | indirect-unit only | - | 15: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +12 more<br>via `test_axisymmetric_phantom` → `grid_tissue_setup` → `preproc_head` → `head_model_place` | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
 | `head/head_smooth_and_crop.m` | indirect-unit only | - | 15: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +12 more<br>via `test_axisymmetric_phantom` → `grid_tissue_setup` → `preproc_head` → `head_smooth_and_crop` | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
 | `head/mean_beam_axis.m` | direct-unit | `test_mean_beam_axis` | 14: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +11 more | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
-| `head/placement_run_dir.m` | direct-unit | `test_placement_paths`, `test_placement_report`, `test_plantus_placement` | 19: `test_babelbrain_modes`, `test_handoff_guards`, `test_heuristic_candidate` +16 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
+| `head/placement_run_dir.m` | direct-unit | `test_placement_paths`, `test_placement_report`, `test_plantus_placement` | 18: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +15 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `head/placement_signature.m` | direct-unit | `test_placement_paths` | 19: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +16 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `head/preproc_align_to_focal_axis.m` | indirect-unit only | - | 21: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +18 more<br>via `test_axisymmetric_phantom` → `grid_tissue_setup` → `preproc_head` → `preproc_align_to_focal_axis` | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
 | `head/preproc_align_to_mean_focal_axis.m` | indirect-unit only | - | 15: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +12 more<br>via `test_axisymmetric_phantom` → `grid_tissue_setup` → `preproc_head` → `preproc_align_to_mean_focal_axis` | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
@@ -362,7 +362,7 @@ direct-unit: 55 | indirect-unit only: 33 | none: 4
 | `helper/get_nonempty_field.m` | direct-unit | `test_helper` | 28: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +25 more | acoustic, demo_acoustic, demo_head, demo_localite, demo_thermal, head, physics_axisym, standalone, thermal, unit, water |
 | `helper/get_output_dir.m` | direct-unit | `test_output_dirs_char` | 27: `test_babelbrain_modes`, `test_cleanup_uncertainty_intermediates`, `test_debug_reports` +24 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `helper/get_pct_dir.m` | direct-unit | `test_pct_paths` | 28: `test_axisymmetric_phantom`, `test_babelbrain`, `test_babelbrain_modes` +25 more | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
-| `helper/get_placement_dir.m` | direct-unit | `test_placement_paths` | 21: `test_babelbrain_modes`, `test_handoff_guards`, `test_heuristic_candidate` +18 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
+| `helper/get_placement_dir.m` | direct-unit | `test_placement_paths` | 20: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +17 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `helper/get_prestus_path.m` | direct-unit | `test_config_layering`, `test_resolve_geometric_entry`, `test_transducer_library`, `test_uncertainty_medium_layer`, `test_uncertainty_nesting` | 57: `test_acoustic_store_key`, `test_air_cavity`, `test_axisymmetric_phantom` +54 more | acoustic, demo_acoustic, demo_config, demo_head, demo_inputs, demo_localite, demo_pct, demo_thermal, head, itrusst, physics_3d, physics_axisym, standalone, telemetry_live, thermal, unit, water |
 | `helper/get_slice_by_label.m` | none | - | - | - |
 | `helper/get_xyz_mesh.m` | direct-unit | `test_helper` | 14: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +11 more | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
@@ -396,7 +396,7 @@ direct-unit: 55 | indirect-unit only: 33 | none: 4
 | `helper/resolve_python_env.m` | direct-unit | `test_helper` | 17: `test_babelbrain`, `test_babelbrain_modes`, `test_handoff_guards` +14 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `helper/reuse_upstream_cache.m` | indirect-unit only | - | 16: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +13 more<br>via `test_axisymmetric_phantom` → `grid_tissue_setup` → `preproc_head` → `reuse_upstream_cache` | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
 | `helper/round_if_integer.m` | direct-unit | `test_helper` | 42: `test_air_cavity`, `test_axisymmetric_phantom`, `test_babelbrain_modes` +39 more | acoustic, demo_acoustic, demo_config, demo_head, demo_inputs, demo_localite, demo_pct, demo_thermal, head, itrusst, physics_3d, physics_axisym, standalone, thermal, unit, water |
-| `helper/run_command.m` | direct-unit | `test_hpc_submit`, `test_pct_paths`, `test_run_command` | 43: `test_axisymmetric_phantom`, `test_babelbrain`, `test_babelbrain_modes` +40 more | acoustic, demo_acoustic, demo_head, demo_thermal, head, physics_axisym, slurm_live, standalone, telemetry_live, thermal, unit, water |
+| `helper/run_command.m` | direct-unit | `test_hpc_submit`, `test_pct_paths`, `test_run_command` | 42: `test_axisymmetric_phantom`, `test_babelbrain`, `test_babelbrain_modes` +39 more | acoustic, demo_acoustic, demo_head, demo_thermal, head, physics_axisym, slurm_live, standalone, telemetry_live, thermal, unit, water |
 | `helper/run_shell_script.m` | direct-unit | `test_run_command` | 15: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +12 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `helper/run_stats.m` | direct-unit | `test_run_stats` | 23: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +20 more | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
 | `helper/safe_addpath.m` | indirect-unit only | - | 22: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +19 more<br>via `test_legacy_bridge` → `prestus_pipeline` → `safe_addpath` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
@@ -406,9 +406,9 @@ direct-unit: 55 | indirect-unit only: 33 | none: 4
 | `helper/segmentation_fingerprint.m` | indirect-unit only | - | 32: `test_acoustic_store_key`, `test_air_cavity`, `test_axisymmetric_phantom` +29 more<br>via `test_air_cavity` → `cache_signature` → `segmentation_fingerprint` | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
 | `helper/shell_quote_arg.m` | direct-unit | `test_command_injection`, `test_r_quote_string`, `test_run_command`, `test_shell_quote_arg` | 15: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +12 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `helper/should_save_output.m` | indirect-unit only | - | 19: `test_babelbrain_modes`, `test_get_t1_mni_file`, `test_handoff_guards` +16 more<br>via `test_babelbrain_modes` → `uncertainty_pipeline` → `should_save_output` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
-| `helper/simnibs_env_overrides.m` | direct-unit | `test_simnibs_selection` | 24: `test_babelbrain_modes`, `test_get_t1_mni_file`, `test_handoff_guards` +21 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
-| `helper/simnibs_install_info.m` | direct-unit | `test_simnibs_selection` | 25: `test_babelbrain_modes`, `test_command_injection`, `test_get_t1_mni_file` +22 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
-| `helper/simnibs_ld_library_path.m` | direct-unit | `test_simnibs_selection` | 25: `test_babelbrain_modes`, `test_command_injection`, `test_get_t1_mni_file` +22 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
+| `helper/simnibs_env_overrides.m` | direct-unit | `test_simnibs_selection` | 23: `test_babelbrain_modes`, `test_get_t1_mni_file`, `test_handoff_guards` +20 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
+| `helper/simnibs_install_info.m` | direct-unit | `test_simnibs_selection` | 24: `test_babelbrain_modes`, `test_command_injection`, `test_get_t1_mni_file` +21 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
+| `helper/simnibs_ld_library_path.m` | direct-unit | `test_simnibs_selection` | 24: `test_babelbrain_modes`, `test_command_injection`, `test_get_t1_mni_file` +21 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `helper/simnibs_version.m` | indirect-unit only | - | 16: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +13 more<br>via `test_simnibs_selection` → `segmentation_check_existing` → `simnibs_version` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `helper/struct_md5.m` | direct-unit | `test_acoustic_store_key` | 15: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +12 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `helper/subset_fields.m` | direct-unit | `test_helper` | - | unit |
@@ -692,7 +692,7 @@ direct-unit: 10 | indirect-unit only: 5
 
 ## transducer
 
-direct-unit: 14 | indirect-unit only: 17 | none: 2
+direct-unit: 13 | indirect-unit only: 18 | none: 2
 
 | File | Status | Direct tests | Indirect tests | Levels |
 |---|---|---|---|---|
@@ -720,7 +720,7 @@ direct-unit: 14 | indirect-unit only: 17 | none: 2
 | `transducer/tp_plot_heuristic_position.m` | indirect-unit only | - | 21: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +18 more<br>via `test_transducer_positioning_start` → `transducer_positioning` → `tp_plot_heuristic_position` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `transducer/tp_remove_ear_locations.m` | indirect-unit only | - | 21: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +18 more<br>via `test_transducer_positioning_start` → `transducer_positioning` → `tp_remove_ear_locations` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `transducer/tp_scalp_boundary.m` | indirect-unit only | - | 21: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +18 more<br>via `test_neuronav_io` → `preproc_transducer_placement` → `tp_scalp_boundary` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
-| `transducer/tp_select_heuristic_position.m` | direct-unit | `test_heuristic_candidate` | 21: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +18 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
+| `transducer/tp_select_heuristic_position.m` | indirect-unit only | - | 21: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +18 more<br>via `test_transducer_positioning_start` → `transducer_positioning` → `tp_select_heuristic_position` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `transducer/transducer_analyze_position.m` | none | - | - | - |
 | `transducer/transducer_analyze_position_fast.m` | indirect-unit only | - | 20: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +17 more<br>via `test_transducer_positioning_start` → `transducer_positioning` → `tp_evaluate_candidate_positions` → `transducer_analyze_position_fast` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `transducer/transducer_positioning.m` | direct-unit | `test_transducer_positioning_start` | 20: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +17 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
@@ -738,7 +738,7 @@ direct-unit: 16 | indirect-unit only: 5 | none: 2
 |---|---|---|---|---|
 | `transform/affine_apply_pts.m` | direct-unit | `test_ensure_ras_plus`, `test_transform` | 25: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +22 more | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
 | `transform/affine_bounds.m` | indirect-unit only | - | 20: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +17 more<br>via `test_axisymmetric_phantom` → `grid_tissue_setup` → `preproc_head` → `head_model_load_or_build` → `affine_bounds` | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
-| `transform/affine_inverse.m` | direct-unit | `test_affine_inverse` | 41: `test_affine_resample_3d`, `test_air_cavity`, `test_axisymmetric_phantom` +38 more | acoustic, demo_acoustic, demo_head, demo_localite, demo_thermal, head, standalone, thermal, unit, water |
+| `transform/affine_inverse.m` | direct-unit | `test_affine_inverse` | 40: `test_affine_resample_3d`, `test_air_cavity`, `test_axisymmetric_phantom` +37 more | acoustic, demo_acoustic, demo_head, demo_localite, demo_thermal, head, standalone, thermal, unit, water |
 | `transform/affine_resample_3d.m` | direct-unit | `test_affine_resample_3d`, `test_skull_from_hu` | 33: `test_air_cavity`, `test_axisymmetric_phantom`, `test_babelbrain` +30 more | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
 | `transform/canonical_affine_transform.m` | indirect-unit only | - | 21: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +18 more<br>via `test_transducer_positioning_start` → `transducer_positioning` → `canonical_affine_transform` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `transform/convert_2d_to_axisymmetric.m` | none | - | - | - |
@@ -748,17 +748,17 @@ direct-unit: 16 | indirect-unit only: 5 | none: 2
 | `transform/ensure_ras_plus.m` | direct-unit | `test_ensure_ras_plus`, `test_transform` | 26: `test_air_cavity`, `test_axisymmetric_phantom`, `test_babelbrain_modes` +23 more | acoustic, demo_acoustic, demo_head, demo_thermal, head, standalone, thermal, unit, water |
 | `transform/grid_mm_to_voxel.m` | direct-unit | `test_grid_mm_to_voxel` | 16: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +13 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `transform/grid_remap_affine.m` | direct-unit | `test_grid_remap` | 16: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +13 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
-| `transform/grid_to_ras.m` | direct-unit | `test_localite_export`, `test_ras_round_trip`, `test_ras_to_voxel`, `test_transform` | 22: `test_babelbrain_modes`, `test_handoff_guards`, `test_heuristic_candidate` +19 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
+| `transform/grid_to_ras.m` | direct-unit | `test_localite_export`, `test_ras_round_trip`, `test_ras_to_voxel`, `test_transform` | 21: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +18 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `transform/grid_to_ras_affine.m` | direct-unit | `test_ras_round_trip` | 18: `test_babelbrain`, `test_babelbrain_modes`, `test_babelbrain_thermal_timing` +15 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `transform/grid_world_affine.m` | direct-unit | `test_grid_remap` | 17: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +14 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
-| `transform/mni2subject_coords_LDfix.m` | indirect-unit only | - | 23: `test_babelbrain_modes`, `test_handoff_guards`, `test_heuristic_candidate` +20 more<br>via `test_neuronav_io` → `preproc_transducer_placement` → `mni2subject_coords_LDfix` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
+| `transform/mni2subject_coords_LDfix.m` | indirect-unit only | - | 22: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +19 more<br>via `test_neuronav_io` → `preproc_transducer_placement` → `mni2subject_coords_LDfix` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `transform/nifti_affine_from_1based.m` | direct-unit | `test_transform` | 18: `test_babelbrain`, `test_babelbrain_modes`, `test_babelbrain_thermal_timing` +15 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `transform/radialExpand2DTo3D.m` | direct-unit | `test_axisymmetric_phantom`, `test_transform` | 16: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +13 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
-| `transform/ras_to_grid.m` | direct-unit | `test_localite_export`, `test_neuronav_io`, `test_plantus_placement`, `test_ras_round_trip`, `test_ras_to_voxel`, `test_transform` | 23: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +20 more | acoustic, demo_acoustic, demo_head, demo_localite, demo_thermal, head, standalone, thermal, unit, water |
-| `transform/ras_to_voxel.m` | direct-unit | `test_ras_to_voxel` | 28: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +25 more | acoustic, demo_acoustic, demo_head, demo_localite, demo_thermal, head, standalone, thermal, unit, water |
+| `transform/ras_to_grid.m` | direct-unit | `test_localite_export`, `test_neuronav_io`, `test_plantus_placement`, `test_ras_round_trip`, `test_ras_to_voxel`, `test_transform` | 22: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +19 more | acoustic, demo_acoustic, demo_head, demo_localite, demo_thermal, head, standalone, thermal, unit, water |
+| `transform/ras_to_voxel.m` | direct-unit | `test_ras_to_voxel` | 27: `test_axisymmetric_phantom`, `test_babelbrain_modes`, `test_handoff_guards` +24 more | acoustic, demo_acoustic, demo_head, demo_localite, demo_thermal, head, standalone, thermal, unit, water |
 | `transform/sample_volume_at_world.m` | indirect-unit only | - | 15: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +12 more<br>via `test_study` → `create_group_maps` → `sample_volume_at_world` | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 | `transform/subject2mni_coords_LDfix.m` | none | - | - | - |
-| `transform/transform_coordinates.m` | direct-unit | `test_transform` | 22: `test_babelbrain_modes`, `test_handoff_guards`, `test_heuristic_candidate` +19 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
+| `transform/transform_coordinates.m` | direct-unit | `test_transform` | 21: `test_babelbrain_modes`, `test_handoff_guards`, `test_integration_demo` +18 more | acoustic, demo_acoustic, demo_thermal, standalone, thermal, unit, water |
 
 ## uncertainty
 
@@ -959,7 +959,7 @@ A pytest file counts as direct when it imports the module, indirect when it impo
 | `test_handoff_guards` | unit | 2 |
 | `test_head_preprocessing` | unit | 7 |
 | `test_helper` | unit | 14 |
-| `test_heuristic_candidate` | unit | 2 |
+| `test_heuristic_candidate` | unit | 1 |
 | `test_hpc_job_report` | slurm_live, unit | 1 |
 | `test_hpc_scratch` | unit | 1 |
 | `test_hpc_submit` | unit | 5 |
