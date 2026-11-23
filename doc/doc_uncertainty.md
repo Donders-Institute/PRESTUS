@@ -185,6 +185,9 @@ Each edit is merged onto the variant's bounds; tissues and properties neither li
 
 ## Partial-FOV Bound Variants
 
+!!! warning "Experimental, not yet validated"
+    Whether one mismatch factor from the default medium carries over to the bound variants has not been tested against whole-grid runs. Use the rescaled bounds for planning, and confirm a final safety assessment with all variants on the whole grid.
+
 Five whole-head simulations are the main cost of an uncertainty run. With `simulation.uncertainty_fov: partial`, only the default variant runs on the whole grid. The four bound variants run in the [partial acoustic FOV](doc_partial-fov.md), and one more run repeats the default medium in that FOV:
 
 ```yaml
