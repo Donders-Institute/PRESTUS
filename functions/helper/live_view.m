@@ -196,11 +196,8 @@ function n = figure_number(f)
 % The figure's number; NaN when it has none (IntegerHandle off: Number is
 % empty, which arrayfun's uniform output cannot take).
     n = NaN;
-    try
-        if ~isempty(f.Number)
-            n = double(f.Number);
-        end
-    catch
+    if isgraphics(f, 'figure') && ~isempty(f.Number)
+        n = double(f.Number);
     end
 end
 

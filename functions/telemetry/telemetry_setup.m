@@ -117,12 +117,17 @@ end
 function tf = allowed_before_levels(cfg_file)
 % An opt-in recorded under a notice before levels existed (notice < 3).
     tf = false;
+    if ~isfile(cfg_file)
+        return
+    end
     try
         cfg = jsondecode(fileread(cfg_file));
-        tf = isstruct(cfg) && isfield(cfg, 'opt_in') && isequal(cfg.opt_in, true) && ...
-             ~isfield(cfg, 'levels') && (~isfield(cfg, 'notice') || cfg.notice < 3);
     catch
+        % Unreadable or corrupt consent file: not an earlier opt-in; nothing is sent and nothing is asked (TELEMETRY_LEVELS).
+        return
     end
+    tf = isstruct(cfg) && isfield(cfg, 'opt_in') && isequal(cfg.opt_in, true) && ...
+         ~isfield(cfg, 'levels') && (~isfield(cfg, 'notice') || cfg.notice < 3);
 end
 
 % -------------------------------------------------------------------------
