@@ -77,8 +77,10 @@ end
         kwave_version(getkWavePath);
     end
 
-    % return to PRESTUS path
-    cd(prestus_path);
+    % Relative file and folder settings are taken from the PRESTUS root (where
+    % they resolved when this function changed MATLAB's working folder) and
+    % made absolute here, so the caller's working folder is left unchanged.
+    [parameters, resolved_paths] = resolve_config_paths(parameters, prestus_path);
 
     subject_id = parameters.subject_id;
 

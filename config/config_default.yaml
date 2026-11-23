@@ -45,7 +45,7 @@ simulation:
 
 path:
   anat: ''              # Location of the structural input data [full path]
-  sim: ''               # Location of the simulation outputs [full path; a relative path is relative to the MATLAB working directory]
+  sim: ''               # Location of the simulation outputs [full path; a relative path is taken from the PRESTUS folder]
   seg: ''               # Location of the segmentation directories (containing m2m folders) [full path]
   placement: ''         # Placement outputs (heuristic, PlanTUS, TUS_entry runs): <placement>/sub-XXX/<mode>/<target_name>/.
                         # Empty = <sim>/placement. Point several setups at one folder to share placements across them.
