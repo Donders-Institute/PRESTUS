@@ -14,7 +14,7 @@ On this page:
 - [Run Time and Memory](#run-time-and-memory): run time and memory of the reverse run.
 - [Assumptions and Limits](#assumptions-and-limits): where the method does not apply.
 
-!!! warning "Draft"
+!!! warning "Experimental"
     This feature is new and not yet validated against forward simulations. Treat its predictions as a ranking signal and check any pose or phase set you intend to use with a regular acoustic simulation.
 
 !!! note "At a glance"

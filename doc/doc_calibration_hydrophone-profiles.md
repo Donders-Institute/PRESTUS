@@ -98,6 +98,9 @@ The GUI plots modelled against measured (solid) or derived (dashed) profiles, an
 
 ### Within-Ring Velocity Profile
 
+!!! warning "Experimental"
+    The ring profile is not validated. On-axis profiles alone do not determine the sub-ring weights; without off-axis or plane measurements, the off-axis field it predicts is unvalidated.
+
 Optional. The library models each ring as a uniformly vibrating piston. For several [Sonic Concepts](https://sonicconcepts.com/) CTX transducers no choice of phases and gains then reproduces the measured near-field to focal peak ratio. On CTX-500-026, the measured near-field peak (8–12 mm from the [exit plane](doc_glossary.md#exit-plane), 0.4–0.6 of the focal intensity at deep settings) comes out about 7× too weak. Uniform rings match [Imasonic](https://www.imasonic.com) transducers well.
 
 The ring profile splits every ring into `n_sub` sub-rings with a complex weight that is the **same at every focal depth**. Each depth keeps one phase and gain per channel. On-axis profiles alone do not determine the weights uniquely. **Without off-axis data, keep the library fit and treat the off-axis field of a ring profile as unvalidated.** Off-axis scans ([format](doc_calibration_profile-formats.md#plane-and-volume-scans)) constrain the weights and are fitted together with the axial profiles.

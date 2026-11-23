@@ -13,6 +13,9 @@ On this page:
 - [Thermal Simulation](#thermal-simulation): BabelBrain heating, its timing, and its tissue thermal properties.
 - [Limitations and Unsupported PRESTUS Modes](#limitations-and-unsupported-prestus-modes): which PRESTUS features work with BabelBrain.
 
+!!! warning "Experimental"
+    The BabelBrain backend is not yet validated against measurements or the [ITRUSST](https://itrusst.org/) benchmarks in PRESTUS. BabelBrain thermal runs use BabelBrain's own tissue thermal properties ([known limitation](#limitations-and-unsupported-prestus-modes)). Use it to cross-check k-Wave, not to replace it.
+
 !!! note "At a glance"
     - **When you need it:** To cross-check a k-Wave result with an independent solver, or to use the Apple Silicon GPU.
     - **Before you start:** The `external/BabelBrain` submodule and a BabelBrain [conda](https://docs.conda.io/) environment ([Installation](#installation)).

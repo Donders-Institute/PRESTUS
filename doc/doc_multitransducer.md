@@ -103,6 +103,9 @@ transducer:
 
 ## Complex Pressure Field
 
+!!! warning "Experimental"
+    Superposition of saved complex fields (`io.save_p_complex`, `superpose_complex_fields`) is not yet validated in PRESTUS. Check a superposed field against a coherent simulation before you rely on it.
+
 ```yaml
 io:
   save_p_complex: true

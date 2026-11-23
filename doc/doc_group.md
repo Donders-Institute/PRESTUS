@@ -36,6 +36,9 @@ The same analysis runs post hoc with `targeting_analysis(parameters, 'PlannedFoc
 
 ## Group MNI Maps
 
+!!! warning "Experimental"
+    The group maps and the [group report](#group-html-report) are experimental: their layout, file names, and summary statistics may change between releases. Check group values against the per-run outputs before you report them.
+
 `prestus_group_report_start` builds these by default (`'Maps', false` to skip), for layered media only (`simulation.medium` containing `layered` in the study or subject config); other media get the report without maps. They use each run's MNI NIfTIs and are computed per condition, or across all runs when there are no conditions. `<out>` is `<path.sim>/group/<study.name>/` for a study and `<path.sim>/group/<medium><affix>/` otherwise.
 
 | File in `<out>/maps/` | Content |

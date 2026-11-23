@@ -8,6 +8,9 @@ On this page:
 - [Python Environment Setup](#python-environment-setup): installing jwave and JAX for CPU or GPU.
 - [Limitations](#limitations): what jwave does not support.
 
+!!! warning "Experimental"
+    The jwave backend is not yet validated against measurements or the [ITRUSST](https://itrusst.org/) benchmarks in PRESTUS. The conservative Helmholtz operator became the default in October 2026 ([Helmholtz operator](doc_jwave_configuration.md)). Use jwave to cross-check k-Wave, not to replace it.
+
 !!! note "At a glance"
     - **When you need it:** To cross-check k-Wave with an independent implementation, or for a fast CW steady-state solve.
     - **Before you start:** A [Python](https://www.python.org/) 3.11 environment with `jax`, `jwave`, `h5py`, and `numpy` ([Python environment setup](#python-environment-setup)).

@@ -55,6 +55,16 @@ PRESTUS v0.7 adds the PRESTUS Nexus as the interface to configure, check, and ru
 - BabelBrain backend: BabelBrain 0.8.8 (`external/BabelBrain`); update its environment with `pip install babelviscofdtd==1.2.7 psutil`
 - Submodules: export_fig v3.58 and PlanTUS v2.0.0; `prestus_setup` fetches missing submodules
 
+**Experimental features**
+
+Not validated in PRESTUS; the docs and `config_default.yaml` mark each one. Check results against a k-Wave fluid run or measurements before you report them.
+
+- Backends: `kwave_elastic`, `jwave`, `babelbrain` (acoustic and thermal), and the `cpp_mlx` code type
+- Transducer: dephased library conditions, the within-ring velocity profile, the matrix steering correction (on by default when the library holds one), and the `define_here` options
+- Placement: PlanTUS, TUS_entry, the heuristic air criterion, and time reversal (including `placement_search` and `pose_workflow`)
+- Head model: pseudo-CT mappings and the air-cavity check
+- Runs and outputs: async multi-transducer runs, uncertainty variants (including `uncertainty_fov: partial`), superposition of saved complex fields (`io.save_p_complex`), and the group report and group MNI maps
+
 #### Rerun guide
 
 Results from v0.6.x change if your runs used any of the following. Fixes to features new in v0.7 are not listed.

@@ -8,6 +8,9 @@ On this page:
 
 - [Steering Correction of Matrix Arrays](#steering-correction-of-matrix-arrays): how the correction is applied, building an entry from hydrophone peaks, and its limits.
 
+!!! warning "Experimental"
+    The steering correction is not yet validated in PRESTUS against hydrophone measurements. It is on by default (`transducer.matrix.use_steering_correction: true`) whenever the library entry holds a correction.
+
 !!! note "At a glance"
     - **When you need it:** You simulate a matrix (2D) array steered to targets away from its geometric focus.
     - **Before you start:** Hydrophone focal-peak measurements at 30–40 steering targets at one drive voltage, and the array's equipment YAML.

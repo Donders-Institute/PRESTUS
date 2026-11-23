@@ -14,7 +14,8 @@ On this page:
 
 `acoustic_backend: kwave_elastic` runs k-Wave's `pstdElastic3D` / `pstdElastic2D` instead of `kspaceFirstOrder*`, so the skull supports shear as well as compressional waves. The motivation is [Gao et al. (2026)](https://doi.org/10.1109/TBME.2025.3603836), who compared fluid and elastic k-Wave skull models against hydrophone scans through an ex vivo skull at normal and 40° incidence for shallow (cortical) foci. In those scans the fluid skull model overestimated the intracranial pressure by ~40 % on average and the −6 dB focal area by up to 170 %. The elastic model was also less sensitive to small transducer position errors.
 
-**Status: draft.** Not yet validated in PRESTUS against measurements or the [ITRUSST](https://itrusst.org/) benchmarks.
+!!! warning "Experimental"
+    Not yet validated in PRESTUS against measurements or the [ITRUSST](https://itrusst.org/) benchmarks. Compare elastic results with a fluid `kwave` run before you use them.
 
 ### Elastic Model Settings
 

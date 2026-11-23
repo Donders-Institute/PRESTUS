@@ -34,8 +34,8 @@ Top-level keys (not nested under `simulation`). Pre-processing (segmentation, me
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `acoustic_backend` | Acoustic solver. | `'kwave'` | `kwave` / `kwave_elastic` / `babelbrain` / `jwave`. Validated in `load_parameters`. `babelbrain` takes one transducer, with the beam along the grid z axis (not `grid.mode: ras_plus`); see [BabelBrain geometry limits](doc_babelbrain.md#geometry-limits). `kwave_elastic` models shear waves in the skull (see [Elastic skull](doc_kwave_elastic.md#elastic-skull-model-shear-waves)). |
-| `thermal_backend` | Bio-heat solver. | `'kwave'` | `kwave` / `babelbrain`. `babelbrain` requires `acoustic_backend: babelbrain`, one transducer, and no `path.acoustic_input`; invalid combinations error at config load. [jwave](https://github.com/ucl-bug/jwave) has no thermal solver; pair it with `kwave`. |
+| `acoustic_backend` | Acoustic solver. | `'kwave'` | `kwave` / `kwave_elastic` / `babelbrain` / `jwave`. Validated in `load_parameters`. `babelbrain` takes one transducer, with the beam along the grid z axis (not `grid.mode: ras_plus`); see [BabelBrain geometry limits](doc_babelbrain.md#geometry-limits). `kwave_elastic` models shear waves in the skull (see [Elastic skull](doc_kwave_elastic.md#elastic-skull-model-shear-waves)). `kwave_elastic`, `babelbrain`, and `jwave` are *experimental*, not validated. |
+| `thermal_backend` | Bio-heat solver. | `'kwave'` | `kwave` / `babelbrain` (*experimental*). `babelbrain` requires `acoustic_backend: babelbrain`, one transducer, and no `path.acoustic_input`; invalid combinations error at config load. [jwave](https://github.com/ucl-bug/jwave) has no thermal solver; pair it with `kwave`. |
 
 ### BabelBrain Settings (`babelbrain`)
 
