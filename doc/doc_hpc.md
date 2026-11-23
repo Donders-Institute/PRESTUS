@@ -6,7 +6,7 @@ On this page:
 
 - [Where a Run Executes](#where-a-run-executes): what each `platform` value does, and where job logs go.
 - [Job Resources](#job-resources): wall time, memory, and the other `hpc.*` keys.
-- [GPU Support](#gpu-support): requesting GPUs and partitions, with benchmark timings.
+- [GPU Support](#gpu-support): requesting GPUs and partitions.
 - [Post-Job Resource Report](#post-job-resource-report): what a finished SLURM job used.
 
 !!! note "At a glance"
@@ -25,6 +25,8 @@ hpc:
 Many subjects or conditions are submitted together from a [study manifest](doc_group_study-setup.md#study-setup) with `prestus_study_start`. The [PRESTUS Nexus](doc_nexus.md) can submit to a cluster, also over SSH from a laptop, and follows the jobs and their logs.
 
 On the Donders cluster, see [Donders HPC](doc_hpc_donders.md) for interactive sessions and your own job scripts.
+
+**Recommended: the C++ k-Wave codes, on CPU and GPU.** Set `simulation.code_type: cpp_cpu` for CPU jobs and `cpp_gpu` for GPU jobs. They run several times faster than `matlab_cpu` and `matlab_gpu` on the same hardware, so jobs hold their nodes and GPUs for less time, and they keep peak memory low. They need the k-Wave binaries ([k-Wave](doc_kwave.md#solver-implementations-code_type)) and node-local disk for their input and output files ([Node-local scratch](#node-local-scratch)).
 
 ## Where a Run Executes
 
@@ -78,29 +80,7 @@ PRESTUS is a MATLAB toolbox and only supports *Nvidia GPUs*. When Nvidia GPUs ar
 
 `hpc.gpu` requests a specific GPU type and is usually not needed. On the Donders cluster, set `hpc.partition: 'gpu40g'` (GPUs with more than 40 GB vRAM) for most thermal simulations; `hpc.reservation` selects a reserved queue, if you have one. See [HPC parameters](doc_parameters_run.md#high-performance-computing-hpc).
 
-??? note "Benchmark data, Nvidia GPUs"
-    These are potentially unrepresentative benchmarks run on a 256 × 216 × 192 mm grid, with minor variations depending on transducer placement.
-
-    **Acoustic simulations**
-
-    | GPU | Memory Used | Duration | Notes |
-    |---|---|---|---|
-    | A100 80 GB | 12 GB | 14 mins | Slightly smaller grid size |
-    | A100 80 GB (partitioned 2×40 GB) | 12 GB | 25 mins | |
-    | A100 40 GB | 12 GB | 19 mins | |
-    | A16 16 GB | 12 GB | 145 mins | |
-    | P100 16 GB | 12 GB | 43 mins | Compiled; ~1.5× the L40S duration |
-    | L40S 47 GB | 14 GB | 28 mins | Compiled |
-
-    **Heating simulations**
-
-    | GPU | Memory Used | Duration | Notes |
-    |---|---|---|---|
-    | A100 80 GB | ?? GB | ~12 s/trial (400 trials: ~90 mins) | Slightly smaller grid size |
-    | A100 40 GB | ?? GB | ~17 s/trial (400 trials: ~115 mins) | |
-    | A16 16 GB | Out of RAM | ??? | |
-    | P100 16 GB | Out of RAM | ??? | |
-    | L40S 47 GB | ?? GB | ~4 s/trial (400 trials: ~45 mins) | |
+How long a run takes on each GPU type, and how much GPU memory it needs, is on [Run time and resources](doc_run-time.md), with a calculator and the times of this project's earlier runs.
 
 ## Post-Job Resource Report
 

@@ -53,7 +53,7 @@ acoustic_fov_diameter_mm: 60    # 3–4× the −6 dB beam diameter at focus
 acoustic_fov_length_mm:  120    # bowl apex–focus distance + 40 mm (grid.z_beyond_focus_mm default)
 ```
 
-At 2 mm resolution this box is roughly 30 × 30 × 60 voxels (54 k), compared with a whole-head grid of 256 × 216 × 192 mm (the [benchmark grid](doc_hpc.md#gpu-support); 128 × 108 × 96 voxels, 1.3 M): a ~96 % reduction in voxel count. Print the actual reduction at runtime:
+At 2 mm resolution this box is roughly 30 × 30 × 60 voxels (54 k), compared with a whole-head grid of 256 × 216 × 192 mm (128 × 108 × 96 voxels, 1.3 M): a ~96 % reduction in voxel count. Print the actual reduction at runtime:
 
 ```matlab
 fprintf('FOV: [%s]  full: [%s]  reduction: %.1f %%\n', ...
