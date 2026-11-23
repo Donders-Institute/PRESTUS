@@ -20,6 +20,7 @@ PRESTUS v0.7 adds the PRESTUS Nexus as the interface to configure, check, and ru
 | `grid.default_dims` | `[144, 144, 400]` → `auto` | The free-water grid is sized to the transducer |
 | `headmodel.csf_expansion` | `40` → `20` | Now the full dilation distance; halve values set in project and study configs |
 | `io.save_source_matrices`, `save_acoustic_matrices`, `save_thermal_matrices` | → `[]` | Inherit `io.save_matrices`; default saving is unchanged |
+| `thermal.pulse_model` (new) | v0.6.1 heated pulse by pulse → `train_averaged` | ⚠️ Heating results change: each pulse train heats as one segment, as k-Plan (peak rises within 0.8 %, thermal dose about 1 %). Set `pulse_resolved` to reproduce v0.6.1 heating |
 
 **Changed behaviour**
 
@@ -70,7 +71,7 @@ Results from v0.6.x change if your runs used any of the following. Fixes to feat
 | 2D annular sources | The per-ring outer diameter was used instead of the full aperture | Acoustic stage |
 | Several transducers | Coherent: transducers 2..N used transducer 1's drive, phases, geometry, and frequency. Async: heating applied all intensities during every pulse (up to N× too high) and now follows `timing.async_schedule` | Coherent: acoustic stage; async: thermal stage |
 | Calibrations or library entries made with v0.6.x | The Rayleigh model integrated over the projected ring area (on-axis focal pressure 1–9 % low); the O'Neil model was evaluated 0.5 mm short; row-vector profiles could give degenerate fits; interpolation to unmeasured depths fixed the focus; calibration files recorded the default ISPPA | Refit; set `target_isppa_wcm2` in configs built from old calibration files |
-| Skull mappings `aubry` (density, sound speed, attenuation) or `mueller` (attenuation) | The densest-bone HU was the largest skull HU inside the cropped simulation grid; it is now the 99.9th percentile of the skull over the whole head (`pct.hu_reference_percentile`) | Medium stage onward |
+| Skull mappings `aubry` (density, sound speed, attenuation) or `mueller` (attenuation) | The densest-bone HU was the largest skull HU inside the cropped simulation grid; it is now the 99.9th percentile of the skull over the whole head (`pct.hu_reference_percentile`), and HU above it map as the densest bone | Medium stage onward |
 | Pseudo-CT | `treeby` was 27 HU low in the skull; the `kosciessa` fit used the wrong width crossings; the UTE soft-tissue peak was the bin edge; with `mapping_density: k-plan`, the thermal skull density landed on other tissue when layers were removed or reordered | Regenerate the pseudo-CT; thermal stage for the `k-plan` case |
 | `pct.mapping_density: k-plan` with heating | The fixed thermal skull density (1850 kg/m³) also entered the heat source, so skull heating was too low where the mapped bone is less dense (0.74 of k-Plan on k-Plan's own pressure field); it now enters only the heat capacity and diffusion, and the heat source uses the mapped density and sound speed, as k-Plan | Thermal stage |
 | `headmodel.smooth_properties: true` with heating | The heat source multiplied the separately smoothed attenuation and absorption-fraction maps, which overshoots at tissue boundaries (up to 8× in the last skin voxel before bone at 1 mm FWHM); it now uses the absorption map smoothed as one, so skin and skull heating fall | Thermal stage |

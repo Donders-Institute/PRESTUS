@@ -53,7 +53,7 @@ HU limits act on the CT before and after resampling, so they also clip the inter
 
 ## The HU Reference
 
-Some mappings scale by the HU of the densest bone: density `marsac-babelbrain` and `aubry`, sound speed `aubry`, and attenuation `mueller` and `aubry`. PRESTUS takes this reference over the whole head: a percentile (`pct.hu_reference_percentile`, default 99.9) of the CT within the layers `pct.hu_reference_layers` (default the skull layers) of the segmentation, on the segmentation grid and after the HU limits. The reference therefore does not depend on the simulation grid, its crop, or the interpolation. A percentile below 100 keeps a few bright voxels, such as metal or artefacts, from setting the scale of the whole skull.
+Some mappings scale by the HU of the densest bone: density `marsac-babelbrain` and `aubry`, sound speed `aubry`, and attenuation `mueller` and `aubry`. PRESTUS takes this reference over the whole head: a percentile (`pct.hu_reference_percentile`, default 99.9) of the CT within the layers `pct.hu_reference_layers` (default the skull layers) of the segmentation, on the segmentation grid and after the HU limits. The reference therefore does not depend on the simulation grid, its crop, or the interpolation. A percentile below 100 keeps a few bright voxels, such as metal or artefacts, from setting the scale of the whole skull. Voxels above the reference get the properties of the densest bone, in PRESTUS and in the BabelBrain bridge.
 
 ```yaml
 pct:

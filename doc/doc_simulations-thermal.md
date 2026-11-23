@@ -122,7 +122,7 @@ cem43 = cem43 + ...
 
 Set `thermal.cem43_iso: 1` to use this form in the HTML report. It is computed by `cem43_iso_increment` and combines:
 
-- **ISO 14708-3:2017**, Clause 17.1, Formula (1): R = 0.25 for T < 43 °C and R = 0.5 for T ≥ 43 °C, "valid for temperatures between 39 °C and 57 °C". Table 101 gives the tissue thresholds brain 2, bone 16, and skin 21 CEM43, which [ITRUSST](https://itrusst.com/) adopts ([Aubry et al., 2025](https://doi.org/10.1016/j.brs.2025.10.007)) and PRESTUS uses as reference levels (`get_risk_limits`).
+- **ISO 14708-3:2017**, Clause 17.1, Formula (1): R = 0.25 for T < 43 °C and R = 0.5 for T ≥ 43 °C, "valid for temperatures between 39 °C and 57 °C". Table 101 gives the tissue thresholds brain 2, bone 16, and skin 21 CEM43, which [ITRUSST](https://itrusst.org/) adopts ([Aubry et al., 2025](https://doi.org/10.1016/j.brs.2025.10.007)) and PRESTUS uses as reference levels (`get_risk_limits`).
 - **ITRUSST biophysical safety consensus** (Aubry et al., 2025): dose is accumulated over the whole time the tissue is above 39 °C, including cooling; and because thermotolerance "is not maintained beyond 43 °C, nor does it return upon cooling", R = 0.5 is used for all time steps after 43 °C has been reached (citing Sapareto & Dewey, 1984). PRESTUS tracks this with T_max.
 - **PRESTUS choice**: voxels that reach 57 °C (current T or T_max) are set to CEM43 = ∞. ISO 14708-3 only states that the formula is not valid above 57 °C; ∞ is a conservative flag for that range, not taken from either source.
 
