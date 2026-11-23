@@ -1354,6 +1354,7 @@ drawnow;
                 dataTipTextRow('Session', tips{2}); dataTipTextRow('Target', tips{3}); rows(:)];
             hs.DataTipTemplate.Interpreter = 'none';
         catch
+            % Hover labels only; graphics without data-tip support plot without them.
         end
     end
 

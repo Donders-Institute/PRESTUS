@@ -153,10 +153,11 @@ end
 function id = segmentation_identity(parameters)
 % Subject, size and modification date of the segmentation (final_tissues)
     id = struct('subject_id', get_field(parameters, {'subject_id'}), 'bytes', [], 'date', []);
-    try
-        f = dir(fullfile(parameters.path.seg, sprintf('m2m_sub-%03d', parameters.subject_id), 'final_tissues.nii.gz'));
+    seg = get_field(parameters, {'path', 'seg'}, '');
+    sid = get_field(parameters, {'subject_id'}, []);
+    if (ischar(seg) || isstring(seg)) && strlength(string(seg)) > 0 && isnumeric(sid) && isscalar(sid)
+        f = dir(fullfile(char(seg), sprintf('m2m_sub-%03d', sid), 'final_tissues.nii.gz'));
         if ~isempty(f), id.bytes = f(1).bytes; id.date = round(f(1).datenum * 86400); end   % [s]
-    catch
     end
 end
 
@@ -172,10 +173,26 @@ function id = measured_ct_identity(parameters)
         return
     end
     id = struct('name', char(pattern), 'bytes', [], 'date', []);
-    try
-        f = dir(pct_ct_file(parameters));
-        if ~isempty(f), id.name = f(1).name; id.bytes = f(1).bytes; id.date = round(f(1).datenum * 86400); end   % [s]
-    catch
+    % A pattern that matches no file leaves bytes and date empty; the medium
+    % stage then raises the missing-CT error itself.
+    ct = pct_ct_file(parameters, MustExist=false);
+    if ~isempty(ct)
+        f = dir(ct);
+        id.name = f(1).name; id.bytes = f(1).bytes; id.date = round(f(1).datenum * 86400);   % [s]
+    end
+end
+
+function id = bone_mask_identity(parameters)
+% Name, size and modification date of the bone mask file; [] unless pct.bone_source 'mask'
+    id = [];
+    if ~strcmp(char(get_field(parameters, {'pct', 'bone_source'}, 'segmentation')), 'mask')
+        return
+    end
+    id = struct('name', char(string(get_field(parameters, {'path', 'bone_mask_pattern'}, ''))), 'bytes', [], 'date', []);
+    bone = pct_bone_mask_file(parameters, MustExist=false);
+    if ~isempty(bone)
+        f = dir(bone);
+        id.name = f(1).name; id.bytes = f(1).bytes; id.date = round(f(1).datenum * 86400);   % [s]
     end
 end
 

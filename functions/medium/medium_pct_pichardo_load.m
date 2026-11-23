@@ -59,6 +59,10 @@ if isfile(h5_path)
         MapSoS   = double(h5read(h5_path, '/MapSoS')); % [m/s],   N×M
         MapAtt   = double(h5read(h5_path, '/MapAtt')); % [Np/m],  N×M
     catch h5_err
+        % Reading needs the Blosc filter plugin; without it the shipped copy
+        % of the same table (MapPichardo.mat) is used, and the reason is shown.
+        warning('PRESTUS:pct:pichardoH5Unreadable', ...
+            'Cannot read %s (%s); using %s.', h5_path, h5_err.message, mat_path);
     end
 end
 if ~isfile(h5_path) || ~isempty(h5_err)

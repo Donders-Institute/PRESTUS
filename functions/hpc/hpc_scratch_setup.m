@@ -144,13 +144,12 @@ function free_gb = scratch_free_gb(d)
     if ~isunix
         return
     end
-    try
-        [st, out] = run_command({'df', '-Pk', d});
-        if st == 0
-            lines = strsplit(strtrim(out), newline);
-            tok = regexp(strtrim(lines{end}), '\s+', 'split');
-            free_gb = str2double(tok{4}) / 1024^2;
+    [st, out] = run_command({'df', '-Pk', d});
+    if st == 0
+        lines = strsplit(strtrim(out), newline);
+        tok = regexp(strtrim(lines{end}), '\s+', 'split');
+        if numel(tok) >= 4
+            free_gb = str2double(tok{4}) / 1024^2;   % NaN when the column is not a number
         end
-    catch
     end
 end

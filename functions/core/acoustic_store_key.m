@@ -139,11 +139,8 @@ end
 
 function v = prestus_version_file()
     v = 'unknown';
-    try
-        f = fullfile(get_prestus_path, 'VERSION');
-        if isfile(f)
-            v = strtrim(fileread(f));
-        end
-    catch
+    f = fullfile(get_prestus_path, 'VERSION');
+    if isfile(f)
+        v = strtrim(fileread(f));
     end
 end

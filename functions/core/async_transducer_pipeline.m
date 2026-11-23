@@ -685,13 +685,8 @@ end % async_transducer_pipeline
 function tf = has_per_transducer_fields(file)
 % A combined cache written before per-transducer fields (sensor_data.p_async_tx)
 % cannot drive the scheduled heat source: combine again.
-    tf = false;
-    try
-        s = load(file, 'acoustic_provenance');
-        tf = isfield(s.acoustic_provenance, 'combination_per_transducer') && ...
-             s.acoustic_provenance.combination_per_transducer;
-    catch
-    end
+    prov = cached_provenance(file);
+    tf = isfield(prov, 'combination_per_transducer') && isequal(prov.combination_per_transducer, true);
     if ~tf
         fprintf('           Cache lacks per-transducer fields — combining again.\n');
     end
@@ -794,16 +789,12 @@ end
 function tf = has_same_groups(file, fg)
 % A combined cache made with other firing groups (combination_groups; absent
 % when every transducer fired on its own) is combined again.
-    tf = false;
-    try
-        s = load(file, 'acoustic_provenance');
-        if isfield(s.acoustic_provenance, 'combination_groups')
-            [~, ~, cached] = unique(s.acoustic_provenance.combination_groups, 'stable');
-            tf = isequal(cached(:)', fg.group);
-        else
-            tf = ~any(fg.coherent);
-        end
-    catch
+    prov = cached_provenance(file);
+    if isfield(prov, 'combination_groups')
+        [~, ~, cached] = unique(prov.combination_groups, 'stable');
+        tf = isequal(cached(:)', fg.group);
+    else
+        tf = ~any(fg.coherent);
     end
     if ~tf
         fprintf('           Cache was combined with other firing groups — combining again.\n');

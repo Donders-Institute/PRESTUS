@@ -339,9 +339,10 @@ if ~isempty(kgrid_cached) && isobject(kgrid_cached)
     N   = dst_dims + pad;
     dx  = parameters.grid.resolution_mm * 1e-3;
     kgrid = kWaveGrid(N(1), dx, N(2), dx, N(3), dx);
-    try
+    % A cached grid without a time array keeps Nt = 'auto'; any other value
+    % must transfer, so a failing setTime stops the run.
+    if isnumeric(kgrid_cached.Nt) && isnumeric(kgrid_cached.dt)
         kgrid.setTime(kgrid_cached.Nt, kgrid_cached.dt);
-    catch
     end
 end
 
@@ -484,8 +485,10 @@ try
         msg = sprintf('Settings that differ from the run that wrote the cache: %s.', ...
             strjoin(diffs(1:min(end, 10)), ', '));
     end
-catch
-    % keep the generic advice: the cache's signature could not be read
+catch ME
+    % This builds the message of an error the caller raises next; a failure
+    % here must not replace that error, so it is reported inside the message.
+    msg = sprintf('%s (The cache''s settings could not be read: %s)', msg, ME.message);
 end
 end
 

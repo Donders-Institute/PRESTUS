@@ -142,11 +142,10 @@ end
 function [name, mem_gb] = gpu_name()
 name = '';
 mem_gb = NaN;
-try
+if canUseGPU()   % false without a GPU or the Parallel Computing Toolbox
     g = gpuDevice();
     name = g.Name;
     mem_gb = double(g.TotalMemory) / 1e9;   % a MIG slice reports its own memory
-catch
 end
 end
 
@@ -170,6 +169,7 @@ try
     fmt = 'yyyy-MM-dd''T''HH:mm:ss';
     s = seconds(datetime(t{2}, 'InputFormat', fmt) - datetime(t{1}, 'InputFormat', fmt));
 catch
+    % A job not yet started reports StartTime=Unknown; the wait is then unknown.
     s = NaN;
 end
 end
@@ -179,15 +179,15 @@ gb = NaN;
 if ~isunix || ismac || ~isfile('/proc/self/status')
     return
 end
-try
-    tok = regexp(fileread('/proc/self/status'), 'VmHWM:\s+(\d+)\s*kB', 'tokens', 'once');
+tok = regexp(fileread('/proc/self/status'), 'VmHWM:\s+(\d+)\s*kB', 'tokens', 'once');
+if ~isempty(tok)
     gb = str2double(tok{1}) / 1024^2;
-    if ~isempty(getenv('SLURM_JOB_ID'))
-        % The job cgroup also holds child solvers (k-Wave C++ binary, BabelBrain).
-        % (evalc: log_memory_usage prints a line; keep the run log clean.)
-        [~, mem] = evalc('log_memory_usage(''run_stats'')');
-        gb = max(gb, mem.cg_peak_gb);
-    end
-catch
+end
+if ~isempty(getenv('SLURM_JOB_ID'))
+    % The job cgroup also holds child solvers (k-Wave C++ binary, BabelBrain).
+    % (evalc: log_memory_usage prints a line; keep the run log clean. It
+    % returns NaN where cgroups are not readable.)
+    [~, mem] = evalc('log_memory_usage(''run_stats'')');
+    gb = max(gb, mem.cg_peak_gb);
 end
 end

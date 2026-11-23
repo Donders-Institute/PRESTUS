@@ -63,7 +63,9 @@ try
         if isfile(csv_path)
             try
                 tables{v} = read_metrics_table(csv_path);
-            catch
+            catch ME
+                % The report is still written without this input; the reason is shown.
+                warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'variant metrics table', ME.message);
                 tables{v} = [];
             end
         end
@@ -105,7 +107,9 @@ try
                     heating{v} = h;
                 end
                 clear s;
-            catch
+            catch ME
+                % The report is still written without this input; the reason is shown.
+                warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'variant heating results', ME.message);
                 heating{v} = [];
             end
         end
@@ -838,7 +842,9 @@ function html = build_pct_bounds_section(parameters, variants, default_affix)
         end
         try
             bounds.(v.name) = uncertainty_medium_layer(parameters, v.name).medium_properties.skull;
-        catch
+        catch ME
+            % The report is still written without this input; the reason is shown.
+            warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'variant skull bounds', ME.message);
         end
     end
 
@@ -1100,7 +1106,9 @@ function timing = parse_timing_from_log(log_path)
             lines{end+1} = fgetl(fid); %#ok<AGROW>
         end
         fclose(fid);
-    catch
+    catch ME
+        % The report is still written without this input; the reason is shown.
+        warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'run log', ME.message);
         return;
     end
     % Match timer-stop lines: ⏱ <label>  <seconds>s | ...

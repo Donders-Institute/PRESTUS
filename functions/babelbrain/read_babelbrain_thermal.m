@@ -102,12 +102,14 @@ if ~isempty(info_.Datasets)
 end
 nested_prefix_ = '/AllData/item_0/';
 nested_names_  = {};
-try
+% Older BabelBrain versions write no /AllData/item_0 group: look it up
+% instead of probing, so a damaged file still raises.
+all_data_ = info_.Groups(strcmp({info_.Groups.Name}, '/AllData'));
+if ~isempty(all_data_) && any(strcmp({all_data_(1).Groups.Name}, '/AllData/item_0'))
     nested_info_ = h5info(thermal_h5, '/AllData/item_0');
     if ~isempty(nested_info_.Datasets)
         nested_names_ = {nested_info_.Datasets.Name};
     end
-catch
 end
 
 read_any_ = @(key) read_field_any(thermal_h5, key, root_names_, nested_prefix_, nested_names_);

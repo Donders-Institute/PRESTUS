@@ -56,13 +56,12 @@ function [file, found, index] = library_entry_file(library_path, key, tran_seria
     end
     tran_serial = char(tran_serial);
     if isempty(model)
-        try     % the model named in the transducer's equipment entry
-            eq = load_equipment_config();
-            if isfield(eq.trans, tran_serial) && isfield(eq.trans.(tran_serial), 'model') && ...
-                    ~isempty(eq.trans.(tran_serial).model)
-                model = char(eq.trans.(tran_serial).model);
-            end
-        catch
+        % the model named in the transducer's equipment entry; a broken
+        % equipment folder raises here rather than filing the entry by guess
+        eq = load_equipment_config();
+        if isfield(eq.trans, tran_serial) && isfield(eq.trans.(tran_serial), 'model') && ...
+                ~isempty(eq.trans.(tran_serial).model)
+            model = char(eq.trans.(tran_serial).model);
         end
     end
     if isempty(model)

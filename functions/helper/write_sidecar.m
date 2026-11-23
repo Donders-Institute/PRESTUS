@@ -50,12 +50,7 @@ end
                 isstruct(parameters.io.prestus_version)
             info = parameters.io.prestus_version;
         else
-            info = struct('version', 'unknown', 'commit', 'unknown', 'commit_date', '', ...
-                'branch', '', 'dirty', 'unknown');
-            try
-                [~, ~, info] = prestus_version();
-            catch
-            end
+            [~, ~, info] = prestus_version();   % reports 'unknown' itself without git
         end
         out = struct( ...
             'sidecar_version', 1, ...

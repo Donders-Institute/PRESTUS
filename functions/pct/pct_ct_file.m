@@ -1,4 +1,4 @@
-function ct_file = pct_ct_file(parameters)
+function ct_file = pct_ct_file(parameters, opts)
 % PCT_CT_FILE  This subject's measured CT, or '' when the pseudo-CT is used
 %
 % The CT-based skull mapping reads one CT image per subject. A measured CT
@@ -8,9 +8,12 @@ function ct_file = pct_ct_file(parameters)
 %
 % Use as:
 %   ct_file = pct_ct_file(parameters)
+%   ct_file = pct_ct_file(parameters, MustExist=false)
 %
 % Input:
 %   parameters - PRESTUS parameter struct (subject_id, path.anat, path.ct_pattern)
+%   MustExist  - false: return '' instead of erroring when the pattern matches
+%                no file (default true)
 %
 % Output:
 %   ct_file - full path of the measured CT; '' when path.ct_pattern is empty.
@@ -20,6 +23,7 @@ function ct_file = pct_ct_file(parameters)
 
 arguments
     parameters (1,1) struct
+    opts.MustExist (1,1) logical = true
 end
 
     ct_file = '';
@@ -32,7 +36,9 @@ end
     ct_glob = fullfile(char(parameters.path.anat), ...
         sprintf(char(parameters.path.ct_pattern), parameters.subject_id));
     d = dir(ct_glob);
-    if isempty(d)
+    if isempty(d) && ~opts.MustExist
+        return
+    elseif isempty(d)
         error('PRESTUS:pct:ctNotFound', 'No CT file matched path.ct_pattern: %s', ct_glob);
     end
     if numel(d) > 1

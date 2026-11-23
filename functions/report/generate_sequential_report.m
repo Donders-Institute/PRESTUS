@@ -126,7 +126,9 @@ try
         if ~isempty(csv_path) && isfile(csv_path)
             try
                 d.csv = read_metrics_table(csv_path);
-            catch
+            catch ME
+                % The report is still written without this input; the reason is shown.
+                warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'run metrics table', ME.message);
                 d.csv = [];
             end
         end
@@ -152,7 +154,9 @@ try
                 if isfield(tmp, 'time_status_seq')
                     d.time_status_seq = tmp.time_status_seq;
                 end
-            catch
+            catch ME
+                % The report is still written without this input; the reason is shown.
+                warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'run heating time series', ME.message);
             end
         end
 
@@ -306,7 +310,9 @@ function [out_path, img_path] = build_max_intensity_nii(run_data, base_p, subjec
             else
                 vol_max = max(vol_max, vol);
             end
-        catch
+        catch ME
+            % The report is still written without this input; the reason is shown.
+            warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'run intensity map', ME.message);
         end
     end
 
@@ -340,7 +346,13 @@ function img_path = build_max_intensity_overview_img(vol_max, base_p, subject_id
     end
     dir_img = base_p.io.dir_img;
     if ~isfolder(dir_img)
-        try; mkdir(dir_img); catch; return; end
+        if ~isfolder(dir_img)
+            [ok, msg] = mkdir(dir_img);
+            if ~ok
+                warn('PRESTUS:report:inputUnreadable', 'Report: cannot create %s: %s', dir_img, msg);
+                return
+            end
+        end
     end
     out_png = fullfile(dir_img, ...
         sprintf('sub-%03d_%s_sequential_%s_max_overview.png', subject_id, medium, intensity_type));
@@ -369,7 +381,9 @@ function img_path = build_max_intensity_overview_img(vol_max, base_p, subject_id
                         t1w_norm = t1w_raw / t1w_max;
                     end
                 end
-            catch
+            catch ME
+                % The report is still written without this input; the reason is shown.
+                warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'T1 underlay', ME.message);
             end
         end
     end
@@ -893,7 +907,9 @@ function variant_run_data = load_variant_run_data(variant_params_list, base_p, m
                 if isfield(tmp, 'time_status_seq')
                     d.time_status_seq = tmp.time_status_seq;
                 end
-            catch
+            catch ME
+                % The report is still written without this input; the reason is shown.
+                warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'run heating time series', ME.message);
             end
         end
         variant_run_data{ri} = d;

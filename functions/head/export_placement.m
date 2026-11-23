@@ -86,11 +86,7 @@ end
 
 function ct = planning_ct(parameters)
 % The measured CT (path.ct_pattern), else the pseudo-CT when it exists; '' otherwise.
-    ct = '';
-    try
-        ct = pct_ct_file(parameters);
-    catch
-    end
+    ct = pct_ct_file(parameters, MustExist=false);
     d = char(string(get_field(parameters, {'io', 'dir_pct'}, '')));
     if isempty(ct) && ~isempty(d) && isfile(fullfile(d, 'pseudoCT.nii.gz'))
         ct = fullfile(d, 'pseudoCT.nii.gz');

@@ -685,6 +685,7 @@ function s = failed_stage()
             s = labels{1};
         end
     catch
+        % Called while reporting another error: it must not replace that error.
     end
 end
 

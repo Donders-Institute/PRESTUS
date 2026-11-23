@@ -45,7 +45,9 @@ try
     if isfield(parameters.io, 'filename_table') && isfile(parameters.io.filename_table)
         try
             csv_table = read_metrics_table(parameters.io.filename_table);
-        catch
+        catch ME
+            % The report is still written without this input; the reason is shown.
+            warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'metrics table', ME.message);
             csv_table = [];
         end
     end
@@ -1522,10 +1524,7 @@ function [v, detail] = get_prestus_version(parameters)
             isstruct(parameters.io.prestus_version)
         info = parameters.io.prestus_version;
     else
-        try
-            [~, ~, info] = prestus_version();
-        catch
-        end
+        [~, ~, info] = prestus_version();   % reports 'unknown' itself without git
     end
     if ~isempty(info) && ~strcmp(info.version, 'unknown')
         v = info.version;
@@ -1540,17 +1539,14 @@ function [v, detail] = get_prestus_version(parameters)
         detail = '';
     end
     if ~isempty(v), return; end
-    try
-        this_dir = fileparts(mfilename('fullpath'));   % functions/report/
-        repo_root = fullfile(this_dir, '..', '..');    % PRESTUS root
-        ver_file  = fullfile(repo_root, 'VERSION');
-        if isfile(ver_file)
-            raw = strtrim(fileread(ver_file));
-            if ~isempty(raw)
-                v = raw;
-            end
+    this_dir = fileparts(mfilename('fullpath'));   % functions/report/
+    repo_root = fullfile(this_dir, '..', '..');    % PRESTUS root
+    ver_file  = fullfile(repo_root, 'VERSION');
+    if isfile(ver_file)
+        raw = strtrim(fileread(ver_file));
+        if ~isempty(raw)
+            v = raw;
         end
-    catch
     end
 end
 
@@ -1558,30 +1554,27 @@ function v = get_kwave_version(parameters)
 % Read k-Wave version from its Contents.m file, resolved via the toolbox path.
 % Returns version string (e.g. '1.4') or empty string if not found.
     v = '';
-    try
-        % Prefer path stored in parameters if set
-        kw_root = '';
-        if isfield(parameters, 'paths') && isfield(parameters.paths, 'kwave_toolbox')
-            kw_root = parameters.paths.kwave_toolbox;
+    % Prefer path stored in parameters if set
+    kw_root = '';
+    if isfield(parameters, 'paths') && isfield(parameters.paths, 'kwave_toolbox')
+        kw_root = parameters.paths.kwave_toolbox;
+    end
+    if isempty(kw_root)
+        % Fall back: find kWaveGrid on the MATLAB path
+        kw_grid = which('kWaveGrid');
+        if ~isempty(kw_grid)
+            kw_root = fileparts(kw_grid);
         end
-        if isempty(kw_root)
-            % Fall back: find kWaveGrid on the MATLAB path
-            kw_grid = which('kWaveGrid');
-            if ~isempty(kw_grid)
-                kw_root = fileparts(kw_grid);
+    end
+    if ~isempty(kw_root)
+        contents = fullfile(kw_root, 'Contents.m');
+        if isfile(contents)
+            txt = fileread(contents);
+            tok = regexp(txt, 'Version\s+([\d.]+)', 'tokens', 'once');
+            if ~isempty(tok)
+                v = tok{1};
             end
         end
-        if ~isempty(kw_root)
-            contents = fullfile(kw_root, 'Contents.m');
-            if isfile(contents)
-                txt = fileread(contents);
-                tok = regexp(txt, 'Version\s+([\d.]+)', 'tokens', 'once');
-                if ~isempty(tok)
-                    v = tok{1};
-                end
-            end
-        end
-    catch
     end
 end
 
@@ -1767,7 +1760,9 @@ function html = build_medium_properties_babelbrain(parameters)
                 h5_path = '';
             end
         end
-    catch
+    catch ME
+        % The report is still written without this input; the reason is shown.
+        warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'BabelBrain input file lookup', ME.message);
         h5_path = '';
     end
 
@@ -1781,7 +1776,9 @@ function html = build_medium_properties_babelbrain(parameters)
                 mat_raw = mat_raw';
             end
             mat = double(mat_raw);
-        catch
+        catch ME
+            % The report is still written without this input; the reason is shown.
+            warn('PRESTUS:report:inputUnreadable', 'Report: %s not read: %s', 'BabelBrain material table', ME.message);
         end
     end
 
@@ -1798,9 +1795,9 @@ function html = build_medium_properties_babelbrain(parameters)
 
     % Frequency for attenuation unit conversion (Np/m → dB/cm/MHz)
     freq_mhz = NaN;
-    try
+    if isfield(parameters, 'transducer') && ~isempty(parameters.transducer) && ...
+            isfield(parameters.transducer, 'freq_hz') && isnumeric(parameters.transducer(1).freq_hz)
         freq_mhz = parameters.transducer(1).freq_hz / 1e6;
-    catch
     end
 
     % CT-derived skull note
@@ -2557,7 +2554,10 @@ function html = build_toc(parameters, is_layered, extra_html)
                 end
             end
         end
-    catch
+    catch ME
+        % The report is still written; the dot says the status is unknown.
+        worst = 'unknown';
+        warn('PRESTUS:report:statusUnknown', 'Safety status not determined: %s', ME.message);
     end
     dot_colour = worst;
     if strcmp(worst, 'unknown'), dot_colour = 'ink-4'; end
