@@ -1,4 +1,4 @@
-function [out_path, ct_out_path] = write_babelbrain_input(medium_masks, focus_pos, parameters, planimg, out_dir, target_name, ppw_override, pseudoCT, trans_pos)
+function [out_path, ct_out_path, materials_path] = write_babelbrain_input(medium_masks, focus_pos, parameters, planimg, out_dir, target_name, ppw_override, pseudoCT, trans_pos, medium_table)
 % WRITE_BABELBRAIN_INPUT  Write BabelViscoInput NIfTI from PRESTUS medium masks
 %
 % Converts PRESTUS medium_masks (layer index volume in grid space) to a
@@ -12,6 +12,13 @@ function [out_path, ct_out_path] = write_babelbrain_input(medium_masks, focus_po
 %   3 = trabecular bone
 %   4 = brain
 %   5 = focal point    (single voxel — the only accepted way to pass the target)
+%
+% With medium_table (babelbrain.medium 'prestus') the labels are material
+% classes instead: 0 = water, 5 = focal point, 5 + k = class k of
+% BABELBRAIN_MEDIUM_TABLE (uint16). BabelBrain reads labels >= 6 as its
+% brain-segmentation materials and uses label - 1 as the material index, so
+% <stem>_PRESTUSMaterials.json lists the materials in that order: water, three
+% unused rows (water), the focal voxel's class, then classes 1..K.
 %
 % Required BabelBrain filename:
 %   <out_dir>/<ID>/<target_name>_<freq_kHz>kHz_<PPW>PPW_BabelViscoInput.nii.gz
@@ -51,11 +58,16 @@ function [out_path, ct_out_path] = write_babelbrain_input(medium_masks, focus_po
 %   trans_pos     - (optional) [1x3] transducer voxel in the same grid as
 %                   focus_pos; sets the beam direction for the depth flip
 %                   (default: beam +z assumed)
+%   medium_table  - (optional) struct with cls, table and water from
+%                   BABELBRAIN_MEDIUM_TABLE (same grid as medium_masks); [] =
+%                   tissue labels
 %
 % Output:
 %   out_path      - full path to the written BabelViscoInput NIfTI file
 %   ct_out_path   - full path to the written CT NIfTI file, or '' if pseudoCT
 %                   was not supplied
+%   materials_path - full path to the written <stem>_PRESTUSMaterials.json,
+%                   or '' without medium_table
 %
 % See also: BABELBRAIN_WRAPPER, BABELBRAIN_TX_GEOMETRY, EXPORT_BABELBRAIN_WEIGHTS
 
@@ -69,6 +81,20 @@ arguments
     ppw_override  (1,1)   double = 0   % pass resolved PPW from wrapper; 0 = auto-compute
     pseudoCT               {mustBeNumeric} = []
     trans_pos              {mustBeNumeric} = []   % [1x3] transducer voxel in the same grid as focus_pos; sets beam direction for the depth flip
+    medium_table           = []                   % struct from babelbrain_medium_table; [] = tissue labels
+end
+
+materials_path = '';
+use_table = ~isempty(medium_table);
+if use_table
+    if ~isequal(size(medium_table.cls), size(medium_masks))
+        error('write_babelbrain_input:tableSize', 'medium_table.cls size [%s] must match medium_masks size [%s].', ...
+            num2str(size(medium_table.cls)), num2str(size(medium_masks)));
+    end
+    if ~isempty(pseudoCT)
+        error('write_babelbrain_input:tableWithCT', ...
+            'medium_table carries the pseudo-CT properties itself; pass no pseudoCT with it.');
+    end
 end
 
 ct_out_path = '';
@@ -86,17 +112,7 @@ res_mm   = parameters.grid.resolution_mm;
 % -- computed up front since the PPW fallback (when the caller doesn't already
 % resolve one, e.g. ppw_override=0) should target the same reference, not a
 % separate/inconsistent water- or brain-based guess.
-pichardo_shear_floor_ms = 1000.0 * 0.422 + 680.515;
-smallest_sos_ms = pichardo_shear_floor_ms;
-if isfield(parameters, 'medium_properties')
-    mp_names = fieldnames(parameters.medium_properties);
-    for mi = 1:numel(mp_names)
-        mp = parameters.medium_properties.(mp_names{mi});
-        if isfield(mp, 'sound_speed') && mp.sound_speed > 0
-            smallest_sos_ms = min(smallest_sos_ms, mp.sound_speed);
-        end
-    end
-end
+[~, smallest_sos_ms] = babelbrain_grid_step_mm(parameters);   % BabelBrain's SmallestSOS (Pichardo shear floor or slower medium)
 
 if ppw_override > 0
     ppw = ppw_override;
@@ -173,6 +189,16 @@ if ~isempty(idx_skull_gen)
     label_map(unassigned_skull) = 2;  % treat as cortical when undifferentiated
 end
 
+% babelbrain.medium 'prestus': the material classes replace the tissue labels
+% (same geometry: the classes come from the medium built on these masks)
+label_class = 'uint8';
+if use_table
+    label_class = 'uint16';
+    label_map = zeros(size(medium_masks), label_class);
+    tissue_vox = medium_table.cls > 0;
+    label_map(tissue_vox) = uint16(medium_table.cls(tissue_vox)) + 5;
+end
+
 % Resample the tissue label map (marker not yet placed) from the PRESTUS grid
 % to BabelBrain's native step with nearest-neighbour interpolation (integer
 % labels). Voxel (1,1,1) maps to itself in both grids. Two mutually inverse
@@ -188,7 +214,7 @@ new_dims = max(1, round(old_dims * resample_factor));
 if abs(resample_factor - 1) > 1e-6
     M_old_to_new = diag([resample_factor, resample_factor, resample_factor, 1]);
     M_old_to_new(4, 1:3) = 1 - resample_factor;
-    label_map = uint8(round(affine_resample_3d(single(label_map), M_old_to_new, new_dims, 'nearest', 0)));
+    label_map = cast(round(affine_resample_3d(single(label_map), M_old_to_new, new_dims, 'nearest', 0)), label_class);
 
     M_new_to_old = diag([1/resample_factor, 1/resample_factor, 1/resample_factor, 1]);
     M_new_to_old(4, 1:3) = 1 - 1/resample_factor;
@@ -199,6 +225,10 @@ end
 % old<->new voxel relationship as M_new_to_old, anchored at voxel (1,1,1).
 fp = round((focus_pos - 1) * resample_factor) + 1;
 fp = max(1, min(fp, new_dims));  % clamp to grid
+focus_class = 0;
+if use_table && label_map(fp(1), fp(2), fp(3)) > 5
+    focus_class = double(label_map(fp(1), fp(2), fp(3))) - 5;
+end
 label_map(fp(1), fp(2), fp(3)) = 5;
 
 % Orient the depth axis so BabelBrain's acoustic source lands on the TRANSDUCER
@@ -286,11 +316,16 @@ if ~isempty(trans_pos) && numel(trans_pos) >= 3 && ~isempty(bowl_depth_mm)
 end
 
 fprintf('[write_babelbrain_input] Label counts:\n');
-for lbl = [0 1 2 3 4 5]
-    n = sum(label_map(:) == lbl);
-    names = {'background','skin','cortical','trabecular','brain','focal'};
-    if n > 0
-        fprintf('  %d (%s): %d voxels\n', lbl, names{lbl+1}, n);
+if use_table
+    fprintf('  0 (water): %d voxels, 5 (focal): 1 voxel, classes 6..%d: %d voxels in %d classes\n', ...
+        nnz(label_map == 0), 5 + size(medium_table.table, 1), nnz(label_map > 5), numel(unique(label_map(label_map > 5))));
+else
+    for lbl = [0 1 2 3 4 5]
+        n = sum(label_map(:) == lbl);
+        names = {'background','skin','cortical','trabecular','brain','focal'};
+        if n > 0
+            fprintf('  %d (%s): %d voxels\n', lbl, names{lbl+1}, n);
+        end
     end
 end
 
@@ -302,8 +337,8 @@ niftiwrite(uint8(label_map), tmp_file);
 hdr = niftiinfo([tmp_file '.nii']);
 delete([tmp_file '.nii']);
 
-hdr.Datatype        = 'uint8';
-hdr.BitsPerPixel    = 8;
+hdr.Datatype        = label_class;
+hdr.BitsPerPixel    = 8 * (1 + use_table);
 hdr.PixelDimensions = repmat(bb_native_res_mm, 1, 3);
 hdr.SpaceUnits      = 'Millimeter';
 hdr.Description     = sprintf('PRESTUS BabelViscoInput: %s  freq=%dkHz  ppw=%d', ...
@@ -370,6 +405,28 @@ end
 %% Write NIfTI
 niftiwrite(label_map, strrep(out_path, '.nii.gz', ''), hdr, 'Compressed', true);
 fprintf('[write_babelbrain_input] Written: %s\n', out_path);
+
+%% Write the material table (babelbrain.medium 'prestus')
+% BabelBrain material index = label - 1 for labels >= 5 (CreateMaterialMaps,
+% brain-segmentation branch): 0 water, 1-3 unused, 4 the focal voxel (label 5),
+% 4 + k class k (label 5 + k). Columns: density, long. SoS, shear SoS, long.
+% attenuation [Np/m], shear attenuation (BabelBrain's AddMaterial order).
+if use_table
+    w = medium_table.water;
+    if focus_class > 0; f_row = medium_table.table(focus_class, :); else; f_row = w; end
+    rows = [repmat(w, 4, 1); f_row; medium_table.table];
+    mats = [rows(:,1), rows(:,2), zeros(size(rows,1),1), rows(:,3), zeros(size(rows,1),1)];
+    materials_path = strrep(out_path, 'BabelViscoInput.nii.gz', 'PRESTUSMaterials.json');
+    fid = fopen(materials_path, 'w');
+    if fid < 0
+        error('write_babelbrain_input:materialsWrite', 'Cannot open %s for writing.', materials_path);
+    end
+    fwrite(fid, jsonencode(struct('columns', {{'density', 'long_sos', 'shear_sos', 'long_att_np_m', 'shear_att_np_m'}}, ...
+        'materials', mats, 'focal_class', focus_class)), 'char');
+    fclose(fid);
+    fprintf('[write_babelbrain_input] Material table: %d materials (%d classes) -> %s\n', ...
+        size(mats, 1), size(medium_table.table, 1), materials_path);
+end
 
 %% Write companion CT NIfTI (raw HU, pre-quantization), same grid as the mask
 if ~isempty(pseudoCT)

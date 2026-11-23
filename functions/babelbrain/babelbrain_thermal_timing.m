@@ -77,9 +77,13 @@ end
 
 % Number of pulse-train repetitions: n_ptri_reps = round(ptrd / ptri)
 % (thermal_parameters.m).
+% parameters.timing holds ptrd and ptri; n_ptri_reps exists only in the
+% derived thermal parameters, so derive it here when it is absent.
 bt.repetitions = 1;
-if isfield(t, 'n_ptri_reps') && t.n_ptri_reps > 1
+if isfield(t, 'n_ptri_reps') && ~isempty(t.n_ptri_reps) && t.n_ptri_reps > 1
     bt.repetitions = round(t.n_ptri_reps);
+elseif isfield(t, 'ptrd') && isfield(t, 'ptri') && ~isempty(t.ptrd) && ~isempty(t.ptri) && t.ptri > 0
+    bt.repetitions = max(1, round(t.ptrd / t.ptri));
 end
 
 % Post-sequence cooldown (BabelBrain PauseBetweenGroupedSonications with a

@@ -301,6 +301,12 @@ def parse_args():
                         'longitudinal attenuation from the babelbrain_elastic entries of the skull layers '
                         'in --medium_properties_json (the kwave_elastic values at the drive frequency). '
                         'Requires --medium_properties_json; not available with --use_ct.')
+    p.add_argument('--prestus_materials_json', default='',
+                   help='babelbrain.medium prestus: <stem>_PRESTUSMaterials.json written by '
+                        'write_babelbrain_input.m. Replaces the material table of the tissue run '
+                        '(water, three unused rows, the focal voxel, then the PRESTUS material classes; '
+                        'BabelBrain material index = label - 1) and sets every Q correction to 1, so '
+                        'BabelViscoFDTD runs on the PRESTUS medium. Water-only runs are unaffected.')
     p.add_argument('--log_file',            default='',
                    help='Path to write a copy of all stdout/stderr output for post-hoc debugging.')
     p.add_argument('--source_amp_pa',       default=0.0, type=float,
@@ -1342,6 +1348,67 @@ def _quantize_ct_for_babelbrain(basedir, subject_id, target, freq, ppw, hu_floor
     print(f'[run_babelbrain_case] CT index map written (overwriting raw-HU CT.nii.gz): {ct_path}')
 
 
+def _load_prestus_materials(json_path):
+    """Read <stem>_PRESTUSMaterials.json (write_babelbrain_input.m) as an
+    [N x 5] array of BabelBrain AddMaterial rows [Density, LongSoS, ShearSoS,
+    LongAtt (Np/m), ShearAtt (Np/m)], checked for shape and values."""
+    import json
+    with open(json_path) as f:
+        d = json.load(f)
+    mats = np.atleast_2d(np.asarray(d['materials'], dtype=float))
+    if mats.ndim != 2 or mats.shape[1] != 5 or mats.shape[0] < 6:
+        raise ValueError(f'{json_path}: expected [N x 5] materials with N >= 6 '
+                         f'(water, three unused rows, focal voxel, classes), got {mats.shape}')
+    if np.any(mats[:, 0] <= 0) or np.any(mats[:, 1] <= 0) or np.any(mats[:, [2, 4]] != 0) \
+            or np.any(mats[:, 3] < 0):
+        raise ValueError(f'{json_path}: densities and sound speeds must be > 0, attenuation >= 0, '
+                         'shear columns 0 (fluid medium)')
+    return mats
+
+
+def _patch_prestus_materials(bb_root, materials):
+    """babelbrain.medium prestus: give BabelViscoFDTD the PRESTUS material table.
+
+    write_babelbrain_input.m labels each voxel 5 + its material class (the focal
+    voxel 5). Labels above 5 send BabelBrain down its brain-segmentation branch,
+    whose CreateMaterialMaps sets material index = label - 1, so the table row
+    order is water, three unused rows, the focal voxel, then the classes.
+    BabelBrain's Step1 adds its own tissue materials and then calls
+    SimulationConditionsBASE.UpdateConditions, which derives the time step from
+    the table; the table is replaced at the start of that call, so the time
+    step, the per-material relaxation fit and the Q corrections (all 1: the
+    attenuation is PRESTUS's, as on the patched non-CT path) all see it.
+    Water-only runs keep BabelBrain's water.
+    """
+    add_babelbrain_paths(bb_root)
+    SimBase = importlib.import_module(BB_BASE).SimulationConditionsBASE
+    if getattr(SimBase, '_prestus_materials_patch', False):
+        return
+    orig_update = SimBase.UpdateConditions
+
+    def patched_update(self, SkullMaskNii, AlphaCFL=1.0, bWaterOnly=False, **kw):
+        if not bWaterOnly:
+            labels = np.asarray(SkullMaskNii.dataobj)
+            n_lab = int(labels.max())
+            if n_lab - 1 > materials.shape[0] - 1:
+                raise ValueError(f'[run_babelbrain_case] PRESTUS medium: label {n_lab} needs material '
+                                 f'{n_lab - 1}, table has {materials.shape[0]} rows')
+            self.ResetMaterial()
+            for row in materials:
+                self.AddMaterial(*[float(v) for v in row])
+            self._QCorrection = np.ones(materials.shape[0])
+            print(f'[run_babelbrain_case] PRESTUS medium: {materials.shape[0]} materials '
+                  f'(density {materials[5:, 0].min():.0f}-{materials[5:, 0].max():.0f} kg/m3, '
+                  f'SoS {materials[5:, 1].min():.0f}-{materials[5:, 1].max():.0f} m/s, '
+                  f'att {materials[5:, 3].min():.2f}-{materials[5:, 3].max():.2f} Np/m), Q correction 1.')
+        return orig_update(self, SkullMaskNii, AlphaCFL=AlphaCFL, bWaterOnly=bWaterOnly, **kw)
+
+    patched_update.__name__ = 'UpdateConditions'
+    SimBase.UpdateConditions = patched_update
+    SimBase._prestus_materials_patch = True
+    print('[run_babelbrain_case] Patched SimulationConditionsBASE.UpdateConditions: PRESTUS material table.')
+
+
 def _inject_prestus_materials(bb_root, freq, props_json_path, bone_shear=False):
     """Overwrite BabelBrain's built-in non-CT material database (``MatFreq``) with
     PRESTUS's configured medium properties, so k-Wave / jwave / BabelBrain all
@@ -1519,6 +1586,14 @@ def main():
                   f'both bone materials (got {sorted(elastic)}); stopping instead of running '
                   'with BabelBrain\'s built-in shear values.', file=sys.stderr)
             sys.exit(1)
+
+    # babelbrain.medium prestus: BabelViscoFDTD on the PRESTUS material table
+    if args.prestus_materials_json and not args.water_only:
+        if args.use_ct or args.bone_shear or args.q_correction > 0:
+            print('[run_babelbrain_case] --prestus_materials_json replaces the tissue materials; it does '
+                  'not combine with --use_ct, --bone_shear or --q_correction.', file=sys.stderr)
+            sys.exit(1)
+        _patch_prestus_materials(bb_root, _load_prestus_materials(args.prestus_materials_json))
 
     # Defensive crash-prevention patches (no result change for normal inputs).
     _patch_resave_normalized(bb_root, write_output=args.debug)

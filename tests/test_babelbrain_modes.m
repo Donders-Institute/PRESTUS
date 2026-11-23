@@ -316,6 +316,116 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelb
             tc.verifyError(@() run_thermal(tc, 'vulkan'), 'resolve_bb_backend:unknownBackend');
         end
 
+        %% babelbrain.medium 'prestus' (BabelViscoFDTD on the PRESTUS medium)
+
+        function prestusMediumTableExactForStepMedium(tc)
+            % Without smoothing every tissue is one material with its own
+            % properties; water is class 0.
+            p = bb_parameters(tc.TmpDir, 'matlab');
+            [masks, ~, ~] = phantom_masks(p, {'skin', 'skull_cortical', 'skull_trabecular', 'skull_cortical', 'brain'});
+            km = medium_from_masks(p, masks, 0);
+            [cls, tbl, w, info] = babelbrain_medium_table(km, p.medium_properties.water, p.transducer(1).freq_hz);
+            names = fieldnames(p.medium_properties);
+            tissues = {'skin', 'skull_cortical', 'skull_trabecular', 'brain'};
+            tc.verifyEqual(size(tbl, 1), numel(tissues));
+            tc.verifyEqual(info.max_abs_error, [0 0 0], 'AbsTol', 1e-9);
+            tc.verifyTrue(all(cls(masks == find(strcmp(names, 'water'))) == 0), 'water -> class 0');
+            for t = tissues
+                k = unique(cls(masks == find(strcmp(names, t{1}))));
+                tc.verifyNumElements(k, 1, t{1});
+                mp = p.medium_properties.(t{1});
+                tc.verifyEqual(tbl(k, 1:2), [mp.density, mp.sound_speed], 'AbsTol', 1e-9, t{1});
+            end
+            tc.verifyEqual(w(1:2), [p.medium_properties.water.density, p.medium_properties.water.sound_speed]);
+        end
+
+        function prestusMediumTableBoundsSmoothedMedium(tc)
+            % Smoothed properties give intermediate materials; every voxel stays
+            % within one quantisation step of its material, also when the
+            % class limit coarsens the steps.
+            p = bb_parameters(tc.TmpDir, 'matlab');
+            [masks, ~, ~] = phantom_masks(p, {'skin', 'skull_cortical', 'brain'});
+            km = medium_from_masks(p, masks, 1.5);
+            f = p.transducer(1).freq_hz;
+            for cap = [1000 12]
+                [cls, tbl, ~, info] = babelbrain_medium_table(km, p.medium_properties.water, f, cap);
+                tc.verifyLessThanOrEqual(size(tbl, 1), cap);
+                tc.verifyGreaterThan(size(tbl, 1), 3, 'intermediate materials');
+                X = [km.density(:), km.sound_speed(:), km.alpha_coeff(:) * (f/1e6)^km.alpha_power * 100/8.685889638];
+                on = cls(:) > 0;
+                err = max(abs(X(on, :) - tbl(cls(on), :)), [], 1);
+                tc.verifyLessThanOrEqual(err, info.steps + 1e-9, sprintf('cap %d', cap));
+                tc.verifyEqual(err, info.max_abs_error, 'AbsTol', 1e-9);
+            end
+            tc.verifyGreaterThan(info.steps, [1 1 0.1], 'cap 12 coarsens the steps');
+        end
+
+        function prestusMediumReachesBridge(tc)
+            % The label map carries the material classes and the material
+            % JSON lists them at index label - 1 (BabelBrain's brain-
+            % segmentation branch); the labels path stays uint8 tissue labels.
+            p = bb_parameters(tc.TmpDir, 'matlab');
+            p.thermal_backend = 'kwave';
+            p.grid.dims = [40 40 60];
+            [masks, fp, tp] = phantom_masks(p, {'skin', 'skull_cortical', 'brain'});
+            km = medium_from_masks(p, masks, 1.5);
+
+            p.babelbrain.medium = 'labels';
+            [~, argv, nii] = run_wrapper(tc, p, masks, fp, tp, [], km);
+            tc.verifyFalse(has_flag(argv, '--prestus_materials_json'), 'labels: no material table');
+            tc.verifyClass(niftiread(nii), 'uint8');
+
+            p.babelbrain.medium = 'prestus';
+            [~, argv, nii] = run_wrapper(tc, p, masks, fp, tp, [], km);
+            tc.assertTrue(has_flag(argv, '--prestus_materials_json'));
+            mj  = jsondecode(fileread(flag_value(argv, '--prestus_materials_json')));
+            lab = niftiread(nii);
+            tc.verifyClass(lab, 'uint16');
+            tc.verifyEqual(nnz(lab == 5), 1, 'one focal voxel');
+            tc.verifyFalse(any(ismember(lab(:), 1:4)), 'no tissue labels');
+            [~, tbl, w] = babelbrain_medium_table(km, p.medium_properties.water, p.transducer(1).freq_hz);
+            mats = mj.materials;
+            tc.verifyEqual(size(mats), [5 + size(tbl, 1), 5]);
+            tc.verifyEqual(mats(6:end, [1 2 4]), tbl, 'AbsTol', 1e-9, 'class k at row 5 + k');
+            tc.verifyEqual(mats(1:4, [1 2 4]), repmat(w, 4, 1), 'AbsTol', 1e-9);
+            tc.verifyEqual(mats(:, [3 5]), zeros(size(mats, 1), 2), 'fluid');
+            tc.verifyLessThanOrEqual(double(max(lab(:))) - 1, size(mats, 1) - 1, 'every label has a material');
+            if mj.focal_class > 0
+                tc.verifyEqual(mats(5, [1 2 4]), tbl(mj.focal_class, :), 'AbsTol', 1e-9);
+            else
+                tc.verifyEqual(mats(5, [1 2 4]), w, 'AbsTol', 1e-9);
+            end
+        end
+
+        function prestusMediumRejectsLabelOptions(tc)
+            % ct_mapping, elastic bone, q_correction and BabelBrain heating act
+            % on BabelBrain's tissue labels, which the PRESTUS medium replaces.
+            base = bb_parameters(tc.TmpDir, 'matlab');
+            base.babelbrain.medium = 'prestus';
+            base.thermal_backend = 'kwave';
+            base.grid.dims = [40 40 60];
+            [masks, fp, tp] = phantom_masks(base, {'skin', 'skull_cortical', 'brain'});
+            km = medium_from_masks(base, masks, 0);
+            cases = {@(p) setfield(p, 'babelbrain', setfield(p.babelbrain, 'ct_mapping', 'Webb-Marsac')), ...
+                     @(p) setfield(p, 'babelbrain', setfield(p.babelbrain, 'q_correction', 3)), ...
+                     @(p) setfield(p, 'babelbrain', setfield(p.babelbrain, 'shear', 'prestus_elastic')), ...
+                     @(p) setfield(p, 'thermal_backend', 'babelbrain')};
+            for k = 1:numel(cases)
+                p = cases{k}(base);
+                tc.verifyError(@() run_wrapper(tc, p, masks, fp, tp, [], km), ...
+                    'babelbrain_wrapper:prestusMediumConflict', sprintf('case %d', k));
+            end
+            p = base;
+            p.babelbrain.medium = 'voxels';
+            tc.verifyError(@() run_wrapper(tc, p, masks, fp, tp, [], km), 'babelbrain_wrapper:unknownMedium');
+        end
+
+        function prestusMediumThermalRejected(tc)
+            % BabelBrain's thermal solver reads tissue regions from its labels
+            tc.verifyError(@() run_thermal(tc, 'cuda', 'prestus'), 'babelbrain_thermal_wrapper:prestusMedium');
+            run_thermal(tc, 'cuda', 'labels');   % control: runs up to the missing output
+        end
+
     end
 end
 
@@ -383,12 +493,14 @@ function lab = write_labels(tc, p, masks, fp, tp)
     lab = niftiread(nii);
 end
 
-function [js, argv, nii] = run_wrapper(tc, p, masks, fp, tp, pct)
+function [js, argv, nii] = run_wrapper(tc, p, masks, fp, tp, pct, km)
 % babelbrain_wrapper dry run with run_command recorded; returns the material
-% JSON it wrote and the argv of the BabelBrain call.
+% JSON it wrote and the argv of the BabelBrain call. km: the k-Wave medium
+% (babelbrain.medium 'prestus'; default none).
+    if nargin < 7; km = struct(); end
     setappdata(0, 'prestus_test_cmds', {});
     planimg = struct('t1_header', [], 'transf', [], 'inv_transf', [], 'origin_ras_mm', [0 0 0]);
-    sd = babelbrain_wrapper(p, masks, struct(), fp, tp, planimg, pct);
+    sd = babelbrain_wrapper(p, masks, km, fp, tp, planimg, pct);
     tc.verifyEqual(sd.babelbrain_source, 'dry_run');
     cmds = getappdata(0, 'prestus_test_cmds');
     is_case = cellfun(@(c) any(contains(c, 'run_babelbrain_case.py')) && ~any(strcmp(c, '--get_version')), cmds);
@@ -403,11 +515,12 @@ function [js, argv, nii] = run_wrapper(tc, p, masks, fp, tp, pct)
     tc.verifyTrue(isfile(nii));
 end
 
-function argv = run_thermal(tc, backend)
+function argv = run_thermal(tc, backend, medium)
 % babelbrain_thermal_wrapper with run_command recorded; returns the argv of
 % the run_babelbrain_thermal.py call. The wrapper then stops because no
 % thermal output exists, which is expected here.
     p = bb_parameters(tc.TmpDir, 'matlab');
+    if nargin > 2; p.babelbrain.medium = medium; end
     p.babelbrain.computing_backend = backend;
     p.babelbrain.device_name       = 'auto';
     p.babelbrain.isppa_w_per_cm2   = 5;   % skip the in-situ ISPPA (needs a field)
@@ -432,6 +545,26 @@ function argv = run_thermal(tc, backend)
     is_th = cellfun(@(c) any(contains(c, 'run_babelbrain_thermal.py')), cmds);
     tc.assertEqual(nnz(is_th), 1, 'one BabelBrain thermal call');
     argv = cmds{is_th};
+end
+
+function km = medium_from_masks(p, masks, sigma_vox)
+% k-Wave medium of medium_masks with the medium_properties values, optionally
+% smoothed (Gaussian, sigma in voxels; replicate padding as smooth3)
+    names = fieldnames(p.medium_properties);
+    c = zeros(size(masks)); r = c; a = c;
+    for k = 1:numel(names)
+        m = masks == k;
+        mp = p.medium_properties.(names{k});
+        c(m) = mp.sound_speed; r(m) = mp.density;
+        if isfield(mp, 'alpha_coeff'); a(m) = mp.alpha_coeff; end
+    end
+    if sigma_vox > 0
+        n = 2 * ceil(2 * sigma_vox) + 1;
+        c = smooth3(c, 'gaussian', n, sigma_vox);
+        r = smooth3(r, 'gaussian', n, sigma_vox);
+        a = smooth3(a, 'gaussian', n, sigma_vox);
+    end
+    km = struct('sound_speed', c, 'density', r, 'alpha_coeff', a, 'alpha_power', 2);
 end
 
 function v = flag_value(argv, flag)

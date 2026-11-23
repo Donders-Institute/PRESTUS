@@ -129,6 +129,13 @@ else
     temp_points_raw = zeros(0, 0);
 end
 
+% h5read reverses the axis order of BabelBrain's [Npts x Nt] array (Python),
+% so it arrives as [Nt x Npts]: bring the time axis back to the columns.
+if ~isempty(temp_points_raw) && size(temp_points_raw, 1) == numel(time_profile) && ...
+        size(temp_points_raw, 2) ~= numel(time_profile)
+    temp_points_raw = temp_points_raw.';
+end
+
 % Intensity scalars: root or AllData/item_0; NaN when absent.
 MaxIsppa = read_scalar_any_(thermal_h5, 'MaxIsppa', root_names_, nested_prefix_, nested_names_);
 MaxIspta = read_scalar_any_(thermal_h5, 'MaxIspta', root_names_, nested_prefix_, nested_names_);

@@ -59,6 +59,8 @@ function [parameters] = prestus_pipeline(parameters, options)
     currentLoc = fileparts(mfilename("fullpath"));
     safe_addpath(fullfile(currentLoc, '..', 'functions'));
     [parameters] = path_log_setup(parameters, get_prestus_path);
+    % babelbrain.match_grid: grid.resolution_mm = BabelBrain's step, before any stage reads it
+    parameters = babelbrain_match_grid(parameters);
 
     % k-Wave .h5 files on node-local scratch (hpc.tmp_gb > 0 inside a SLURM
     % job); scratch_cleanup removes the folder when this function exits.
@@ -233,6 +235,13 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     [parameters, kwave_medium, medium_masks, segmentation, trans_pos, focus_pos, fov_state] = ...
         acoustic_fov_crop(parameters, kwave_medium, medium_masks, segmentation, trans_pos, focus_pos);
+    % The pseudo-CT is read after this point only by the BabelBrain backend's CT
+    % path (write_babelbrain_input), which needs it on the cropped grid of the masks
+    if fov_state.active && ~isempty(pseudoCT) && isequal(size(pseudoCT), double(fov_state.full_dims))
+        fov_end = fov_state.offset + parameters.grid.dims - 1;
+        pseudoCT = pseudoCT(fov_state.offset(1):fov_end(1), fov_state.offset(2):fov_end(2), ...
+            fov_state.offset(3):fov_end(3));
+    end
 
     % Record the FOV-crop voxel offset on planimg so any downstream stage that
     % exports the (possibly FOV-cropped) grid directly to RAS space — e.g.

@@ -733,7 +733,9 @@ babelbrain:
   computing_backend: auto   # GPU/CPU backend: 'auto' | 'cuda' | 'opencl' | 'metal' | 'cpu' (or 1-4); thermal has no CPU backend
   device_name: auto         # Device to use: 'auto' selects the first available
   ppw: 12                   # Points-per-wavelength for BabelBrain's internal FDTD grid (BabelViscoFDTD benchmark fidelity; lower = faster but more axial numerical dispersion)
+  match_grid: false         # true: build the PRESTUS grid at BabelBrain's own step (SmallestSOS / freq / ppw; 0.3675 mm at 500 kHz, 6 PPW) instead of grid.resolution_mm, so the medium is not resampled between the grids. For comparisons with native BabelBrain runs; needs acoustic_backend 'babelbrain'
   do_refocusing: false      # Apply BabelBrain refocusing step
+  drive: prestus                    # Element drive: 'prestus' (BabelBrain reproduces the PRESTUS element phases, as the other backends) | 'native' (BabelBrain steers itself to focal_distance_ep, as a run from its own interface; no weights file, no focal calibration)
   focal_calibration: true           # Geometric-fallback steering only (no explicit element phases): choose the steer so the achieved FWHM-centre (or peak) lands at focal_distance_ep. With explicit phases this runs locate-only (reports the predicted focus, never replaces the drive). Set false to disable.
   focal_calibration_target: flhm_center  # Quantity placed at focal_distance_ep: 'flhm_center' (−3 dB axial midpoint; manufacturer convention) | 'peak'
   profile_calibration: false        # Refit drive phases to the continuous-bowl ideal (BabelBrain only; moves it away from the k-Wave/jwave phases). Leave off for cross-backend comparison.
@@ -741,6 +743,7 @@ babelbrain:
   use_rayleigh_for_water: false     # Water-only field solver. false: full-wave FDTD (matches k-Wave/jwave for like-for-like backend comparison; recommended). true: BabelBrain's native Rayleigh–Sommerfeld integral (faster, exact linear free-field, but focuses slightly tighter/deeper than a gridded full-wave solve → reads as a rigid axial offset + higher peak vs the other backends). Only affects water-only runs; the transcranial field always uses FDTD.
   q_correction: []                 # Bone Q-factor correction of BabelBrain's relaxation attenuation model (its QCorrection). [] = 1.0 on the non-CT path (realises the specified bone alpha_coeff), BabelBrain's 3.0 on the CT path. Realised bone attenuation scales ~1/Q; values > 0 override both paths.
   shear: 'off'                     # Bone shear: 'off' (fluid bone, shear speed 0) | 'prestus_elastic' (cortical/trabecular shear speed, shear and longitudinal attenuation from the elastic: section, as kwave_elastic, at the drive frequency; label path only, not with ct_mapping)
+  medium: labels            # Medium BabelViscoFDTD runs on: 'labels' (BabelBrain's tissue labels with medium_properties) | 'prestus' (the PRESTUS acoustic medium as k-Wave sees it, incl. headmodel.smooth_properties and pseudo-CT skull, quantised into up to 1000 materials; fluid; thermal_backend 'kwave'; not with ct_mapping, shear 'prestus_elastic', or q_correction)
   python_env: ''            # Path to the BabelBrain Python environment or executable; must be set ('' = system python, which usually lacks BabelViscoFDTD)
   ct_mapping: ''            # CT Hounsfield-to-property mapping name for CT-based skull modelling; empty = label-based path
   air_regions: false        # pseudoCT path only (ct_mapping set): internal air (sinuses, mastoid) as BabelBrain's pressure-release reflector mask

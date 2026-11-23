@@ -90,6 +90,18 @@ function sensor_data = babelbrain_wrapper( ...
 %                         shear attenuation and longitudinal attenuation that kwave_elastic
 %                         uses (elastic: section; BABELBRAIN_SKULL_ELASTIC), at the drive
 %                         frequency. Label path only (not with ct_mapping).
+%   .medium             - 'labels' (default): BabelBrain's tissue labels with the
+%                         medium_properties values. 'prestus': BabelViscoFDTD runs on the
+%                         PRESTUS acoustic medium (kwave_medium: smoothed properties,
+%                         pseudo-CT skull), quantised into up to 1000 materials
+%                         (BABELBRAIN_MEDIUM_TABLE). Fluid only; not with ct_mapping,
+%                         shear 'prestus_elastic', q_correction, or thermal_backend 'babelbrain'.
+%   .drive              - 'prestus' (default): BabelBrain reproduces the PRESTUS element drive
+%                         (explicit phases through the weights file), so every backend runs
+%                         the same drive. 'native': BabelBrain steers itself to
+%                         focal_distance_ep (ZSteering = focal_distance_bowl - preset FL, no
+%                         weights file, no focal calibration), as a run from BabelBrain's own
+%                         interface with that focal setting; for emulating such a run.
 %   .focal_calibration  - logical (default true). Without explicit element phases, choose the
 %                         geometric steer so the achieved focus lands at focal_distance_ep
 %                         (CALIBRATE_FOCAL_STEERING); with explicit phases, only report it.
@@ -116,7 +128,8 @@ function sensor_data = babelbrain_wrapper( ...
 % Input:
 %   parameters   - PRESTUS config struct with .babelbrain sub-struct
 %   medium_masks - [Nx x Ny x Nz] medium label volume (from preproc_medium_mask)
-%   kwave_medium - k-Wave medium struct (not used for simulation; kept for
+%   kwave_medium - k-Wave medium struct (babelbrain.medium 'prestus': the medium
+%                  BabelBrain runs on; otherwise unused, kept for
 %                  interface compatibility with acoustic_wrapper)
 %   focus_pos    - [1x3] focus voxel in grid coordinates
 %   trans_pos    - [1x3] transducer (bowl rear-centre / apex) voxel in grid coordinates;
@@ -136,7 +149,7 @@ function sensor_data = babelbrain_wrapper( ...
 arguments
     parameters   (1,1) struct
     medium_masks (:,:,:) {mustBeNumeric}
-    kwave_medium (1,1) struct  %#ok<INUSA>  kept for interface symmetry
+    kwave_medium (1,1) struct  % babelbrain.medium 'prestus' only
     focus_pos    (1,3) {mustBeNumeric}
     trans_pos    (1,3) {mustBeNumeric}
     planimg      (1,1) struct
@@ -180,6 +193,16 @@ bb = apply_default(bb, 'focal_calibration_target', 'flhm_center');  % 'flhm_cent
 % placing the FLHM centre. Corrects the ring-gap discretisation bias in
 % BabelBrain's Rayleigh water field. See calibrate_babelbrain_phase_profile.m.
 bb = apply_default(bb, 'profile_calibration',      false);
+bb = apply_default(bb, 'drive',                    'prestus');   % 'prestus' | 'native'
+bb.drive = char(bb.drive);
+if ~ismember(bb.drive, {'prestus', 'native'})
+    error('babelbrain_wrapper:badDrive', 'babelbrain.drive must be ''prestus'' or ''native'' (got ''%s'').', bb.drive);
+end
+drive_native = strcmp(bb.drive, 'native');
+if drive_native
+    bb.focal_calibration   = false;   % BabelBrain's own geometric steer to focal_distance_ep
+    bb.profile_calibration = false;
+end
 
 % Domain size: derived from parameters.grid.acoustic_fov_length_mm (not user-facing
 % on the babelbrain sub-struct).
@@ -259,6 +282,32 @@ if bone_shear && ~isempty(bb.ct_mapping)
         ['babelbrain.shear ''prestus_elastic'' needs the label path: BabelBrain''s CT path ' ...
          '(babelbrain.ct_mapping) always sets the bone shear speed to 0. Clear ct_mapping.']);
 end
+bb = apply_default(bb, 'medium', 'labels');   % 'labels' | 'prestus'
+bb.medium = lower(char(bb.medium));
+if ~ismember(bb.medium, {'labels', 'prestus'})
+    error('babelbrain_wrapper:unknownMedium', 'Unknown babelbrain.medium "%s" (labels | prestus).', bb.medium);
+end
+prestus_medium = strcmp(bb.medium, 'prestus');
+if prestus_medium
+    % BabelViscoFDTD on the PRESTUS medium: the CT path, elastic bone and the
+    % bone Q correction act on BabelBrain's own tissue labels, which this mode
+    % replaces; BabelBrain's thermal solver reads tissue regions from them too.
+    bad = {};
+    if ~isempty(bb.ct_mapping); bad{end+1} = 'ct_mapping'; end
+    if bone_shear; bad{end+1} = 'shear ''prestus_elastic'''; end
+    if ~isempty(bb.q_correction); bad{end+1} = 'q_correction'; end
+    if isfield(parameters, 'thermal_backend') && strcmpi(char(parameters.thermal_backend), 'babelbrain') ...
+            && isfield(parameters, 'modules') && isfield(parameters.modules, 'run_heating_sims') ...
+            && logical(parameters.modules.run_heating_sims)
+        bad{end+1} = 'thermal_backend ''babelbrain''';
+    end
+    if ~isempty(bad)
+        error('babelbrain_wrapper:prestusMediumConflict', ...
+            ['babelbrain.medium ''prestus'' runs BabelViscoFDTD on the PRESTUS medium (fluid, PRESTUS ' ...
+             'attenuation); it does not combine with %s. The pseudo-CT skull enters through the PRESTUS ' ...
+             'medium; use thermal_backend ''kwave'' for heating.'], strjoin(bad, ', '));
+    end
+end
 if bone_shear && pct_skull_mapped(parameters)
     warning('babelbrain_wrapper:shearWithPct', ...
         ['babelbrain.shear ''prestus_elastic'' uses the medium_properties skull densities; ' ...
@@ -271,6 +320,13 @@ end
 is_water_medium = isfield(parameters, 'simulation') && ...
     isfield(parameters.simulation, 'medium') && ...
     strcmpi(parameters.simulation.medium, 'water');
+if is_water_medium && ~isempty(bb.ct_mapping)
+    % No bone to map in free water, and no pseudo-CT reaches a water run
+    % (e.g. the post-hoc free-water stage of a ct_mapping run)
+    fprintf('[babelbrain_wrapper] Water medium: babelbrain.ct_mapping (%s) not used.\n', bb.ct_mapping);
+    bb.ct_mapping  = '';
+    bb.air_regions = false;
+end
 
 %% Locate BabelBrain Python package and runner script
 % The runner script lives in functions/babelbrain/ alongside this file.
@@ -343,17 +399,7 @@ res_mm   = parameters.grid.resolution_mm;
 % write_babelbrain_input.m). ppw_auto makes that step match grid.resolution_mm;
 % use it or babelbrain.ppw, whichever is finer. write_babelbrain_input resamples
 % the mask to the resulting step.
-pichardo_shear_floor_ms = 1000.0 * 0.422 + 680.515;
-smallest_sos_ms = pichardo_shear_floor_ms;
-if isfield(parameters, 'medium_properties')
-    mp_names_ = fieldnames(parameters.medium_properties);
-    for mi_ = 1:numel(mp_names_)
-        mp_ = parameters.medium_properties.(mp_names_{mi_});
-        if isfield(mp_, 'sound_speed') && mp_.sound_speed > 0
-            smallest_sos_ms = min(smallest_sos_ms, mp_.sound_speed);
-        end
-    end
-end
+[~, smallest_sos_ms] = babelbrain_grid_step_mm(parameters);   % BabelBrain's SmallestSOS (Pichardo shear floor or slower medium)
 ppw_auto = round(smallest_sos_ms / (freq_hz * res_mm * 1e-3));
 ppw_use  = max(bb.ppw, ppw_auto);
 
@@ -392,8 +438,11 @@ fprintf('[babelbrain_wrapper] Transducer: %s\n', bb.tx_system);
 %     the in-repo Rayleigh forward model; D* feeds the ZSteering block below.
 % Skipped when the user pins z_steering_m.
 calib = struct('active', false, 'mode', 'off');
-has_explicit_phases = isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && ...
+has_explicit_phases = ~drive_native && isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && ...
     ~isempty(tr.annular.elem_phase_rad);
+if drive_native
+    fprintf('[babelbrain_wrapper] Drive: native (BabelBrain steers to focal_distance_ep itself; PRESTUS phases not used).\n');
+end
 is_annular_calib = isfield(tr, 'annular') && ...
     all(isfield(tr.annular, {'elem_n','elem_id_mm','elem_od_mm','curv_radius_mm', ...
                              'dist_geom_ep_mm','elem_p_amp'})) && ...
@@ -681,7 +730,26 @@ pseudoCT_for_write = [];
 if ~isempty(bb.ct_mapping)
     pseudoCT_for_write = pseudoCT;
 end
-[nii_path, ct_nii_path] = write_babelbrain_input(medium_masks, focus_pos, parameters, planimg, out_dir, target, ppw_use, pseudoCT_for_write, trans_pos);
+medium_table = [];
+if prestus_medium && ~is_water_medium
+    [mt.cls, mt.table, mt.water, mt_info] = babelbrain_medium_table(kwave_medium, ...
+        parameters.medium_properties.water, freq_hz);
+    if isempty(mt.table)
+        error('babelbrain_wrapper:prestusMediumEmpty', ...
+            'babelbrain.medium ''prestus'': the PRESTUS medium has no voxel that differs from water.');
+    end
+    if min(mt.table(:, 2)) < smallest_sos_ms - 0.5
+        error('babelbrain_wrapper:prestusMediumSlow', ...
+            ['babelbrain.medium ''prestus'': the slowest material (%.1f m/s) is below the sound speed ' ...
+             'that set BabelBrain''s step (%.1f m/s).'], min(mt.table(:, 2)), smallest_sos_ms);
+    end
+    medium_table = mt;
+    fprintf(['[babelbrain_wrapper] PRESTUS medium: %d materials, steps %.3g kg/m^3, %.3g m/s, %.3g Np/m; ' ...
+        'largest voxel deviation %.2f kg/m^3, %.2f m/s, %.3f Np/m.\n'], mt_info.n_classes, mt_info.steps, ...
+        mt_info.max_abs_error);
+end
+[nii_path, ct_nii_path, materials_path] = write_babelbrain_input(medium_masks, focus_pos, parameters, planimg, ...
+    out_dir, target, ppw_use, pseudoCT_for_write, trans_pos, medium_table);
 
 %% Step 2b — Export PRESTUS medium properties for BabelBrain material injection
 % BabelBrain's non-CT path uses its own built-in material database (MatFreq).
@@ -729,7 +797,14 @@ end
 %% Step 3 — Write OptimizedWeightsFile (calibrated phases)
 weights_path = fullfile(out_dir, subj_id, [target '_CalibWeights.h5']);
 
-if isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && isfield(tr.annular, 'elem_p_amp')
+if drive_native
+    % BabelBrain's own steering: no weights file. The source amplitude still
+    % follows the PRESTUS drive (free-water normalisation sets the scale).
+    weights_path = '';
+    if isfield(tr, 'annular') && isfield(tr.annular, 'elem_p_amp') && ~isempty(tr.annular.elem_p_amp)
+        elem_p_amp = tr.annular.elem_p_amp(1);
+    end
+elseif isfield(tr, 'annular') && isfield(tr.annular, 'elem_phase_rad') && isfield(tr.annular, 'elem_p_amp')
     phases_rad = tr.annular.elem_phase_rad;
     elem_p_amp   = tr.annular.elem_p_amp(1);
 
@@ -883,6 +958,7 @@ babelbrain_argv = [{python_bin, bb_runner, ...
     bb_rayleigh_water_flag(bb.use_rayleigh_for_water), ...
     bb_qcorr_flag(bb.q_correction), ...
     bb_shear_flag(bone_shear && ~is_water_medium), ...
+    bb_materials_flag(materials_path), ...
     bb_debug_flag(parameters)];
 
 if is_water_medium
@@ -993,6 +1069,11 @@ sensor_data.babelbrain_version   = bb_version;
 sensor_data.focus_pos            = focus_pos;
 sensor_data.focal_length_mm      = focal_length_mm_for_resample;
 sensor_data.trans_pos            = trans_pos;   % beam-axis direction for the thermal resample
+if prestus_medium && isfield(sensor_data, 'babelbrain_material_map')
+    % Material classes, not tissues: the analysis masks the field with
+    % medium_masks, as for k-Wave (the classes come from that medium)
+    sensor_data = rmfield(sensor_data, 'babelbrain_material_map');
+end
 
 % Derive free-water ISPPA.
 % In water medium mode, the primary simulation IS the water simulation, so
@@ -1101,7 +1182,7 @@ end  % if is_water_medium / else
 
 %% Step 5b — Free-water intensity normalization (intended vs achieved ISPPA)
 % Scale the returned pressure so the free-water ISPPA matches the transducer's
-% intended value, as assemble_limited_fov_fields does:
+% intended value, as APPLY_ISPPA_SCALING does for k-Wave:
 %   k = sqrt(target_isppa_wcm2 / achieved_freewater_isppa)
 % Runs only when a BabelBrain free-water baseline was simulated and
 % target_isppa_wcm2 is set; otherwise the raw solver field is kept. Only
@@ -1330,6 +1411,15 @@ function flag = bb_qcorr_flag(q)
     else
         flag = {};
     end
+end
+
+function flag = bb_materials_flag(materials_path)
+% --prestus_materials_json: BabelViscoFDTD material table (babelbrain.medium 'prestus')
+if isempty(materials_path)
+    flag = {};
+else
+    flag = {'--prestus_materials_json', materials_path};
+end
 end
 
 function flag = bb_shear_flag(bone_shear)

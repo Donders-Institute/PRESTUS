@@ -391,6 +391,8 @@ fields:
   elastic.long_attenuation: {choices: [elastic, medium]}
   babelbrain.computing_backend: {choices: [auto, cuda, opencl, metal, cpu]}
   babelbrain.shear: {choices: ['off', prestus_elastic]}
+  babelbrain.medium: {choices: [labels, prestus]}
+  babelbrain.drive: {choices: [prestus, native]}
   babelbrain.focal_calibration_target: {choices: [flhm_center, peak]}
   babelbrain.python_env: {kind: path}
   # BabelBrain's CT path needs the pseudo-CT, which grid_tissue_setup.m loads only with pct.enabled
@@ -1330,7 +1332,9 @@ display:
   elastic.min_ppw_shear: {label: "Min. points per wavelength (shear)"}
   # BabelBrain card: environment, resolution and domain up front; solver internals advanced
   babelbrain.ppw: {label: "Points per wavelength"}
+  babelbrain.match_grid: {label: "Grid at BabelBrain's step", advanced: true}
   babelbrain.do_refocusing: {label: "Refocusing", advanced: true}
+  babelbrain.drive: {label: "Element drive", advanced: true}
   babelbrain.focal_calibration: {label: "Focal calibration", advanced: true}
   babelbrain.focal_calibration_target: {label: "Focal calibration target", advanced: true}
   babelbrain.profile_calibration: {label: "Axial profile calibration", advanced: true}
@@ -1338,6 +1342,7 @@ display:
   babelbrain.use_rayleigh_for_water: {label: "Rayleigh integral for free water", advanced: true}
   babelbrain.q_correction: {label: "Bone Q correction", advanced: true}
   babelbrain.shear: {label: "Bone shear", advanced: true}
+  babelbrain.medium: {label: "Medium", advanced: true}
   babelbrain.python_env: {label: "Python environment"}
   babelbrain.cleanup_cache: {label: "Delete the cache after the run", advanced: true}
   babelbrain.dry_run: {label: "Prepare inputs only (dry run)", advanced: true}
@@ -1412,6 +1417,8 @@ choice_labels:
   elastic.long_attenuation: {elastic: Elastic model, medium: Fluid medium}
   babelbrain.computing_backend: {auto: Auto, cuda: CUDA, opencl: OpenCL, metal: Metal, cpu: CPU}
   babelbrain.shear: {'off': Off (fluid bone), prestus_elastic: k-Wave elastic skull properties}
+  babelbrain.medium: {labels: BabelBrain tissue labels, prestus: PRESTUS medium (as k-Wave)}
+  babelbrain.drive: {prestus: PRESTUS element phases, native: "BabelBrain's own steering"}
   babelbrain.focal_calibration_target: {flhm_center: 'FLHM centre, −3 dB', peak: Intensity peak}
 
 # ── Choice icons and figures ───────────────────────────────────────────

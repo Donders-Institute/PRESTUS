@@ -117,17 +117,7 @@ res_mm   = parameters.grid.resolution_mm;
 % write_babelbrain_input.m for the full derivation. Plain brain/water sound
 % speed would target the wrong reference and inflate the resampling
 % write_babelbrain_input.m has to do.
-pichardo_shear_floor_ms = 1000.0 * 0.422 + 680.515;
-c_min = pichardo_shear_floor_ms;
-if isfield(parameters, 'medium_properties')
-    mp_names_ = fieldnames(parameters.medium_properties);
-    for mi_ = 1:numel(mp_names_)
-        mp_ = parameters.medium_properties.(mp_names_{mi_});
-        if isfield(mp_, 'sound_speed') && mp_.sound_speed > 0
-            c_min = min(c_min, mp_.sound_speed);
-        end
-    end
-end
+[~, c_min] = babelbrain_grid_step_mm(parameters);   % BabelBrain's SmallestSOS (Pichardo shear floor or slower medium)
 ppw_auto = round(c_min / (freq_hz * res_mm * 1e-3));
 ppw_use  = max(bb.ppw, ppw_auto);
 subj_id  = sprintf('sub-%03d', parameters.subject_id);

@@ -245,29 +245,17 @@ if run_new_sim
         if isfield(results_heating, 'timeseries') && ...
                 isfield(results_heating.timeseries, 'TimeProfileTarget') && ...
                 ~isempty(results_heating.timeseries.TimeProfileTarget)
-            t_ax_bb  = results_heating.timeseries.TimeProfileTarget(:)';
-            t_timing = parameters_th.timing;
-            bb_ptrd  = t_timing.ptrd;
-            bb_ptri  = bb_ptrd;
-            if isfield(t_timing, 'ptri') && t_timing.ptri > t_timing.ptrd
-                bb_ptri = t_timing.ptri;
-            end
-            bb_nreps = 1;
-            if isfield(t_timing, 'n_ptri_reps') && t_timing.n_ptri_reps > 1
-                bb_nreps = t_timing.n_ptri_reps;
-            end
-            tss = struct('time', {0}, 'recorded', {1}, 'status', {'off'});
-            for i_bb_rep = 1:bb_nreps
-                t0_rep = (i_bb_rep - 1) * bb_ptri;
-                tss(end+1) = struct('time', t0_rep + bb_ptrd, 'recorded', 1, 'status', 'on');
-                if bb_ptri > bb_ptrd
-                    tss(end+1) = struct('time', t0_rep + bb_ptri, 'recorded', 1, 'status', 'off');
-                end
-            end
-            if t_ax_bb(end) > tss(end).time + 1e-6
-                tss(end+1) = struct('time', t_ax_bb(end), 'recorded', 1, 'status', 'off');
-            end
-            time_status_seq = tss;
+            % One entry per BabelBrain time sample (the time axis of its
+            % per-tissue series), 'on' within a pulse train of the protocol
+            % BabelBrain ran (BABELBRAIN_THERMAL_TIMING)
+            t_ax_bb = results_heating.timeseries.TimeProfileTarget(:)';
+            bt      = babelbrain_thermal_timing(parameters_th.timing);
+            period  = bt.duration_s + bt.duration_off_s;
+            k_rep   = floor(t_ax_bb / max(period, eps));
+            on      = k_rep < bt.repetitions & (t_ax_bb - k_rep * period) < bt.duration_s;
+            status  = repmat({'off'}, size(t_ax_bb));
+            status(on) = {'on'};
+            time_status_seq = struct('time', num2cell(t_ax_bb), 'recorded', 1, 'status', status);
         else
             time_status_seq = struct([]);
         end

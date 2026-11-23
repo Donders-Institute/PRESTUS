@@ -24,6 +24,23 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_babelb
             tc.verifyEqual(total, t.ptrd + t.post_ptri_dur, 'AbsTol', 1e-12);
         end
 
+        function test_repetitions_from_config_timing(tc)
+            % parameters.timing as configured has ptrd and ptri but no
+            % n_ptri_reps (only THERMAL_PARAMETERS derives it): the
+            % repetitions come from ptrd / ptri, for every protocol shape
+            shapes = {struct('ptd', 10, 'ptri', 30, 'ptrd', 60), ...   % 2 trains
+                      struct('ptd', 40, 'ptri', 50, 'ptrd', 150), ...  % 3 trains
+                      struct('ptd', 10, 'ptri', 10, 'ptrd', 10)};      % one continuous train
+            for i = 1:numel(shapes)
+                t = shapes{i}; t.pd = 0.06; t.pri = 0.2; t.post_ptri_dur = 0;
+                bt = babelbrain_thermal_timing(t);
+                tc.verifyEqual(bt.repetitions, round(t.ptrd / t.ptri), sprintf('shape %d', i));
+                % the derived field, when present, gives the same answer
+                t.n_ptri_reps = t.ptrd / t.ptri;
+                tc.verifyEqual(babelbrain_thermal_timing(t).repetitions, bt.repetitions, sprintf('shape %d', i));
+            end
+        end
+
         function test_no_cooldown_when_unset_or_nonpositive(tc)
             t = rmfield(tc.base_timing(), 'post_ptri_dur');
             tc.verifyEqual(babelbrain_thermal_timing(t).pause_after_s, 0);

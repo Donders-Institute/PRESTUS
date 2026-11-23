@@ -96,6 +96,13 @@ bb = struct();
 if isfield(parameters, 'babelbrain')
     bb = parameters.babelbrain;
 end
+if isfield(bb, 'medium') && strcmpi(char(bb.medium), 'prestus')
+    % The BHTE reads tissue regions and thermal properties from BabelBrain's
+    % tissue labels, which babelbrain.medium 'prestus' replaces by material classes
+    error('babelbrain_thermal_wrapper:prestusMedium', ...
+        ['babelbrain.medium ''prestus'' field: BabelBrain''s thermal solver needs its tissue labels. ' ...
+         'Use thermal_backend ''kwave'' for heating.']);
+end
 bb = apply_default(bb, 'computing_backend',  'auto');
 bb = apply_default(bb, 'device_name',        'auto');
 bb = apply_default(bb, 'python_env',         '');
