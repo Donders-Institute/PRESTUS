@@ -57,9 +57,12 @@ function segmentation_run(data_path, subject_id, filename_t1, filename_t2, param
     if isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'noneck') && parameters.segmentation.noneck == 1
         charm_args = [charm_args, {'--noneck'}];
     end
-    if isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'settings_file') ...
-            && ~isempty(parameters.segmentation.settings_file)
-        settings_file = char(parameters.segmentation.settings_file);
+    settings_file = '';
+    if isfield(parameters, 'segmentation') && isfield(parameters.segmentation, 'settings_file')
+        % char: the YAML default '' can arrive as string "", which isempty counts as non-empty
+        settings_file = strtrim(char(parameters.segmentation.settings_file));
+    end
+    if ~isempty(settings_file)
         if ~isfile(settings_file)
             error('segmentation_run:settingsMissing', 'segmentation.settings_file not found: %s', settings_file);
         end

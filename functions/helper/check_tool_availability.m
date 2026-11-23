@@ -13,6 +13,7 @@ function checks = check_tool_availability(parameters, options)
 %                          m2m folder, or io.overwrite_simnibs set
 %   SimNIBS subject2mni    NIfTI stage with io.save_MNI, layered medium and
 %                          analysis.mni_warp_method 'simnibs'; also needs m2m/toMNI
+%                          (unless charm runs first, which writes it)
 %   SimNIBS mni2subject_coords  transducer placement from MNI coordinates
 %                          (placement.mode 'mni', or 'manual' with
 %                          placement.manual.coordinate_space 'mni'); needs m2m/toMNI
@@ -110,7 +111,9 @@ function checks = check_tool_availability(parameters, options)
         end
         needs_toMNI = needs_toMNI || simnibs_tools{k, 3};
     end
-    if needs_toMNI && ~isempty(m2m)
+    % charm writes toMNI with the segmentation: when it runs first, the warps follow
+    charm_runs = ~isempty(simnibs_tools) && any(strcmp(simnibs_tools(:, 1), 'charm'));
+    if needs_toMNI && ~isempty(m2m) && ~charm_runs
         checks(end+1) = make_check('m2m toMNI', isfolder(fullfile(m2m, 'toMNI')), sprintf( ...
             'No toMNI folder in %s; MNI transforms need the SimNIBS segmentation warps.', m2m));
     end

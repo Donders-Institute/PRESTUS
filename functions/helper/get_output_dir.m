@@ -28,5 +28,6 @@ end
              'Set parameters.path.sim to the simulation output directory before calling the pipeline.']);
     end
 
-    output_dir = fullfile(parameters.path.sim, sprintf('sub-%03d', parameters.subject_id));
+    % char: YAML paths load as strings, and [dir '.nii'] on a string makes a 1x2 string array
+    output_dir = char(fullfile(parameters.path.sim, sprintf('sub-%03d', parameters.subject_id)));
 end

@@ -6,6 +6,8 @@ function [parameters] = path_log_setup(parameters, prestus_path)
 % (output, cache, debug/preproc, debug/medium, debug/source), saves a parameter
 % snapshot to cache, opens a diary log file, and writes an initial parameter
 % summary. Also verifies k-Wave is on the path and prints version information.
+% Relative file and folder settings are made absolute against the PRESTUS root
+% (RESOLVE_CONFIG_PATHS); MATLAB's working folder is not changed.
 %
 % Use as:
 %   parameters = path_log_setup(parameters, prestus_path)
@@ -121,7 +123,8 @@ end
     %     └── babelbrain/— BabelBrain FOV/domain-coverage diagnostics
     % Reports (.html) and tables (.csv) are written directly to dir_output.
     if isfield(parameters.io, 'dir_output') && ~isempty(parameters.io.dir_output)
-        out = parameters.io.dir_output;
+        out = char(parameters.io.dir_output);   % all io.dir_* are char (see GET_OUTPUT_DIR)
+        parameters.io.dir_output = out;
 
         parameters.io.dir_nii              = fullfile(out, 'nii');
         % nii_T1w_dir and nii_MNI_dir both point to nii/; space is encoded in filenames
@@ -170,9 +173,7 @@ end
     % path.pct is empty. Never the SimNIBS m2m folder.
     if isfield(parameters.path, 'seg') && ~isempty(parameters.path.seg)
         parameters.io.dir_pct = get_pct_dir(parameters);
-        % Only create the directory when pCT is actually enabled; an unconditional
-        % mkdir here (after cd(prestus_path) above) would create sub-NNN in the
-        % PRESTUS root if path.pct is a relative path.
+        % Only create the directory when pCT is actually enabled.
         pct_enabled = isfield(parameters, 'pct') && isfield(parameters.pct, 'enabled') && ...
                       parameters.pct.enabled;
         measured_ct = strlength(string(get_field(parameters, {'path', 'ct_pattern'}, ''))) > 0;
@@ -217,6 +218,9 @@ end
         v = parameters.io.prestus_version;
         fprintf('PRESTUS %s (commit %s, %s; uncommitted changes: %s)\n', ...
             v.version, v.commit, v.commit_date, v.dirty);
+    end
+    for k = 1:numel(resolved_paths)
+        fprintf('[path_log_setup] relative setting taken from the PRESTUS root: %s\n', resolved_paths{k});
     end
 
     % summarize parameters
