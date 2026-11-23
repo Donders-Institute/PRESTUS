@@ -1,6 +1,6 @@
-# Localite Files, Offset and Coordinates
+# Localite Files, Offset, and Coordinates
 
-![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+![Pipeline steps; this page belongs to 3 Placement](assets/figures/fig_stage-strip-placement_diagram.svg){ .stage-strip }
 
 A Localite pose is a 4×4 matrix in the coordinates of the planning image, and its origin is a point on the tracked instrument that need not be the transducer. A wrong origin offset shifts the whole simulation along the beam axis, and converting with the wrong image header displaces positions by tens of millimetres. This page gives the folders PRESTUS reads and writes, how the offset from the tracked origin to the transducer is set, and how positions are converted to voxels and MNI space.
 
@@ -8,7 +8,7 @@ On this page:
 
 - [Localite File Layout](#localite-file-layout): the folder layout PRESTUS reads from and writes to, and the path keys.
 - [Transducer Offset (`tracker_to_bowl_mm`)](#transducer-offset-tracker_to_bowl_mm): from the tracked matrix origin to the bowl apex.
-- [Coordinate Transforms](#coordinate-transforms): planning-image space, native voxels and MNI.
+- [Coordinate Transforms](#coordinate-transforms): planning-image space, native voxels, and MNI.
 
 !!! note "At a glance"
     - **When you need it:** You set up the Localite paths, check where the tracked origin sits on the transducer, or convert Localite positions to voxels or MNI.
@@ -79,7 +79,7 @@ With `io.overwrite_files: 'never'`, an existing pair is kept.
 
 ## Transducer Offset (`tracker_to_bowl_mm`)
 
-PRESTUS models the transducer position as the bowl rear centre, the [bowl apex](doc_glossary.md) (`trans_pos`; `bowl_pos` in [k-Wave](https://github.com/ucl-bug/k-wave)'s `makeBowl`); the acoustic focus lies `focal_distance_bowl` beyond it along the beam direction. What the Localite matrix origin (column 4) refers to depends on how the instrument was registered in Localite. The offset from that origin to the bowl rear centre is taken, in this order, from `placement.localite.tracker_to_bowl_mm` (explicit), the transducer geometry `-(curv_radius_mm − dist_geom_ep_mm)` (assumes the origin is at the exit plane) or `placement.localite.reference_distance_mm` (fallback). All three share one sign convention along the beam direction (column 1, towards the head): negative puts the bowl rear centre behind the matrix origin, positive in front of it. A wrong assumption shifts the whole simulation along the beam axis by the difference between the assumed and actual origin.
+PRESTUS models the transducer position as the bowl rear centre, the [bowl apex](doc_glossary.md) (`trans_pos`; `bowl_pos` in [k-Wave](https://github.com/ucl-bug/k-wave)'s `makeBowl`); the acoustic focus lies `focal_distance_bowl` beyond it along the beam direction. What the Localite matrix origin (column 4) refers to depends on how the instrument was registered in Localite. The offset from that origin to the bowl rear centre is taken, in this order, from `placement.localite.tracker_to_bowl_mm` (explicit), the transducer geometry `-(curv_radius_mm − dist_geom_ep_mm)` (assumes the origin is at the [exit plane](doc_glossary.md#exit-plane)), or `placement.localite.reference_distance_mm` (fallback). All three share one sign convention along the beam direction (column 1, towards the head): negative puts the bowl rear centre behind the matrix origin, positive in front of it. A wrong assumption shifts the whole simulation along the beam axis by the difference between the assumed and actual origin.
 
 ```yaml
 placement:
@@ -127,16 +127,14 @@ SimNIBS' nonlinear transform matrices to MNI are relative to the `final_tissues.
 Optional, to average positions across subjects:
 
 4. Aggregate means in MNI mm across subjects (`neuronav_get_group_mean_mni`)
-5. Group mean MNI mm to subject mm (`neuronav_apply_inverse_deformation`)
-6. Subject mm to subject voxel (`neuronav_mm_to_voxel`)
+5. Group mean MNI mm to subject mm and voxel indices (`neuronav_convert_MNI_to_native`)
 
 ??? note "Coordinate spaces of the neuronav functions"
     | Function | Input | Operation | Output |
     |---|---|---|---|
     | `neuronav_convert_trigger_to_voxels` | Localite/trigger data (planning-image space mm, zero-origin RAS) | Planning T1 header | Subject (native) voxel indices |
-    | `neuronav_grid_to_mm_batch` | Subject voxel indices (i, j, k) | Subject T1 [NIfTI](https://nifti.nimh.nih.gov/) affine | Subject native mm (scanner/world space) |
+    | `grid_to_ras` | Subject voxel indices (i, j, k) | Subject T1 [NIfTI](https://nifti.nimh.nih.gov/) affine | Subject native mm (scanner/world space) |
     | `neuronav_apply_deformation` (forward warp) | Native mm locations | Queries the subject's `Conform2MNI_nonl.nii.gz` | MNI mm (for reporting, plotting, averaging) |
-    | `neuronav_get_group_mean_mni` | CSVs with columns like `Mtrans_pos_MNI_x/y/z` | Mean across subjects/sessions | MNI mm group-mean locations (mm, not voxels) |
-    | `neuronav_apply_inverse_deformation` (inverse warp) | MNI mm group-mean locations | Subject's `MNI2Conform_nonl.nii.gz` nonlinear field | Native mm location in that subject's world/scanner space |
-    | `neuronav_mm_to_voxel` (helper) | Native mm (x, y, z) | Subject T1 affine | Subject voxel indices |
-    | `neuronav_export_session_csv` | | | Native voxel indices for target and transducer, native mm, MNI mm (from the deformation step) and MNI voxel indices (may be inaccurate with limited FOVs) |
+    | `neuronav_get_group_mean_mni` | `<path.sim>/sub-*/*_info.csv` (`trans_MNI_mm_*`, `target_MNI_mm_*`) | Mean across subjects/sessions (non-interpolated rows) | MNI group-mean locations in mm and MNI voxel indices |
+    | `neuronav_convert_MNI_to_native` (inverse warp) | MNI mm group-mean locations | SimNIBS nonlinear warp of the subject | Native mm and segmentation voxel indices |
+    | `neuronav_export_session_csv` | | | Native voxel indices for target and transducer, native mm, MNI mm (from the deformation step), and MNI voxel indices (may be inaccurate with limited FOVs) |

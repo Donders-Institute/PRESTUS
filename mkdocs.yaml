@@ -4,34 +4,45 @@ site_description: 'PREprocessing & Simulations Toolbox for transcranial Ultrasou
 site_url: https://donders-institute.github.io/PRESTUS
 site_author: Donders Institute for Brain, Cognition and Behaviour
 
+copyright: Copyright &copy; 2022–2026 PRESTUS contributors · <a href="https://github.com/Donders-Institute/PRESTUS/blob/main/LICENSE">GPL-3.0</a>
+
 repo_url: https://github.com/Donders-Institute/PRESTUS
 repo_name: Donders-Institute/PRESTUS
 
 theme:
   name: material
-  icon:
-    logo: material/waves
+  custom_dir: overrides   # main.html: short browser-tab title
+  variant: classic   # Zensical (builds the published site): the Material look; ignored by MkDocs + Material (mike deploy)
+  logo: https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/logo_PRESTUS_dark.png   # transparent, light ink for the dark header
+  favicon: https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/favicon_PRESTUS.png
   features:
     - navigation.sections
-    - navigation.expand
     - content.code.copy
   palette:
-    # Light mode toggle
-    - scheme: default
+    # Follow the system (macOS / Windows light or dark appearance, via the browser)
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
       primary: custom
       accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-        
-    # Dark mode toggle  
-    - scheme: slate
+
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
       primary: custom
       accent: custom
       toggle:
         icon: material/brightness-4
-        name: Switch to light mode
-  fonts:
+        name: Switch to system preference
+  font:          # loaded from Google Fonts by the theme (as the published v0.6 site)
     text: Roboto
     code: Roboto Mono
 
@@ -40,16 +51,16 @@ nav:
   - 🧭 Get Started:
     - Concepts: doc_concepts.md
     - Installation: doc_installation.md
-    - Your First Simulation: doc_getting-started.md
+    - First Simulation: doc_first-simulation.md
     - Reading Your Results: doc_results.md
     - Configuring a Study: doc_configuration.md
     - PRESTUS Nexus (GUI):
       - Overview: doc_nexus.md
       - Tabs and Pages: doc_nexus_tabs.md
-      - Calibration and Localite Pages: doc_nexus_calibration-localite.md
   - 🧠 Head Model:
-    - Segmentation & Preprocessing: doc_preproc.md
-    - Medium Setup: doc_medium.md
+    - Segmentation: doc_segmentation.md
+    - Head Model: doc_head-model.md
+    - Medium Properties: doc_medium.md
     - (pseudo-)CT:
       - Overview: doc_pseudoCT.md
       - From UTE to Pseudo-HU: doc_pseudoCT_generation.md
@@ -58,52 +69,73 @@ nav:
     - Transducer Definition: doc_transducer.md
     - Transducer Library:
       - Overview: doc_transducer_library.md
+      - Shipped Entries: doc_transducer_library_shipped.md
       - Adding & Maintaining Entries: doc_transducer_library_maintenance.md
     - Calibration:
       - Overview: doc_calibration.md
-      - Refining With Your Hydrophone Profiles: doc_calibration_refinement.md
+      - Emulating Hydrophone Profiles: doc_calibration_hydrophone-profiles.md
+      - Profile File Formats: doc_calibration_profile-formats.md
       - "Matrix Arrays: Steering Correction": doc_calibration_matrix-steering.md
   - 🎯 Placement:
-    - Overview & Manual: doc_placement.md
+    - Overview: doc_placement.md
+    - Manual: doc_placement_manual.md
     - MNI: doc_placement_mni.md
     - Heuristic: doc_placement_heuristic.md
-    - PlanTUS: doc_placement_plantus.md
+    - PlanTUS:
+      - Overview: doc_placement_plantus.md
+      - How It Works: doc_placement_plantus_pipeline.md
     - TUS_entry: doc_placement_tus_entry.md
     - Localite:
       - Overview: doc_placement_neuronav.md
       - Placing from a Recorded Pose: doc_placement_neuronav_recorded-pose.md
-      - Files, Offset and Coordinates: doc_placement_neuronav_coordinates.md
+      - Files, Offset, and Coordinates: doc_placement_neuronav_coordinates.md
       - Ingestion (GUI & Script): doc_placement_neuronav_workflows.md
       - Named Target Coordinates: doc_placement_neuronav_targets.md
   - 🖥️ Simulation:
     - Acoustic: doc_simulations-acoustic.md
     - Thermal: doc_simulations-thermal.md
-    - Limited Acoustic FOV: doc_limited_fov.md
+    - Partial FOV: doc_partial-fov.md
     - Time Reversal: doc_time_reversal.md
   - ▶️ Running & Outputs:
-    - Running on a Cluster: doc_hpc.md
-    - Partial Runs (Modules): doc_modules.md
+    - Running on a Cluster:
+      - Overview: doc_hpc.md
+      - Donders HPC: doc_hpc_donders.md
+    - Run Time and Resources: doc_run-time.md
+    - Pipeline Modules: doc_modules.md
     - Outputs & Reports:
       - Overview: doc_outputs.md
       - Metrics Table Columns: doc_outputs_metrics-table.md
       - Reusing Earlier Outputs and Caches: doc_outputs_reuse.md
-    - Studies & Group Analysis: doc_group.md
+    - Studies & Group Analysis:
+      - Study Setup: doc_group_study-setup.md
+      - Group Analysis: doc_group.md
   - 📊 Advanced Modes:
     - Overview: doc_advanced.md
-    - Multi-Intensity: doc_multiintensity.md
+    - Multi-ISPPA: doc_multiintensity.md
     - Multi-Transducer:
       - Overview: doc_multitransducer.md
-      - Async Firing: doc_multitransducer_async.md
+      - Async Mode: doc_multitransducer_async.md
     - Sequential: doc_sequential.md
-    - Uncertainty Analysis: doc_uncertainty.md
+    - Uncertainty Quantification: doc_uncertainty.md
   - ⚙️ Backends:
     - Overview: doc_backend.md
-    - k-Wave (Default): doc_kwave.md
+    - k-Wave (Default):
+      - Overview: doc_kwave.md
+      - Elastic Skull: doc_kwave_elastic.md
     - BabelBrain: doc_babelbrain.md
-    - jwave: doc_jwave.md
+    - jwave:
+      - Overview: doc_jwave.md
+      - Configuration: doc_jwave_configuration.md
   - 📚 Reference:
     - Glossary: doc_glossary.md
-    - Parameters: doc_parameters.md
+    - Parameters:
+      - Overview: doc_parameters.md
+      - Run, Paths, and Outputs: doc_parameters_run.md
+      - Transducer: doc_parameters_transducer.md
+      - Calibration: doc_parameters_calibration.md
+      - Placement and Time Reversal: doc_parameters_placement.md
+      - Head Model and Grid: doc_parameters_head-model.md
+      - Simulation and Sonication: doc_parameters_simulation.md
     - Functions: doc_functions.md
     - Coordinate Systems: doc_coordinate_systems.md
     - How PRESTUS Works: doc_architecture.md
@@ -121,6 +153,13 @@ nav:
 
 plugins:
   - search
+  - redirects:          # renamed pages: old URLs keep working (mkdocs-redirects)
+      redirect_maps:
+        doc_preproc.md: doc_head-model.md
+        doc_limited_fov.md: doc_partial-fov.md
+        doc_calibration_refinement.md: doc_calibration_hydrophone-profiles.md
+        doc_getting-started.md: doc_first-simulation.md
+        doc_nexus_calibration-localite.md: doc_nexus_tabs.md
 
 extra:
   version:
@@ -145,6 +184,8 @@ markdown_extensions:
 extra_css:
   - stylesheets/extra.css
   - stylesheets/usage_statistics.css
+  - stylesheets/load_predictor.css
+  - stylesheets/thermal_pulse_model.css
 
 extra_javascript:
   - https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6
@@ -152,3 +193,8 @@ extra_javascript:
   - javascripts/header_home_link.js
   - javascripts/developer_details.js
   - javascripts/usage_statistics.js
+  - javascripts/multitransducer_fields.js
+  - javascripts/time_reversal_fields.js
+  - javascripts/thermal_pulse_model.js
+  - javascripts/load_model_data.js
+  - javascripts/load_predictor.js

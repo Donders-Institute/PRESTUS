@@ -1,13 +1,13 @@
 # Named Target Coordinates
 
-![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+![Pipeline steps; this page belongs to 3 Placement](assets/figures/fig_stage-strip-placement_diagram.svg){ .stage-strip }
 
 When a session has several named targets, each simulated focus needs a coordinate and a record of how far that coordinate can be trusted. `neuronav_resolve_target` takes each target's coordinate from the best source available, from a pre-hoc lookup table down to a projection along the tracked transducer axis, and reports which source it used.
 
 On this page:
 
 - [Target Coordinates from Several Sources](#target-coordinates-from-several-sources): what the functions resolve and when to use them.
-- [Inputs You Provide](#inputs-you-provide): the recordings, the `target_map` and the optional sources.
+- [Inputs You Provide](#inputs-you-provide): the recordings, the `target_map`, and the optional sources.
 - [Resolution Order](#resolution-order): the four tiers and their confidence.
 - [Worked Example](#worked-example): a loop over subjects and sessions.
 - [Exported Session CSV](#exported-session-csv): the per-session output and the function reference.
@@ -20,11 +20,11 @@ On this page:
 
 ## Target Coordinates from Several Sources
 
-When a session has several named targets, your own extraction script resolves **named, per-session brain-target coordinates** (e.g. this subject's `L_V1` on `ses-03`) from whichever raw Localite export the operator recorded, with a logged account of how confident each resolved coordinate is. The resolved coordinate is what a simulation uses as `focus_pos`. This is not a pipeline mode: the functions read the ingested files and add to the single-target placement pipeline rather than replacing it. Use them when a study needs **more than one named target per subject**, or a documented answer to where each reported coordinate came from. Localite file formats are in [Neuronavigation read-in](doc_placement_neuronav.md#realised-angle-vs-planned-trajectory) and coordinate spaces in [Localite Files, Offset and Coordinates](doc_placement_neuronav_coordinates.md#coordinate-transforms).
+When a session has several named targets, your own extraction script resolves **named, per-session brain-target coordinates** (e.g. this subject's `L_V1` on `ses-03`) from whichever raw Localite export the operator recorded, with a logged account of how confident each resolved coordinate is. The resolved coordinate is what a simulation uses as `focus_pos`. This is not a pipeline mode: the functions read the ingested files and add to the single-target placement pipeline rather than replacing it. Use them when a study needs **more than one named target per subject**, or a documented answer to where each reported coordinate came from. Localite file formats are in [Neuronavigation read-in](doc_placement_neuronav.md#realised-angle-vs-planned-trajectory) and coordinate spaces in [Localite Files, Offset, and Coordinates](doc_placement_neuronav_coordinates.md#coordinate-transforms).
 
 ## Inputs You Provide
 
-1. **Raw entry-point recordings** per subject and session, in any supported format (`TriggerMarkers`, `GUMMarkers` or `InstrumentMarker`). This supplies the transducer/coil position, always read from the current session's own recording.
+1. **Raw entry-point recordings** per subject and session, in any supported format (`TriggerMarkers`, `GUMMarkers`, or `InstrumentMarker`). This supplies the transducer/coil position, always read from the current session's own recording.
 2. **A `target_map`** naming your targets, built by `neuronav_build_target_map` from the `neuronav.coil_map` you construct per subject and session:
 
     ```matlab

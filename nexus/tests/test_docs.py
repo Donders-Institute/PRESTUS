@@ -65,7 +65,7 @@ def test_key_doc_prefers_override_then_section(schema):
 
 def test_tab_and_subtab_docs():
     assert docs.tab_doc("run") == "doc_nexus_tabs.md#run-tab"
-    assert docs.tab_doc("placement", "Localite").startswith("doc_nexus_calibration-localite.md")
+    assert docs.tab_doc("placement", "Localite") == "doc_nexus_tabs.md#localite-page"
     assert docs.tab_doc("placement", "no such sub-tab") == docs.tab_doc("placement")
     assert docs.tab_doc("no such tab") == ""
 

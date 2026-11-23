@@ -1,0 +1,18 @@
+/* Load calculator (doc_hpc.md, Resource Estimates; javascripts/load_predictor.js). */
+#load-predictor { background: var(--md-code-bg-color, #f5f5f5); border-radius: 8px; padding: .8rem; margin: 1rem 0; font-size: .68rem; }
+.lp-controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: .5rem .7rem; margin-bottom: 1rem; }
+.lp-controls label { display: flex; flex-direction: column; gap: .2rem; color: var(--md-default-fg-color--light, #666); }
+.lp-controls label[hidden] { display: none; }
+.lp-controls .lp-check { flex-direction: row; align-items: center; gap: .4rem; color: var(--md-default-fg-color, #222); }
+.lp-controls select, .lp-controls input[type="number"] {
+  font: inherit; color: var(--md-default-fg-color, #222); background: var(--md-default-bg-color, #fff);
+  border: 1px solid var(--md-default-fg-color--lightest, #ccc); border-radius: 4px; padding: .25rem .35rem; min-width: 0; }
+.lp-total { display: flex; flex-wrap: wrap; align-items: baseline; gap: .6rem; margin-bottom: .4rem; }
+.lp-big { font-size: 1.2rem; font-weight: 700; color: var(--md-default-fg-color, #222); }
+.lp-mem { margin-left: auto; color: var(--md-default-fg-color--light, #666); }
+.lp-bar { display: block; width: 100%; height: 22px; border-radius: 4px; overflow: hidden; margin: .3rem 0 .8rem; }
+.lp-table { width: 100%; border-collapse: collapse; }
+.md-typeset .lp-table td, .md-typeset .lp-table th, .lp-table th { padding: .1rem .5rem; line-height: 1.35; text-align: left; }
+.lp-swatch { box-sizing: border-box; border: 1px solid var(--md-default-fg-color--lighter, #bbb); display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; margin-right: .4rem; vertical-align: -.05rem; }
+.lp-note { color: var(--md-default-fg-color--light, #666); font-size: .64rem; }
+.md-typeset .lp-table { font-size: inherit; }

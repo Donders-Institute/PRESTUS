@@ -1,18 +1,18 @@
 # Testing
 
-PRESTUS is tested at five levels, from checks that take seconds and run on every change to benchmarks that need a GPU or a real subject and run before a release. This page tells you which level a change needs, what data, hardware and time each level takes, and how to add a test.
+PRESTUS is tested at five levels, from checks that take seconds and run on every change to benchmarks that need a GPU or a real subject and run before a release. This page tells you which level a change needs, what data, hardware, and time each level takes, and how to add a test.
 
 On this page:
 
-- [Level 0: Static Checks](#level-0-static-checks): the doc, parameter, link and Nexus checks that run on every push.
+- [Level 0: Static Checks](#level-0-static-checks): the doc, parameter, link, and Nexus checks that run on every push.
 - [Level 1: Unit Tests](#level-1-unit-tests): data-free tests of each function's logic, grouped by area.
 - [Level 2: Physics Benchmarks](#level-2-physics-benchmarks): free-water fields against the [O'Neil](https://doi.org/10.1121/1.1906542) solution and the [ITRUSST](https://itrusst.org/) benchmarks, with their tolerances.
-- [Level 3: Pipeline Tests](#level-3-pipeline-tests): the whole pipeline on synthetic water, a segmented subject and the demo subject, with golden metrics.
+- [Level 3: Pipeline Tests](#level-3-pipeline-tests): the whole pipeline on synthetic water, a segmented subject, and the demo subject, with golden metrics.
 - [Level 4: Backends and the Nexus Round Trip](#level-4-backends-and-the-nexus-round-trip): [jwave](https://github.com/ucl-bug/jwave) and [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) against [k-Wave](https://github.com/ucl-bug/k-wave), and Nexus configs loaded in MATLAB.
 - [Release Checklist](#release-checklist): the tests to run before tagging a release.
 - [Rules for New Tests](#rules-for-new-tests): where a new test goes and the rules it follows.
 
-The [MATLAB](https://www.mathworks.com/products/matlab.html) tests use [`matlab.unittest`](https://www.mathworks.com/help/matlab/matlab-unit-test-framework.html) and live in `tests/`; the Nexus tests use [pytest](https://docs.pytest.org/) and live in `nexus/tests/`. `run_all_tests(level)` runs a MATLAB level and fails (non-zero exit under `matlab -batch`) when any test fails.
+The [MATLAB](https://www.mathworks.com/products/matlab.html) tests use [`matlab.unittest`](https://www.mathworks.com/help/matlab/matlab-unit-test-framework.html) and live in `tests/`; the Nexus tests use [pytest](https://docs.pytest.org/) and live in `nexus/tests/`. `run_all_tests(level)` runs a MATLAB level and fails (non-zero exit under `matlab -batch`) when any test fails. It also records the wall time, CPU time and peak memory of every test and test class in `prestus_test_resources_<level>_<run>.csv` (folder `PRESTUS_TEST_RESOURCES_DIR`, default the system temp folder) and prints the slowest tests; memory is measured on Linux only.
 
 | Level | What it guarantees | Command | Needs | Time | Runs |
 |---|---|---|---|---|---|
@@ -28,13 +28,17 @@ The [MATLAB](https://www.mathworks.com/products/matlab.html) tests use [`matlab.
 
 ```bash
 python tests/docs/gen_function_index.py --check   # doc_functions.md lists every function
+python tests/docs/gen_doc_icons.py --check        # doc/assets/icons match the Nexus drawings
+python tests/docs/gen_load_data.py --check        # load calculator data matches throughput.yaml
 python tests/docs/check_param_docs.py             # every config key documented; defaults match
 python tests/docs/check_links.py                  # relative links and anchors resolve
-mkdocs build --strict -d /tmp/prestus-site        # site builds without warnings (mkdocs < 2)
+python tests/docs/check_images.py                 # images and PRESTUS_bin files exist (--bin DIR: local clone)
+zensical build --strict -f mkdocs.yaml            # site builds without warnings, as deployed (pip install -r requirements-docs.txt)
+mkdocs build --strict -d /tmp/prestus-site        # optional: MkDocs + Material (CI, non-blocking)
 (cd nexus && python -m pytest -q -m "not matlab")
 ```
 
-`gen_function_index.py` without `--check` regenerates `doc/doc_functions.md` (it keeps written descriptions and takes new ones from each file's help line). `check_param_docs.py` compares the Default column of `doc_parameters.md` with `config_default.yaml`. The Nexus tests include the schema drift test (`test_schema.py`: overlay vs. `config_default.yaml` and `functions/`), which also guards the list of extra config keys MATLAB uses for its unknown-key check.
+`gen_function_index.py` without `--check` regenerates `doc/doc_functions.md` (it keeps written descriptions and takes new ones from each file's help line). `gen_doc_icons.py` without `--check` rewrites the option-table icons in `doc/assets/icons/` from `nexus/prestus_nexus/ui/choice_icons.py`, the drawings of the Nexus drop-downs. `gen_load_data.py` without `--check` rewrites `doc/javascripts/load_model_data.js`, the data of the load calculator on [Run time and resources](doc_run-time.md), from `nexus/prestus_nexus/throughput.yaml`. `check_param_docs.py` compares the Default column of `doc_parameters.md` with `config_default.yaml`. The Nexus tests include the schema drift test (`test_schema.py`: overlay vs. `config_default.yaml` and `functions/`), which also guards the list of extra config keys MATLAB uses for its unknown-key check.
 
 ---
 
@@ -45,7 +49,7 @@ cd tests
 run_all_tests          % same as run_all_tests('unit')
 ```
 
-No data, SimNIBS, k-Wave simulation or GPU is needed. A failed test prints its full diagnostic; a skipped test prints why it was skipped.
+No data, SimNIBS, k-Wave simulation, or GPU is needed. A failed test prints its full diagnostic; a skipped test prints why it was skipped.
 
 | Area | Files |
 |---|---|
@@ -78,10 +82,10 @@ These check numbers, not just that code runs. Both use a focused bowl in lossles
 | −3 dB (intensity) axial focal length | 5 % |
 | Four-ring annular array in phase (CTX-500 ring diameters on the same bowl) against O'Neil summed over the rings: focal position / peak pressure / −3 dB length | 1 mm / 2 % / 5 % (2026-10-08: 0.50 mm, +0.10 %, +0.04 %; the summed peak is flat, ±0.5 mm costs 0.08 % pressure) |
 | Doubling the drive doubles the pressure | 1 % |
-| A target ISPPA on an uncalibrated transducer is met in water | 2 % |
+| A target I<sub>SPPA</sub> on an uncalibrated transducer is met in water | 2 % |
 | With `run_water_baseline: 0`, an unmet target stops the run | error `prestus:isppa:noBaseline` |
 
-**`test_itrusst_benchmark`**: benchmarks PH1-BM1-SC1 (focused bowl) and PH1-BM1-SC2 (20 mm plane piston, a [flat annular element](doc_transducer.md#flat-elements)) of [Aubry et al. (2022)](https://doi.org/10.1121/10.0013426): the pressure amplitude in the central plane against the published k-Wave reference (60 points per wavelength). Download `INTERCOMPARISON-PH1-DATA-V1.0` from [Zenodo](https://doi.org/10.5281/zenodo.6020543) and set `PRESTUS_ITRUSST_DATA` to it; the test skips otherwise.
+**`test_itrusst_benchmark`**: benchmarks PH1-BM1-SC1 (focused bowl) and PH1-BM1-SC2 (20 mm plane piston, a [flat annular element](doc_transducer.md#flat-elements)) of [Aubry et al. (2022)](https://doi.org/10.1121/10.0013426): the pressure amplitude in the central plane against the published k-Wave reference (60 [points per wavelength](doc_glossary.md#ppw)). Download `INTERCOMPARISON-PH1-DATA-V1.0` from [Zenodo](https://doi.org/10.5281/zenodo.6020543) and set `PRESTUS_ITRUSST_DATA` to it; the test skips otherwise.
 
 | Metric | Bowl: tolerance (2D) | Bowl: result 2026-10-02 | Piston: tolerance (2D) | Piston: result 2026-10-02 |
 |---|---|---|---|---|
@@ -93,7 +97,7 @@ These check numbers, not just that code runs. Both use a focused bowl in lossles
 For the piston, every on-axis near-field maximum has the same amplitude (2 p₀), so the focal pressure and position are taken beyond half the near-field distance (a²/2λ), which leaves only the last axial maximum.
 
 ```matlab
-run_all_tests('physics')       % unit + test_physics_water (2D axisymmetric, ~5 min CPU)
+run_all_tests('physics')       % unit + test_physics_water and test_water_baseline_box (2D, ~7 min CPU)
 setenv('PRESTUS_ITRUSST_DATA', '/path/to/INTERCOMPARISON-PH1-DATA-V1.0')
 run_all_tests('itrusst')       % 2D BM1 bowl + piston, 3D BM1 bowl
 run_all_tests('physics_3d')    % 3D O'Neil check
@@ -113,7 +117,7 @@ The 3D variants (tags `physics_3d`, `itrusst_3d`; ~6 M voxels at 0.5 mm) belong 
 run_all_tests('water')     % unit + slower unit checks + 3D water pipeline + multi-ISPPA
 ```
 
-`test_integration_water` runs the full pipeline with `simulation.medium: water` on a small 3D grid (CPU k-Wave), `test_isppa_rescaling` the multi-ISPPA pipeline. The level also runs the slower data-free checks: `test_transducer_model` tag `fit` (optimiser) and `test_plantus_placement` tag `integration` (mocked [PlanTUS](https://github.com/mlueckel/PlanTUS) subprocess; needs Python 3). Fixture: `fixtures/make_minimal_parameters.m` (single-element bowl, drive level, no target ISPPA), `fixtures/make_synthetic_segmentation.m`.
+`test_integration_water` runs the full pipeline with `simulation.medium: water` on a small 3D grid (CPU k-Wave), `test_isppa_rescaling` the multi-[I<sub>SPPA</sub>](doc_glossary.md#isppa) pipeline. `test_telemetry_pipeline` checks that a run sends `run_start` and `run_end`, and a failing one `run_error` with its stage (nothing leaves the machine). The level also runs the slower data-free checks: `test_transducer_model` tag `fit` (optimiser) and `test_plantus_placement` tag `integration` (mocked [PlanTUS](https://github.com/mlueckel/PlanTUS) subprocess; needs Python 3). Fixture: `fixtures/make_minimal_parameters.m` (single-element bowl, drive level, no target I<sub>SPPA</sub>), `fixtures/make_synthetic_segmentation.m`.
 
 ### Subject Smoke Tests
 
@@ -169,6 +173,8 @@ prestus_testdata/
 | `test_jwave.m` | jwave (Helmholtz) vs k-Wave on the same water simulation: peak, FWHM, field correlation (tag `quick` without the timing sweep) | `JWAVE_PYTHON` |
 | `nexus/tests/test_matlab_roundtrip.py` | configs written by the Nexus load in `load_parameters` with identical values | MATLAB (`PRESTUS_MATLAB`) |
 | `nexus/tests/test_real_configs.py` | every study config in `$PRESTUS_REAL_CONFIG_DIR` round-trips | real configs |
+| `run_all_tests('slurm_live')` (`test_hpc_job_report`) | submits a 5 s SLURM job (1 core, 1 GB) and checks the resource report built from its real `sacct` record; skipped without `sbatch` | a SLURM cluster |
+| `run_all_tests('telemetry_live')` (`test_telemetry_live`) | the telemetry server accepts the `run_start`, `run_end` and `run_error` events PRESTUS builds, with run types `technical` and `development`; adds 4 rows that usage statistics leave out; weekly in CI | network |
 | `nexus/tests/test_bridge.py` (matlab-marked part), `test_bridge_pages_matlab.py` | the real `nexus_bridge`; the Localite and Calibration pages end to end (synthetic Localite study; CTX_250_001 profiles from `local/profiles`) | MATLAB |
 
 ```matlab

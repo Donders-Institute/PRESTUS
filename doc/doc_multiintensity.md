@@ -1,15 +1,15 @@
-# Multi-ISPPA Mode
+# Multi-I<sub>SPPA</sub> Mode
 
 Heating and safety metrics depend on the intensity a study applies, and choosing one often means comparing several candidates. In the linear regime the pressure field scales with the square root of intensity, so this mode runs the acoustic simulation once and scales it to each target before a separate thermal simulation. The scaling holds only below the onset of nonlinear effects; at very high targets the scaled field may not be valid.
 
 On this page:
 
 - [Configuration](#configuration): giving several target intensities.
-- [Output files](#output-files): per-target files and the summary report.
-- [Validity of post-hoc scaling](#validity-of-post-hoc-scaling): when one acoustic result can serve every target.
-- [Resuming a partial run](#resuming-a-partial-run): re-running a partial sweep, stages and HPC options.
-- [Combining with uncertainty mode](#combining-with-uncertainty-mode): running a sweep for each uncertainty variant.
-- [Combining with async transducers](#combining-with-async-transducers): per-transducer targets and sweeps.
+- [Output Files](#output-files): per-target files and the summary report.
+- [Validity of Post-Hoc Scaling](#validity-of-post-hoc-scaling): when one acoustic result can serve every target.
+- [Resuming a Partial Run](#resuming-a-partial-run): re-running a partial sweep, stages, and HPC options.
+- [Combining with Uncertainty Mode](#combining-with-uncertainty-mode): running a sweep for each uncertainty variant.
+- [Combining with Async Transducers](#combining-with-async-transducers): per-transducer targets and sweeps.
 
 !!! note "At a glance"
     - **When you need it:** To compare heating and safety metrics across candidate intensities without repeating the acoustic simulation.
@@ -26,7 +26,7 @@ transducer:
   # ... other transducer fields
 ```
 
-PRESTUS then runs one acoustic simulation, caches it, and runs the thermal analysis at each requested intensity, each with its own output files and HTML report, plus a summary report. The free-water baseline that the scaling needs runs automatically (`modules.run_water_baseline: auto`, the default); see [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting). In the Nexus, *Sweep…* next to the target ISPPA (Transducer tab) edits the list.
+PRESTUS then runs one acoustic simulation, caches it, and runs the thermal analysis at each requested intensity, each with its own output files and HTML report, plus a summary report. The [free-water baseline](doc_glossary.md#free-water-baseline) that the scaling needs runs automatically (`modules.run_water_baseline: auto`, the default); see [I<sub>SPPA</sub> targeting](doc_simulations-acoustic.md#isppa-targeting). In the Nexus, *Sweep…* next to the target [I<sub>SPPA</sub>](doc_glossary.md#isppa) (Transducer tab) edits the list.
 
 !!! note
     The older form `calibration.target_isppa_wcm2` is still accepted and is moved to `transducer(1).target_isppa_wcm2` at load time with a deprecation warning.
@@ -90,7 +90,7 @@ Each stage checks for its sentinel output file before submitting (HPC) or runnin
 
 ## Combining with Uncertainty Mode
 
-Multi-ISPPA mode and uncertainty mode compose. When both `simulation.uncertainty = true` and `transducer.target_isppa_wcm2` is a vector, uncertainty is the outer mode and each variant runs its own multi-ISPPA pipeline:
+Multi-I<sub>SPPA</sub> mode and uncertainty mode compose. When both `simulation.uncertainty = true` and `transducer.target_isppa_wcm2` is a vector, uncertainty is the outer mode and each variant runs its own multi-I<sub>SPPA</sub> pipeline:
 
 ```
 Stage 1    preproc / source setup                      (shared)
@@ -102,10 +102,10 @@ Variants   default, Temp-H, Temp-L, Trans-H, Trans-L, each:  (after stage 1)
 Stage 7    uncertainty report: one per target          (after every variant job)
 ```
 
-Affixes compose: the variant affix (`_desc-temphigh`) prefixes the per-target affix, yielding `_desc-temphigh_desc-isppa030`. Each target gets an uncertainty report comparing the five variants at that intensity, e.g. `sub-001_layered_desc-uncertainty_report_desc-isppa030.html` (with the base `io.output_affix` before the target suffix when one is set). No report aggregates across intensities. See [doc_uncertainty.md](doc_uncertainty.md#combining-with-multi-isppa-or-async-modes).
+Affixes compose: the variant affix (`_desc-temphigh`) prefixes the per-target affix, yielding `_desc-temphigh_desc-isppa030`. Each target gets an uncertainty report comparing the five variants at that intensity, e.g. `sub-001_layered_desc-uncertainty_report_desc-isppa030.html` (with the base `io.output_affix` before the target suffix when one is set). No report aggregates across intensities. See [Combining with Multi-I<sub>SPPA</sub> or Async Modes](doc_uncertainty.md#combining-with-multi-isppa-or-async-modes).
 
 ## Combining with Async Transducers
 
-When `simulation.transducer_coupling = 'async'` and multiple transducers are defined, each transducer carries its own `target_isppa_wcm2`. The async pipeline scales each transducer's pressure field independently before summing intensities incoherently. If any transducer has a vector target, one combine+thermal pair is run per sweep point. See [doc_multitransducer.md](doc_multitransducer.md).
+When `simulation.transducer_coupling = 'async'` and multiple transducers are defined, each transducer carries its own `target_isppa_wcm2`. The async pipeline scales each transducer's pressure field independently before summing intensities incoherently. If any transducer has a vector target, one combine+thermal pair is run per sweep point. See [Multi-Transducer Modelling](doc_multitransducer.md).
 
-See also: [doc_calibration.md](doc_calibration.md), [doc_uncertainty.md](doc_uncertainty.md), [doc_modules.md](doc_modules.md)
+See also: [Transducer Calibration](doc_calibration.md), [Uncertainty Quantification](doc_uncertainty.md), [Pipeline Modules](doc_modules.md)

@@ -1,21 +1,21 @@
 # How PRESTUS Works
 
-A PRESTUS result depends not only on your study config but also on the config layers merged beneath it, on where the run executed and on which cached stage outputs it reused. This page shows how a run is put together, so that you can trace a value or a result to the stage that produced it, and change the pipeline without breaking the conventions that keep results consistent.
+A PRESTUS result depends not only on your study config but also on the config layers merged beneath it, on where the run executed, and on which cached stage outputs it reused. This page shows how a run is put together, so that you can trace a value or a result to the stage that produced it, and change the pipeline without breaking the conventions that keep results consistent.
 
 On this page:
 
 - [Overview and Entry Points](#overview-and-entry-points): the path from config to outputs and the entry-point functions.
-- [Configuration Layers](#configuration-layers): the four config layers, the steps after merging and which keys count as known.
-- [Run Execution and Chained Jobs](#run-execution-and-chained-jobs): local runs, cluster jobs and the chained pipelines that split a run into several jobs.
-- [Pipeline Stages](#pipeline-stages): what each stage reads, writes and caches, and the functions behind it.
+- [Configuration Layers](#configuration-layers): the four config layers, the steps after merging, and which keys count as known.
+- [Run Execution and Chained Jobs](#run-execution-and-chained-jobs): local runs, cluster jobs, and the chained pipelines that split a run into several jobs.
+- [Pipeline Stages](#pipeline-stages): what each stage reads, writes, and caches, and the functions behind it.
 - [Caches and Reuse](#caches-and-reuse): when a cache is reused, how its settings are checked, and starting from an earlier run's outputs.
-- [Intensity Scaling](#intensity-scaling): how results are scaled to the free-water target ISPPA, also with several transducers.
+- [Intensity Scaling](#intensity-scaling): how results are scaled to the free-water target I<sub>SPPA</sub>, also with several transducers.
 - [Acoustic and Thermal Backends](#acoustic-and-thermal-backends): how the solver is selected and dispatched.
-- [Logging and Provenance](#logging-and-provenance): output folders, logs, parameter snapshots and provenance records.
-- [Checklist for Code Changes](#checklist-for-code-changes): what to update for a new key, function or stage, and the checks to run before committing.
+- [Logging and Provenance](#logging-and-provenance): output folders, logs, parameter snapshots, and provenance records.
+- [Checklist for Code Changes](#checklist-for-code-changes): what to update for a new key, function, or stage, and the checks to run before committing.
 
 !!! note "At a glance"
-    - **When you need it:** When you debug a run or change the pipeline. For the stage switches see [Modules](doc_modules.md); for every parameter see [Parameters](doc_parameters.md).
+    - **When you need it:** When you debug a run or change the pipeline. For the stage switches see [Pipeline Modules](doc_modules.md); for every parameter see [Parameters](doc_parameters.md).
     - **Before you start:** Nothing; this is a reference page for contributors and advanced users.
 
 ## Overview and Entry Points
@@ -31,7 +31,7 @@ Entry points:
 | Function | Use |
 |---|---|
 | `prestus_pipeline_start(parameters)` | One subject: runs locally or submits an HPC job. |
-| `prestus_study_start(config)` | Many subjects/conditions from a study manifest; one `prestus_pipeline_start` per row ([Group analysis](doc_group.md#study-setup)). |
+| `prestus_study_start(config)` | Many subjects/conditions from a study manifest; one `prestus_pipeline_start` per row ([Group analysis](doc_group_study-setup.md#study-setup)). |
 | `prestus_group_report_start(config)` | Group maps and report from finished runs. |
 | `prestus_nexus` | Desktop app that writes the study config and starts the above ([Nexus](doc_nexus.md)). |
 | `prestus_pipeline(parameters)` | The stages themselves (called by the above; call it directly only for debugging). |
@@ -83,9 +83,9 @@ Three **chained pipelines** split one run into several jobs that pass results th
     | `planimg` | Planning image (T1) header and the transforms between T1 voxels and the simulation grid | grid stage |
     | `segmentation`, `medium_masks` | Tissue labels on the grid, and their mapping to `medium_properties` layers | grid stage |
     | `kwave_medium` | Sound speed, density, attenuation (and thermal properties in `medium_plus`) on the grid | medium stage |
-    | `kgrid`, `source`, `sensor` | [k-Wave](https://github.com/ucl-bug/k-wave) grid, source and sensor | source stage |
-    | `acoustic_provenance` | Free-water baseline ISPPA and its origin, calibration, FOV offsets | baseline + acoustic stage |
-    | `sensor_data` | `p_max_all`, `p_min_all`, `p_final` (scaled to the target ISPPA) | acoustic stage |
+    | `kgrid`, `source`, `sensor` | [k-Wave](https://github.com/ucl-bug/k-wave) grid, source, and sensor | source stage |
+    | `acoustic_provenance` | Free-water baseline I<sub>SPPA</sub> and its origin, calibration, FOV offsets | baseline + acoustic stage |
+    | `sensor_data` | `p_max_all`, `p_min_all`, `p_final` (scaled to the target I<sub>SPPA</sub>) | acoustic stage |
     | `fov_state` | Full-grid copies when the acoustic run uses a cropped field of view | FOV crop |
 
     `parameters.state` records what is available downstream: `acoustics_available`, `heating_available`, `acoustic_dry_run` (a backend wrote its inputs but did not simulate), and `planned_trans_t1_vox` / `planned_focus_t1_vox` (planned positions in T1 voxels, kept for the targeting analysis because the grid stage replaces `trans_pos`/`focus_pos` with grid indices).
@@ -94,17 +94,18 @@ Three **chained pipelines** split one run into several jobs that pass results th
     | # | Stage | Reads | Writes / caches |
     |---|---|---|---|
     | 1 | Segmentation | T1 (T2) | `m2m_sub-XXX/` (governed by `io.overwrite_simnibs`) |
-    | 2 | Placement | `placement.*`, [Localite](https://www.localite.de/)/heuristic/MNI/[PlanTUS](https://github.com/mlueckel/PlanTUS) inputs | `transducer(i).trans_pos/focus_pos` in T1 voxels; placement report |
+    | 2 | Placement | `placement.*`, [Localite](https://www.localite.de/)/heuristic/MNI/[PlanTUS](https://github.com/mlueckel/PlanTUS) inputs | `transducer(i).trans_pos/focus_pos` in T1 voxels; `sub-XXX_placement<affix>.json`; placement report `sub-XXX_placement_<mode><affix>.html` (`placement.report`) |
     | 3 | Grid | T1, segmentation, pseudo-CT | `cache/…_grid_cache…mat` (`io.save_grid_cache`), `…_planimg…mat` sidecar |
     | 4 | Medium | masks, `medium_properties`, pseudo-CT | `cache/…_medium_cache…mat` (`io.save_medium_cache`); property [NIfTI](https://nifti.nimh.nih.gov/)s |
     | – | FOV crop | `grid.acoustic_fov_*` | cropped medium and positions; `fov_state` |
     | 5 | Source | transducer geometry, drive | `cache/…_kwave_source…mat` |
     | – | Free-water baseline | source, water properties | `acoustic_provenance.freefield_isppa_wcm2`, `freefield_source` |
+    | – | Time reversal | `time_reversal.*`, medium, source | `…_timereversal_summary.csv`, `…_timereversal_elements.csv`, `…_timereversal_poses_T<i>.csv` (pose search); `cache/…_timereversal.mat` |
     | 6 | Acoustic | medium, source, sensor | `cache/…_results…mat` (`cache_acoustic`) |
     | 7 | Acoustic analysis | `sensor_data`, masks | `…<affix>.csv`, intensity/pressure/MI NIfTIs, `…_targeting.csv` |
     | 8 | Thermal | acoustic field, timing protocol | `cache/…_heating_res…mat` |
     | 9 | Thermal analysis | heating results | thermal columns in the CSV, temperature/CEM43 NIfTIs |
-    | 10 | Reports | all outputs | `…_report…html` |
+    | 10 | Reports | all outputs | `…_report…html` (+ segmentation, debug); group report `<path.sim>/group_<medium>_report<affix>.html` (`modules.generate_group_report`) |
     | 11 | Post-hoc water | same transducer | a water run per transducer |
     | 12 | Sequential | `options.sequential_configs` | follow-up run starting from this run's end temperature |
 
@@ -118,6 +119,7 @@ Three **chained pipelines** split one run into several jobs that pass results th
     | – | FOV crop | `acoustic_fov_crop` |
     | 5 | Source | `coherent_drive_calibration` (coherent, >1 transducer); `source_sensor_setup` → `source_create`; `checkStability` |
     | – | Free-water baseline | `acoustic_water_baseline` → `needs_water_baseline`, `water_baseline` |
+    | – | Time reversal | `time_reversal_stage` |
     | 6 | Acoustic | `acoustic_stage` → `run_acoustic_backend` (`acoustic_wrapper` / `jwave_wrapper` / `babelbrain_wrapper`); `apply_isppa_scaling` |
     | 7 | Acoustic analysis | `acoustic_analysis`; `nifti_acoustic`; `targeting_analysis` |
     | 8 | Thermal | `thermal_stage` → `thermal_simulation` (k-Wave `kWaveDiffusion`) or `babelbrain_thermal_wrapper` |
@@ -130,10 +132,10 @@ Three **chained pipelines** split one run into several jobs that pass results th
 
 Every expensive stage writes a cache under `cache/` named `sub-XXX_<medium>_<stage>…<affix>.mat` (the full list is under [Output directory structure](doc_outputs.md#output-directory-structure)). Whether a cache is reused is decided by `io.overwrite_files` (`confirm_overwriting`): `never` reuses, `always`/`force` recompute, anything else asks in interactive sessions.
 
-Caches are for re-runs of the same run. A separate run starts from an earlier run's **stage outputs** instead: the SimNIBS segmentation (`path.seg`), the pseudo-CT (`pseudoCT.json`), a placement run (`placement_run.json`, `placement.reuse`) and the T1w pressure map (`path.acoustic_input`, `LOAD_ACOUSTIC_INPUT`). See [Starting from earlier stage outputs](doc_outputs_reuse.md#starting-from-earlier-stage-outputs).
+Caches are for re-runs of the same run. A separate run starts from an earlier run's **stage outputs** instead: the SimNIBS segmentation (`path.seg`), the pseudo-CT (`pseudoCT.json`), a placement run (`placement_run.json`, `placement.reuse`), and the T1w pressure map (`path.acoustic_input`, `LOAD_ACOUSTIC_INPUT`). See [Starting from earlier stage outputs](doc_outputs_reuse.md#starting-from-earlier-stage-outputs).
 
 ??? note "Cache signatures and sidecars"
-    Because cache names do not encode the settings, a reused cache could silently ignore a changed setting. Grid, medium and acoustic caches therefore store the settings they depend on (`cache_signature`) and compare them on reuse (`check_cache_signature`, `io.cache_signature_check`); see [Cache reuse checks](doc_outputs_reuse.md#cache-reuse-checks). The acoustic cache also checks that its grid size matches the current grid (`cache_acoustic:staleGrid`) and re-runs the acoustic simulation otherwise. A run that reuses another run's grid cache (`io.preproc_affix`, `io.reuse_upstream_caches`) keeps its own transducer settings (drive, phases, ISPPA targets) and takes only the grid-space positions from the cache (`load_grid_cache_file`). Likewise it keeps its own grid settings (e.g. a partial acoustic FOV, `grid.acoustic_fov_*`) and takes only what the grid stage computes (`dims`, `default_dims`, `resolution_mm`, `display_orientation`). Pipeline sub-jobs that reuse their own stage-0 caches (`io.reuse_upstream_caches`) skip the signature check.
+    Because cache names do not encode the settings, a reused cache could silently ignore a changed setting. Grid, medium, and acoustic caches therefore store the settings they depend on (`cache_signature`) and compare them on reuse (`check_cache_signature`, `io.cache_signature_check`); see [Cache reuse checks](doc_outputs_reuse.md#cache-reuse-checks). The acoustic cache also checks that its grid size matches the current grid (`cache_acoustic:staleGrid`) and re-runs the acoustic simulation otherwise. A run that reuses another run's grid cache (`io.preproc_affix`, `io.reuse_upstream_caches`) keeps its own transducer settings (drive, phases, I<sub>SPPA</sub> targets) and takes only the grid-space positions from the cache (`load_grid_cache_file`). Likewise it keeps its own grid settings (e.g. a partial acoustic FOV, `grid.acoustic_fov_*`) and takes only what the grid stage computes (`dims`, `default_dims`, `resolution_mm`, `display_orientation`). Pipeline sub-jobs that reuse their own stage-0 caches (`io.reuse_upstream_caches`) skip the signature check.
 
     Each stage output, except the standard SimNIBS output, has a JSON sidecar (`write_sidecar`) recording the settings it depends on, compared on reuse by `check_sidecar_signature` under the same `io.cache_signature_check`.
 
@@ -142,9 +144,9 @@ Caches are for re-runs of the same run. A separate run starts from an earlier ru
 
 ## Intensity Scaling
 
-Simulations run at the drive `elem_p_amp`; results are reported at the free-water ISPPA `transducer.target_isppa_wcm2`, by scaling pressure with `sqrt(target / baseline)`. The baseline comes from a free-water simulation of the same source (`modules.run_water_baseline: auto` runs it when needed) or from a matching library calibration. A target that cannot be met stops the run rather than being reported unscaled. See [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting).
+Simulations run at the drive `elem_p_amp`; results are reported at the free-water [I<sub>SPPA</sub>](doc_glossary.md#isppa) `transducer.target_isppa_wcm2`, by scaling pressure with `sqrt(target / baseline)`. The baseline comes from a free-water simulation of the same source (`modules.run_water_baseline: auto` runs it when needed) or from a matching library calibration. A target that cannot be met stops the run rather than being reported unscaled. See [I<sub>SPPA</sub> targeting](doc_simulations-acoustic.md#isppa-targeting).
 
-With several transducers each target is that transducer's own free-water ISPPA. Coherent runs cannot scale the combined field per transducer, so `coherent_drive_calibration` sets each transducer's `elem_p_amp` before the source is built (baseline: the transducer alone in water, or its matching calibration) and `apply_isppa_scaling` leaves the result unscaled (`acoustic_provenance.coherent_drive`). Async runs scale each field in `combine_async_intensity`. See [Multi-transducer: ISPPA targets](doc_multitransducer.md#isppa-targets).
+With several transducers each target is that transducer's own free-water I<sub>SPPA</sub>. Coherent runs cannot scale the combined field per transducer, so `coherent_drive_calibration` sets each transducer's `elem_p_amp` before the source is built (baseline: the transducer alone in water, or its matching calibration) and `apply_isppa_scaling` leaves the result unscaled (`acoustic_provenance.coherent_drive`). Async runs scale each field in `combine_async_intensity`. See [Multi-transducer: I<sub>SPPA</sub> targets](doc_multitransducer.md#isppa-targets).
 
 ## Acoustic and Thermal Backends
 
@@ -152,7 +154,7 @@ With several transducers each target is that transducer's own free-water ISPPA. 
 
 ## Logging and Provenance
 
-`path_log_setup` creates the per-subject output folders (`io.dir_*`), starts a MATLAB diary in `log/`, writes a parameters snapshot to `cache/` and a human-readable resolved-parameters YAML to `log/`. The acoustic cache carries `acoustic_provenance` (baseline ISPPA and its source, calibration, [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) version). Errors close the diary and are rethrown with their identifier; opt-in anonymous usage statistics record the run's outcome ([Telemetry](doc_telemetry.md)).
+`path_log_setup` creates the per-subject output folders (`io.dir_*`), starts a MATLAB diary in `log/`, writes a parameters snapshot to `cache/` and a human-readable resolved-parameters YAML to `log/`. The acoustic cache carries `acoustic_provenance` (baseline I<sub>SPPA</sub> and its source, calibration, [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) version). Errors close the diary and are rethrown with their identifier; opt-in anonymous usage statistics record the run's outcome ([Telemetry](doc_telemetry.md)).
 
 ## Checklist for Code Changes { .developer }
 
@@ -166,7 +168,8 @@ With several transducers each target is that transducer's own free-water ISPPA. 
     python tests/docs/gen_function_index.py --check
     python tests/docs/check_param_docs.py
     python tests/docs/check_links.py
-    mkdocs build --strict -d /tmp/prestus-site
+    python tests/docs/check_images.py
+    zensical build --strict -f mkdocs.yaml
     (cd nexus && python -m pytest -q -m "not matlab")
     matlab -batch "cd tests; run_all_tests('unit')"
     ```

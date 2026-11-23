@@ -1,12 +1,12 @@
 # MNI Transducer Placement
 
-![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+![Pipeline steps; this page belongs to 3 Placement](assets/figures/fig_stage-strip-placement_diagram.svg){ .stage-strip }
 
-A transducer site and target given in MNI coordinates let one plan apply to every subject, but each subject's simulation needs both points in its own anatomy. `placement.mode: 'mni'` converts both points to the subject's T1 grid, snaps the transducer to the scalp and sets its exit plane `placement.skin_gap_mm` (default 5 mm) off the scalp; no search is performed, so the result is deterministic. The [heuristic](doc_placement_heuristic.md) mode, by contrast, takes only an MNI target and searches the scalp for a transducer position.
+A transducer site and target given in MNI coordinates let one plan apply to every subject, but each subject's simulation needs both points in its own anatomy. `placement.mode: 'mni'` converts both points to the subject's T1 grid, snaps the transducer to the scalp, and sets its [exit plane](doc_glossary.md#exit-plane) `placement.skin_gap_mm` (default 5 mm) off the scalp; no search is performed, so the result is deterministic. The [heuristic](doc_placement_heuristic.md) mode, by contrast, takes only an MNI target and searches the scalp for a transducer position.
 
 On this page:
 
-- [How a Position Is Resolved](#how-a-position-is-resolved): coordinate conversion, scalp snap and standoff.
+- [How a Position Is Resolved](#how-a-position-is-resolved): coordinate conversion, scalp snap, and standoff.
 - [Limitations](#limitations): the transducer types the mode assumes and what to check.
 
 !!! note "At a glance"
@@ -37,7 +37,7 @@ A SimNIBS `m2m_sub-XXX` folder (under `path.seg`) is required: the conversion re
 
 3. **Standoff.** The transducer is offset outward from the scalp along the focal axis (target → scalp) so that its exit plane lies `placement.skin_gap_mm` (default 5 mm) off the scalp, as in the heuristic. The bowl apex sits a further `curv_radius_mm − dist_geom_ep_mm` behind the exit plane.
 
-The resolved `trans_pos` / `focus_pos` (T1 grid voxels) are written into every configured transducer, and a QC overlay is saved. Downstream simulation is unchanged.
+The resolved `trans_pos` / `focus_pos` (T1 grid voxels) are written into every configured transducer, and a QC overlay is saved. The log prints the resulting bowl-to-focus distance, and warns if it differs from a set `transducer.focal_distance_bowl` by more than 5 mm: the requested focus may then lie outside what the transducer can reach. Downstream simulation is unchanged.
 
 ??? note "Functions involved"
     - Conversion: `transform_coordinates` and `mni2subject_coords_LDfix`, shared with the heuristic.

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="760" height="58"
+ viewBox="0 0 760 58"
+ xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.2" baseProfile="tiny">
+<title>fig_protocol-together_diagram</title>
+<desc>Generated with Qt</desc>
+<defs>
+</defs>
+<g fill="none" stroke="black" stroke-width="1" fill-rule="evenodd" stroke-linecap="square" stroke-linejoin="bevel" >
+
+<g fill="none" stroke="#000000" stroke-opacity="1" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+</g>
+
+<g fill="#efefef" fill-opacity="1" stroke="none" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+<rect x="0" y="0" width="760" height="58"/>
+</g>
+
+<g fill="none" stroke="#000000" stroke-opacity="1" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+</g>
+
+<g fill="none" stroke="#cdd6df" stroke-opacity="1" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+<polyline fill="none" vector-effect="none" points="6,30 754,30 " />
+</g>
+
+<g fill="#0072b2" fill-opacity="1" stroke="none" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+<rect x="6" y="4" width="99.7333" height="13"/>
+</g>
+
+<g fill="#d55e00" fill-opacity="1" stroke="none" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+<rect x="6" y="17" width="99.7333" height="13"/>
+</g>
+
+<g fill="none" stroke="#ffffff" stroke-opacity="1" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+<text fill="#ffffff" fill-opacity="1" stroke="none" xml:space="preserve" x="29.7969" y="21.5313" font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+ >1 · T1, T2</text>
+</g>
+
+<g fill="#009e73" fill-opacity="1" stroke="none" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+<rect x="255.333" y="4" width="199.467" height="26"/>
+</g>
+
+<g fill="none" stroke="#ffffff" stroke-opacity="1" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+<text fill="#ffffff" fill-opacity="1" stroke="none" xml:space="preserve" x="338.078" y="21.5313" font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+ >2 · T3</text>
+</g>
+
+<g fill="#1f6fb2" fill-opacity="0.235294" stroke="none" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+<rect x="454.8" y="24" width="299.2" height="6"/>
+</g>
+
+<g fill="none" stroke="#6b7886" stroke-opacity="1" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+<text fill="#6b7886" fill-opacity="1" stroke="none" xml:space="preserve" x="6" y="45.5938" font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+ >0</text>
+<text fill="#6b7886" fill-opacity="1" stroke="none" xml:space="preserve" x="575.859" y="45.5938" font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+ >2.5 min incl. 60 s steady-state</text>
+</g>
+
+<g fill="none" stroke="#000000" stroke-opacity="1" stroke-width="1" stroke-linecap="square" stroke-linejoin="bevel" transform="matrix(1,0,0,1,0,0)"
+font-family="Roboto, 'Helvetica Neue', Arial, 'DejaVu Sans', sans-serif" font-size="9" font-weight="400" font-style="normal" 
+>
+</g>
+</g>
+</svg>

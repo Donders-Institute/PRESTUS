@@ -1,13 +1,13 @@
 # Metrics Table Columns
 
-![Pipeline steps; this page belongs to 6 Outputs](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-outputs_diagram.svg){ .stage-strip }
+![Pipeline steps; this page belongs to 7 Outputs](assets/figures/fig_stage-strip-outputs_diagram.svg){ .stage-strip }
 
-The metrics CSV holds every number a run reports: intensities, pressures, mechanical indices, focal volumes and, with heating, temperatures and thermal doses. Each column has a precise definition and unit, and several are checked against the ITRUSST non-significant risk limits, so the column you quote decides what your reported value means.
+The metrics CSV holds every number a run reports: intensities, pressures, mechanical indices, focal volumes, and, with heating, temperatures and thermal doses. Each column has a precise definition and unit, and several are checked against the ITRUSST non-significant risk limits, so the column you quote decides what your reported value means.
 
 On this page:
 
-- [Metrics table](#metrics-table): the file and where targeting accuracy is written.
-    - [Intensity nomenclature](#intensity-nomenclature): how IPA, ISPPA and the mechanical index are computed.
+- [Metrics Table](#metrics-table): the file and where targeting accuracy is written.
+    - [Intensity nomenclature](#intensity-nomenclature): how IPA, I<sub>SPPA</sub>, and the mechanical index are computed.
     - [Acoustic metrics](#acoustic-metrics): global and tissue-specific acoustic columns.
     - [Thermal metrics](#thermal-metrics): global and tissue-specific thermal columns.
     - [Non-significant risk limits](#non-significant-risk-limits): the reference levels the report flags against.
@@ -22,7 +22,7 @@ On this page:
 
 Filename: `sub-XXX_<simulation_medium><affix>.csv`
 
-One CSV holds all quantitative metrics: acoustic metrics first, then thermal metrics if heating was simulated. Tissue-specific columns exist for layered simulations only.
+One CSV holds all quantitative metrics: acoustic metrics first, then thermal metrics if heating was simulated. Tissue-specific columns exist for layered and phantom simulations.
 
 Targeting accuracy (`modules.run_targeting_analysis`, layered or phantom media) goes to `sub-XXX_<simulation_medium><affix>_targeting.csv`; see [Targeting accuracy](doc_group.md#targeting-accuracy).
 
@@ -34,29 +34,31 @@ All intensity values are **pulse-average intensity (IPA)**, computed from the st
 I = p² / (2ρc)   [W/cm²]
 ```
 
-`p` is the peak pressure amplitude, `ρ` density and `c` sound speed. The factor 2 averages over the sinusoid's cycle. The result is the temporal-peak intensity (ITP). IPA, the time-average intensity *during* the pulse, is ITP times the ramp factor of `timing.pulse_ramp_dur` and `timing.pulse_ramp_shape`; for pulses without a ramp IPA = ITP. The average over the repetition interval (ISPTA) also applies the duty cycle PD/PRI: it is the average within a pulse train, without the pulse-train duty cycle PTD/PTRI.
+`p` is the peak pressure amplitude, `ρ` density, and `c` sound speed. The factor 2 averages over the sinusoid's cycle. The result is the temporal-peak intensity (ITP). IPA, the time-average intensity *during* the pulse, is ITP times the ramp factor of `timing.pulse_ramp_dur` and `timing.pulse_ramp_shape`; for pulses without a ramp IPA = ITP. The average over the repetition interval (I<sub>SPTA</sub>) also applies the duty cycle PD/PRI: it is the average within a pulse train, without the pulse-train duty cycle PTD/PTRI.
 
-The **spatial peak** of IPA is ISPPA. IPA at a specific location (target point, radius average) is labelled IPA.
+The **spatial peak** of IPA is [I<sub>SPPA</sub>](doc_glossary.md#isppa). IPA at a specific location (target point, radius average) is labelled IPA.
 
-The **mechanical index** per voxel is MI = p⁻ / √f, with p⁻ the peak rarefaction (negative) pressure in MPa and f the centre frequency in MHz (IEC 62359 / FDA). PRESTUS uses the absolute value of `p_min_all` from [k-Wave](https://github.com/ucl-bug/k-wave). For multi-transducer async combinations it uses the per-voxel most-negative pressure across transducers (`p_min_async`).
+The **[mechanical index](doc_glossary.md#mi)** per voxel is MI = p⁻ / √f, with p⁻ the peak rarefaction (negative) pressure in MPa and f the centre frequency in MHz (IEC 62359 / FDA). PRESTUS uses the absolute value of `p_min_all` from [k-Wave](https://github.com/ucl-bug/k-wave). For multi-transducer async combinations it uses the per-voxel most-negative pressure across transducers (`p_min_async`).
 
 [Darmani et al. (2022, Clinical Neurophysiology)](https://doi.org/10.1016/j.clinph.2021.12.010) give an overview of the nomenclature.
 
-![intensity_nomenclature](https://ars.els-cdn.com/content/image/1-s2.0-S1388245721008920-gr2.jpg)
+![Ultrasound intensity nomenclature (Darmani et al., 2022, Figure 2)](https://ars.els-cdn.com/content/image/1-s2.0-S1388245721008920-gr2.jpg)
 
 ??? note "References"
     Darmani, G., Bergmann, T. O., Butts Pauly, K., Caskey, C. F., de Lecea, L., Fomenko, A., Fouragnan, E., Legon, W., Murphy, K. R., Nandi, T., Phipps, M. A., Pinton, G., Ramezanpour, H., Sallet, J., Yaakub, S. N., Yoo, S. S., & Chen, R. (2022). Non‑invasive transcranial ultrasound stimulation for neuromodulation. *Clinical Neurophysiology, 135*, 51–73. https://doi.org/10.1016/j.clinph.2021.12.010
 
 ### Acoustic Metrics
 
-Focal distances come in two references: columns ending in `_ep_mm` count from the exit plane, as `focal_distance_ep` does; columns ending in `_bowl_mm` from the bowl apex (`trans_pos`). Group and comparison reports read the earlier `real_focal_distance_mm` as `real_focal_distance_bowl_mm`. See [Transducer-Target Distance](doc_transducer.md#transducer-target-distance).
+Focal distances come in two references: columns ending in `_ep_mm` count from the [exit plane](doc_glossary.md#exit-plane), as `focal_distance_ep` does; columns ending in `_bowl_mm` from the bowl apex (`trans_pos`). Group and comparison reports read the earlier `real_focal_distance_mm` as `real_focal_distance_bowl_mm`. See [Transducer-Target Distance](doc_transducer.md#transducer-target-distance).
 
 ??? note "Global acoustic columns"
     | Column | Unit | Description |
     |---|---|---|
     | `subject_id` | none | Subject identifier |
     | `freq_Hz` | Hz | Transducer centre frequency |
-    | `Isppa` | W/cm² | ISPPA: maximum pulse-average intensity across the entire simulation grid |
+    | `Isppa` | W/cm² | I<sub>SPPA</sub>: maximum pulse-average intensity across the entire simulation grid |
+    | `Isptp` | W/cm² | Spatial-peak temporal-peak intensity across the grid |
+    | `Ispta` | W/cm² | Spatial-peak temporal-average intensity across the grid |
     | `Isppa_after_exitplane` | W/cm² | Maximum IPA beyond the transducer exit plane (or within brain if modelled) |
     | `real_focal_distance_bowl_mm` | mm | Distance from the bowl apex (`trans_pos`) to the location of maximum IPA |
     | `real_focal_distance_ep_mm` | mm | Distance from the exit plane to the location of maximum IPA; compare with `focal_distance_ep` |
@@ -64,10 +66,12 @@ Focal distances come in two references: columns ending in `_ep_mm` count from th
     | `Ipa_target_radius` | W/cm² | Mean IPA within a sphere of radius `analysis.focus_area_radius` mm centred on the target |
     | `trans_pos_vox` | voxels | Transducer position in simulation grid coordinates |
     | `focus_pos_vox` | voxels | Target focus position in simulation grid coordinates |
+    | `TIC` | none | Cranial thermal index |
+    | `freefield_isppa_wcm2` | W/cm² | Free-water I<sub>SPPA</sub> of the same drive (layered and phantom simulations) |
 
     Water/free-field simulations also include `Psptp` (spatial peak temporal peak pressure), `Ptp_target` (temporal peak pressure at the target) and `MI` (global mechanical index from peak rarefaction pressure, unitless; [ITRUSST](https://itrusst.org/) limit 1.9, labelled "MI (free water)" in the report). They also include the ITRUSST focal metrics (`focal_vol_3dB_mm3`, `focal_vol_6dB_mm3`, `focal_centroid_3dB_bowl_mm`, `focal_centroid_3dB_ep_mm`, `focal_flhm_center_bowl_mm`, `focal_flhm_center_ep_mm`, `focal_fwhm_axial_mm`, `focal_fwhm_lateral_min_mm`, `focal_fwhm_lateral_max_mm`), computed beyond the transducer exit plane.
 
-??? note "Tissue-specific acoustic columns (layered simulations only)"
+??? note "Tissue-specific acoustic columns (layered and phantom simulations)"
     | Column | Unit | Description |
     |---|---|---|
     | `Isppa_brain` | W/cm² | Maximum IPA within brain tissue (GM + WM) |
@@ -76,7 +80,7 @@ Focal distances come in two references: columns ending in `_ep_mm` count from th
     | `Psptp_brain` | Pa | Spatial peak temporal peak pressure within brain tissue |
     | `Psptp_skull` | Pa | Spatial peak temporal peak pressure within skull bone |
     | `Psptp_skin` | Pa | Spatial peak temporal peak pressure within skin |
-    | `Psptp` | Pa | Global spatial peak temporal peak pressure across the entire grid (also written for water/free-field runs). Max pressure safety limit: 2 MPa |
+    | `Psptp` | Pa | Global spatial peak temporal peak pressure across the entire grid (also written for water/free-field runs) |
     | `Ptp_target` | Pa | Temporal peak pressure at the target coordinate |
     | `MI_brain` | none | Maximum mechanical index within brain tissue (GM + WM) |
     | `MI_skull` | none | Maximum mechanical index within skull bone |
@@ -93,6 +97,19 @@ Focal distances come in two references: columns ending in `_ep_mm` count from th
     | `focal_fwhm_axial_mm` | mm | −3 dB focal width (FWHM of IPA) through the brain peak along the transducer axis (`trans_pos` to `focus_pos`); crossings of half the peak interpolated between grid points. Empty when the focal lobe reaches the grid edge |
     | `focal_fwhm_lateral_min_mm`, `focal_fwhm_lateral_max_mm` | mm | Narrowest and widest −3 dB focal width through the brain peak in the plane perpendicular to the transducer axis, measured every 5°; equal for a round focus |
 
+??? note "Air-cavity columns (with `headmodel.air_cavities`)"
+    Written for layered simulations when the [air-cavity check](doc_head-model.md#air-cavity-check) is on.
+
+    | Column | Unit | Description |
+    |---|---|---|
+    | `aircav_n_vox` | voxels | Internal air-cavity voxels on the simulation grid |
+    | `Psptp_aircav` | Pa | Spatial peak temporal peak pressure inside the cavities |
+    | `aircav_rel_db` | dB | `Psptp_aircav` relative to `Psptp_brain` |
+    | `aircav_beam_frac_max` | 0–1 | Largest share of the −6 dB beam cross-section inside the cavities at any depth between the exit plane and the focus |
+    | `aircav_beam_frac_depth_mm` | mm | Depth of that share from the exit plane |
+    | `aircav_beam_frac_vol` | 0–1 | Share of the prefocal −6 dB beam volume inside the cavities |
+    | `aircav_flag` | 0/1 | 1 when `aircav_rel_db` exceeds `warn_db` or `aircav_beam_frac_max` exceeds `warn_beam_fraction` |
+
 ### Thermal Metrics
 
 Thermal columns are only written when heating simulations are run. Temperature is simulated over the full sonication protocol (on/off cycles) with the [Pennes bioheat equation](https://doi.org/10.1152/jappl.1948.1.2.93). All values are spatial maxima within the respective tissue.
@@ -101,25 +118,26 @@ Thermal columns are only written when heating simulations are run. Temperature i
     | Column | Unit | Description |
     |---|---|---|
     | `maxT` | °C | Global maximum temperature reached at any point during sonication |
-    | `endT` | °C | Global maximum temperature at the end of the last sonication pulse |
-    | `maxCEM43` | min | Global maximum CEM43 (kWave form) over the full protocol |
-    | `maxCEM43end` | min | Global maximum CEM43 (kWave form) at end of last pulse |
+    | `endT` | °C | Global maximum temperature at the end of the simulated protocol (after the last pulse train and `timing.post_ptri_dur`) |
+    | `maxCEM43` | min | Global maximum CEM43 (k-Wave form) over the full protocol |
+    | `maxCEM43end` | min | Global maximum CEM43 (k-Wave form) at the end of the simulated protocol (after the last pulse train and `timing.post_ptri_dur`) |
     | `maxCEM43iso` | min | Global maximum CEM43 (ISO form) over the full protocol |
-    | `maxCEM43isoend` | min | Global maximum CEM43 (ISO form) at end of last pulse |
+    | `maxCEM43isoend` | min | Global maximum CEM43 (ISO form) at the end of the simulated protocol (after the last pulse train and `timing.post_ptri_dur`) |
 
 ??? note "Tissue-specific thermal columns"
     | Column | Unit | Description |
     |---|---|---|
     | `maxT_brain/skull/skin` | °C | Maximum temperature in each tissue during sonication. ITRUSST limit: 39 °C |
-    | `endT_brain/skull/skin` | °C | Maximum temperature in each tissue at end of last pulse |
+    | `endT_brain/skull/skin` | °C | Maximum temperature in each tissue at the end of the simulated protocol (after the last pulse train and `timing.post_ptri_dur`) |
     | `riseT_brain/skull/skin` | °C | Maximum temperature rise above baseline (maxT − baseline). ITRUSST limit: 2 °C |
-    | `rise_endT_brain/skull/skin` | °C | Temperature rise above baseline at end of last pulse |
-    | `CEM43_brain/skull/skin` | min | Maximum CEM43 (kWave form) in each tissue. ITRUSST limits: brain 2 min, skull 16 min, skin 21 min |
-    | `CEM43_end_brain/skull/skin` | min | CEM43 (kWave form) in each tissue at end of last pulse |
+    | `riseT37_brain/skull/skin` | °C | Maximum temperature rise above 37 °C. ITRUSST limit: 2 °C |
+    | `rise_endT_brain/skull/skin` | °C | Temperature rise above baseline at the end of the simulated protocol (after the last pulse train and `timing.post_ptri_dur`) |
+    | `CEM43_brain/skull/skin` | min | Maximum CEM43 (k-Wave form) in each tissue. ITRUSST limits: brain 2 min, skull 16 min, skin 21 min |
+    | `CEM43_end_brain/skull/skin` | min | CEM43 (k-Wave form) in each tissue at the end of the simulated protocol (after the last pulse train and `timing.post_ptri_dur`) |
     | `CEM43iso_brain/skull/skin` | min | Maximum CEM43 (ISO form) in each tissue |
-    | `CEM43iso_end_brain/skull/skin` | min | CEM43 (ISO form) in each tissue at end of last pulse |
+    | `CEM43iso_end_brain/skull/skin` | min | CEM43 (ISO form) in each tissue at the end of the simulated protocol (after the last pulse train and `timing.post_ptri_dur`) |
 
-Both CEM43 formulations are always computed; see [Thermal simulations](doc_simulations-thermal.md) for the formulas. The HTML report shows the one selected by `parameters.thermal.cem43_iso`.
+Both [CEM43](doc_glossary.md#cem43) formulations are always computed; see [Thermal simulations](doc_simulations-thermal.md) for the formulas. The HTML report shows the one selected by `parameters.thermal.cem43_iso`.
 
 ### Non-Significant Risk Limits
 
@@ -129,7 +147,6 @@ The HTML report flags each metric against the ITRUSST consensus non-significant 
 |---|---|
 | MI transcranial | 1.9 |
 | MI (free water) | 1.9 |
-| Max pressure | 2 MPa |
 | Temperature rise (a) | 2 °C |
 | Maximum temperature (b) | 39 °C |
 | CEM43 (brain) (c) | 2 min |

@@ -1,6 +1,8 @@
-# Time Reversal: Refocusing, Aberration Report and Pose Search
+# Time Reversal: Refocusing, Aberration Report, and Pose Search
 
-The skull delays and attenuates the parts of the beam differently, so the waves from different parts of the transducer no longer arrive at the target in phase: the focus weakens and shifts. With `time_reversal.enabled: true`, PRESTUS measures this with one extra simulation per target, using acoustic reciprocity, and uses it to report the aberration, give refocusing phases for arrays and score alternative transducer poses.
+![Pipeline steps; this page belongs to 5 Acoustic](assets/figures/fig_stage-strip-acoustic_diagram.svg){ .stage-strip }
+
+The skull delays and attenuates the parts of the beam differently, so the waves from different parts of the transducer no longer arrive at the target in phase: the focus weakens and shifts. With `time_reversal.enabled: true`, PRESTUS measures this with one extra simulation per target, using acoustic reciprocity, and uses it to report the aberration, give refocusing phases for arrays, and score alternative transducer poses.
 
 On this page:
 
@@ -8,7 +10,7 @@ On this page:
 - [Phases by Transducer Type](#phases-by-transducer-type): the phases each transducer type can use, and the summary metrics.
 - [Applying the Phases](#applying-the-phases): running the acoustic simulation with the refocusing phases.
 - [Pose Search](#pose-search): scoring poses around the planned one from the same reverse run.
-- [Pose Workflow](#pose-workflow): search, forward verification and final run in one call.
+- [Pose Workflow](#pose-workflow): search, forward verification, and final run in one call.
 - [Run Time and Memory](#run-time-and-memory): run time and memory of the reverse run.
 - [Assumptions and Limits](#assumptions-and-limits): where the method does not apply.
 
@@ -31,7 +33,7 @@ time_reversal:
     enabled: false       # true: search, forward verification and final run in one call
 ```
 
-Outputs per transducer: `<prefix>_timereversal_summary.csv` (metrics), `<prefix>_timereversal_elements.csv` (relative transfer, current and time-reversal phase, and the phase error with which each element arrives at the target) and, with a pose search, `<prefix>_timereversal_poses_T<i>.csv`.
+Outputs per transducer: `<prefix>_timereversal_summary.csv` (metrics), `<prefix>_timereversal_elements.csv` (relative transfer, current and time-reversal phase, and the phase error with which each element arrives at the target), and, with a pose search, `<prefix>_timereversal_poses_T<i>.csv`.
 
 ## Phases by Transducer Type
 
@@ -41,6 +43,10 @@ Outputs per transducer: `<prefix>_timereversal_summary.csv` (metrics), `<prefix>
 | Annular array (`elem_n > 1`) | One per ring: the axially symmetric part of the correction | All metrics; `apply_phases` uses the ring phases |
 | Single element | None | Coherence and predicted focal shift; nothing to apply |
 
+The animation below follows these steps on a cross-section: the planned drive through the skull, the reverse run from the target, and the refocused drive for each transducer type. The readouts use the same coherence and gain as the summary file. It is a schematic (2-D, straight rays with a delay and loss in the skull, slowed down); PRESTUS solves the full wave equation on the head model.
+
+<div class="tr-fields"></div>
+
 The metrics in `<prefix>_timereversal_summary.csv`:
 
 - **coherence_elements**: |Σ contributions| / Σ |contributions| over the elements with the current phases. 1 means the elements arrive in phase; `refocus_gain_pressure` = 1 / coherence_elements is what refocusing gains at the target.
@@ -48,7 +54,7 @@ The metrics in `<prefix>_timereversal_summary.csv`:
 - **shift_*_mm**: predicted focal shift with the current drive (axial > 0: deeper than the target), and with the time-reversal drive (`shift_refocused_*`).
 
 ??? note "How the reverse run works"
-    A point source is placed at the target and run as a continuous wave on the grid, medium and time axis of the acoustic simulation (`reverse_point_source_field`). By reciprocity, the pressure this source produces at a point *x* equals the pressure that a source at *x* would produce at the target (up to one constant common to all points). Recorded on the transducer surface, the reverse field therefore gives, for every element, the amplitude and phase with which it reaches the target through the skull (`time_reversal_refocus`):
+    A point source is placed at the target and run as a continuous wave on the grid, medium, and time axis of the acoustic simulation (`reverse_point_source_field`). By reciprocity, the pressure this source produces at a point *x* equals the pressure that a source at *x* would produce at the target (up to one constant common to all points). Recorded on the transducer surface, the reverse field therefore gives, for every element, the amplitude and phase with which it reaches the target through the skull (`time_reversal_refocus`):
 
     ```
     G_e = sum over the element's grid points of (weight × reverse field)
@@ -61,18 +67,18 @@ The metrics in `<prefix>_timereversal_summary.csv`:
 
 ## Applying the Phases
 
-With `apply_phases: true`, the time-reversal phases replace the element phases before the acoustic simulation, and the source is rebuilt. The free-water baseline has already run with the geometric phases, so ISPPA targeting (`target_isppa_wcm2`) keeps the element drive amplitudes of the geometric drive: the refocused run shows what the same transducer output delivers when refocused. Whether your hardware can apply arbitrary phases (and with which precision) is not checked.
+With `apply_phases: true`, the time-reversal phases replace the element phases before the acoustic simulation, and the source is rebuilt. The [free-water baseline](doc_glossary.md#free-water-baseline) has already run with the geometric phases, so [I<sub>SPPA</sub>](doc_glossary.md#isppa) targeting (`target_isppa_wcm2`) keeps the element drive amplitudes of the geometric drive: the refocused run shows what the same transducer output delivers when refocused. Whether your hardware can apply arbitrary phases (and with which precision) is not checked.
 
 ## Pose Search
 
 For transducers that cannot refocus, the pose is the main lever: where the transducer sits on the scalp and where it points. With `placement_search.enabled: true` (curved annular transducers, 3D grid), the same reverse run also scores poses around the planned one. Each pose costs an interpolation of the recorded field, not a simulation.
 
-The result is `<prefix>_timereversal_poses_T<i>.csv`, sorted by `p_corrected_rel` (target pressure relative to the planned pose with geometric aim), with the apex, corrected aim point and target in grid voxels, T1 voxels and RAS mm. A pose is set up as a manual placement with `trans_pos` = apex and `focus_pos` = aim point (`placement.manual.coordinate_space: ras`), and `transducer.focal_distance_ep` = the apex-to-aim distance minus the bowl depth (`curv_radius_mm` − `dist_geom_ep_mm`). The acoustic run keeps the planned pose. To verify the best poses with forward simulations and run the chosen one, use the [pose workflow](#pose-workflow), or set up a pose by hand with `time_reversal_pose_parameters(parameters, pose_row)`. In the Nexus, *Results ▸ Poses ▸ Use this pose…* creates a follow-up config at the selected pose ([Follow-up runs](doc_nexus_tabs.md#follow-up-runs)).
+The result is `<prefix>_timereversal_poses_T<i>.csv`, sorted by `p_corrected_rel` (target pressure relative to the planned pose with geometric aim), with the apex, corrected aim point, and target in grid voxels, T1 voxels, and RAS mm. A pose is set up as a manual placement with `trans_pos` = apex and `focus_pos` = aim point (`placement.manual.coordinate_space: ras`), and `transducer.focal_distance_ep` = the apex-to-aim distance minus the bowl depth (`curv_radius_mm` − `dist_geom_ep_mm`). The acoustic run keeps the planned pose. To verify the best poses with forward simulations and run the chosen one, use the [pose workflow](#pose-workflow), or set up a pose by hand with `time_reversal_pose_parameters(parameters, pose_row)`. In the Nexus, *Results ▸ Poses ▸ Use this pose…* creates a follow-up config at the selected pose ([Follow-up runs](doc_nexus_tabs.md#follow-up-runs)).
 
-`time_reversal.only: true` stops the run after this stage (no water baseline, acoustic or thermal simulation), for a report or pose table on its own.
+`time_reversal.only: true` stops the run after this stage (no water baseline, acoustic, or thermal simulation), for a report or pose table on its own.
 
 ??? note "Candidate poses and scoring"
-    **Candidates** (`reciprocity_pose_candidates`): beam directions tilted from the planned one up to `max_angle_deg`, in steps of `angle_step_deg`, all aimed at the target. For each direction the exit plane sits `placement.skin_gap_mm` off the scalp (heuristic, MNI, PlanTUS and TUS_entry placements) or at the planned pose's gap (manual and Localite), so the required focal depth changes with the direction. Where the scalp curves, the bowl is moved outward until its surface overlaps the scalp no more than the planned bowl does (`push_mm` in the pose table), so all poses are seated alike. A single element cannot steer: its apex is placed at the curvature radius from the target instead, and its aim correction is lateral only. With `jitter_mm` (one or more distances, e.g. `0.5` or `[0.5 1 2 5]`), the planned pose with its apex moved by each distance is scored too (rows of kind `jitter`), the local search often run with forward simulations. `jitter_mode: grid` moves the apex ± along each grid axis, as when editing voxel coordinates; `jitter_mode: scalp` slides the transducer over the scalp perpendicular to the beam in 8 directions and seats it against the scalp, which suits shifts beyond about 1 mm. Poses whose surface overlaps the head by more than the planned surface does plus 2 % of its points are dropped (`inside_fraction`); the planned pose is always kept. The reverse run records the field over the region these poses cover.
+    **Candidates** (`reciprocity_pose_candidates`): beam directions tilted from the planned one up to `max_angle_deg`, in steps of `angle_step_deg`, all aimed at the target. For each direction the exit plane sits `placement.skin_gap_mm` off the scalp (heuristic, MNI, PlanTUS, and TUS_entry placements) or at the planned pose's gap (manual and Localite), so the required focal depth changes with the direction. Where the scalp curves, the bowl is moved outward until its surface overlaps the scalp no more than the planned bowl does (`push_mm` in the pose table), so all poses are seated alike. A single element cannot steer: its apex is placed at the curvature radius from the target instead, and its aim correction is lateral only. With `jitter_mm` (one or more distances, e.g. `0.5` or `[0.5 1 2 5]`), the planned pose with its apex moved by each distance is scored too (rows of kind `jitter`), the local search often run with forward simulations. `jitter_mode: grid` moves the apex ± along each grid axis, as when editing voxel coordinates; `jitter_mode: scalp` slides the transducer over the scalp perpendicular to the beam in 8 directions and seats it against the scalp, which suits shifts beyond about 1 mm. Poses whose surface overlaps the head by more than the planned surface does plus 2 % of its points are dropped (`inside_fraction`); the planned pose is always kept. The reverse run records the field over the region these poses cover.
 
     **Scoring** (`reciprocity_score_poses`): for each pose, the surface is sampled (`annular_aperture_points`) and the target pressure is a sum over the reverse field there. Per pose:
 
@@ -81,14 +87,14 @@ The result is `<prefix>_timereversal_poses_T<i>.csv`, sorted by `p_corrected_rel
     - **aberration-corrected aim**: aim and steer at *target − predicted shift* (tilting the bowl about its apex), repeated `aim_iterations` times, so that the predicted focus lands on the target; the target pressure after this correction ranks the poses;
     - the gain ring refocusing would add.
 
-    **Grid.** The simulation grid ends close to the planned transducer, so tilted poses can lie outside it. The reverse run of a pose search therefore uses its own grid: the full grid (also with a [limited acoustic FOV](doc_limited_fov.md), whose crop the forward run keeps), padded with water on the sides the candidate poses need (the log reports the padding). The padding makes the reverse run larger, and so longer, than the forward run.
+    **Grid.** The simulation grid ends close to the planned transducer, so tilted poses can lie outside it. The reverse run of a pose search therefore uses its own grid: the full grid (also with a [partial acoustic FOV](doc_partial-fov.md), whose crop the forward run keeps), padded with water on the sides the candidate poses need (the log reports the padding). The padding makes the reverse run larger, and so longer, than the forward run.
 
 ## Pose Workflow
 
 `time_reversal.pose_workflow.enabled: true` turns a run into the whole placement workflow, in one call of `prestus_pipeline_start` (`pose_workflow_pipeline`). It needs one curved annular transducer (ring array or single element) and a head model (`simulation.medium: layered`). The `placement_search` settings apply; `placement_search.enabled` is set by the workflow.
 
 1. **Search** (`<affix>_posesearch`): the reverse run on the full grid scores the candidate poses; no forward simulation.
-2. **Verify** (`<affix>_pose<id>_<geo|aim>`): forward runs, acoustics only, of the planned pose (the reference, aimed at the target) and the `n_top` best poses by predicted target pressure after aim correction, plus the pose ids in `poses`. `aim` sets the aim of each run: `corrected` (at the aberration-corrected aim point; the planned pose is then run with it too), `geometric` (at the target) or `both`. `verify_fov: partial` (default) runs them on an acoustic FOV around each beam. The poses run are listed in `<prefix><affix>_poseverify_selection.csv`.
+2. **Verify** (`<affix>_pose<id>_<geo|aim>`): forward runs, acoustics only, of the planned pose (the reference, aimed at the target) and the `n_top` best poses by predicted target pressure after aim correction, plus the pose ids in `poses`. `aim` sets the aim of each run: `corrected` (at the aberration-corrected aim point; the planned pose is then run with it too), `geometric` (at the target), or `both`. `verify_fov: partial` (default) runs them on an acoustic FOV around each beam. The poses run are listed in `<prefix><affix>_poseverify_selection.csv`.
 3. **Results and final run**: per verification run, the mean intensity in a sphere of `target_radius_mm` around the target and the distance of the −3 dB focal centroid and peak from the target (axial and lateral), next to the predicted values, in `<prefix><affix>_poseverify_results.csv`. The runs are ranked by `rank_by` (`target_intensity` or `focus_error`), among those within `max_focus_error_mm` of the target if set; the log reports the rank agreement between predicted and simulated intensity. With `final_run: true`, the best pose then runs on the full grid with the configured modules (thermal, report): `<affix>_posebest`.
 
 On [MATLAB](https://www.mathworks.com/products/matlab.html) the stages run one after the other. On [SLURM](https://slurm.schedmd.com/) or qsub, each stage is submitted: a small CPU job after the search job submits the verification runs, and another after those (whether they succeeded or not) collects the results and submits the final run. This needs a cluster that lets jobs submit jobs. A stage whose outputs exist is skipped unless `io.overwrite_files: always`, so calling the workflow again after a failure continues where it stopped.
@@ -99,7 +105,7 @@ The verification and final runs place the transducer as a manual placement in RA
 - inline ring phases are replaced by geometric steering to the aim point in water, the drive the pose scores assume;
 - a single element has no phases; its poses already place the geometric focus on the target or the corrected aim point.
 
-The runs keep the config's intensity setting. With `target_isppa_wcm2`, each run is scaled to the same free-water ISPPA, so the simulated intensities compare poses at the same device setting; the predictions compare them at the same element drive. The two differ where the poses' focal depths differ much (the free-water focal intensity changes with steering depth).
+The runs keep the config's intensity setting. With `target_isppa_wcm2`, each run is scaled to the same free-water I<sub>SPPA</sub>, so the simulated intensities compare poses at the same device setting; the predictions compare them at the same element drive. The two differ where the poses' focal depths differ much (the free-water focal intensity changes with steering depth).
 
 Cost: one reverse run (as long as a full-grid acoustic run, more memory: `search_memorylimit`), `n_top + 1` (or twice that with `aim: both`) partial-FOV forward runs, and one full run.
 
@@ -116,10 +122,10 @@ Memory stays below that of the acoustic simulation: the forward source is releas
 - Cartesian grids only (no axisymmetric runs).
 - Not with `acoustic_backend: babelbrain`, which has its own refocusing (`babelbrain.do_refocusing`, phased-array presets only).
 - The pose search ignores calibrated phase offsets of the library entry (it steers geometrically in water) and treats each pose as a rigid bowl. The verification runs use the library drive, so they include the offsets.
-- The pose scores interpolate the recorded field (cubic) at the transducer surface; at ~7 points per wavelength the interpolation error is about 1 % of the target pressure, the size of the differences between ±0.5 mm poses.
+- The pose scores interpolate the recorded field (cubic) at the transducer surface; at ~7 [points per wavelength](doc_glossary.md#ppw) the interpolation error is about 1 % of the target pressure, the size of the differences between ±0.5 mm poses.
 
 ??? note "References: related work and benchmarks"
-    - Pinton (2026), *Whole-skull acoustic transparency from a single time-reversal solve for reciprocity-based transducer placement and aperture optimization in transcranial focused ultrasound*, [arXiv:2609.27852](https://arxiv.org/abs/2609.27852): the same principle (one time-reversal solve, then placement, aperture and orientation searched on the recorded map), with [Fullwave 2](https://github.com/gfpinton/fullwave2) on a CT skull.
+    - Pinton (2026), *Whole-skull acoustic transparency from a single time-reversal solve for reciprocity-based transducer placement and aperture optimization in transcranial focused ultrasound*, [arXiv:2609.27852](https://arxiv.org/abs/2609.27852): the same principle (one time-reversal solve, then placement, aperture, and orientation searched on the recorded map), with [Fullwave 2](https://github.com/gfpinton/fullwave2) on a CT skull.
     - [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) refocusing: phase correction for phased arrays from a back-propagated field (`babelbrain.do_refocusing`).
     - SCOUT (2024, [PMC11592240](https://pmc.ncbi.nlm.nih.gov/articles/PMC11592240/)): position of a single-element transducer optimised with repeated forward k-Wave simulations.
     - [Park et al. (2019)](https://doi.org/10.1016/j.cmpb.2019.104982), *Comput Methods Programs Biomed* 179: placement by the lowest average reflection coefficient along straight beam lines (no wave simulation).

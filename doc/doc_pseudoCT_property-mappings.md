@@ -1,24 +1,69 @@
 # Skull Property Mappings
 
-![Pipeline steps; this page belongs to 3 Grid & medium](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-medium_diagram.svg){ .stage-strip }
+![Pipeline steps; this page belongs to 4 Grid & medium](assets/figures/fig_stage-strip-medium_diagram.svg){ .stage-strip }
 
-The pseudo-CT holds pseudo-Hounsfield units, while the simulation needs density, sound speed and attenuation in each skull voxel. Several published mappings make this conversion, and they assume different HU scales and give different skull properties. This page lists the mappings PRESTUS offers for each property, their equations and prerequisites, and how to check the resulting skull properties before simulating.
+The pseudo-CT holds pseudo-Hounsfield units, while the simulation needs density, sound speed, and attenuation in each skull voxel. Several published mappings make this conversion, and they assume different HU scales and give different skull properties. This page lists the mappings PRESTUS offers for each property, their equations and prerequisites, and how to check the resulting skull properties before simulating.
 
 On this page:
 
 - [From Pseudo-HU to Acoustic Properties](#from-pseudo-hu-to-acoustic-properties): how the mappings are applied.
+- [Limits and Interpolation](#limits-and-interpolation): resampling the CT and regularising the HU and the mapped properties.
+- [The HU Reference](#the-hu-reference): the densest-bone HU for mappings that normalise by it.
 - [Mapping Skull Density](#mapping-skull-density): the `pct.mapping_density` options.
 - [Mapping Skull Sound Speed](#mapping-skull-sound-speed): the `pct.mapping_soundspeed` options.
 - [Mapping Skull Attenuation](#mapping-skull-attenuation): the `pct.mapping_attenuation` options.
 - [Predicting the Modelled Skull Properties](#predicting-the-modelled-skull-properties): the skull property distributions a run will model, and the references.
 
 !!! note "At a glance"
-    - **When you need it:** When you change `pct.mapping_density`, `pct.mapping_soundspeed` or `pct.mapping_attenuation` from the `k-plan` default, or want the equations behind a mapping.
+    - **When you need it:** When you change `pct.mapping_density`, `pct.mapping_soundspeed`, or `pct.mapping_attenuation` from the `k-plan` default, or want the equations behind a mapping.
     - **Before you start:** A pseudo-CT ([Setting Up a Pseudo-CT Run](doc_pseudoCT.md#setting-up-a-pseudo-ct-run)) and a density calibration that matches its UTE-to-HU mapping ([Matching the CT Calibration](doc_pseudoCT_generation.md#matching-the-ct-calibration)).
 
 ## From Pseudo-HU to Acoustic Properties
 
-With `pct.enabled: 1`, choose a mapping for each of density, sound speed and attenuation. The pseudo-CT is read from the pseudo-CT folder (see [Setting Up a Pseudo-CT Run](doc_pseudoCT.md#setting-up-a-pseudo-ct-run)). This is a subtype of a `layered` medium. Mappings apply only within the uniform skull mask. A property set to `"none"`, or with its field missing, keeps the uniform `skull` value. Defaults below are those in `config_default.yaml`.
+With `pct.enabled: 1`, choose a mapping for each of density, sound speed, and attenuation. The pseudo-CT is read from the pseudo-CT folder (see [Setting Up a Pseudo-CT Run](doc_pseudoCT.md#setting-up-a-pseudo-ct-run)). This is a subtype of a `layered` medium. Mappings apply only within the uniform skull mask. A property set to `"none"`, or with its field missing, keeps the uniform `skull` value. Defaults below are those in `config_default.yaml`.
+
+```yaml
+pct:
+  enabled: 1                    # map skull properties from a (pseudo-)CT
+  mapping_density: k-plan       # see Mapping Skull Density
+  mapping_soundspeed: k-plan    # see Mapping Skull Sound Speed
+  mapping_attenuation: k-plan   # see Mapping Skull Attenuation
+```
+
+## Limits and Interpolation
+
+The CT is resampled onto the simulation grid with `pct.interpolation`: `linear` (default), `cubic`, or `spline`. `spline` is the interpolating cubic spline BabelBrain uses. Cubic and spline interpolation overshoot at sharp edges such as the outer surface of the skull.
+
+`pct.limits` regularises the CT and the properties mapped from it in one scheme. Each limit is a number, `water` (the configured water value of that property), or `[]` for none:
+
+```yaml
+pct:
+  limits:
+    hu_min: []
+    hu_max: []                # BabelBrain CT: 2100
+    density_min: 'water'
+    density_max: []
+    sound_speed_min: 'water'
+    sound_speed_max: []
+    alpha_coeff_min: []
+    alpha_coeff_max: []
+```
+
+HU limits act on the CT before and after resampling, so they also clip the interpolation overshoot, and before the skull is defined from HU ([Skull from the CT](doc_pseudoCT.md#skull-from-the-ct)). Property limits act on the mapped skull values. Ranges that belong to a published mapping, such as the HU range of `marsac`, stay part of that mapping. The medium statistics (`<io.dir_cache>/sub-XXX_<medium>_medium_stats<affix>.json`) record the skull HU distribution before and after the HU limits and how many skull voxels each limit changed.
+
+## The HU Reference
+
+Some mappings scale by the HU of the densest bone: density `marsac-babelbrain` and `aubry`, sound speed `aubry`, and attenuation `mueller` and `aubry`. PRESTUS takes this reference over the whole head: a percentile (`pct.hu_reference_percentile`, default 99.9) of the CT within the layers `pct.hu_reference_layers` (default the skull layers) of the segmentation, on the segmentation grid and after the HU limits. The reference therefore does not depend on the simulation grid, its crop, or the interpolation. A percentile below 100 keeps a few bright voxels, such as metal or artefacts, from setting the scale of the whole skull.
+
+```yaml
+pct:
+  hu_reference_layers: ['skull']
+  hu_reference_percentile: 99.9   # 100 = the largest HU
+```
+
+Skull HU above the reference extrapolate the density and sound speed mappings, keep the lowest attenuation, and raise a warning. With the [BabelBrain backend](doc_babelbrain.md) on its CT path, the same reference sets BabelBrain's density scale.
+
+`pct.hu_reference_resolution_mm` takes the reference after resampling the whole-head CT onto an isotropic grid of that spacing with `pct.interpolation`, as BabelBrain does on its simulation grid. Use it only to reproduce such a tool. Cubic and spline interpolation overshoot at the skull surface, so the reference then rises with an interpolation artefact and depends on the grid: lower density for all bone below the overshoot.
 
 ## Mapping Skull Density
 
@@ -29,6 +74,7 @@ Set by `pct.mapping_density`.
 | `k-plan` (**default**) | 4-part piecewise linear fit based on k-Plan defaults; `pct.density_calibration` replaces the table (see [Matching the CT Calibration](doc_pseudoCT_generation.md#matching-the-ct-calibration)) |
 | `k-wave` | 4-part piecewise linear fit based on Schneider et al. (1996) |
 | `marsac` | linear between `HU_min = 300` and `HU_max = 2000`, [Marsac et al. (2017)](https://doi.org/10.1080/02656736.2017.1295322) |
+| `marsac-babelbrain` | BabelBrain's form of `marsac`: scaled by the largest skull HU; to emulate BabelBrain's CT path |
 | `aubry` | porosity-based mixture of bone and water, [Aubry et al. (2003)](https://doi.org/10.1121/1.1529663) |
 | `air-tissue` | linear air-to-bone calibration ([BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain)-compatible); **use with `pichardo` or `mcdannold` sound speed or attenuation** |
 
@@ -46,9 +92,11 @@ Set by `pct.mapping_density`.
     density = [1.2, 1060, 1530, 2150]
     ```
 
-    The minimum is regularised to the configured water density. Sound speed and attenuation of the k-plan pipeline follow from density. k-Plan's bone segmentation starts at density values of 1150 kg/m3, which internally regularizes data ranges; PRESTUS does not enforce this. **Thermal simulations** use a fixed bone density:
+    The minimum is regularised to the configured water density. Sound speed and attenuation of the k-plan pipeline follow from density. k-Plan's bone segmentation starts at density values of 1150 kg/m3, which internally regularizes data ranges; PRESTUS does not enforce this. **Thermal simulations** use a fixed bone density in the heat capacity and heat conduction, as k-Plan:
 
     $$ \rho_\text{skull} = 1850 \, \text{kg/m}^3 $$
+
+    The heat source keeps the mapped density and sound speed of the acoustic simulation.
 
     **`k-wave`.** Pseudo-CT values are shifted by +1000 and thresholded at 300 to align with [hounsfield2density](http://www.k-wave.org/documentation/hounsfield2density.php):
 
@@ -61,6 +109,10 @@ Set by `pct.mapping_density`.
     $$ \rho_\text{skull} = \rho_\text{water} + (\rho_\text{bone} - \rho_\text{water}) \cdot \frac{\text{HU} - \text{HU}_\text{min}}{\text{HU}_\text{max} - \text{HU}_\text{min}} $$
 
     with max. skull density `rho_bone = 2100` kg/m3.
+
+    **`marsac-babelbrain`.** As BabelBrain's CT path (`HUtoDensityMarsac`). Skull pHU below BabelBrain's bone threshold of 300 HU are raised to it:
+
+    $$ \rho_\text{skull} = 1000 + 1700 \cdot \frac{\text{HU}}{\max_\text{skull} \text{HU}} $$
 
     **`aubry`.** Mixture of bone and water density, both from the configuration:
 
@@ -85,7 +137,7 @@ Set by `pct.mapping_soundspeed`.
 | `pichardo` | frequency-dependent ρ→c, [Pichardo et al.](https://doi.org/10.1088/0031-9155/56/1/014) 2D interpolation map; needs `pct.mapping_density: air-tissue` |
 | `mcdannold` | polynomial ρ→c, [McDannold et al.](https://doi.org/10.1227/01.NEU.0000360379.95800.2F); needs density first (`air-tissue` or `marsac`) |
 
-For `k-plan`, `webb`, `pichardo` and `mcdannold`, the minimum sound speed is regularised to water sound speed.
+For `k-plan`, `webb`, `pichardo`, and `mcdannold`, the minimum sound speed is regularised to water sound speed.
 
 ??? note "Sound speed equations"
     **`k-plan`.**
@@ -127,7 +179,7 @@ Set by `pct.mapping_attenuation`.
 | `k-plan` (**default**) | uniform: the skull `alpha_coeff` and `alpha_power` of `medium_properties`; to replicate k-Plan set `alpha_coeff = 13.3` and `alpha_power = 1` |
 | `mueller` | HU-based, [Mueller et al. (2017)](https://doi.org/10.1088/1741-2552/aa843e), bounds from [Yaakub et al. (2023)](https://doi.org/10.1016/j.brs.2023.01.838) |
 | `aubry` | porosity-based, Aubry et al. (2003) |
-| `webb` | exponential HU-based model, [Webb et al. (2021)](https://doi.org/10.1109/TUFFC.2020.3039743); scanner-specific values via `pct.webb_att_alpha0`, `pct.webb_att_beta` and `pct.webb_att_c` |
+| `webb` | exponential HU-based model, [Webb et al. (2021)](https://doi.org/10.1109/TUFFC.2020.3039743); scanner-specific values via `pct.webb_att_alpha0`, `pct.webb_att_beta`, and `pct.webb_att_c` |
 | `pichardo` | frequency-dependent ρ→Att from Pichardo et al. 2D interpolation map; prerequisites as for `pichardo` sound speed |
 | `mcdannold` | polynomial ρ→Att from McDannold et al. with linear frequency scaling; needs density first |
 
@@ -154,7 +206,7 @@ Set by `pct.mapping_attenuation`.
 
     $$ \alpha_\text{skull}(f) = \alpha_0 \cdot \left(\frac{f}{1\,\text{MHz}}\right)^{\beta} \cdot \exp(c \cdot \text{HU}) $$
 
-    Output is [k-Wave](https://github.com/ucl-bug/k-wave) `alpha_coeff` [dB/cm/MHz$^\beta$] with `alpha_power = β`. Defaults (GE 120 kVp, B kernel, 0.5 × 0.6 mm): α₀ = 26, β = 1.3, c = −0.0016. Set scanner-specific values from Webb et al. Table IV with `pct.webb_att_alpha0`, `pct.webb_att_beta` and `pct.webb_att_c`.
+    Output is [k-Wave](https://github.com/ucl-bug/k-wave) `alpha_coeff` [dB/cm/MHz$^\beta$] with `alpha_power = β`. Defaults (GE 120 kVp, B kernel, 0.5 × 0.6 mm): α₀ = 26, β = 1.3, c = −0.0016. Set scanner-specific values from Webb et al. Table IV with `pct.webb_att_alpha0`, `pct.webb_att_beta`, and `pct.webb_att_c`.
 
     **`pichardo`.** Reads longitudinal attenuation [Np/m] from `MapPichardo.h5` as a function of density [kg/m³] and frequency [MHz]. The value at the simulation frequency is converted to k-Wave `alpha_coeff` [dB/cm/MHz] with `alpha_power = 1` (linear frequency scaling assumed). Prerequisites as for `pichardo` sound speed; density must be filled first.
 

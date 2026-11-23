@@ -4,12 +4,10 @@ A head simulation takes minutes to hours on a GPU, and a study runs many of them
 
 On this page:
 
-- [Where a run executes](#where-a-run-executes): what each `platform` value does, and where job logs go.
-- [Job resources](#job-resources): wall time, memory and the other `hpc.*` keys.
-- [GPU support](#gpu-support): requesting GPUs and partitions, with benchmark timings.
-- [Resource estimates from earlier runs](#resource-estimates-from-earlier-runs): predicting time and memory from runs already done.
-- [Post-job resource report](#post-job-resource-report): what a finished SLURM job used.
-- [Donders HPC](#donders-hpc): interactive sessions on the Donders cluster.
+- [Where a Run Executes](#where-a-run-executes): what each `platform` value does, and where job logs go.
+- [Job Resources](#job-resources): wall time, memory, and the other `hpc.*` keys.
+- [GPU Support](#gpu-support): requesting GPUs and partitions, with benchmark timings.
+- [Post-Job Resource Report](#post-job-resource-report): what a finished SLURM job used.
 
 !!! note "At a glance"
     - **When you need it:** For head simulations without a local GPU, and whenever you run many simulations.
@@ -24,7 +22,9 @@ hpc:
   memorylimit: 20        # GB
 ```
 
-Many subjects or conditions are submitted together from a [study manifest](doc_group.md#study-setup) with `prestus_study_start`. The [PRESTUS Nexus](doc_nexus.md) can submit to a cluster, also over SSH from a laptop, and follows the jobs and their logs.
+Many subjects or conditions are submitted together from a [study manifest](doc_group_study-setup.md#study-setup) with `prestus_study_start`. The [PRESTUS Nexus](doc_nexus.md) can submit to a cluster, also over SSH from a laptop, and follows the jobs and their logs.
+
+On the Donders cluster, see [Donders HPC](doc_hpc_donders.md) for interactive sessions and your own job scripts.
 
 ## Where a Run Executes
 
@@ -35,33 +35,40 @@ Many subjects or conditions are submitted together from a [study manifest](doc_g
 | `slurm` | Submit a SLURM job (`sbatch`) |
 | `qsub` | Submit a PBS/Torque job (`qsub`) |
 
-Job logs go to `log_hpc/` in the subject's output folder (`sub-XXX_slurm_output_<id>.log`). MATLAB returns as soon as the job is submitted, unless `hpc.wait_for_job` is set. A small dependent job then writes a [resource report](#post-job-resource-report).
+Job logs go to `log_hpc/` in the subject's output folder (`sub-XXX_slurm_output_<id>.log`; `sub-XXX_qsub_output_<id>.log` for qsub). MATLAB returns as soon as the job is submitted, unless `hpc.wait_for_job` is set. A small dependent job then writes a [resource report](#post-job-resource-report).
 
-Some modes split one run into several chained jobs that pass results through caches: async multi-transducer runs, multi-intensity sweeps and uncertainty runs ([How PRESTUS works](doc_architecture.md#run-execution-and-chained-jobs)). Post-hoc free-water simulations (`modules.run_posthoc_water_sims`) are submitted as separate jobs.
+Some modes split one run into several chained jobs that pass results through caches: async multi-transducer runs, multi-intensity sweeps, and uncertainty runs ([How PRESTUS works](doc_architecture.md#run-execution-and-chained-jobs)). Post-hoc free-water simulations (`modules.run_posthoc_water_sims`) are submitted as separate jobs.
 
 To submit, PRESTUS saves the parameters to a temporary file, writes a small launcher that adds the PRESTUS paths and calls `prestus_pipeline`, and submits it.
 
 ## Job Resources
 
-| Key | Default | Meaning |
-|---|---|---|
-| `hpc.timelimit` | `'04:00:00'` | Wall time per job |
-| `hpc.memorylimit` | `20` | Memory per job [GB] |
-| `hpc.gpu`, `hpc.partition`, `hpc.reservation` | `''` | GPU type, partition, reservation (see [GPU support](#gpu-support)) |
-| `hpc.posthoc_water_timelimit`, `hpc.posthoc_water_memorylimit` | `'05:00:00'`, `40` | Resources of the post-hoc free-water jobs |
-| `hpc.job_prefix` | `'PS'` | Prefix of job names |
-| `hpc.wait_for_job`, `hpc.max_wait_checks` | `false`, `540` | Block MATLAB until the job ends (one check every 20 s) |
-| `hpc.ld_library_path` | `''` | Shared-library path prefixed for [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html) tools. Empty: the libraries of the install in `startup.simnibs_bin_path`, so it follows the selected environment. Set it only to override, e.g. if `charm` reports `undefined symbol` errors |
-| `hpc.name` | `'default'` | `'snellius'` selects the [Snellius](https://www.surf.nl/en/services/compute/snellius-the-national-supercomputer) partition presets (`snellius.*`) |
+Each job requests 4 hours of wall time (`hpc.timelimit`) and 20 GB of memory (`hpc.memorylimit`); post-hoc free-water jobs request 5 hours and 40 GB. Raise these for fine grids or heating runs. GPU type, partition, and reservation are described under [GPU support](#gpu-support), node-local disk under [Node-local scratch](#node-local-scratch), and `hpc.name: 'snellius'` selects the [Snellius](https://www.surf.nl/en/services/compute/snellius-the-national-supercomputer) presets. All `hpc` keys, with their defaults, are listed under [HPC parameters](doc_parameters_run.md#high-performance-computing-hpc).
 
-All keys are listed in [Parameters](doc_parameters.md#high-performance-computing-hpc). Which simulations need a GPU and which settings are fastest is described in [k-Wave](doc_kwave.md). The time and memory earlier runs needed are summarised under [Resource estimates](#resource-estimates-from-earlier-runs).
+### Node-local scratch
+
+The C++ k-Wave codes (`cpp_cpu`, `cpp_gpu`) write an input and an output `.h5` file per simulation, often 5–15 GB together. Inside a job they go to `$TMPDIR` when the scheduler sets it, else to `<output>/cache/`. To reserve node-local disk for them and choose where they go, set `hpc.tmp_gb`:
+
+```yaml
+hpc:
+  tmp_gb: 50          # adds '#SBATCH --tmp=50G' to the job script; 0 = off (default)
+  scratch_dir: auto   # or a path, e.g. '/scratch/${USER}/${SLURM_JOB_NAME}' (created if missing)
+```
+
+With `scratch_dir: auto`, PRESTUS takes the first existing folder of `$PRESTUS_SCRATCH`, `$SLURM_TMPDIR`, `/scratch/$USER/$SLURM_JOB_NAME`, and `/scratch/$USER/$SLURM_JOB_ID`. If none exists but `/scratch/$USER` does, it creates `/scratch/$USER/$SLURM_JOB_NAME` and removes it again at the end if it is empty. The last fallback is `$TMPDIR`. On a cluster whose scratch is not under `/scratch`, set `PRESTUS_SCRATCH_BASE` before MATLAB starts. The job log names the folder in a `Node-local scratch:` line, with the free space.
+
+PRESTUS works in `prestus_<jobid>/sub-NNN<affix>/` inside that folder and removes it when the run ends or fails, including `.h5` files a failed k-Wave run left behind. A job killed by the scheduler leaves the folder to the cluster's own cleanup. `cache/` always stays in the output folder, because later stages and runs read it.
+
+If no node can provide `--tmp=<tmp_gb>G`, the job stays pending: lower `hpc.tmp_gb` or set it to `0`.
+
+All keys are listed in [Parameters](doc_parameters_run.md#high-performance-computing-hpc). Which simulations need a GPU and which settings are fastest is described in [k-Wave](doc_kwave.md). Predicted run time and memory, and the time and memory earlier runs needed, are on [Run time and resources](doc_run-time.md).
 
 ## GPU Support
 
 TUS simulations are accelerated by GPUs, but requesting GPUs can lead to longer wait times (on the Donders cluster, the concurrent GPU limit per user is 4). To reduce wait times, run acoustic simulations first (to confirm targeting; they need less RAM) and then run thermal simulations with the final protocol. Avoid blanket simulations (e.g. circling through all participants with all permutations), especially for thermal simulations.
 
 A job requests a GPU when a solver it runs computes on one:
-- k-Wave with `simulation.code_type` `matlab_gpu` or `cpp_gpu`, for the acoustic stage, k-Wave heating or time reversal;
+- k-Wave with `simulation.code_type` `matlab_gpu` or `cpp_gpu`, for the acoustic stage, k-Wave heating, or time reversal;
 - jwave, unless `jwave.use_gpu` is `false`;
 - BabelBrain, unless `babelbrain.computing_backend` is `cpu`.
 
@@ -69,11 +76,7 @@ A job requests a GPU when a solver it runs computes on one:
 
 PRESTUS is a MATLAB toolbox and only supports *Nvidia GPUs*. When Nvidia GPUs are digitally partitioned, MATLAB R2024+ can fail to identify the assigned GPU. Submitted SLURM jobs therefore load `matlab/R2023b`, whichever MATLAB version submits them (`MATLAB/2024b` with `hpc.name: 'snellius'`). PBS jobs load `matlab/R2022b`, because the PBS nodes support CUDA 11.2 only.
 
-| Field | Default | Explanation |
-|---|---|---|
-| `hpc.gpu` | `''` | Request a specific GPU type (e.g. `"nvidia_a100-sxm4-40gb:1"`); usually not needed. `scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'` lists the available types. |
-| `hpc.partition` | `''` | Queue partition. The Donders cluster offers `gpu40g` (GPUs with > 40 GB vRAM), which should be used for most thermal simulations. |
-| `hpc.reservation` | `''` | Reserved queue, if you have one. |
+`hpc.gpu` requests a specific GPU type and is usually not needed. On the Donders cluster, set `hpc.partition: 'gpu40g'` (GPUs with more than 40 GB vRAM) for most thermal simulations; `hpc.reservation` selects a reserved queue, if you have one. See [HPC parameters](doc_parameters_run.md#high-performance-computing-hpc).
 
 ??? note "Benchmark data, Nvidia GPUs"
     These are potentially unrepresentative benchmarks run on a 256 × 216 × 192 mm grid, with minor variations depending on transducer placement.
@@ -99,26 +102,6 @@ PRESTUS is a MATLAB toolbox and only supports *Nvidia GPUs*. When Nvidia GPUs ar
     | P100 16 GB | Out of RAM | ??? | |
     | L40S 47 GB | ?? GB | ~4 s/trial (400 trials: ~45 mins) | |
 
-## Resource Estimates from Earlier Runs
-
-Each run that simulates appends one line to `<path.sim>/run_stats.jsonl`. The Nexus shows an estimate from these lines on the Run tab (*Show deployment, save & resource details*). Without the Nexus:
-
-```
-cd <PRESTUS>/nexus
-python -m prestus_nexus.estimate path/to/study.yaml [--stats path/to/run_stats.jsonl]
-```
-
-The estimate uses earlier runs with the same `simulation.code_type`, `acoustic_backend`, `simulation.medium` and `grid.resolution_mm`, on the same `hpc.partition` if there are any, else on any partition. It reports the median and maximum of:
-
-- **Acoustic simulation time**, as recorded.
-- **Thermal simulation time**: seconds per thermal step × the steps of the current `timing.*` protocol.
-- **Peak RAM** of the job.
-
-Segmentation, pseudo-CT, [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain) preprocessing and queue wait are not estimated. Estimates appear once runs of the project have finished, and get better as more runs are recorded.
-
-??? note "What `run_stats.jsonl` records"
-    Each line holds the acoustic grid voxels and time steps, thermal voxels and steps, the acoustic and thermal simulation durations, the run total, solver (`simulation.code_type`, `acoustic_backend`), medium, resolution, `hpc.partition`, node, GPU model and peak RAM. Runs that reuse a cached acoustic result, dry runs, and runs with the stage off record nothing for that stage. Peak RAM is the MATLAB process high-water mark, or under SLURM the job cgroup peak, which includes the k-Wave C++ binary and BabelBrain. It is recorded on Linux only. Nothing is sent anywhere; this is separate from [telemetry](doc_telemetry.md).
-
 ## Post-Job Resource Report
 
 After a SLURM job finishes, `hpc_job_report` writes `log_hpc/sub-XXX_job<ID>_report.txt` with wall time, CPU/GPU allocation, peak memory, a CO₂e estimate and, where billing rates are known, the cost. The report runs from `hpc_wait_for_completion` when `hpc.wait_for_job` is set, and otherwise as a small dependent job. `memory_efficiency` and the `--mem` suggestion use `peak_mem_gb`.
@@ -135,30 +118,3 @@ After a SLURM job finishes, `hpc_job_report` writes `log_hpc/sub-XXX_job<ID>_rep
 
     For local runs, each BabelBrain run also prints one summary line to the pipeline log, e.g.
     `[memory_summary] BabelBrain: BabelBrain peak=7.2 GB | MATLAB peak=3.1 GB | cgroup peak=10.5 GB, limit=64.0 GB`.
-
-## Donders HPC
-
-The Donders cluster runs SLURM. Current resource usage is shown at https://grafana.dccn.nl/ (*intranet required*); the [HPC wiki](https://hpc.dccn.nl/) (*intranet required*) has the full documentation. The workflows below start an interactive session from which you submit PRESTUS jobs.
-
-??? note "Donders HPC, SLURM workflow"
-    1. Log in to an access node (`mentat005`, `mentat006`, `mentat007`): `ssh abcxyz@mentat005.dccn.nl`
-    2. Start the VNC manager (`vncmanager - 2`) and connect via [VNC](https://intranet.donders.ru.nl/index.php?id=vnc00&no_cache=1&sword_list%5B%5D=VNC). [TigerVNC](https://tigervnc.org/): enter ip [e.g. `mentat007.dccn.nl:12`]
-    3. Load SLURM: `module load slurm`
-    4. Start an interactive job:
-        - Without MATLAB GUI: `srun --mem=8gb --time=01:00:00 --x11 -p interactive --pty bash -i`
-        - With MATLAB GUI: `srun --partition=gpu --gres=gpu:1 --mem=8G --time=01:00:00 --x11 --pty /bin/bash -i`
-    5. Start MATLAB: `module load matlab/R2023b` then `matlab`. SLURM supports [CUDA](https://developer.nvidia.com/cuda/toolkit) 12.2, see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/50). The submitted jobs load `matlab/R2023b` whatever version this session runs, because R2024+ can fail to identify partitioned GPUs ([GPU support](#gpu-support)).
-    6. Run PRESTUS with `platform: slurm` (or `auto`). Check job status with `squeue`. For PBS→SLURM command migration see [this documentation](https://hpc.dccn.nl/docs/cluster_howto/compute_slurm.html#migrating-from-torque-pbs-to-slurm).
-
-??? note "Donders HPC, PBS workflow"
-    1. Log in to an access node (`mentat001`, `mentat002`, `mentat003`, `mentat004`): `ssh abcxyz@mentat004.dccn.nl`
-    2. Start the VNC manager (`vncmanager - 2`) and connect via [VNC](https://intranet.donders.ru.nl/index.php?id=vnc00&no_cache=1&sword_list%5B%5D=VNC). TigerVNC: enter ip [e.g. `mentat004.dccn.nl:12`]
-    3. Load QSUB: `module load qsub`
-    4. Start an interactive job:
-
-        ```
-        qsub -I -l 'nodes=1:gpus=1,feature=cuda,walltime=05:00:00,mem=24gb,reqattr=cudacap>=5.0'
-        ```
-
-    5. Start MATLAB: `module load matlab/R2022b` then `matlab`. PBS only supports CUDA 11.2, which is dropped from R2023 on; see [this issue](https://github.com/Donders-Institute/PRESTUS/issues/50).
-    6. Run PRESTUS with `platform: qsub` (or `auto`). Check job status with `qstat`.

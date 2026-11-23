@@ -1,6 +1,6 @@
 # Localite Ingestion: GUI and Script Workflows
 
-![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+![Pipeline steps; this page belongs to 3 Placement](assets/figures/fig_stage-strip-placement_diagram.svg){ .stage-strip }
 
 [Localite](https://www.localite.de/) placement simulates the transducer pose the operator recorded, and ingestion decides which recorded series become simulated targets and what each is called. A series kept by mistake, or a name given to the wrong series, puts the simulated focus on another target than the one stimulated. This page turns raw Localite exports into the named, averaged targets that `placement.mode: localite` reads.
 
@@ -8,14 +8,14 @@ On this page:
 
 - [Shared Settings File](#shared-settings-file): the config keys that the GUI and scripts share.
 - [Series Naming](#series-naming): the naming rule and the label map for inconsistent operator labels.
-- [GUI Workflow](#gui-workflow): single sessions, batches and the MNI view in `neuronav_gui`.
+- [GUI Workflow](#gui-workflow): single sessions, batches, and the MNI view in `neuronav_gui`.
 - [Script Workflow](#script-workflow): batch ingestion with `neuronav_ingest_batch` and the summary CSV.
 
 !!! note "At a glance"
     - **When you need it:** Once per session (or in batch for a whole study) before simulating recorded poses.
     - **Before you start:** The raw Localite exports (`path.localite_raw`).
 
-Ingestion turns recorded Localite positions into named, averaged targets per subject and session (folder layout and output files: [Localite file layout](doc_placement_neuronav_coordinates.md#localite-file-layout)). Run it in `neuronav_gui`, on the PRESTUS Nexus's *Placement ▸ Localite* page (settings from the study config; see [Localite page](doc_nexus_calibration-localite.md#localite-page)), or scripted with `neuronav_ingest_batch`. All three run the same functions on the same settings:
+Ingestion turns recorded Localite positions into named, averaged targets per subject and session (folder layout and output files: [Localite file layout](doc_placement_neuronav_coordinates.md#localite-file-layout)). Run it in `neuronav_gui`, on the PRESTUS Nexus's *Placement ▸ Localite* page (settings from the study config; see [Localite page](doc_nexus_tabs.md#localite-page)), or scripted with `neuronav_ingest_batch`. All three run the same functions on the same settings:
 
 | | GUI (`neuronav_gui`) | Script (`neuronav_ingest_batch`) |
 |---|---|---|
@@ -93,7 +93,7 @@ yaml.dumpFile('target_labels.yaml', struct('neuronav', struct('target_labels', m
 
 In the GUI, the **Batch** window shows the same label table: **Group labels by stem** fills the target column of unmapped labels from their stems (existing mappings are kept), **Use labels as found** resets all of them, and any cell can be edited. Only labels whose target differs from the label end up in the saved map. The map applies to single-session naming too.
 
-Check the name sources afterwards: the GUI's **Name from** column and the summary's `rule`, `label`, `axis_dist_mm` and `depth_mm` columns show where each name came from. A match far from the usual focal depth usually means the intended target is missing from the export; narrow `target_depth_mm` to reject such matches.
+Check the name sources afterwards: the GUI's **Name from** column and the summary's `rule`, `label`, `axis_dist_mm`, and `depth_mm` columns show where each name came from. A match far from the usual focal depth usually means the intended target is missing from the export; narrow `target_depth_mm` to reject such matches.
 
 ## GUI Workflow
 
@@ -109,7 +109,7 @@ neuronav_gui(parameters)       % pre-fill from a parameter struct
 2. **▶ Detect series** detects the series into a temporary folder; nothing is written yet. Check the series table and the plots.
 3. Tick the series to keep, check each target name (and optionally set a `#rrggbb` colour), then **✓ Write outputs**. Changing any input after detection disables writing until series are detected again.
 
-??? note "Settings read from a config, the series table and the pulse filter"
+??? note "Settings read from a config, the series table, and the pulse filter"
     Settings read from a config (all optional): `path.localite_raw` (falls back to `path.localite`), `path.localite_post`, `placement.localite.loc_folder` / `voxel_size` / `expected_segment_length` / `session`, `io.overwrite_files`, `neuronav.coil_map`.
 
     The series table lists every detected series with pulse count, position deviation (mm from the series mean position), rotation deviation (rad from the mean orientation) and a flag for untracked series (all positions at the origin). The tabs show a 3-D plot of every pulse position (small dot = one pulse, ring = series mean, arrow = beam direction; no arrow for GUMMarkers), per-pulse deviation traces (one dot per pulse), all raw marker files found with the one used marked, and the captured log/warnings.
@@ -134,7 +134,7 @@ A pose aimed at a target missing from the export takes the nearest remaining one
 
 ### Many Sessions
 
-**▦ Batch…** opens a window that scans the raw root and lists every session with its marker files, planned labels and whether it is already ingested.
+**▦ Batch…** opens a window that scans the raw root and lists every session with its marker files, planned labels, and whether it is already ingested.
 
 1. Tick sessions (**All**, **None**, **Not yet ingested**, or individually).
 2. Check the label table on the right; group or rename targets.
@@ -153,8 +153,8 @@ neuronav_ingest_batch(p, {'sub-001', 'ses-01'; 'sub-002', 'ses-01'});
 
 **◎ MNI view…** (in the Batch window) maps the summary CSV to MNI space and plots transducer, focus and beam axis of every subject and session over an MNI head outline.
 
-??? note "Loading, filtering and saving the MNI view"
-    **MNI view** reads the summary CSV (default `<output root>/neuronav_ingest_summary.csv`, i.e. every session ingested so far) and, on **▶ Load & map to MNI**, maps each target's transducer, focus and Localite pose to MNI mm. Set **SimNIBS root** (`path.seg`); the planning T1 is found as in the main window (`path.localite_t1`). Subjects without a warp or planning T1 are listed in the status line and left out. The 3-D plot shows transducers (●), foci (◆), the beam axis between them and optionally the tracker pose (▲) over a head outline. Tick or untick subjects, sessions and targets in the three tables, colour by target, subject or session, and hover a point for its subject, session and target. **⬇ Save CSV…** writes the summary with the MNI columns.
+??? note "Loading, filtering, and saving the MNI view"
+    **MNI view** reads the summary CSV (default `<output root>/neuronav_ingest_summary.csv`, i.e. every session ingested so far) and, on **▶ Load & map to MNI**, maps each target's transducer, focus, and Localite pose to MNI mm. Set **SimNIBS root** (`path.seg`); the planning T1 is found as in the main window (`path.localite_t1`). Subjects without a warp or planning T1 are listed in the status line and left out. The 3-D plot shows transducers (●), foci (◆), the beam axis between them, and optionally the tracker pose (▲) over a head outline. Tick or untick subjects, sessions, and targets in the three tables, colour by target, subject, or session, and hover a point for its subject, session, and target. **⬇ Save CSV…** writes the summary with the MNI columns.
 
 ??? note "Warp and head outline"
     The mapping uses `neuronav_summary_to_mni`: planning T1 → `m2m_<sub>/final_tissues.nii.gz` → `m2m_<sub>/toMNI/Conform2MNI_nonl.nii.gz`. The outline is taken from **Head template**: [SimNIBS](https://simnibs.github.io/simnibs/)'s `MNI152_T1_1mm.nii.gz` when a SimNIBS installation is found (`startup.simnibs_bin_path`, or the default install folder); left empty, it is taken from the first mapped subject's `final_tissues_MNI.nii.gz`.
@@ -199,7 +199,7 @@ summary = neuronav_ingest_batch(parameters, todo);
 |---|---|
 | `sub`, `ses`, `target` | Session and target name (empty when nothing was written) |
 | `series_index`, `coil` | Detected series (as in `placement.localite.position`) and coil index |
-| `rule` | `coil_map`, `heuristic` or `default` (see naming) |
+| `rule` | `coil_map`, `heuristic`, or `default` (see naming) |
 | `label`, `label_source` | Planned-target label as recorded, and the file it came from |
 | `axis_dist_mm`, `depth_mm` | Distance of that target from the beam axis, and its depth along it |
 | `n_pulses`, `pos_dev_mm`, `rot_dev_rad` | Series QC (as in the JSON sidecar) |
@@ -209,6 +209,6 @@ summary = neuronav_ingest_batch(parameters, todo);
 | `trans_vox_*`, `focus_vox_*` | The same in planning-T1 voxels |
 | `xml`, `status` | Ingested file and outcome |
 
-Transducer, focus and voxel coordinates need the transducer focal distance (`transducer.focal_distance_ep` or `_bowl`) and the planning T1 (`path.localite_t1`, pattern `path.localite_t1_pattern`); when either is missing they are `NaN` and `status` says why. The pose columns are always filled.
+Transducer, focus, and voxel coordinates need the transducer focal distance (`transducer.focal_distance_ep` or `_bowl`) and the planning T1 (`path.localite_t1`, pattern `path.localite_t1_pattern`); when either is missing they are `NaN` and `status` says why. The pose columns are always filled.
 
 `placement.mode: 'localite'` reads the ingested files for simulation.

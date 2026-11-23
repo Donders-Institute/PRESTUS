@@ -255,8 +255,21 @@
   function fgL()  { return getComputedStyle(document.body).getPropertyValue('--md-default-fg-color--light')  || '#999'; }
   function gridC(){ return getComputedStyle(document.body).getPropertyValue('--md-default-fg-color--lightest')|| '#e0e0e0'; }
 
+  // Rows are monthly totals: each carries its event count in n.
   function countBy(arr, fn) {
-    return arr.reduce((a, r) => { const v = fn(r); a[v] = (a[v]||0)+1; return a; }, {});
+    return arr.reduce((a, r) => { const v = fn(r); a[v] = (a[v]||0) + r.n; return a; }, {});
+  }
+
+  // All rows of a view, 1000 per request (the API's row cap), in row_id order.
+  async function fetchAll(client, view) {
+    const rows = [], page = 1000;
+    for (let from = 0; ; from += page) {
+      const { data, error } = await client.from(view).select('*')
+        .order('row_id').range(from, from + page - 1);
+      if (error) return { data: null, error };
+      rows.push(...data);
+      if (data.length < page) return { data: rows, error: null };
+    }
   }
 
   function doughnutChart(id, labels, data) {
@@ -270,11 +283,13 @@
   async function init() {
     const client = supabase.createClient(URL, KEY);
 
-    const { data: rawData, error } = await client
-      .from('events')
-      .select('received_at,event,status,duration_s,uuid,sim_platform,code_type,pipeline_mode,medium,pct_enabled,prestus_ver,prestus_hash,run_type')
-      .in('event', ['run_end', 'run_error'])
-      .limit(5000);
+    // Monthly totals (public.usage_summary) and the installs lower bound
+    // (public.usage_installs); the page never reads individual events.
+    const [{ data: rawData, error: e1 }, { data: inst, error: e2 }] = await Promise.all([
+      fetchAll(client, 'usage_summary'),
+      client.from('usage_installs').select('installs_min'),
+    ]);
+    const error = e1 || e2;
 
     document.getElementById('telem-loading').style.display = 'none';
 
@@ -296,15 +311,16 @@
     const data = rawData.filter(r => runType(r) === 'deployment');
 
     // ── Stat cards ─────────────────────────────────────────────────
-    const total     = data.length;
+    const total     = data.reduce((a, r) => a + r.n, 0);
     const layeredRuns = data.filter(r => classifyMedium(r).startsWith('layered'));
+    const sumN = rows => rows.reduce((a, r) => a + r.n, 0);
     const layeredSucc = layeredRuns.filter(r => r.status === 'success');
-    const successPct  = layeredRuns.length ? Math.round(layeredSucc.length / layeredRuns.length * 100) + '%' : '—';
-    const users     = new Set(data.map(r => r.uuid).filter(Boolean)).size;
+    const successPct  = sumN(layeredRuns) ? Math.round(sumN(layeredSucc) / sumN(layeredRuns) * 100) + '%' : '—';
+    const installs  = inst?.[0]?.installs_min ?? '—';
     const versions  = new Set(data.map(resolveVersion).filter(v => v !== 'unknown')).size;
     const technicalSucc = technicalData.filter(r => r.status === 'success');
-    const technicalPct  = technicalData.length
-      ? Math.round(technicalSucc.length / technicalData.length * 100) + '%'
+    const technicalPct  = sumN(technicalData)
+      ? Math.round(sumN(technicalSucc) / sumN(technicalData) * 100) + '%'
       : '—';
 
     const statsEl = document.getElementById('telem-stats');
@@ -313,7 +329,7 @@
       ['Completed runs', total],
       ['Success rate (layered)', successPct],
       ['Versions',       versions],
-      ['Unique users',   users],
+      ['Installs (at least)', installs],
       ['Technical pass rate', technicalPct],
     ].forEach(([label, val]) => {
       statsEl.insertAdjacentHTML('beforeend',
@@ -324,13 +340,13 @@
 
     // ── Simulations per month, stacked by tag family ───────────────
     const allVersions = [...new Set(data.map(resolveTagFamily))].filter(v => v !== 'unknown').sort((a, b) => a === 'untagged' ? -1 : b === 'untagged' ? 1 : a.localeCompare(b));
-    const monthSet = new Set(data.map(r => r.received_at?.slice(0, 7)).filter(Boolean));
+    const monthSet = new Set(data.map(r => r.month).filter(Boolean));
     const months   = [...monthSet].sort();
 
     const mvCount = {};
     data.forEach(r => {
-      const key = r.received_at?.slice(0, 7) + '|' + resolveTagFamily(r);
-      if (key) mvCount[key] = (mvCount[key] || 0) + 1;
+      const key = r.month + '|' + resolveTagFamily(r);
+      mvCount[key] = (mvCount[key] || 0) + r.n;
     });
 
     new Chart(document.getElementById('tc-timeline'), {
@@ -385,19 +401,19 @@
     const mc = countBy(data, classifyMedium);
     doughnutChart('tc-medium', Object.keys(mc), Object.values(mc));
 
-    // ── Mean run duration by medium (all completed runs) ─────────
+    // ── Mean run duration by medium (runs that report a duration) ─
     const durByMedium = {};
-    data.filter(r => r.duration_s).forEach(r => {
+    data.filter(r => r.n_duration > 0).forEach(r => {
       const med = classifyMedium(r);
-      if (!durByMedium[med]) durByMedium[med] = [];
-      durByMedium[med].push(r.duration_s / 60);
+      if (!durByMedium[med]) durByMedium[med] = { sum: 0, n: 0 };
+      durByMedium[med].sum += r.duration_s_sum / 60;
+      durByMedium[med].n   += r.n_duration;
     });
     const durOrder  = ['water', 'phantom', 'layered', 'layered + pCT'];
     const durLabels = [...durOrder.filter(m => durByMedium[m]),
                        ...Object.keys(durByMedium).filter(m => !durOrder.includes(m))];
     const durMeans  = durLabels.map(m => {
-      const vals = durByMedium[m];
-      return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
+      return +(durByMedium[m].sum / durByMedium[m].n).toFixed(1);
     });
     new Chart(document.getElementById('tc-duration'), {
       type: 'bar',
@@ -423,8 +439,8 @@
     data.forEach(r => {
       const med = classifyMedium(r);
       if (!srByMedium[med]) srByMedium[med] = { ok: 0, total: 0 };
-      srByMedium[med].total++;
-      if (r.status === 'success') srByMedium[med].ok++;
+      srByMedium[med].total += r.n;
+      if (r.status === 'success') srByMedium[med].ok += r.n;
     });
     const srOrder  = ['water', 'phantom', 'layered', 'layered + pCT'];
     const srLabels = [...srOrder.filter(m => srByMedium[m]),

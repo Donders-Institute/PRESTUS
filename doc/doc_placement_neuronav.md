@@ -1,6 +1,6 @@
 # Neuronavigation Read-In
 
-![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+![Pipeline steps; this page belongs to 3 Placement](assets/figures/fig_stage-strip-placement_diagram.svg){ .stage-strip }
 
 PRESTUS reads transducer poses recorded with the [Localite](https://www.localite.de/) neuronavigation system and simulates them post hoc, to verify the focus of the realised stimulation. The recorded pose decides where the simulated transducer sits and where its beam points, so the file you read it from and the offset from the tracker to the transducer shape every focus position and intensity the simulation reports. An example demo (without data) is in `examples/demo_localite.m`.
 
@@ -18,7 +18,7 @@ Localite data pass through two stages. **Ingestion** (`neuronav_gui`, or `neuron
 Subpages:
 
 - [Placing from a Recorded Pose](doc_placement_neuronav_recorded-pose.md): automatic and file mode, several transducers, many sessions; for anyone setting up a Localite run.
-- [Localite Files, Offset and Coordinates](doc_placement_neuronav_coordinates.md): folder layout and path keys, the tracker-to-bowl offset and coordinate transforms; for anyone setting up paths, checking the transducer offset or converting positions to voxels or MNI.
+- [Localite Files, Offset, and Coordinates](doc_placement_neuronav_coordinates.md): folder layout and path keys, the tracker-to-bowl offset, and coordinate transforms; for anyone setting up paths, checking the transducer offset, or converting positions to voxels or MNI.
 - [Localite Ingestion: GUI and Script Workflows](doc_placement_neuronav_workflows.md): turning raw exports into named, averaged targets in `neuronav_gui` or with `neuronav_ingest_batch`; for anyone ingesting sessions.
 - [Named Target Coordinates](doc_placement_neuronav_targets.md): resolving several named targets per session from several sources in your own script; for studies with more than one target per subject.
 
@@ -43,7 +43,7 @@ The Localite file types answer different questions. The wrong one silently misma
 - **The reported focus position is axis-projected, not a stored coordinate.** `localite_matrix_to_positions` computes `focus_pos = trans_pos + focal_distance_bowl * ref_vec`, where `trans_pos = ref_pos + d * ref_vec` is the bowl rear centre and `d` is the resolved [transducer offset](doc_placement_neuronav_coordinates.md#transducer-offset-tracker_to_bowl_mm) (with the default exit-plane origin this equals `ref_pos + focal_distance_ep * ref_vec`): it projects forward from the tracked position along the tracked beam axis by the calibrated focal distance. This keeps the reported target self-consistent with the reported angle. A separately clicked static Target point need not lie on the tracked beam axis.
 
 ??? note "Localite XML file formats"
-    All formats are parsed by `neuronav_compute_series_statistics`, which handles single markers, repeated trigger trains and multi-position recordings alike.
+    All formats are parsed by `neuronav_compute_series_statistics`, which handles single markers, repeated trigger trains, and multi-position recordings alike.
 
     **TriggerMarkers.** Multiple triggers can be sent during stimulation to record the transducer location over time. Files are named `TMSTrigger/TriggerMarkers_Coil0_<timestamp>`. Recorded locations are averaged within each position series (identified by time-gap segmentation). Multiple positions per recording session are supported.
 

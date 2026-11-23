@@ -1,15 +1,19 @@
 # Reading Your Results
 
-![Pipeline steps; this page belongs to 6 Outputs](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-outputs_diagram.svg){ .stage-strip }
+![Pipeline steps; this page belongs to 7 Outputs](assets/figures/fig_stage-strip-outputs_diagram.svg){ .stage-strip }
 
 A finished run leaves a folder of files. Before you use its numbers, check that the run simulated the placement and intensity you intended, and compare its exposure with the safety reference levels. This page lists the files to open first, the checks in order, and how to read the safety summary; every file and column is described in [Outputs & Reports](doc_outputs.md), and terms in the [Glossary](doc_glossary.md).
 
 On this page:
 
-- [Files to Open First](#files-to-open-first): the report, placement report, metrics table and maps to open first.
-- [Checks Before Using Results](#checks-before-using-results): placement, intensity, safety reference levels and unusual results.
+- [Files to Open First](#files-to-open-first): the report, placement report, metrics table, and maps to open first.
+- [Checks Before Using Results](#checks-before-using-results): placement, intensity, safety reference levels, and unusual results.
 - [Uncertainty of the Estimate](#uncertainty-of-the-estimate): how to see how much results depend on tissue properties.
 - [Methods Text](#methods-text): the methods paragraph the report writes for you.
+
+!!! note "At a glance"
+    - **When you need it:** After every run, before you use or report its numbers.
+    - **Before you start:** A finished run and its output folder (`<path.sim>/sub-XXX/`).
 
 ## Files to Open First
 
@@ -17,7 +21,7 @@ Results are in `<path.sim>/sub-XXX/`. Open these first:
 
 | File | What it is |
 |---|---|
-| `sub-XXX_<medium>_report<affix>.html` | The simulation report: safety summary, key numbers, figures and the run log. Start here. |
+| `sub-XXX_<medium>_report<affix>.html` | The simulation report: safety summary, key numbers, figures, and the run log. Start here. |
 | `sub-XXX_placement_<mode><affix>.html` | The placement report: where the transducer and the target ended up, drawn on the T1 (head simulations). |
 | `sub-XXX_<medium><affix>.csv` | All metrics in one table, for your own analysis. |
 | `nii/` | 3D maps (intensity, pressure, MI, temperature) in the participant's T1 space and in MNI space, to view in any [NIfTI](https://nifti.nimh.nih.gov/) viewer. |
@@ -31,14 +35,14 @@ Results are in `<path.sim>/sub-XXX/`. Open these first:
 Open the placement report and the report's figures:
 
 - **The transducer sits on the scalp**, not inside the head or far from it, and points at the target.
-- **The focus lies at the target.** The report's intensity overlay should show the hot spot in the target region. In the table, compare `real_focal_distance_mm` (where the peak actually is) with your focal depth setting, and `Ipa_target` (intensity at the target) with `Isppa_brain` (the peak in the brain). A peak far from the target means the placement or the focal depth setting needs a second look.
-- **The configuration summary** in the report lists the transducer, focal depth, target intensity and medium that were used. Check that they are the ones you intended.
+- **The focus lies at the target.** The report's intensity overlay should show the hot spot in the target region. In the table, compare `real_focal_distance_mm` (where the peak actually is) with your [focal depth setting](doc_glossary.md#focal-depth-setting), and `Ipa_target` (intensity at the target) with `Isppa_brain` (the peak in the brain). A peak far from the target means the placement or the focal depth setting needs a second look.
+- **The configuration summary** in the report lists the transducer, focal depth, target intensity, and medium that were used. Check that they are the ones you intended.
 
 For many runs, the targeting analysis (`sub-XXX_<medium><affix>_targeting.csv`) measures the distance between the simulated and the planned focus ([Targeting accuracy](doc_group.md#targeting-accuracy)).
 
 ### 2. Intensity in the Brain
 
-- `transducer.target_isppa_wcm2` is the **free-water** intensity (30 W/cm² by default). The intensity **in the brain** (`Isppa_brain`, `Ipa_target`) is lower, mostly because the skull reflects and absorbs ultrasound. How much lower depends on the person, the skull thickness and the angle of incidence.
+- `transducer.target_isppa_wcm2` is the **free-water** intensity (30 W/cm² by default). The intensity **in the brain** (`Isppa_brain`, `Ipa_target`) is lower, mostly because the skull reflects and absorbs ultrasound. How much lower depends on the person, the skull thickness, and the angle of incidence.
 - If the run log shows `prestus:isppa:largeScale`, the field was scaled by more than 4× (or less than 0.25×) from the simulated drive. The result is then an extrapolation; check that it is still realistic for your device.
 
 ### 3. Safety Reference Levels
@@ -55,14 +59,14 @@ The top of the report shows a **safety verdict** and one card per metric. Each c
 | Metric | Reference level |
 |---|---|
 | Mechanical index, transcranial (`MI_tc`) or in free water (`MI`) | 1.9 |
-| Peak pressure (`Psptp`) | 2 MPa |
 | Temperature rise (`riseT_*`) | 2 °C |
+| Temperature rise above a fixed 37 °C start (`riseT37_*`) | 2 °C |
 | Maximum temperature (`maxT_*`) | 39 °C |
 | Thermal dose (`CEM43_*`) | brain 2, skull 16, skin 21 min |
 
 A red card does **not** by itself mean the protocol is unsafe, and the verdict then says *inspect* rather than *fail*. The ITRUSST thermal criteria are alternatives: an exposure qualifies as non-significant risk through the temperature rise, the maximum temperature **or** the thermal dose. Check the flagged values against the criteria that apply to your protocol, and read the original consensus for details. PRESTUS reports the comparison; it makes no safety recommendation of its own.
 
-Thermal metrics only appear when a thermal simulation ran (`modules.run_heating_sims: 1`, with a sonication protocol in `timing.*`). The report shows the CEM43 form selected by `thermal.cem43_iso` ([Thermal](doc_simulations-thermal.md#thermal-dose-cem43-calculation)).
+Thermal metrics only appear when a thermal simulation ran (`modules.run_heating_sims: 1`, with a sonication protocol in `timing.*`). The report shows the [CEM43](doc_glossary.md#cem43) form selected by `thermal.cem43_iso` ([Thermal](doc_simulations-thermal.md#thermal-dose-cem43-calculation)).
 
 ### 4. Unusual Results
 
@@ -71,7 +75,7 @@ Thermal metrics only appear when a thermal simulation ran (`modules.run_heating_
 | The highest intensity is in the skin or skull rather than the brain | Expected to some degree near the transducer; a hot spot at the scalp can also mean poor contact or a transducer placed into the head. Check the placement report. |
 | The focus is much shallower or deeper than the setting | Strong skull refraction, or a target depth outside the transducer's range (`min_foc`–`max_foc` of the device). |
 | Warnings about points per wavelength (PPW) in the log | The grid is too coarse for the frequency; results near the focus may be inaccurate ([Spatial and temporal sampling](doc_simulations-acoustic.md#spatial-and-temporal-sampling)). |
-| `load_transducer_from_library:uncalibratedAmplitude` in the log | The transducer's drive at this depth was not checked in k-Wave; absolute intensities carry that uncertainty ([Free-water k-Wave drive calibration](doc_calibration_refinement.md#free-water-k-wave-drive-calibration)). |
+| `load_transducer_from_library:uncalibratedAmplitude` in the log | The transducer's drive at this depth was not checked in k-Wave; absolute intensities carry that uncertainty ([Free-water k-Wave drive calibration](doc_calibration_hydrophone-profiles.md#free-water-k-wave-drive-calibration)). |
 
 More known messages and their fixes are in [Troubleshooting](doc_troubleshooting.md).
 
@@ -81,4 +85,4 @@ Simulated intensities and temperatures depend on assumed tissue properties, whic
 
 ## Methods Text
 
-The report contains an automatically written methods paragraph (with references) describing the software, transducer, grid, tissue properties, protocol and resulting exposure. Copy it with *Copy methods text*, and check it against your study before using it in a manuscript.
+The report contains an automatically written methods paragraph (with references) describing the software, transducer, grid, tissue properties, protocol, and resulting exposure. Copy it with *Copy methods text*, and check it against your study before using it in a manuscript.

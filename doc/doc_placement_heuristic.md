@@ -1,8 +1,8 @@
 # Heuristic Transducer Placement
 
-![Pipeline steps; this page belongs to 2 Placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/fig_stage-strip-placement_diagram.svg){ .stage-strip }
+![Pipeline steps; this page belongs to 3 Placement](assets/figures/fig_stage-strip-placement_diagram.svg){ .stage-strip }
 
-When only a target is known, the transducer position still has to be chosen, and it decides how much skull lies in front of the transducer. `placement.mode: 'heuristic'` searches the skull surface for a transducer position whose geometric focus reaches an MNI target, keeps candidates whose exit plane intersects little skull and selects the one closest to the target. Besides the target and the focal depth (`transducer.focal_distance_ep` or `focal_distance_bowl`), which sets the search radius, no manual input is needed, which suits automatic end-to-end workflows.
+When only a target is known, the transducer position still has to be chosen, and it decides how much skull lies in front of the transducer. `placement.mode: 'heuristic'` searches the skull surface for a transducer position whose geometric focus reaches an MNI target, keeps candidates whose [exit plane](doc_glossary.md#exit-plane) intersects little skull and selects the one closest to the target. Besides the target and the focal depth (`transducer.focal_distance_ep` or `focal_distance_bowl`), which sets the search radius, no manual input is needed, which suits automatic end-to-end workflows.
 
 On this page:
 
@@ -14,7 +14,7 @@ On this page:
 
 !!! note "At a glance"
     - **When you need it:** When you have a target but no planned transducer position, e.g. for many subjects at once.
-    - **Before you start:** A [SimNIBS](https://simnibs.github.io/simnibs/) segmentation, an MNI target and the focal depth (`transducer.focal_distance_ep`).
+    - **Before you start:** A [SimNIBS](https://simnibs.github.io/simnibs/) segmentation, an MNI target, and the focal depth (`transducer.focal_distance_ep`).
 
 ```yaml
 placement:
@@ -24,7 +24,7 @@ placement:
     target_name: 'target'         # used in output file names
 ```
 
-The search converts the target to subject space with SimNIBS tools, finds candidate positions on the skull by expanding a sphere, scores each candidate (target distance, intersection with skin, mean and variance of the distances to skin and skull), optionally removes positions over the ears, and selects one position by the criteria below. Candidates and the selected position are written to the [placement run folder](doc_outputs.md#where-outputs-live), `<path.placement>/sub-XXX/heuristic/<target_name>/`; a copy of the selected position also goes to `path.localite_export` when set. All parameters: [overview](doc_parameters.md#heuristic-placement-placementheuristic).
+The search converts the target to subject space with SimNIBS tools, finds candidate positions on the skull by expanding a sphere, scores each candidate (target distance, intersection with skin, mean and variance of the distances to skin and skull), optionally removes positions over the ears, and selects one position by the criteria below. Candidates and the selected position are written to the [placement run folder](doc_outputs.md#where-outputs-live), `<path.placement>/sub-XXX/heuristic/<target_name>/`; a copy of the selected position also goes to `path.localite_export` when set. All parameters: [overview](doc_parameters_placement.md#heuristic-placement-placementheuristic).
 
 `transducer_positioning` runs the search; `transducer_positioning_start` calls it. Candidate positions come from an expanding sphere on the skull. For each candidate it computes the intersection proportion between the transducer and skin, mean and variance of the distances to skin and skull, and the geometric focus and exit plane positions. Each candidate's exit plane lies `placement.skin_gap_mm` (default 5 mm) off the scalp.
 
@@ -54,17 +54,11 @@ Optional. Transducer locations over the ears are not wanted. Candidates within `
 
 ## Position Selection
 
-The accepted intersection with the skull is set by `placement.heuristic.criterion_intersection`. If no candidate meets it, the criterion is expanded by `expand_step` (default: 1%) until one does. The keys below sit under `placement.heuristic`; an empty value (`[]`, the default) switches a criterion off.
+The accepted intersection with the skull is set by `placement.heuristic.criterion_intersection`. If no candidate meets it, the criterion is expanded by `expand_step` (default: 1%) until one does, up to 0.3; if none qualifies then, placement stops with an error. The keys below sit under `placement.heuristic`; an empty value (`[]`, the default) switches a criterion off.
 
-| Criterion | Default | Explanation |
-|:----------|---------------|-------------|
-| `criterion_intersection` | < 0.05 | [Fraction] Reduce skull traversal |
-| `criterion_skin_mean` | `[]` (off) | [Quantile] Short EP distance to skin |
-| `criterion_skull_mean` | `[]` (off) | [Quantile] Short EP distance to skull |
-| `criterion_skin_var` | `[]` (off) | [Quantile] Coherent transducer exit plane toward skin (e.g. little curvature) |
-| `criterion_skull_var` | `[]` (off) | [Quantile] Coherent transducer exit plane toward skull surface (irregular bone distorts phase and the wavefront) |
+Four further criteria, off by default, keep the candidates whose mean distance from the exit plane to skin or skull is short (`criterion_skin_mean`, `criterion_skull_mean`) or whose distance varies little across the exit plane (`criterion_skin_var`, `criterion_skull_var`), each as a quantile. See [Heuristic placement parameters](doc_parameters_placement.md#heuristic-placement-placementheuristic).
 
-Among the candidates that meet the criteria, the one closest to the target is selected. To place another candidate instead, set `placement.heuristic.candidate` to its `idx` in the candidate table; the criteria are then not applied (an `idx` the table does not hold stops the run). The Nexus *Heuristic* sub-tab sets it: it plots and lists the candidates of the last run, and *Place here* places the one you click, reusing the candidate table rather than recomputing it. The output table gives its coordinates in **voxel (grid space)**, **mm (Localite space)** and **mm (RAS+ space)**, based on the image header of the segmentation image.
+Among the candidates that meet the criteria, the one closest to the target is selected. To place another candidate instead, set `placement.heuristic.candidate` to its `idx` in the candidate table; the criteria are then not applied (an `idx` the table does not hold stops the run). The Nexus *Heuristic* sub-tab sets it: it plots and lists the candidates of the last run, and *Place here* places the one you click, reusing the candidate table rather than recomputing it. The output table gives its coordinates in **voxel (grid space)**, **mm (Localite space)**, and **mm (RAS+ space)**, based on the image header of the segmentation image.
 
 !!! warning
     Localite mm coordinates assume that the Localite planning image has `canonical_affine_transform` applied (see [Localite planning image](#localite-planning-image)). They are the 0-based voxel indices ([MATLAB](https://www.mathworks.com/products/matlab.html) index − 1) rescaled by the voxel sizes in the header, with no affine transformation. Always verify coordinates visually.
@@ -105,7 +99,7 @@ Among the candidates that meet the criteria, the one closest to the target is se
 
 PRESTUS generates an overview of the selected transducer placement:
 
-![ex_heuristic_placement](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/ex_heuristic_placement.png)
+![Heuristic placement result: target and transducer on a coronal segmentation slice, and the transducer on the 3D scalp surface](https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/ex_heuristic_placement.png)
 
 If `path.localite_export` is set, a copy of the plot and the position table is also written to `<path.localite_export>/sub-XXX/` (`io.dir_localite_export`).
 

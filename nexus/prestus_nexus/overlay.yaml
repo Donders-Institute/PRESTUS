@@ -75,7 +75,7 @@ sections:
   layers:             {label: Tissue layers, icon: layers, sub: Which SimNIBS labels make up each simulated tissue., advanced: true, locked: true, lock_note: 'These map the SimNIBS charm labels onto the simulated tissues (skin, skull, brain, …). The defaults match charm''s labels; change them only for a different segmentation or a phantom, and report the mapping you used.', doc: doc_head-model.md#layer-mapping-and-smoothing}   # the SimNIBS charm labels per tissue
   timing:             {label: Sonication protocol, icon: pulse, sub: 'Pulse duration, repetition, and the length of the sonication.', doc: doc_simulations-thermal.md#protocol-timing}
   thermal:            {label: Thermal model, icon: thermometer, sub: 'Time step, sensors, and thermal dose of the heating simulation.', doc: doc_simulations-thermal.md#step-temperature-and-sensor-settings}
-  jwave:              {label: jwave options, icon: advanced, sub: Settings of the jwave solver., doc: doc_jwave_configuration.md#configuration-reference}
+  jwave:              {label: jwave options, icon: advanced, sub: Settings of the jwave solver., doc: doc_parameters_simulation.md#jwave-settings-jwave}
   babelbrain:         {label: BabelBrain options, icon: advanced, sub: Settings of the BabelBrain solver., doc: doc_babelbrain.md}
   elastic:            {label: Elastic skull options, icon: tissue_skull, sub: 'Shear waves in the skull, for the k-Wave elastic solver.', doc: doc_kwave_elastic.md#elastic-model-settings}
   time_reversal:      {label: Time reversal, icon: redo, sub: 'Refocusing, aberration report, and pose search by time reversal.', advanced: true, doc: doc_time_reversal.md#main-settings}
@@ -524,17 +524,17 @@ deprecated:
   calibration.optmethod: {use: calibration.opt_method, kind: rename, since: v0.6.0}
   calibration.seed: {use: calibration.opt_seed, kind: rename, since: v0.6.0}
   calibration.addEPdistance: {use: calibration.add_FDO, kind: rename, since: v0.6.0}
-  placement.plantus.additional_offset_mm: {use: placement.skin_gap_mm, kind: rename, since: v0.7-pre}
+  placement.plantus.additional_offset_mm: {use: placement.skin_gap_mm, kind: rename, since: v0.7.0}
   calibration.weights: {use: calibration.opt_weights, kind: convert, convert: calibration_weights, since: v0.6.0, note: "the meaning is inverted (now 0 = uniform, w >= 1 = Gaussian with SD = centre/w); set calibration.opt_weights"}
-  calibration.path_input_phase: {use: [], kind: removed, since: v0.7-pre, note: "no longer read"}
+  calibration.path_input_phase: {use: [], kind: removed, since: v0.7.0, note: "no longer read"}
   calibration.submit_medium: {use: [], kind: removed, since: v0.6.0, note: "calibration runs use platform"}
-  calibration.save_in_calibration_folder: {use: [], kind: removed, since: v0.7-pre, note: "outputs go to calibration.path_output, path_output_profiles and library_path"}
+  calibration.save_in_calibration_folder: {use: [], kind: removed, since: v0.7.0, note: "outputs go to calibration.path_output, path_output_profiles, and library_path"}
   calibration.interpolateToEP: {use: [], kind: removed, since: v0.6.0, note: "v0.5.0 overwrote it before use, so it had no effect"}
   calibration.fit_velocity_to_intensity: {use: [], kind: removed, since: v0.6.1, note: "the drive scales with sqrt(ISPPA)"}
-  calibration.opt_upper_velocity: {use: [], kind: removed, since: v0.7-pre, note: "the drive scales with sqrt(ISPPA)"}
-  calibration.opt_amp_validation: {use: [], kind: removed, since: v0.7-pre, note: "the drive scales with sqrt(ISPPA); kwave_drive_calibration calibrates each depth once"}
-  thermal.sensor_xy_halfsize: {use: [], kind: removed, since: v0.7-pre, note: "the thermal simulation records no sensor; heating results come from the full temperature field"}
-  thermal.record_t_at_every_step: {use: [], kind: removed, since: v0.7-pre, note: "the thermal simulation records no sensor; heating results come from the full temperature field"}
+  calibration.opt_upper_velocity: {use: [], kind: removed, since: v0.7.0, note: "the drive scales with sqrt(ISPPA)"}
+  calibration.opt_amp_validation: {use: [], kind: removed, since: v0.7.0, note: "the drive scales with sqrt(ISPPA); kwave_drive_calibration calibrates each depth once"}
+  thermal.sensor_xy_halfsize: {use: [], kind: removed, since: v0.7.0, note: "the thermal simulation records no sensor; heating results come from the full temperature field"}
+  thermal.record_t_at_every_step: {use: [], kind: removed, since: v0.7.0, note: "the thermal simulation records no sensor; heating results come from the full temperature field"}
   modules.report_style: {use: report.style, kind: rename, since: v0.7.0}
   modules.report_style_switcher: {use: report.style_switcher, kind: rename, since: v0.7.0}
   # Converted where they are read (source):
@@ -876,13 +876,13 @@ tabs:
     intro: The device and driving system, its geometry, drive level, and focal depth.
     sections: [transducer, tx_geometry, tx_drive, calibration]
     doc: doc_nexus_tabs.md#transducer-tab
-    subtab_docs: {Calibration: doc_nexus_calibration-localite.md#calibration-page}
+    subtab_docs: {Calibration: doc_nexus_tabs.md#calibration-page}
   - key: placement
     label: Placement
     intro: Where the transducer sits and where it focuses, from coordinates, neuronavigation, or planning tools.
     sections: [placement, neuronav]
     doc: doc_nexus_tabs.md#placement-viewer
-    subtab_docs: {Settings: doc_placement.md#choosing-a-placement-mode, Viewer: doc_nexus_tabs.md#placement-viewer, Beam axis: doc_nexus_tabs.md#placement-viewer, 3D: doc_nexus_tabs.md#placement-viewer, Localite: doc_nexus_calibration-localite.md#localite-page, PlanTUS: doc_placement_plantus.md#running-plantus, TUS entry: doc_placement_tus_entry.md}
+    subtab_docs: {Settings: doc_placement.md#choosing-a-placement-mode, Viewer: doc_nexus_tabs.md#placement-viewer, Beam axis: doc_nexus_tabs.md#placement-viewer, 3D: doc_nexus_tabs.md#placement-viewer, Localite: doc_nexus_tabs.md#localite-page, PlanTUS: doc_placement_plantus.md#running-plantus, TUS entry: doc_placement_tus_entry.md}
   - key: medium
     label: Medium
     intro: What the beam travels through.

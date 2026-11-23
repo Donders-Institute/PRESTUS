@@ -1,18 +1,33 @@
 # Sequential Simulations
 
-A sonication that follows another can start in tissue that is still warm from the first and adds to the thermal dose already accumulated. Run independently, each simulation starts from the baseline temperature and zero CEM43, so this carryover is missing. Sequential mode chains the runs so that each heating simulation starts from the end-of-run temperature and CEM43 maps of the previous one.
+A sonication that follows another can start in tissue that is still warm from the first and adds to the thermal dose already accumulated. Run independently, each simulation starts from the baseline temperature and zero [CEM43](doc_glossary.md#cem43), so this carryover is missing. Sequential mode chains the runs so that each heating simulation starts from the end-of-run temperature and CEM43 maps of the previous one.
 
 On this page:
 
-- [Basic usage](#basic-usage): passing follow-up configs to the pipeline.
-- [Cache reuse](#cache-reuse): which stages a follow-up run reuses and which it recomputes.
-- [Sequential simulation parameters](#sequential-simulation-parameters): the settings that carry the thermal state forward.
-- [Combining with uncertainty mode](#combining-with-uncertainty-mode): chaining each uncertainty variant.
-- [Output affix handling](#output-affix-handling): how files of each run and variant are named.
+- [Planning a Sequence in the Nexus](#planning-a-sequence-in-the-nexus): stances fired one after another, set up in one config.
+- [Basic Usage](#basic-usage): passing follow-up configs to the pipeline.
+- [Cache Reuse](#cache-reuse): which stages a follow-up run reuses and which it recomputes.
+- [Sequential Simulation Parameters](#sequential-simulation-parameters): the settings that carry the thermal state forward.
+- [Combining with Uncertainty Mode](#combining-with-uncertainty-mode): chaining each uncertainty variant.
+- [Output Affix Handling](#output-affix-handling): how files of each run and variant are named.
 
 !!! note "At a glance"
-    - **When you need it:** When you stimulate from different coordinates in sequence and want the cumulative thermal state (for stimulation in parallel, see [Multi-Transducer Modelling](doc_multitransducer.md)).
+    - **When you need it:** When you stimulate from different coordinates in sequence and want the cumulative thermal state (for stimulation in parallel, see [Multi-Transducer Modelling](doc_multitransducer.md)). A sequence planned in advance is easiest to set up in the [Nexus](#planning-a-sequence-in-the-nexus).
     - **Before you start:** One config per sonication, loaded as structs.
+
+## Planning a Sequence in the Nexus
+
+The *Sonication sequence* card (Sonication tab, under the timing diagram) sets up several stances that sonicate one after another. **Add a later sonication** adds a stance as a new step, which you place in the Viewer. Each step has its own duration and pulse timing (**Pulse timing…**), and each pause is modelled as off time. Transducers that should fire at the same time go into one step (**Fire with previous step**). The strip above the table shows the whole protocol to scale.
+
+The sequence is stored in the config with the [async `custom` schedule](doc_multitransducer_async.md#firing-schedule). Each step's start goes in `transducer(i).timing_offset_s`, and each step's timing goes in `transducer(i).timing` wherever it differs from the `timing` block, which holds the step with transducer 1. *Simulate as* chooses how the sequence runs:
+
+| Choice | How it runs | Possible when |
+|---|---|---|
+| One joint run | The config as it is: one acoustic simulation per transducer and one thermal simulation for the whole sequence. The transducers of a step fire together as a [firing group](doc_multitransducer_async.md#firing-schedule): their fields are summed coherently, and steps whose pulses partly overlap interfere while both are on. | Always. |
+| Chain of runs | One config per step (`<config>_step-<k>.yaml`, written when you run), chained as sequential follow-ups. Each pause becomes the previous step's `timing.post_ptri_dur`, and each step gets its own grid. A step with several transducers is one coherent run. | Steps do not overlap; each pause is a whole number of `timing.post_pt_timestep`; no uncertainty mode and no list of target I<sub>SPPA</sub>s. |
+| Automatic (default) | One joint run. | |
+
+With one joint run and `grid.async_layout: per_transducer`, heat outside transducer 1's grid is lost; use the shared grid or a chain for stances far apart. The card lists what stops a choice, and so does the Issues panel for the automatic choice. [Example Protocols](doc_multitransducer_async.md#example-protocols) shows sequences, transducers firing together, interleaved pulses, and a mixed protocol with uncertainty as the card draws them.
 
 ## Basic Usage
 
@@ -35,7 +50,7 @@ options.sequential_configs = sequential_configs;
 prestus_pipeline_start(config_1, options);
 ```
 
-Field names in `sequential_configs` must follow the pattern `config_<N>` where `<N>` is a non-negative integer (e.g. `config_2`, `config_3`, `config_11`). The dispatcher picks the field with the lowest numeric value first; only relative order matters. Non-numeric suffixes (e.g. `config_abc`) are silently ignored.
+Field names in `sequential_configs` must follow the pattern `config_<N>` where `<N>` is a non-negative integer (e.g. `config_2`, `config_3`, `config_11`). The dispatcher picks the field with the lowest numeric value first; only relative order matters. A field that does not match the pattern (e.g. `config_abc`) stops the run with the error `sequential_pipeline:badFieldName`.
 
 In the Nexus, *Results ▸ Follow-up…* with *Sequential* creates a follow-up config and adds it to the chain under *Run ▸ Where to run ▸ Pipeline options*, which the run script passes as `options.sequential_configs` ([Run tab](doc_nexus_tabs.md#run-tab)).
 
@@ -72,7 +87,7 @@ options.sequential_configs.config_2.io.acoustic_cache_affix = config_1.io.output
 
 ## Combining with Uncertainty Mode
 
-`options.sequential_configs` can be combined with `parameters.simulation.uncertainty = true`. Each follow-up run is executed once per uncertainty variant (default, Temp-H, Temp-L, Trans-H, Trans-L). The default and Temp variants inherit the thermal end-state from the matched variant of the prior run; the Trans variants re-run the acoustic simulation only:
+`options.sequential_configs` can be combined with `parameters.simulation.uncertainty = true` when every run keeps the first run's transducer positions: the variants of a follow-up reuse the first run's grid. For stances that change position, use one [async run](doc_multitransducer_async.md#firing-schedule) instead, which uncertainty mode wraps. Each follow-up run is executed once per uncertainty variant (default, Temp-H, Temp-L, Trans-H, Trans-L). The default and Temp variants inherit the thermal end-state from the matched variant of the prior run; the Trans variants re-run the acoustic simulation only:
 
 ```matlab
 parameters.simulation.uncertainty = true;
@@ -85,14 +100,14 @@ prestus_pipeline(parameters, options);
 
 After all sequential runs complete, a sequential report is written for all variants. The base run appears as **run 1**; each follow-up adds a further run entry. The report shows temperature and CEM43 timeseries with the Temp-L to Temp-H band shaded around the default trajectory.
 
-On HPC, job names are prefixed with `r1-` when sequential configs are present (e.g. `PRESTUS-r1-u2-sim-default_sub-001`) to keep scheduler job names unambiguous across chained submissions. See [doc_uncertainty.md](doc_uncertainty.md) for the uncertainty pipeline.
+On HPC, job names are prefixed with `r1-` when sequential configs are present (e.g. `PRESTUS-r1-u2-sim-default_sub-001`) to keep scheduler job names unambiguous across chained submissions. See [Uncertainty Quantification](doc_uncertainty.md) for the uncertainty pipeline.
 
 ## Output Affix Handling
 
 Every PRESTUS output file embeds an **affix**, a short string appended to the subject/medium prefix, that distinguishes files produced by different simulation variants or pipeline modes. PRESTUS assigns affixes from the active modes; you rarely set one yourself.
 
-- A plain sequential run gets `_seq<N>` (e.g. `_seq2` for the second run).
-- An uncertainty variant gets `_desc-temphigh`, `_desc-templow`, `_desc-transhigh` or `_desc-translow`.
+- A plain sequential follow-up appends `_seq<N>` to the affix of the run before it, with N the number of its `config_<N>` field (e.g. `_seq2`, then `_seq2_seq3`).
+- An uncertainty variant gets `_desc-temphigh`, `_desc-templow`, `_desc-transhigh`, or `_desc-translow`.
 - Both combined: `_desc-temphigh_seq2`.
 - A custom `io.output_affix` on any sequential config is used as-is; no `_seq<N>` suffix is added.
 
@@ -112,7 +127,7 @@ sub-001_layered_desc-temphigh_seq2.csv           ← sequential run 2, Temp-H
 If you see a warning that a variant output was not found but the file exists on disk, confirm that `io.dir_output` was set before calling the pipeline (i.e. `path_log_setup` has run), and that no custom `options.affixes` struct was passed with different values than those used during simulation.
 
 ??? note "Affix construction and report file lookup"
-    **Affix sanitisation.** `load_parameters` sanitises the raw affix string before use: characters that are not alphanumeric, hyphens, underscores, or slashes are replaced with underscores, and the prefix `_desc-` is prepended if not already present. So `"pilot"` becomes `"_desc-pilot"`.
+    **Affix sanitisation.** `load_parameters` sanitises the raw affix string before use: characters other than letters, digits, hyphens, and underscores are replaced with underscores; leading underscores and a leading `desc-` are stripped, and `_desc-` is prepended. So `"pilot"` becomes `"_desc-pilot"`.
 
     **Full affix table.**
 
@@ -123,7 +138,7 @@ If you see a warning that a variant output was not found but the file exists on 
     | Uncertainty, default variant | `base_affix` |
     | Uncertainty, Temp-H / Temp-L variant | `base_affix + '_desc-temphigh'` / `'_desc-templow'` |
     | Uncertainty, Trans-H / Trans-L variant | `base_affix + '_desc-transhigh'` / `'_desc-translow'` |
-    | Sequential run N, no uncertainty | `base_affix + '_seq<N>'` |
+    | Sequential run N, no uncertainty | affix of the run before it `+ '_seq<N>'` (N from its `config_<N>` field) |
     | Sequential run N, default variant | `base_affix + '_seq<N>'` |
     | Sequential run N, other variants | `base_affix + '_desc-<variant>_seq<N>'` (e.g. `'_desc-temphigh_seq<N>'`) |
     | Sequential run N, custom affix supplied | the supplied affix, unchanged |
@@ -134,4 +149,4 @@ If you see a warning that a variant output was not found but the file exists on 
 
     **Thermal cache affix.** `io.thermal_cache_affix` controls the filename of the heating `.mat` cache (`sub-NNN_<medium>_heating_res<affix>.mat`). It defaults to the run's own `output_affix`. Set it explicitly only if you need to point a follow-up run at a specific pre-existing cache file.
 
-See also: [doc_uncertainty.md](doc_uncertainty.md), [doc_multitransducer.md](doc_multitransducer.md), [doc_hpc.md](doc_hpc.md)
+See also: [Uncertainty Quantification](doc_uncertainty.md), [Multi-Transducer Modelling](doc_multitransducer.md), [Running on a Cluster (HPC)](doc_hpc.md)

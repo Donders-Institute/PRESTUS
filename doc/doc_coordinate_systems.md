@@ -5,7 +5,7 @@ A position given in the wrong coordinate space puts the transducer or the focus 
 On this page:
 
 - [Canonical Coordinate Convention](#canonical-coordinate-convention): the entry-point space and where conversion happens.
-- [Coordinate Spaces](#coordinate-spaces): voxel, RAS, Localite and MNI spaces.
+- [Coordinate Spaces](#coordinate-spaces): voxel, RAS, Localite, and MNI spaces.
 - [Coordinate Flow for Head Models](#coordinate-flow-for-head-models): from neuronavigation to simulation and back.
 - [Coordinate Flow for Phantoms and Water](#coordinate-flow-for-phantoms-and-water): positions and an optional RAS affine for phantom grids.
 - [MNI Voxel Order and Laterality](#mni-voxel-order-and-laterality): why MNI laterality needs no manual flip.
@@ -28,7 +28,7 @@ RAS (Right-Anterior-Superior) mm is the entry-point space in PRESTUS. [Localite]
 | Simulation grid | voxels (1-based) | `grid` | k-Wave internal space: the T1 voxel grid rescaled to `grid.resolution_mm`, rotated per `grid.mode` (`focal_axis`, the default, and `transducer_axis` turn the beam axis onto z; `ras_plus` keeps the T1 axes) and cropped. `planimg.transf` maps T1 voxels to this grid. |
 | Subject / scanner space | mm | `ras_plus` | RAS mm in the subject's native scanner frame. PRESTUS's entry-point space: Localite markers and external coordinates arrive in RAS mm and are converted to T1 voxels via `ras_to_grid()`. |
 | Localite planning image | mm | `ras_plus` (adjusted header) | Subject space expressed via the diagonal affine written by `canonical_affine_transform`. Voxel-to-world mapping is `world = (voxel − 1) × voxel_size_mm` for 1-based PRESTUS voxels (no rotation). See [Save Localite planning image](doc_placement_heuristic.md#localite-planning-image). |
-| MNI space | mm | `mni` | MNI152 standard space, standard world-mm convention (negative X = left, positive X = right, the same laterality sense as RAS). The template's voxel *array* is stored in LAS order, but going through the [NIfTI](https://nifti.nimh.nih.gov/) affine (as `ras_to_grid()`/`transform_coordinates()` do) accounts for that. See [MNI voxel order and laterality](#mni-voxel-order-and-laterality). |
+| MNI space | mm | `mni` | MNI152 standard space of FSL's 1 mm template (`MNI152NLin6Asym`, the template SimNIBS ships), standard world-mm convention (negative X = left, positive X = right, the same laterality sense as RAS). The template's voxel *array* is stored in LAS order, but going through the [NIfTI](https://nifti.nimh.nih.gov/) affine (as `ras_to_grid()`/`transform_coordinates()` do) accounts for that. See [MNI voxel order and laterality](#mni-voxel-order-and-laterality). |
 | MNI voxel | voxels (1-based) | *(unnamed)* | Integer indices into an MNI template volume (e.g. 182×218×182 for [SimNIBS](https://simnibs.github.io/simnibs/)'s `toMNI/final_tissues_MNI.nii.gz`). Convert via the template's NIfTI affine. |
 
 ## Coordinate Flow for Head Models
@@ -44,7 +44,7 @@ Localite XML
   → nifti_to_mni                         [MNI voxels]   ← SimNIBS warp
 ```
 
-**Key rule:** `ras_to_grid()` / `grid_to_ras()` are the sole boundary between RAS mm and T1 voxel indices (1-based). Downstream of that call, everything is voxels. Do not replicate affine inversion elsewhere.
+**Key rule:** `ras_to_grid()` / `grid_to_ras()` are the sole boundary between RAS mm and T1 voxel indices (1-based). Downstream of that call, everything is voxels. Do not replicate affine inversion elsewhere: for several points or a sub-voxel (unrounded) index, use `ras_to_voxel()`, which `ras_to_grid()` itself calls. Other 4×4 affines (grid transforms, SimNIBS matrices) are inverted with `affine_inverse()`, which reads both conventions and keeps the fixed row or column exact.
 
 ## Coordinate Flow for Phantoms and Water
 
@@ -91,7 +91,7 @@ When the same T1 was used for both neuronavigation and SimNIBS input, the m2m T1
 
 ## SimNIBS Warps and Transforms
 
-PRESTUS reuses nonlinear warp fields produced by SimNIBS/[CHARM](https://simnibs.github.io/simnibs/build/html/documentation/command_line/charm.html):
+PRESTUS reuses nonlinear warp fields produced by SimNIBS/[charm](https://simnibs.github.io/simnibs/build/html/documentation/command_line/charm.html):
 
 - `Conform2MNI_nonl.nii.gz`: subject native → MNI (displacement field, mm)
 - `MNI2Conform_nonl.nii.gz`: MNI → subject native (inverse displacement field, mm)
@@ -105,6 +105,8 @@ For point (coordinate) transforms, `mni2subject_coords_LDfix` / `subject2mni_coo
 `niftiinfo()` stores the NIfTI voxel-to-world affine in `Transform.T` (transposed, row-vector convention). Like the NIfTI standard, it takes **0-based** voxel indices, whereas PRESTUS voxels are **1-based** MATLAB indices into the `niftiread` array:
 
 - World from PRESTUS voxel: `world = T' * [vox - 1; 1]`  (`grid_to_ras`)
-- PRESTUS voxel from world: `vox = round(T' \ [world; 1]) + 1`  (`ras_to_grid`)
+- PRESTUS voxel from world: `vox = round(T' \ [world; 1]) + 1`  (`ras_to_grid`; `ras_to_voxel` without the rounding)
+
+PRESTUS reorders the T1 and segmentation voxels to RAS+ when it loads them (axis permutations and flips, no resampling). The affine keeps any oblique rotation, so every voxel keeps its world position.
 
 Always use `ras_to_grid()` / `grid_to_ras()` rather than applying `Transform.T` to voxel indices directly. Affines composed on 1-based grids (e.g. `grid_to_ras_affine`) must include the 1-based → 0-based shift before `Transform.T`. Such an affine becomes a NIfTI header via `nifti_affine_from_1based`.

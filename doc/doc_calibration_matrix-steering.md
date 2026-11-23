@@ -1,5 +1,7 @@
 # Matrix Arrays: Steering Correction
 
+![Pipeline steps; this page belongs to 2 Transducer](assets/figures/fig_stage-strip-transducer_diagram.svg){ .stage-strip }
+
 The focal peak a matrix array delivers changes with the steering target in ways the geometric model does not predict. The steering correction scales the drive by a factor measured at a set of targets, so that a simulated condition matches what the device delivers. Only users of matrix (2D) arrays need this page.
 
 On this page:
@@ -14,7 +16,7 @@ On this page:
 
 A matrix (2D) array's delivered focal peak can differ from the geometric model by a factor that changes with the steering target (element directivity, crosstalk, manufacturing spread). The steering correction measures that factor at a set of targets and scales the drive by it.
 
-**How it is applied.** `create_matrix_karray` multiplies every element amplitude by k(target) and records it in `transducer.matrix.steering_k`. `elem_p_amp` stays the nominal drive setting, and the simulated field is what the device delivers at that setting. With [ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting) the results are reported at the target ISPPA either way; the correction changes the drive that achieves them: `elem_p_amp × isppa_scale_p`, or in volts `drive_ref_v × elem_p_amp × isppa_scale_p / elem_p_amp_ref`. With `target_isppa_wcm2: []` the results are reported at the corrected drive. Switch it off with `transducer.matrix.use_steering_correction: false`.
+**How it is applied.** `create_matrix_karray` multiplies every element amplitude by k(target) and records it in `transducer.matrix.steering_k`. `elem_p_amp` stays the nominal drive setting, and the simulated field is what the device delivers at that setting. With [I<sub>SPPA</sub> targeting](doc_simulations-acoustic.md#isppa-targeting) the results are reported at the target [I<sub>SPPA</sub>](doc_glossary.md#isppa) either way; the correction changes the drive that achieves them: `elem_p_amp × isppa_scale_p`, or in volts `drive_ref_v × elem_p_amp × isppa_scale_p / elem_p_amp_ref`. With `target_isppa_wcm2: []` the results are reported at the corrected drive. Switch it off with `transducer.matrix.use_steering_correction: false`.
 
 **Building an entry.** Measure the focal peak at 30–40 targets spread through the steering range you will use, including its edges and the geometric focus, plus a few kept back to check the fit. Use one drive voltage and the geometric phases PRESTUS computes for each target. Write one CSV row per target, then build the entry with `build_steering_correction`.
 
@@ -35,7 +37,7 @@ A matrix (2D) array's delivered focal peak can differ from the geometric model b
         struct('out_file', fullfile('config', 'calibration', '<serial>.yaml'), 'serial', '<serial>'));
     ```
 
-`resolve_transducer_from_serial` attaches the entry to a matrix transducer given by `serial` (the entry for `<serial>` with `combo.ds_serial` first, then the driving-system-agnostic one, or `transducer.library_path`; see [Library keys](doc_transducer_library.md#using-a-library-entry)). Without an entry the array is simulated uncorrected. The entry stores the fit, its cross-validated errors, `elem_p_amp_ref` and `drive_ref_v`. An inline `transducer.matrix.steering_correction` takes precedence.
+`resolve_transducer_from_serial` attaches the entry to a matrix transducer given by `serial` (the entry for `<serial>` with `combo.ds_serial` first, then the driving-system-agnostic one, or `transducer.library_path`; see [Library keys](doc_transducer_library.md#using-a-library-entry)). Without an entry the array is simulated uncorrected. The entry stores the fit, its cross-validated errors, `elem_p_amp_ref`, and `drive_ref_v`. An inline `transducer.matrix.steering_correction` takes precedence.
 
 **Limits.** Only the focal peak is corrected, not side lobes or field shape. The model assumes the beam along +z of the transducer frame and does not support Clover setups. The Rayleigh model treats each element as a baffled piston in free water; check it against k-Wave with a free-water run at a few targets.
 

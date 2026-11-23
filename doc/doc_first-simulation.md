@@ -1,4 +1,4 @@
-# Your First Simulation
+# First Simulation
 
 This page takes you from a fresh installation to a finished simulation and its outputs. It starts in free water (no MRI, no [SimNIBS](https://simnibs.github.io/simnibs/build/html/index.html), a few minutes on a CPU) and then points to what changes for a head simulation.
 
@@ -7,9 +7,13 @@ On this page:
 - [1. Run a Free-Water Simulation](#1-run-a-free-water-simulation): a complete run in MATLAB and the files it writes.
 - [2. Use a Transducer From the Library](#2-use-a-transducer-from-the-library): naming a device instead of typing its geometry and drive.
 - [3. Set Up a Head Simulation](#3-set-up-a-head-simulation): the inputs and settings a head simulation adds.
-- [4. Next Steps](#4-next-steps): where to go for study configs, the Nexus and larger studies.
+- [4. Next Steps](#4-next-steps): where to go for study configs, the Nexus, and larger studies.
 
-Before you start, install PRESTUS and its [MATLAB](https://www.mathworks.com/products/matlab.html) dependencies ([Installation](doc_installation.md)). SimNIBS is only needed from step 3 on. If terms such as *exit plane*, *ISPPA* or *free-water baseline* are new to you, keep the [glossary](doc_glossary.md) open alongside.
+!!! note "At a glance"
+    - **When you need it:** After installing, to run PRESTUS for the first time.
+    - **Before you start:** PRESTUS and its [MATLAB](https://www.mathworks.com/products/matlab.html) dependencies installed ([Installation](doc_installation.md)); SimNIBS only from step 3 on.
+
+If terms such as *[exit plane](doc_glossary.md#exit-plane)*, *[I<sub>SPPA</sub>](doc_glossary.md#isppa)*, or *[free-water baseline](doc_glossary.md#free-water-baseline)* are new to you, keep the [glossary](doc_glossary.md) open alongside.
 
 If you prefer forms to code, the [PRESTUS Nexus](doc_nexus.md) builds the same config from a T1 and the defaults, and runs it. The steps below show what the Nexus writes for you.
 
@@ -57,15 +61,15 @@ prestus_pipeline_start(parameters);
 
 The run takes a few minutes on a CPU. When it finishes, `out/sub-001/` holds the results:
 
-- `sub-001_water.csv`: the metrics table (ISPPA, focal distance, focal volume, …);
+- `sub-001_water.csv`: the metrics table (I<sub>SPPA</sub>, focal distance, focal volume, …);
 - `sub-001_water_report.html`: the HTML report with the safety dashboard and figures;
-- `nii/`, `img/`, `log/` and `cache/`: maps, figures, the run log and intermediate files.
+- `nii/`, `img/`, `log/`, and `cache/`: maps, figures, the run log, and intermediate files.
 
 [Reading your results](doc_results.md) explains what to check first; [Outputs](doc_outputs.md) lists every file and column.
 
 ## 2. Use a Transducer From the Library
 
-Real studies rarely type in element geometry and drive. PRESTUS ships an equipment and calibration library: name the transducer and its driving system, set the focal depth and the free-water intensity you want, and PRESTUS fills in geometry, phases and drive. The library is resolved when the config is loaded, so put these keys in a [YAML](https://yaml.org/) file rather than setting them in MATLAB afterwards:
+Real studies rarely type in element geometry and drive. PRESTUS ships an equipment and calibration library: name the transducer and its driving system, set the focal depth and the free-water intensity you want, and PRESTUS fills in geometry, phases, and drive. The library is resolved when the config is loaded, so put these keys in a [YAML](https://yaml.org/) file rather than setting them in MATLAB afterwards:
 
 ```yaml
 # config_first.yaml
@@ -83,11 +87,11 @@ parameters = load_parameters('config_first.yaml', pwd);
 %     (without the transducer geometry lines), and prestus_pipeline_start(parameters)
 ```
 
-With a target ISPPA set, PRESTUS also runs a short free-water baseline and scales the field to that intensity ([ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting)). The available devices, how the library works and how to calibrate your own are described in [Transducer Library](doc_transducer_library.md).
+With a target I<sub>SPPA</sub> set, PRESTUS also runs a short free-water baseline and scales the field to that intensity ([I<sub>SPPA</sub> targeting](doc_simulations-acoustic.md#isppa-targeting)). The available devices, how the library works, and how to calibrate your own are described in [Transducer Library](doc_transducer_library.md).
 
 ## 3. Set Up a Head Simulation
 
-A head (`layered`) simulation adds an MRI, a SimNIBS segmentation and a target. Compared to step 2 you need:
+A head (`layered`) simulation adds an MRI, a SimNIBS segmentation, and a target. Compared to step 2 you need:
 
 | What | Where it is set | See |
 |---|---|---|
@@ -97,16 +101,16 @@ A head (`layered`) simulation adds an MRI, a SimNIBS segmentation and a target. 
 | Transducer position and target | `transducer.trans_pos`/`focus_pos`, or a `placement.mode` | [Placement](doc_placement.md) |
 | Sonication protocol (for heating) | `timing.*`, `modules.run_heating_sims: 1` | [Thermal](doc_simulations-thermal.md) |
 
-On the first run PRESTUS runs SimNIBS `charm` (this takes an hour or more); later runs reuse the segmentation unless `io.overwrite_simnibs` is set. To segment first and simulate later, set `modules.segmentation_only: 1`. Head simulations are much larger than step 1: use a GPU (`simulation.code_type: matlab_gpu` or `cpp_gpu`, see [k-Wave](doc_kwave.md)) or a cluster ([HPC](doc_hpc.md)). Thermal simulations are off by default (`modules.run_heating_sims: 0`); switch them on once the acoustic result looks right.
+On the first run PRESTUS runs SimNIBS `charm` (this takes an hour or more); later runs reuse the segmentation unless `io.overwrite_simnibs` is set. To segment first and simulate later, set `modules.segmentation_only: 1`. Head simulations are much larger than step 1: use a GPU (`simulation.code_type: cpp_gpu`, recommended once the [C++ binaries](doc_installation.md#k-wave-c-binaries) are installed, or `matlab_gpu`, see [k-Wave](doc_kwave.md)) or a cluster ([HPC](doc_hpc.md)). Thermal simulations are off by default (`modules.run_heating_sims: 0`); switch them on once the acoustic result looks right.
 
 ## 4. Next Steps
 
 - Keep your settings in a project folder and a study config: [Configuring a study](doc_configuration.md).
 - Prefer forms to YAML: [PRESTUS Nexus](doc_nexus.md).
 - Use subject-specific skull properties from a UTE scan: [pseudo-CT](doc_pseudoCT.md).
-- Re-run only part of the pipeline: [Modules](doc_modules.md).
-- Many subjects or conditions: [Group analysis](doc_group.md#study-setup).
-- Sweeps over intensities, several transducers, sequences or tissue-property uncertainty: [Advanced modes](doc_advanced.md).
+- Re-run only part of the pipeline: [Pipeline Modules](doc_modules.md).
+- Many subjects or conditions: [Group analysis](doc_group_study-setup.md#study-setup).
+- Sweeps over intensities, several transducers, sequences, or tissue-property uncertainty: [Advanced modes](doc_advanced.md).
 
 ## Demos and Examples
 

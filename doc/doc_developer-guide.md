@@ -1,29 +1,29 @@
 # Developer Guide
 
-Many changes to PRESTUS touch more than one file: a new config key also needs a row in the parameter docs, and a change to a cached stage needs an updated cache signature. This page shows how the code is organised and what happens during a run, so that you know where a change belongs, what else to update and which checks to run before you commit.
+Many changes to PRESTUS touch more than one file: a new config key also needs a row in the parameter docs, and a change to a cached stage needs an updated cache signature. This page shows how the code is organised and what happens during a run, so that you know where a change belongs, what else to update, and which checks to run before you commit.
 
 On this page:
 
 - [Pipeline and Design Principles](#pipeline-and-design-principles): the pipeline in one paragraph and the three ideas that hold the code together.
 - [Code Layout](#code-layout): which folder holds which subsystem, and the file to start reading at.
 - [Steps of a Run](#steps-of-a-run): the steps of a run in order, from loading the config to writing outputs.
-- [Required Updates per Change](#required-updates-per-change): what to edit, what else to update and which check catches an omission.
+- [Required Updates per Change](#required-updates-per-change): what to edit, what else to update, and which check catches an omission.
 - [Pre-Commit Checks](#pre-commit-checks): the checks CI runs, and which test levels a change needs.
 - [Nexus Code Structure](#nexus-code-structure): how the Nexus builds its forms, and which Python file does what.
 
 !!! note "At a glance"
-    - **When you need it:** Before your first change to the pipeline, the config or the Nexus.
-    - **Before you start:** A working installation ([Installation](doc_installation.md)) and one finished simulation ([Your First Simulation](doc_getting-started.md)).
+    - **When you need it:** Before your first change to the pipeline, the config, or the Nexus.
+    - **Before you start:** A working installation ([Installation](doc_installation.md)) and one finished simulation ([First Simulation](doc_first-simulation.md)).
 
 ## Pipeline and Design Principles
 
-PRESTUS turns one configuration into one simulation. The configuration is a set of [YAML](https://yaml.org/) files merged into a single [MATLAB](https://www.mathworks.com/products/matlab.html) struct, `parameters`. The pipeline then runs a fixed sequence of stages: segment the head, place the transducer, build the grid and the tissue properties, simulate the sound field, simulate heating, and write reports. Each stage receives what it needs as function arguments and returns its results, so a stage can be read, tested and skipped on its own.
+PRESTUS turns one configuration into one simulation. The configuration is a set of [YAML](https://yaml.org/) files merged into a single [MATLAB](https://www.mathworks.com/products/matlab.html) struct, `parameters`. The pipeline then runs a fixed sequence of stages: segment the head, place the transducer, build the grid and the tissue properties, simulate the sound field, simulate heating, and write reports. Each stage receives what it needs as function arguments and returns its results, so a stage can be read, tested, and skipped on its own.
 
 Three ideas hold the code together:
 
 - **The config is the interface.** Every behaviour a user can choose is a key in `config/config_default.yaml`. Code reads its settings from `parameters`, not from globals.
-- **Expensive stages are cached.** Grid, medium, acoustic and thermal results are saved under the subject's `cache/` folder. A re-run reuses them; grid, medium and acoustic caches are first checked against the settings they were made with.
-- **Results are reported at a free-water intensity.** Simulations run at a nominal drive, and the field is scaled afterwards so that the same transducer in water would give the requested ISPPA.
+- **Expensive stages are cached.** Grid, medium, acoustic, and thermal results are saved under the subject's `cache/` folder. A re-run reuses them; grid, medium, and acoustic caches are first checked against the settings they were made with.
+- **Results are reported at a free-water intensity.** Simulations run at a nominal drive, and the field is scaled afterwards so that the same transducer in water would give the requested [I<sub>SPPA</sub>](doc_glossary.md#isppa).
 
 The Nexus is a separate [Python](https://www.python.org/) application. It edits the YAML and starts MATLAB; it never simulates.
 
@@ -51,21 +51,21 @@ The Nexus is a separate [Python](https://www.python.org/) application. It edits 
 
 ## Steps of a Run
 
-1. **Load.** `load_parameters` merges the toolbox defaults, an optional project copy of the defaults, the study YAML and any overrides, in that order. It then fills in derived values, such as the transducer geometry from the equipment library, and validates the result.
+1. **Load.** `load_parameters` merges the toolbox defaults, an optional project copy of the defaults, the study YAML, and any overrides, in that order. It then fills in derived values, such as the transducer geometry from the equipment library, and validates the result.
 2. **Decide where to run.** `prestus_pipeline_start` runs the pipeline in the current MATLAB session or submits it as a cluster job. Some modes (several transducers fired separately, several intensities, uncertainty) split into chained jobs.
 3. **Place.** The placement stage turns the chosen placement method into transducer and focus positions in T1 voxels. This is the only place where RAS millimetres become voxels.
-4. **Build the head model.** The grid stage crops and resamples the head onto the simulation grid; the medium stage maps tissue labels (or a pseudo-CT) to sound speed, density and attenuation.
-5. **Simulate sound.** The source stage builds the transducer on the grid. A free-water run of the same source gives the baseline intensity, and the acoustic stage calls the chosen solver (k-Wave, [jwave](https://github.com/ucl-bug/jwave) or [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain)) and scales the field to the target ISPPA.
+4. **Build the head model.** The grid stage crops and resamples the head onto the simulation grid; the medium stage maps tissue labels (or a pseudo-CT) to sound speed, density, and attenuation.
+5. **Simulate sound.** The source stage builds the transducer on the grid. A free-water run of the same source gives the baseline intensity, and the acoustic stage calls the chosen solver (k-Wave, [jwave](https://github.com/ucl-bug/jwave) or [BabelBrain](https://github.com/ProteusMRIgHIFU/BabelBrain)) and scales the field to the target I<sub>SPPA</sub>.
 6. **Simulate heat.** The thermal stage runs the sonication protocol on the scaled field.
 7. **Write outputs.** Analysis functions write the metrics CSV, [NIfTI](https://nifti.nimh.nih.gov/) maps and the HTML report to the subject's output folder.
 
-The stage table in [How PRESTUS Works](doc_architecture.md#pipeline-stages) gives each stage's functions, inputs and cache files. Each stage can be switched off with a `modules.*` flag ([Modules](doc_modules.md)).
+The stage table in [How PRESTUS Works](doc_architecture.md#pipeline-stages) gives each stage's functions, inputs, and cache files. Each stage can be switched off with a `modules.*` flag ([Pipeline Modules](doc_modules.md)).
 
 ## Required Updates per Change
 
 | To | Edit | Also update | Checked by |
 |---|---|---|---|
-| Add a config key | `config/config_default.yaml`, with a comment (the Nexus shows it as help) | a row in [Parameters](doc_parameters.md) | `check_param_docs.py`, Nexus `test_schema.py` |
+| Add a config key | `config/config_default.yaml`, with a comment (the Nexus shows it as help) | a row on the matching [Parameters](doc_parameters.md) page | `check_param_docs.py`, Nexus `test_schema.py` |
 | Read a key the defaults do not define | the reading function | an entry under `extra:` in `nexus/prestus_nexus/overlay.yaml` | Nexus `test_schema.py` |
 | Rename a released key | `config_default.yaml` | an entry under `deprecated:` in `overlay.yaml`; `upgrade_config_keys` then converts old configs | Nexus `test_schema.py` |
 | Change what a cached stage computes | the stage function | `cache_signature.m` for that stage, so old caches are rejected | `test_cache_signature.m` |
@@ -82,15 +82,17 @@ Docs describe current behaviour as tasks, and the changelog has one line per cha
 Run the checks CI runs before you commit:
 
 ```bash
+pip install -r requirements-docs.txt   # once: the docs toolchain CI uses
 python tests/docs/gen_function_index.py --check
 python tests/docs/check_param_docs.py
 python tests/docs/check_links.py
-mkdocs build --strict -d /tmp/prestus-site
+python tests/docs/check_images.py
+zensical build --strict -f mkdocs.yaml           # writes site/ (gitignored); preview: zensical serve -f mkdocs.yaml
 (cd nexus && python -m pytest -q -m "not matlab")
 matlab -batch "cd tests; run_all_tests('unit')"
 ```
 
-Unit tests need no data. A change to the physics needs `run_all_tests('physics')` as well; a change to the pipeline needs the demo levels, which use the demo subject. [Testing](doc_testing.md) lists every level, the data it needs and its run time.
+Unit tests need no data. A change to the physics needs `run_all_tests('physics')` as well; a change to the pipeline needs the demo levels, which use the demo subject. [Testing](doc_testing.md) lists every level, the data it needs, and its run time.
 
 ## Nexus Code Structure
 

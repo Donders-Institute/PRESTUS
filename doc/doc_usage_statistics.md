@@ -1,6 +1,6 @@
 # Usage Statistics
 
-The charts below are populated live from the anonymised telemetry database. Data is only collected from users who have opted in. See [Telemetry](doc_telemetry.md) for details on what is collected and how to opt in or out.
+The charts below are populated live from the anonymised telemetry database. Data is only collected from users who have opted in. See [Telemetry](doc_telemetry.md) for details on what is collected and how to opt in or out. The page reads monthly totals only, never individual events. *Installs* is a lower bound: some older PRESTUS versions gave many installations the same ID.
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>

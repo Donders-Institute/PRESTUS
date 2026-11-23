@@ -41,7 +41,7 @@ The merge is deep: a study file that sets only `grid.resolution_mm` keeps every 
 
     Before merging, keys from earlier PRESTUS versions are converted to their current names ([see below](#configs-from-earlier-prestus-versions)). After merging, `load_parameters` validates the result: it resolves `transducer.serial` against the [transducer library](doc_transducer_library.md), checks the timing protocol and the backend combination, and turns `io.output_affix` into a `_desc-<label>` file-name entity. Keys PRESTUS does not know produce the warning `prestus:unknownConfigKey`, with a suggestion when it looks like a typo.
 
-You can also change the struct in [MATLAB](https://www.mathworks.com/products/matlab.html) after loading (`parameters.subject_id = 2;`), as in [Your first simulation](doc_getting-started.md). The exception is the transducer library keys (`transducer.serial`, `combo`, `library_path`, and the `focal_distance_ep` they resolve phases for): `load_parameters` looks up geometry, phases and drive from them, so set them in a file or as an override rather than in the struct afterwards.
+You can also change the struct in [MATLAB](https://www.mathworks.com/products/matlab.html) after loading (`parameters.subject_id = 2;`), as in [First simulation](doc_first-simulation.md). The exception is the transducer library keys (`transducer.serial`, `combo`, `library_path`, and the `focal_distance_ep` they resolve phases for): `load_parameters` looks up geometry, phases, and drive from them, so set them in a file or as an override rather than in the struct afterwards.
 
 ## Project Config Folder
 
@@ -65,7 +65,7 @@ Load them with `load_parameters('config_projectX.yaml', '/path/to/project/config
 
 ## Example Study Config
 
-A study config for head simulations typically sets the paths, the transducer, the placement and the protocol:
+A study config for head simulations typically sets the paths, the transducer, the placement, and the protocol:
 
 ```yaml
 # config_projectX.yaml
@@ -103,17 +103,17 @@ modules:
   run_heating_sims: 1
 ```
 
-On a workstation without a job scheduler, also set `platform: matlab`: the default `auto` only detects [SLURM](https://slurm.schedmd.com/) or qsub and stops with an error when neither is found. The subject is usually not in the file but set per run (`parameters.subject_id = 3`, an override, or a [study manifest](doc_group.md#study-setup)).
+On a workstation without a job scheduler, also set `platform: matlab`: the default `auto` only detects [SLURM](https://slurm.schedmd.com/) or qsub and stops with an error when neither is found. The subject is usually not in the file but set per run (`parameters.subject_id = 3`, an override, or a [study manifest](doc_group_study-setup.md#study-setup)).
 
 ??? note "Where to look next"
     | Topic | Keys | Page |
     |---|---|---|
-    | Paths and input images | `path.*`, `startup.*` | [Parameters](doc_parameters.md#data-paths-path) |
+    | Paths and input images | `path.*`, `startup.*` | [Parameters](doc_parameters_run.md#data-paths-path) |
     | Medium and tissue properties | `simulation.medium`, `layers`, `medium_properties`, `pct.*` | [Medium Setup](doc_medium.md), [pseudo-CT](doc_pseudoCT.md) |
     | Transducer | `transducer.*` | [Transducer](doc_transducer.md), [Transducer Library](doc_transducer_library.md) |
     | Position and target | `placement.*`, `transducer.trans_pos`/`focus_pos` | [Placement](doc_placement.md) |
     | Protocol and heating | `timing.*`, `thermal.*` | [Thermal](doc_simulations-thermal.md) |
-    | Which stages run | `modules.*` | [Modules](doc_modules.md) |
+    | Which stages run | `modules.*` | [Pipeline Modules](doc_modules.md) |
     | Where and how it runs | `platform`, `hpc.*`, `simulation.code_type`, `acoustic_backend` | [HPC](doc_hpc.md), [Backends](doc_backend.md), [k-Wave](doc_kwave.md) |
     | Output files | `io.*` | [Outputs](doc_outputs.md) |
 
@@ -121,13 +121,15 @@ On a workstation without a job scheduler, also set `platform: matlab`: the defau
 
 `load_parameters` reads configs written for PRESTUS v0.5.0 or later. It converts each renamed key to its current name, in every config layer and in the overrides, and lists the conversions in one warning (`prestus:renamedConfigKey`); keys without a replacement are dropped. Old keys without an exact counterpart stop the run (see below), as does a layer that sets an old key and its current name to different values (`prestus:configKeyConflict`). Update the config with the names from that list; the [Nexus](doc_nexus.md) marks the same keys when you open the file.
 
+Study scripts written for earlier versions run as well. Old key names a script sets on the struct after loading (`parameters.code_type = 'cpp_gpu'`, or a transducer read from an old YAML file) are converted when the run starts, with the same warning. The call form before v0.6.0, `prestus_pipeline_start(subject_id, parameters)`, and the v0.5.0 functions `single_subject_pipeline`, `single_subject_pipeline_with_slurm`, and `single_subject_pipeline_with_qsub` still work and warn (`prestus:legacyCallForm`, `prestus:legacyFunction`) with the current call to use instead.
+
 ??? note "Old keys without a current name"
     A few old keys have no exact counterpart. These stop the run (`prestus:legacyConfigKey`) with a message naming the key to set instead:
 
     | Old key | Set instead |
     |---|---|
     | `smooth_window` [voxels] | `headmodel.smooth_fwhm_mm` [mm] |
-    | `expected_focal_distance_mm` | `transducer.focal_distance_ep` (from the exit plane) or `transducer.focal_distance_bowl` (from the bowl apex) |
+    | `expected_focal_distance_mm` | `transducer.focal_distance_ep` (from the exit plane) or `transducer.focal_distance_bowl` (from the bowl apex); when every transducer in the same file sets one of them, the old key is ignored with a warning (`prestus:legacyRedundantKey`) |
     | `pseudoCT_variant: marquet` | `pct.mapping_density`, `pct.mapping_soundspeed`, `pct.mapping_attenuation` |
     | `calibration.weights: 0` | `calibration.opt_weights` (now 0 = uniform weighting) |
     | `subject_subfolder: 0`, custom `seg_labels` | not supported: outputs always go to `sub-XXX` folders, and the SimNIBS charm labels are fixed |

@@ -4,10 +4,10 @@ This page lists known problems by the message or symptom you see, each with its 
 
 On this page:
 
-- [Installation and Setup](#installation-and-setup): missing [k-Wave](https://github.com/ucl-bug/k-wave), platform detection, config warnings, macOS file access and Nexus installation.
+- [Installation and Setup](#installation-and-setup): missing [k-Wave](https://github.com/ucl-bug/k-wave), platform detection, config warnings, macOS file access, and Nexus installation.
 - [Segmentation (SimNIBS charm)](#segmentation-simnibs-charm): [`charm`](https://simnibs.github.io/simnibs/build/html/documentation/command_line/charm.html) errors and segmentations that are started twice or not redone.
 - [Placement](#placement): [PlanTUS](https://github.com/mlueckel/PlanTUS), [TUS_entry](https://github.com/CyrilAtkinson/TUS_entry) and positions that land in the wrong place.
-- [Simulation](#simulation): ISPPA targeting errors, cache mismatches, sampling warnings and running out of memory.
+- [Simulation](#simulation): I<sub>SPPA</sub> targeting errors, cache mismatches, sampling warnings, and running out of memory.
 
 !!! note "At a glance"
     - **When you need it:** When a run stops with one of the messages below, or a result lands in the wrong place.
@@ -41,19 +41,20 @@ Most entries link to the page that explains the behaviour. If you solve an issue
 |---|---|
 | PlanTUS interactive mode runs headless | No display was found (e.g. a cluster job or an SSH session without X forwarding); run it on a desktop or in a VNC session. |
 | PlanTUS places the last clicked vertex without a review dialog | [PyQt](https://www.riverbankcomputing.com/software/pyqt/)5 is missing in the SimNIBS Python; it ships with SimNIBS, so check `placement.plantus.env_path`. |
-| PlanTUS stops because intermediate files are missing | `wb_command` ([Connectome Workbench](https://www.humanconnectome.org/software/connectome-workbench)) is not found; install it in the SimNIBS environment or set `placement.plantus.connectome_wb_path` ([Installation](doc_installation.md#plantus-dependencies)). |
 | TUS_entry: `replacement has 1 row, data has 0` | TUS_entry needs a solid head mask; check `placement.tus_entry.scalp_mask` ([TUS_entry](doc_placement_tus_entry.md#required-configuration)). |
-| MNI or RAS positions end up in the wrong place | Manual `ras`/`mni` coordinates are converted in the placement stage, so `modules.run_transducer_placement` must be `1` ([Placement](doc_placement.md#manual-coordinate-selection)). For MNI and [Localite](https://www.localite.de/) conventions see [Coordinate systems](doc_coordinate_systems.md). |
+| MNI or RAS positions end up in the wrong place | Manual `ras`/`mni` coordinates are converted in the placement stage, so `modules.run_transducer_placement` must be `1` ([Placement](doc_placement_manual.md#entering-coordinates)). For MNI and [Localite](https://www.localite.de/) conventions see [Coordinate systems](doc_coordinate_systems.md). |
 
 ## Simulation
 
 | Symptom | Cause and fix |
 |---|---|
-| `prestus:isppa:noBaseline` or `prestus:isppa:unsimulatedBaseline` | `transducer.target_isppa_wcm2` needs a free-water baseline that is not available, e.g. `modules.run_water_baseline: 0` with an uncalibrated transducer. Use `auto`, or set the target to `[]` to report the field at `elem_p_amp` ([ISPPA targeting](doc_simulations-acoustic.md#isppa-targeting)). |
+| `prestus:isppa:noBaseline` or `prestus:isppa:unsimulatedBaseline` | `transducer.target_isppa_wcm2` needs a free-water baseline that is not available, e.g. `modules.run_water_baseline: 0` with an uncalibrated transducer. Use `auto`, or set the target to `[]` to report the field at `elem_p_amp` ([I<sub>SPPA</sub> targeting](doc_simulations-acoustic.md#isppa-targeting)). |
 | Warning `prestus:isppa:largeScale` | The target is more than 4× (or less than 0.25×) the simulated drive; check that this is still in the linear regime. |
-| Warning `load_transducer_from_library:uncalibratedAmplitude` | The library drive at this depth was fitted analytically and not checked in k-Wave; see [k-Wave drive calibration](doc_calibration_refinement.md#free-water-k-wave-drive-calibration). |
-| `prestus:cache:signatureMismatch` | A reused grid, medium or acoustic cache was built with other settings. Recompute (`io.overwrite_files: always` or `force`) or delete the cache files ([Cache reuse checks](doc_outputs_reuse.md#cache-reuse-checks)). |
-| Changed source or medium settings have no effect on a re-run | A grid, medium or acoustic cache was reused although its settings differ: `io.cache_signature_check` is `warn` (reuse with a warning) or `off`, or a chained-pipeline sub-job loaded a cache another stage wrote, which is not checked ([Cache reuse checks](doc_outputs_reuse.md#cache-reuse-checks)). Keep `io.cache_signature_check: error`, use `io.overwrite_files: force` or delete the relevant `cache/` files ([Overwrite behaviour](doc_outputs_reuse.md#overwrite-behaviour)). |
+| Warning `load_transducer_from_library:uncalibratedAmplitude` | The library drive at this depth was fitted analytically and not checked in k-Wave; see [k-Wave drive calibration](doc_calibration_hydrophone-profiles.md#free-water-k-wave-drive-calibration). |
+| `prestus:cache:signatureMismatch` | A reused grid, medium, or acoustic cache was built with other settings. Recompute (`io.overwrite_files: always` or `force`) or delete the cache files ([Cache reuse checks](doc_outputs_reuse.md#cache-reuse-checks)). |
+| Changed source or medium settings have no effect on a re-run | A grid, medium, or acoustic cache was reused although its settings differ: `io.cache_signature_check` is `warn` (reuse with a warning) or `off`, or a chained-pipeline sub-job loaded a cache another stage wrote, which is not checked ([Cache reuse checks](doc_outputs_reuse.md#cache-reuse-checks)). Keep `io.cache_signature_check: error`, use `io.overwrite_files: force`, or delete the relevant `cache/` files ([Overwrite behaviour](doc_outputs_reuse.md#overwrite-behaviour)). |
 | Points-per-wavelength (PPW) warning | The grid is too coarse for the frequency; reduce `grid.resolution_mm` ([Spatial and temporal sampling](doc_simulations-acoustic.md#spatial-and-temporal-sampling)). |
 | Out of memory in the thermal simulation | Coarsen `grid.thermal_resolution_mm`, or use a GPU with more memory ([Thermal](doc_simulations-thermal.md#step-temperature-and-sensor-settings), [HPC](doc_hpc.md#gpu-support)). |
-| Out of memory in the acoustic simulation | Use a coarser grid, a [limited acoustic FOV](doc_limited_fov.md), or the C++ binaries ([Memory](doc_simulations-acoustic.md#memory-use)). |
+| Warning `prestus:scratch` *no scratch folder was found* | `hpc.tmp_gb` is set, but none of the scratch locations exists; the `.h5` files stay in `$TMPDIR` or `cache/`. Set `hpc.scratch_dir` to a path, or `PRESTUS_SCRATCH_BASE` ([Node-local scratch](doc_hpc.md#node-local-scratch)). |
+| A SLURM job stays pending after setting `hpc.tmp_gb` | No node can provide `--tmp=<tmp_gb>G`. Lower `hpc.tmp_gb` or set it to `0`. |
+| Out of memory in the acoustic simulation | Use a coarser grid, a [partial acoustic FOV](doc_partial-fov.md), or the C++ binaries ([Memory](doc_simulations-acoustic.md#memory-use)). |
