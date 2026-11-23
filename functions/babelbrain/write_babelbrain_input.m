@@ -332,8 +332,8 @@ end
 %% Build NIfTI header with PRESTUS grid affine
 % Write a temporary NIfTI to obtain a valid base header struct (niftiwrite
 % requires specific fields like Qfactor that cannot be hand-assembled).
-tmp_file = fullfile(tempdir, sprintf('prestus_bb_hdr_%d', randi(1e6)));
-niftiwrite(uint8(label_map), tmp_file);
+tmp_file = tempname;   % unique per call; randi names collided across parallel jobs
+niftiwrite(label_map, tmp_file);
 hdr = niftiinfo([tmp_file '.nii']);
 delete([tmp_file '.nii']);
 
@@ -442,7 +442,7 @@ if ~isempty(pseudoCT)
     ct_fname    = strrep(fname, 'BabelViscoInput', 'CT');
     ct_out_path = fullfile(sub_dir, ct_fname);
 
-    ct_tmp_file = fullfile(tempdir, sprintf('prestus_bb_ct_hdr_%d', randi(1e6)));
+    ct_tmp_file = tempname;
     niftiwrite(ct_vol, ct_tmp_file);
     ct_hdr = niftiinfo([ct_tmp_file '.nii']);
     delete([ct_tmp_file '.nii']);

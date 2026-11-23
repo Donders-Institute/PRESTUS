@@ -27,16 +27,18 @@
 % See also: LOAD_TRANSDUCER_FROM_LIBRARY, REFINE_TRANSDUCER_LIBRARY,
 %           FIT_TRANSDUCER_MODEL, VALIDATE_TRANSDUCER_LIBRARY, CALIBRATION_GUI
 
-close all;
-
 %% ── Paths ────────────────────────────────────────────────────────────────────
 repo_root    = fullfile(fileparts(mfilename('fullpath')), '..', '..');
 equip_path   = fullfile(repo_root, 'config', 'equipment');
 if ~exist('LIBRARY_PATH', 'var'); LIBRARY_PATH = fullfile(repo_root, 'config', 'calibration'); end
 library_path = LIBRARY_PATH;   % output folder (default: the shipped library)
 
-addpath(genpath(fullfile(repo_root, 'functions')));
-addpath(genpath(fullfile(repo_root, 'external')));
+% Only in a fresh session: once PRESTUS is on the path, the path is left as set.
+if isempty(which('load_parameters'))
+    addpath(fullfile(repo_root, 'functions', 'helper'));
+    safe_addpath(fullfile(repo_root, 'functions'));
+    safe_addpath(fullfile(repo_root, 'external'));
+end
 
 %% ── CONFIGURATION ────────────────────────────────────────────────────────────
 % Variables are only set here when not already defined in the caller's workspace.

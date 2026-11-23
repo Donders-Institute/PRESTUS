@@ -26,8 +26,10 @@ end
 %% 1. PATHS & VALIDATION
 
 currentLoc = fileparts(mfilename("fullpath"));
-% add functions here to detect path setup function
-addpath(genpath(fullfile(currentLoc, '..')));
+% Standalone call in a fresh session: put PRESTUS's functions on the path
+if isempty(which('path_log_setup'))
+    addpath(genpath(fullfile(currentLoc, '..')));
+end
 
 [parameters] = path_log_setup(parameters, get_prestus_path);
 subject_id = parameters.subject_id;

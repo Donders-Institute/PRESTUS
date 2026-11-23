@@ -60,11 +60,18 @@ function [elem_pos_m, tr] = extract_element_pos(parameters, tr, trans_pos_m)
     % ---------------------------------------------------------------------
     if file_ext.select_random_subset
 
-        if file_ext.subset.random_seed
-            rng('shuffle'); % seed RNG based on current time
+        % A private stream, so the subset never depends on (or moves) the
+        % session's global random state: random_seed false or empty always
+        % gives the same subset (seed 0); true draws a new seed and prints it,
+        % so that subset can be reproduced.
+        seed = 0;
+        if isequal(file_ext.subset.random_seed, true) || isequal(file_ext.subset.random_seed, 1)
+            seed = randi(RandStream('mt19937ar', 'Seed', 'shuffle'), 2^31 - 1);
+            fprintf('[extract_element_pos] random element subset drawn with seed %d\n', seed);
         end
+        rs = RandStream('mt19937ar', 'Seed', seed);
 
-        [phys_positions_mm, keep] = datasample(phys_positions_mm, ...
+        [phys_positions_mm, keep] = datasample(rs, phys_positions_mm, ...
             file_ext.subset.subset_n_elements, ...
             1, ...
             'Replace', ...

@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use PRESTUS for publications, please cite it as below."
+title: "PRESTUS: PREprocessing & Simulations for Transcranial Ultrasound Stimulation"
+type: software
+license: GPL-3.0
+doi: 10.5281/zenodo.15095860
+repository-code: "https://github.com/Donders-Institute/PRESTUS"
+url: "https://donders-institute.github.io/PRESTUS/"
+authors:
+  - family-names: Kosciessa
+    given-names: J. Q.
+  - family-names: Chetverikov
+    given-names: A.
+  - family-names: Cornelissen
+    given-names: M.
+  - family-names: van der Zee
+    given-names: K.
+  - family-names: Carpino
+    given-names: E.
+  - family-names: Wimmers
+    given-names: M.
+  - family-names: Adelhöfer
+    given-names: N.
+  - family-names: Meijer
+    given-names: S.
+  - family-names: Verhagen
+    given-names: L.
