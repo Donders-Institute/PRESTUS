@@ -32,8 +32,9 @@ function sensor_data = apply_isppa_scaling(sensor_data, acoustic_provenance, par
 % cached acoustic result is loaded.
 
     % Combined async/FOV caches have p_max_all (thermal) and p_max_async (safety)
-    % already scaled to the per-transducer targets inside combine_async_intensity /
-    % assemble_limited_fov_fields.  Re-applying scaling here would double-scale
+    % already scaled to the per-transducer targets inside combine_async_intensity
+    % (and, in older caches, the removed partial-FOV assembly, 'limited_fov_incoherent_sum').
+    % Re-applying scaling here would double-scale
     % p_max_all while leaving p_max_async untouched, producing an inconsistency
     % between thermal and acoustic safety fields.  Skip for those caches.
     if isfield(acoustic_provenance, 'combination_mode') && ...

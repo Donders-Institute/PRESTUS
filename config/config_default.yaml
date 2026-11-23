@@ -492,8 +492,8 @@ grid:
   # thermal_use_acoustic_fov: 0   # 1 = thermal simulation also runs within the acoustic FOV (faster,
   #                               # less accurate cooling boundary). 0 = thermal uses the full grid (default).
   # thermal_resolution_mm: []     # Override grid resolution for thermal simulation only [mm].
-  # origin_ras_mm: []             # Phantom and water grids: RAS position of voxel [1,1,1] [mm], so output NIfTIs open in place; the simulation is unaffected.
   #                               # Leave empty to reuse the acoustic grid resolution.
+  # origin_ras_mm: []             # Phantom and water grids: RAS position of voxel [1,1,1] [mm], so output NIfTIs open in place; the simulation is unaffected.
   # thermal_fov_mm: []            # Independent thermal FOV [mm]; defines a sub-grid around the focus
   #                               # for the thermal solver, independent of the acoustic FOV.
   # pml_size_range: [10, 40]  # Search range [min, max] of 'auto' pml_size [grid points] (k-Wave default)
