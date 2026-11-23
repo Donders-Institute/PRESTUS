@@ -475,7 +475,8 @@ def test_uncertainty_switch_turns_on(window):
     row = next(r for r in page.rows if r.node.path == "simulation.uncertainty")
     row.editor.box.click()
     assert window.model.get("simulation.uncertainty") is True
-    assert sum(r.block.isVisibleTo(page) for r in page.rows) == 1      # the switch only
+    assert [r.node.path for r in page.rows if r.block.isVisibleTo(page)] == \
+        ["simulation.uncertainty", "simulation.uncertainty_fov"]       # the switch and the variants' grid
     from PyQt6.QtCore import Qt
     from prestus_nexus.ui import style
     card = window.uncertainty_card

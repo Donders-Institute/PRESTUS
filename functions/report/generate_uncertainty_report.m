@@ -15,7 +15,12 @@ function report_path = generate_uncertainty_report(parameters, affixes)
 %   parameters - (1,1) simulation parameters struct; parameters.io.dir_output
 %                must point to the shared output folder; the optional
 %                parameters.uncertainty.report_suffix (the default variant's
-%                affix, e.g. '_desc-isppa030') is appended to the report file name
+%                affix, e.g. '_desc-isppa030') is appended to the report file name;
+%                with parameters.uncertainty.fov_reference_affix (the default
+%                medium's partial-FOV repeat, simulation.uncertainty_fov =
+%                'partial') the bound variants' metrics are rescaled to the
+%                whole grid (UNCERTAINTY_FOV_MISMATCH) and the factors written
+%                to sub-NNN_<medium>_desc-uncertainty_fovmismatch<affix>.csv
 %   affixes    - struct with one field per variant name (default: each
 %                variant's descriptor, e.g. .temp_high = '_desc-temphigh')
 %
@@ -69,6 +74,14 @@ try
             'No output tables found in %s — report will be empty.', output_dir);
     end
 
+    %% Partial-FOV mode: rescale the bound variants to the whole grid
+    % (simulation.uncertainty_fov = 'partial'; UNCERTAINTY_PIPELINE)
+    fov = struct('active', false);
+    if isfield(parameters, 'uncertainty') && isfield(parameters.uncertainty, 'fov_reference_affix') && ...
+            ~isempty(parameters.uncertainty.fov_reference_affix)
+        [tables, fov] = rescale_fov_variants(tables, variants, parameters, output_dir, affixes.default);
+    end
+
     %% Load heating timeseries from .mat files (if available)
     % Only load the fields needed for the SVG timeseries plot to limit memory use.
     heating_fields = {'timeseries', 't_array_s', 'focal_plume_T', 'T_time'};
@@ -113,7 +126,7 @@ try
     html_parts{end+1} = '<body>';
 
     % TOC
-    html_parts{end+1} = build_toc(is_layered, any(~cellfun(@isempty, heating)));
+    html_parts{end+1} = build_toc(is_layered, any(~cellfun(@isempty, heating)), fov.active);
 
     % Header
     html_parts{end+1} = build_header(subject_id, medium, parameters, variants, variant_affixes);
@@ -123,6 +136,16 @@ try
         html_parts{end+1} = build_safety_dashboard(tables, variants, is_layered);
     catch ME
         html_parts{end+1} = html_utils.section_error('Safety Dashboard', ME);
+    end
+
+    % Partial-FOV rescaling of the bound variants
+    if fov.active
+        try
+            html_parts{end+1} = html_utils.collapsible('Partial-FOV Rescaling', ...
+                build_fov_section(fov, variants), true, 'fov');
+        catch ME
+            html_parts{end+1} = html_utils.section_error('Partial-FOV Rescaling', ME);
+        end
     end
 
     % Pseudo-CT skull of the default variant against the bound variants' homogeneous skull
@@ -234,6 +257,97 @@ function affixes = default_affixes()
     end
 end
 
+function [tables, fov] = rescale_fov_variants(tables, variants, parameters, output_dir, default_affix)
+% Partial-FOV mode: the bound variants ran in the partial acoustic FOV, the
+% default on the whole grid. Take each metric's whole-grid / partial-FOV factor
+% from the default medium's two runs and apply it to the bound variants'
+% tables. Writes the factors and the bound variants' values before and after
+% rescaling to sub-NNN_<medium>_desc-uncertainty_fovmismatch<affix>.csv.
+    fov = struct('active', true, 'ok', false, 'mismatch', [], 'csv', '', ...
+                 'reference_affix', parameters.uncertainty.fov_reference_affix, 'message', '');
+    subject_id = parameters.subject_id;
+    medium     = parameters.simulation.medium;
+    ref_csv = fullfile(output_dir, sprintf('sub-%03d_%s%s.csv', subject_id, medium, fov.reference_affix));
+    i_def   = find(strcmp({variants.name}, 'default'));
+    if ~isfile(ref_csv) || isempty(tables{i_def})
+        fov.message = sprintf(['The default medium''s whole-grid or partial-FOV table is missing ' ...
+            '(%s): the bound variants are shown unscaled, as simulated in the partial FOV.'], ref_csv);
+        warn('generate_uncertainty_report:fovReference', '%s', fov.message);
+        return
+    end
+    temp_0 = 37;
+    if isfield(parameters, 'thermal') && isfield(parameters.thermal, 'temp_0')
+        temp_0 = parameters.thermal.temp_0;
+    end
+    mismatch = uncertainty_fov_mismatch(tables{i_def}, read_metrics_table(ref_csv), temp_0);
+
+    out = mismatch;
+    for v = 1:numel(variants)
+        if v == i_def || isempty(tables{v})
+            continue
+        end
+        raw       = metric_values(tables(v), mismatch.metric);
+        tables{v} = uncertainty_fov_rescale(tables{v}, mismatch);
+        out.([variants(v).name '_fov'])    = raw(:);
+        out.([variants(v).name '_scaled']) = reshape(metric_values(tables(v), mismatch.metric), [], 1);
+    end
+    fov.mismatch = out;
+    fov.ok       = true;
+    fov.csv      = fullfile(output_dir, sprintf('sub-%03d_%s_desc-uncertainty_fovmismatch%s.csv', ...
+        subject_id, medium, default_affix));
+    try
+        writetable(out, fov.csv);
+    catch ME
+        warn('generate_uncertainty_report:fovCsv', 'Cannot write %s: %s', fov.csv, ME.message);
+    end
+end
+
+function html = build_fov_section(fov, variants)
+% Explains the rescaling and lists each rescaled metric's factor.
+    bound_labels = strjoin({variants(~strcmp({variants.name}, 'default')).label}, ', ');
+    html = sprintf(['<p>The default variant ran on the whole grid; %s ran in the partial acoustic ' ...
+        'FOV. The default medium was repeated in that FOV (affix <code>%s</code>).</p>'], ...
+        html_utils.escape(bound_labels), html_utils.escape(fov.reference_affix));
+    if ~fov.ok
+        html = [html sprintf('<p style="color:#b91c1c;font-weight:600;">%s</p>', html_utils.escape(fov.message))];
+        return
+    end
+    html = [html '<p>Each metric''s factor (whole grid / partial FOV, default medium) is applied to the ' ...
+        'bound variants in every table and card of this report. Intensity, pressure, MI, temperature ' ...
+        'rise, and CEM43 are multiplied by it; absolute temperatures have their rise above the baseline ' ...
+        'multiplied. CEM43 is exponential in temperature, so its factor is a first-order correction. ' ...
+        'Focal position and size, volumes, and the temperature and CEM43 time courses are not rescaled. ' ...
+        'The factor comes from the default medium and is assumed to hold at the bounds.</p>'];
+    m = fov.mismatch;
+    show = ~strcmp(m.kind, 'none') & isfinite(m.full) & isfinite(m.fov);
+    html = [html '<div class="table-wrapper"><table class="data-table"><thead><tr><th>Metric</th>' ...
+        '<th>Default, whole grid</th><th>Default, partial FOV</th><th>Difference</th><th>Factor</th>' ...
+        '</tr></thead><tbody>'];
+    for r = find(show)'
+        if isfinite(m.factor(r))
+            f = sprintf('%.4g', m.factor(r));
+        else
+            f = 'not rescaled';
+        end
+        if isfinite(m.diff_pct(r))
+            d = sprintf('%+.2f %%', m.diff_pct(r));
+        else
+            d = 'N/A';
+        end
+        html = [html sprintf('<tr><td><strong>%s</strong></td><td>%.4g</td><td>%.4g</td><td>%s</td><td>%s</td></tr>', ...
+            html_utils.escape(m.metric{r}), m.full(r), m.fov(r), d, f)]; %#ok<AGROW>
+    end
+    html = [html '</tbody></table></div>'];
+    unscaled = m.metric(strcmp(m.kind, 'none') & isfinite(m.diff_pct) & abs(m.diff_pct) > 0);
+    if ~isempty(unscaled)
+        html = [html sprintf('<p>Not rescaled, and different between the two default runs: %s.</p>', ...
+            html_utils.escape(strjoin(unscaled', ', ')))];
+    end
+    [~, name, ext] = fileparts(fov.csv);
+    html = [html sprintf('<p>Factors and the bound variants'' values before and after rescaling: <code>%s</code>.</p>', ...
+        html_utils.escape([name ext]))];
+end
+
 function trio = pair_trio(variants, pair)
 % Indices [high, default, low] of a pair ('temp' | 'trans') in variants.
     trio = [find(strcmp({variants.pair}, pair) & strcmp({variants.bound}, 'high')), ...
@@ -255,7 +369,12 @@ function label = pair_label(pair)
 end
 
 function vals = metric_values(tables, name)
-% Last row of column name in each variant's table (NaN when absent).
+% Last row of column name in each variant's table (NaN when absent). A cell
+% array of names with one table gives one value per name.
+    if iscell(name)
+        vals = cellfun(@(n) metric_values(tables, n), name);
+        return
+    end
     vals = NaN(1, numel(tables));
     for v = 1:numel(tables)
         if ~isempty(tables{v}) && ismember(name, tables{v}.Properties.VariableNames)
@@ -1136,11 +1255,14 @@ end
 %  UTILITIES
 %% ========================================================================
 
-function html = build_toc(is_layered, has_thermal)
+function html = build_toc(is_layered, has_thermal, has_fov)
     html = '<nav class="toc" id="toc">';
     html = [html '<strong style="font-size:0.85em;color:#475569;">Uncertainty</strong>'];
     html = [html '<a href="#header">Header</a>'];
     html = [html '<a href="#safety">Safety</a>'];
+    if has_fov
+        html = [html '<a href="#fov">Partial FOV</a>'];
+    end
     html = [html '<a href="#acoustic">Acoustic</a>'];
     if has_thermal && is_layered
         html = [html '<a href="#thermal">Thermal</a>'];

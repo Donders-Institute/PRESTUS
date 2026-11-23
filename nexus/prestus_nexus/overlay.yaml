@@ -386,6 +386,7 @@ fields:
   time_reversal.pose_workflow.poses: {kind: yaml, help: "Pose ids of the pose table to verify as well, e.g. [12, 40]."}
   time_reversal.pose_workflow.aim: {kind: str, choices: [corrected, geometric, both]}
   time_reversal.pose_workflow.verify_fov: {kind: str, choices: [partial, full, config]}
+  simulation.uncertainty_fov: {kind: str, choices: [config, partial], visible_if: [{key: simulation.uncertainty, in: [true]}], help: "Partial FOV runs the default variant on the whole grid and the four bound variants, plus a repeat of the default medium, in the partial acoustic FOV (Acoustic FOV sizes, else auto). The report rescales the bound variants by the default medium's whole-grid / partial-FOV factor per metric. Not available with multi-ISPPA sweeps, async coupling, or sequential runs."}
   time_reversal.pose_workflow.rank_by: {kind: str, choices: [target_intensity, focus_error]}
   time_reversal.pose_workflow.max_focus_error_mm: {kind: yaml, unit: mm}
   time_reversal.pose_workflow.search_memorylimit: {kind: yaml, unit: GB}
@@ -966,6 +967,7 @@ display:
   transducer.timing.ptri: {label: "Pulse train repetition interval, this transducer", group: coupling, advanced: true}
   transducer.timing.ptrd: {label: "Sonication duration, this transducer", group: coupling, advanced: true}
   simulation.uncertainty: {label: Uncertainty analysis, group: uncertainty, group_first: true}
+  simulation.uncertainty_fov: {group: uncertainty, label: Grid of the bound variants}
   simulation.uncertainty_overrides: {kind: yaml, group: uncertainty, label: Edited bounds, help: "Edited bound values of the uncertainty variants, per variant, tissue, and property, merged onto the shipped ITRUSST bounds. Edit them in the Values per variant table of the Uncertainty variants card (unlock it first); edited variants no longer bracket the ITRUSST bounds."}
 
   # Paths
@@ -1434,6 +1436,7 @@ choice_labels:
   time_reversal.placement_search.jitter_mode: {grid: Along grid axes, scalp: Over the scalp}
   time_reversal.pose_workflow.aim: {corrected: Aberration-corrected, geometric: Geometric target, both: Both}
   time_reversal.pose_workflow.verify_fov: {partial: Acoustic FOV, full: Full grid, config: As configured}
+  simulation.uncertainty_fov: {config: As configured, partial: Partial FOV (rescaled)}
   time_reversal.pose_workflow.rank_by: {target_intensity: Target intensity, focus_error: Focus error}
   jwave.solver: {helmholtz: Helmholtz (frequency domain), pseudo_spectral: Pseudo-spectral (time domain), finite_differences: Finite differences (time domain)}
   elastic.shear_mapping: {pichardo: Pichardo et al. 2017, 'off': Off (fluid skull)}

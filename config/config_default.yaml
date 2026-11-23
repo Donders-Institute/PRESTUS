@@ -40,6 +40,10 @@ simulation:
   uncertainty_overrides: []     # Edited bound values of the simulation.uncertainty variants, per variant, tissue and property,
                                 #   e.g. {temp_high: {brain: {sound_speed: 1560}}}, merged onto the shipped ITRUSST bounds in
                                 #   config/uncertainty/. [] = the ITRUSST bounds unchanged. Edited variants no longer bracket them.
+  uncertainty_fov: 'config'     # Grid of the simulation.uncertainty variants: 'config' (all on the configured grid) |
+                                #   'partial' (default on the whole grid; the four bound variants and a repeat of the default
+                                #   medium in the partial acoustic FOV, grid.acoustic_fov_* or 'auto'; the report rescales the
+                                #   bound variants by the default medium's whole-grid / partial-FOV factor per metric)
 
 #------------ Paths
 

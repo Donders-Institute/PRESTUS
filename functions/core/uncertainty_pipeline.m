@@ -24,6 +24,15 @@ function jobs = uncertainty_pipeline(parameters, options)
 % run. Inner-pipeline options (e.g. .thermal_timelimit) pass through options.
 % Sequential follow-up runs are not supported in nested mode.
 %
+% Partial-FOV bound variants (simulation.uncertainty_fov = 'partial'): the
+% default variant runs on the whole grid (grid.acoustic_fov_* cleared) and the
+% four bound variants in the partial acoustic FOV (grid.acoustic_fov_* as
+% configured, else 'auto'). One more run repeats the default medium in that FOV
+% (affix <base>_desc-defaultfov). The report takes the whole-grid / partial-FOV
+% factor of each metric from the two default runs and applies it to the bound
+% variants (UNCERTAINTY_FOV_MISMATCH, UNCERTAINTY_FOV_RESCALE); their CSVs keep
+% the partial-FOV values. Not available in nested mode or with sequential runs.
+%
 % Variant definitions (ITRUSST tissue-property bounds, config/uncertainty/):
 %   Default      PRESTUS default medium properties; with pct.enabled, the
 %                skull is mapped from the pseudo-CT
@@ -57,7 +66,10 @@ function jobs = uncertainty_pipeline(parameters, options)
 %   options    - pipeline knobs (optional, default: struct()):
 %                .affixes             — struct with one field per variant name
 %                                       (default, temp_high, temp_low, trans_high,
-%                                       trans_low): filename suffixes per variant
+%                                       trans_low): filename suffixes per variant;
+%                                       .default_fov names the partial-FOV repeat
+%                                       of the default medium (uncertainty_fov
+%                                       'partial'; default <default>_desc-defaultfov)
 %                .stage1_timelimit    — HPC wall time for stage 1 (default '12:00:00')
 %                .sim_timelimit       — HPC wall time for stages 2-6 (default '06:00:00')
 %                .report_timelimit    — HPC wall time for stage 7 (default '00:30:00')
@@ -237,13 +249,43 @@ jobs = struct('all', []);
 
 p_stage1   = make_stage1_params(parameters, ow);
 
+% Partial-FOV mode: whole grid for the default, partial FOV for the bounds
+% and for one repeat of the default medium (the mismatch reference).
+fov_partial = strcmp(uncertainty_fov_mode(parameters), 'partial');
+if fov_partial && ~isempty(nested)
+    error('uncertainty_pipeline:fovNested', ...
+        ['simulation.uncertainty_fov = ''partial'' is not available when the variants run a ' ...
+         '%s pipeline. Set it to ''config''.'], strrep(nested, '_', '-'));
+end
+
 n_var      = numel(variants);
 p_variants = cell(1, n_var);
 for v = 1:n_var
     p_variants{v} = make_sim_params(parameters, options.affixes.(variants(v).name), ...
                         variant_medium_layer(variants(v).name, options), ...
                         variants(v).heating, ow);
+    if fov_partial
+        if strcmp(variants(v).name, 'default')
+            p_variants{v} = set_acoustic_fov(p_variants{v}, 'full');
+        else
+            p_variants{v} = set_acoustic_fov(p_variants{v}, 'partial');
+        end
+    end
 end
+fov_affix = '';
+p_fovref  = [];
+if fov_partial
+    if isfield(options.affixes, 'default_fov')
+        fov_affix = options.affixes.default_fov;
+    else
+        fov_affix = [options.affixes.default '_desc-defaultfov'];
+    end
+    p_fovref = set_acoustic_fov(make_sim_params(parameters, fov_affix, [], true, ow), 'partial');
+    fprintf(['Partial-FOV mode: default on the whole grid; bound variants and a repeat of the ' ...
+             'default medium (%s) in the partial acoustic FOV.\n\n'], fov_affix);
+end
+n_sim        = n_var + double(fov_partial);   % simulation stages
+report_stage = n_sim + 2;
 
 % Pre-assign deterministic log file paths for all seven stages so that
 % generate_uncertainty_report can locate each stage's timing data.
@@ -262,6 +304,9 @@ for v = 1:n_var
         subj, medium, options.affixes.(variants(v).name), run_ts));
 end
 log_files.report = fullfile(logs_dir, sprintf('%s_%s_desc-report_%s.txt', subj, medium, run_ts));
+if fov_partial
+    p_fovref.io.log_file = fullfile(logs_dir, sprintf('%s_%s%s_%s.txt', subj, medium, fov_affix, run_ts));
+end
 
 p_stage1.io.log_file = log_files.stage1;
 if isempty(nested)
@@ -272,6 +317,11 @@ if isempty(nested)
 end
 
 p_report       = make_report_params(parameters, options.affixes, log_files, ow, options);
+if fov_partial
+    % The report rescales the bound variants with the default medium's
+    % whole-grid / partial-FOV factors (GENERATE_UNCERTAINTY_REPORT).
+    p_report.uncertainty.fov_reference_affix = fov_affix;
+end
 
 % =========================================================================
 %% Sequential config pre-processing
@@ -285,6 +335,11 @@ if has_sequential && ~isempty(nested)
         ['Sequential follow-up runs are not supported when the uncertainty variants ' ...
          'run a %s pipeline. Run the sequential chain with a scalar target and ' ...
          'coherent coupling, or drop options.sequential_configs.'], strrep(nested, '_', '-'));
+end
+if has_sequential && fov_partial
+    error('uncertainty_pipeline:fovSequential', ...
+        ['simulation.uncertainty_fov = ''partial'' is not available with sequential follow-up ' ...
+         'runs. Set it to ''config'', or drop options.sequential_configs.']);
 end
 
 % run_index_start: the run number assigned to the FIRST sequential follow-up.
@@ -314,9 +369,14 @@ switch platform
                       @() prestus_pipeline(p_variants{v}));
         end
 
+        if fov_partial
+            run_stage(n_var + 2, 'Default simulation in the partial FOV (mismatch reference)', ...
+                      @() prestus_pipeline(p_fovref));
+        end
+
         % Warn about any missing variant outputs before attempting report
         assert_variant_outputs_exist(parameters, options.affixes);
-        run_stage(n_var + 2, 'Uncertainty report', @() prestus_pipeline(p_report));
+        run_stage(report_stage, 'Uncertainty report', @() prestus_pipeline(p_report));
 
         % Clean up intermediate files when save_matrices = 0
         if ~should_save_output(parameters.io, 'save_matrices')
@@ -404,6 +464,13 @@ switch platform
         % If not skipped, it depends on stage 1 (when stage 1 was submitted).
         [job_ids_sim, sim_submitted] = submit_variant_sims(p_variants, options.affixes, ...
             job_id_stage1, run_prefix, '[Stage %d]', parameters, subj, options, ow);
+        if fov_partial
+            % Repeat of the default medium in the partial FOV (mismatch reference)
+            [job_ids_sim(end+1), sim_submitted(end+1)] = submit_sim(p_fovref, 'default_fov', ...
+                fov_affix, n_var + 2, job_id_stage1, run_prefix, '[Stage %d]', parameters, ...
+                subj, options, ow);
+            fprintf('\n');
+        end
 
         % ── Stage 7 ──────────────────────────────────────────────────────
         % Skip if the report already exists.
@@ -411,8 +478,8 @@ switch platform
         report_file = fullfile(output_dir, ...
             sprintf('sub-%03d_%s_desc-uncertainty_report%s.html', subject_id, medium, options.affixes.default));
         job_id_report = submit_report(p_report, report_file, job_ids_sim(sim_submitted), ...
-            sprintf('[Stage %d]', n_var + 2), ...
-            sprintf('PRESTUS-%su%d-report_%s', run_prefix, n_var + 2, subj), options, ow);
+            sprintf('[Stage %d]', report_stage), ...
+            sprintf('PRESTUS-%su%d-report_%s', run_prefix, report_stage, subj), options, ow);
 
         % ── Sequential runs (HPC) ────────────────────────────────────────
         % Each sequential run submits its variants with afterok on the
@@ -672,30 +739,38 @@ function [job_ids, submitted] = submit_variant_sims(p_variants, affixes, depend_
 % skipped) and which variants were submitted.
     variants   = uncertainty_variants();
     n_var      = numel(variants);
-    output_dir = get_output_dir(base);
     job_ids    = zeros(1, n_var);
     submitted  = false(1, n_var);
     for vi = 1:n_var
-        name     = variants(vi).name;
-        p        = p_variants{vi};
-        csv_file = fullfile(output_dir, sprintf('sub-%03d_%s%s.csv', ...
-            base.subject_id, base.simulation.medium, affixes.(name)));
-        fprintf('%s Submitting %s simulation    ', sprintf(label_fmt, vi + 1), name);
-        if isfile(csv_file) && ~ow.rerun_outputs
-            fprintf('— output exists, skipping.\n');
-            continue
-        end
-        p.hpc.timelimit = options.sim_timelimit;
-        p.hpc.job_name  = sprintf('PRESTUS-%su%d-sim-%s_%s', run_prefix, vi + 1, name, subj);
-        p               = apply_memorylimit(p, options.sim_memorylimit);
-        if ~isempty(depend_id)
-            p.hpc.depend_job_id = depend_id;
-        end
-        job_ids(vi)   = prestus_pipeline_start(p);
-        submitted(vi) = true;
-        fprintf('→ job %s  (mem %iG)\n', num2str(job_ids(vi)), p.hpc.memorylimit);
+        name = variants(vi).name;
+        [job_ids(vi), submitted(vi)] = submit_sim(p_variants{vi}, name, affixes.(name), vi + 1, ...
+            depend_id, run_prefix, label_fmt, base, subj, options, ow);
     end
     fprintf('\n');
+end
+
+function [job_id, submitted] = submit_sim(p, name, affix, stage, depend_id, run_prefix, ...
+        label_fmt, base, subj, options, ow)
+% Submit one simulation job (stage number stage) unless its output CSV exists
+% and the run does not re-run outputs. Returns the job ID (0 when skipped).
+    job_id    = 0;
+    submitted = false;
+    csv_file  = fullfile(get_output_dir(base), sprintf('sub-%03d_%s%s.csv', ...
+        base.subject_id, base.simulation.medium, affix));
+    fprintf('%s Submitting %s simulation    ', sprintf(label_fmt, stage), name);
+    if isfile(csv_file) && ~ow.rerun_outputs
+        fprintf('— output exists, skipping.\n');
+        return
+    end
+    p.hpc.timelimit = options.sim_timelimit;
+    p.hpc.job_name  = sprintf('PRESTUS-%su%d-sim-%s_%s', run_prefix, stage, name, subj);
+    p               = apply_memorylimit(p, options.sim_memorylimit);
+    if ~isempty(depend_id)
+        p.hpc.depend_job_id = depend_id;
+    end
+    job_id    = prestus_pipeline_start(p);
+    submitted = true;
+    fprintf('→ job %s  (mem %iG)\n', num2str(job_id), p.hpc.memorylimit);
 end
 
 function job_id = submit_report(p, report_file, depend_ids, label, job_name, options, ow)
@@ -742,6 +817,32 @@ function p = clear_uncertainty_flag(p)
 % pipeline (which would cause infinite job submission).
     if isfield(p, 'simulation') && isfield(p.simulation, 'uncertainty')
         p.simulation.uncertainty = false;
+    end
+end
+
+function mode = uncertainty_fov_mode(p)
+% simulation.uncertainty_fov: 'config' (default) | 'partial'.
+    mode = 'config';
+    if isfield(p.simulation, 'uncertainty_fov') && ~isempty(p.simulation.uncertainty_fov)
+        mode = char(p.simulation.uncertainty_fov);
+    end
+    if ~ismember(mode, {'config', 'partial'})
+        error('uncertainty_pipeline:fovMode', ...
+            'simulation.uncertainty_fov must be ''config'' or ''partial'' (got ''%s'').', mode);
+    end
+end
+
+function p = set_acoustic_fov(p, mode)
+% 'full': no acoustic FOV. 'partial': the configured grid.acoustic_fov_*
+% values, 'auto' for each one that is unset (RESOLVE_ACOUSTIC_FOV_PARAMS).
+    keys = {'acoustic_fov_length_mm', 'acoustic_fov_diameter_mm'};
+    for k = keys
+        if strcmp(mode, 'full')
+            p.grid.(k{1}) = [];
+        elseif ~isfield(p.grid, k{1}) || isempty(p.grid.(k{1})) || ...
+                (isstring(p.grid.(k{1})) && all(strlength(p.grid.(k{1})) == 0))
+            p.grid.(k{1}) = 'auto';   % unset, also as the empty string a YAML '' loads as
+        end
     end
 end
 
