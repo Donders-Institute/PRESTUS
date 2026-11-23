@@ -59,6 +59,25 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_hpc_su
             tc.verifyEmpty(strfind(txt, 'gpus='));
         end
 
+        function test_dependency_ids_numbers_or_text(tc)
+            % qsub IDs are text ('123.server'); SLURM IDs numbers; both alone or in a list
+            cases = {'slurm', 'depend_job_id',  123,                          '--dependency=afterok:123'
+                     'slurm', 'depend_job_ids', [123 456],                    '--dependency=afterok:123:456'
+                     'qsub',  'depend_job_id',  '123.server',                 'depend=afterok:123.server'
+                     'qsub',  'depend_job_ids', {'123.server', '456.server'}, 'depend=afterok:123.server:456.server'
+                     'qsub',  'depend_job_ids', ["123.server" "456.server"],  'depend=afterok:123.server:456.server'};
+            for k = 1:size(cases, 1)
+                tmp = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+                p = hpc_params();
+                p.hpc.(cases{k, 2}) = cases{k, 3};
+                try %#ok<TRYNC>
+                    hpc_submit_job(cases{k, 1}, 'job_m', p, tmp);
+                end
+                txt = fileread(only_file(tc, tmp, sprintf('temp_%s_*.sh', cases{k, 1})));
+                tc.verifySubstring(txt, cases{k, 4}, sprintf('case %d', k));
+            end
+        end
+
         function test_job_logs_are_per_job(tc)
             % Each job writes its own log. SLURM expands %j in #SBATCH
             % directives; PBS expands nothing in #PBS directives, so the

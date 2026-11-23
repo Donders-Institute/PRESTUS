@@ -122,13 +122,9 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
     % hpc.depend_type: 'afterok' (default) or 'afterany' (e.g. a study's group
     % report, which should run even when some subject jobs failed).
     dep_type = dependency_type(parameters);
-    if isfield(parameters.hpc, 'depend_job_ids') && ~isempty(parameters.hpc.depend_job_ids)
-        dep_str = strjoin(arrayfun(@(x) num2str(x), parameters.hpc.depend_job_ids, ...
-            'UniformOutput', false), ':');
+    dep_str = dependency_ids(parameters);
+    if ~isempty(dep_str)
         fprintf(fid, '#SBATCH --dependency=%s:%s\n', dep_type, dep_str);
-        fprintf(fid, '#SBATCH --kill-on-invalid-dep=yes\n');
-    elseif isfield(parameters.hpc, 'depend_job_id') && ~isempty(parameters.hpc.depend_job_id)
-        fprintf(fid, '#SBATCH --dependency=%s:%d\n', dep_type, parameters.hpc.depend_job_id);
         fprintf(fid, '#SBATCH --kill-on-invalid-dep=yes\n');
     end
     
@@ -235,12 +231,9 @@ function write_qsub_script(temp_qsub_path, parameters, temp_m_file, log_dir)
 
     % Job dependencies (used by uncertainty pipeline for stage chaining)
     dep_type = dependency_type(parameters);
-    if isfield(parameters.hpc, 'depend_job_ids') && ~isempty(parameters.hpc.depend_job_ids)
-        dep_str = strjoin(arrayfun(@(x) num2str(x), parameters.hpc.depend_job_ids, ...
-            'UniformOutput', false), ':');
+    dep_str = dependency_ids(parameters);
+    if ~isempty(dep_str)
         fprintf(fid, '#PBS -W depend=%s:%s\n', dep_type, dep_str);
-    elseif isfield(parameters.hpc, 'depend_job_id') && ~isempty(parameters.hpc.depend_job_id)
-        fprintf(fid, '#PBS -W depend=%s:%d\n', dep_type, parameters.hpc.depend_job_id);
     end
     % PBS does not expand a job ID in #PBS -o/-e, so the script body
     % redirects its output to per-job logs named as for SLURM.
@@ -310,5 +303,32 @@ function dep_type = dependency_type(parameters)
         dep_type = char(parameters.hpc.depend_type);
         assert(any(strcmp(dep_type, {'afterok', 'afterany'})), ...
             'hpc.depend_type must be ''afterok'' or ''afterany'' (got ''%s'').', dep_type);
+    end
+end
+
+function txt = dependency_ids(parameters)
+% hpc.depend_job_ids (or hpc.depend_job_id) as 'id:id:...'; IDs may be numbers
+% (SLURM) or text (qsub, e.g. '12345.server'), alone or in a cell array
+    ids = get_field(parameters, {'hpc', 'depend_job_ids'});
+    if isempty(ids)
+        ids = get_field(parameters, {'hpc', 'depend_job_id'});
+    end
+    if isempty(ids)
+        txt = '';
+        return
+    end
+    if ischar(ids) || isstring(ids)
+        ids = cellstr(ids);
+    elseif isnumeric(ids)
+        ids = num2cell(ids(:)');
+    end
+    txt = strjoin(cellfun(@id_text, ids, 'UniformOutput', false), ':');
+end
+
+function t = id_text(id)
+    if ischar(id) || isstring(id)
+        t = strtrim(char(id));
+    else
+        t = sprintf('%d', id);
     end
 end
