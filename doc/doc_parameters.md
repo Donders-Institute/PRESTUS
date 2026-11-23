@@ -203,6 +203,8 @@ Segmentation and MNI conversion need `startup.simnibs_bin_path`. The other paths
 | `save_thermal_matrices` | Save `heating_res.mat` (temperature time series and field maps)? | `[]` → `1` | `[]` inherits `save_matrices`, else default. |
 | `save_grid_cache` / `save_medium_cache` | Save grid / medium caches? | unset → `0` | Inherit `save_matrices` when unset. |
 | `save_property_maps` | Save per-property NIfTIs to nii/properties/ (layered medium only)? | `0` | Not affected by `save_matrices`. |
+| `save_transducer_nii` | Save a model of the planned transducer as a T1-space NIfTI (`nii/sub-XXX_<medium>_T1w<affix>_transducer.nii.gz`)? | `1` | Layered medium, annular transducers. Voxel values: `1` = emitting face (smallest `elem_id_mm` to largest `elem_od_mm`), `0.5` = the thickness behind it (`transducer_nii_back_mm`), `0` = elsewhere, including the central opening. Built from the planned T1-voxel positions, on the T1 voxel grid, for placement checks next to the T1 and the acoustic maps. No MNI copy. Not affected by `save_matrices`. See [NIfTI Images](doc_outputs.md#nifti-images). |
+| `transducer_nii_back_mm` | Thickness added behind the emitting face in the transducer NIfTI [mm]. | `3` | Display only, value `0.5`: the emitting face (value `1`) stays where PRESTUS places it. `0` gives the face alone. |
 | `save_MNI` | Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)? | `1` | Not affected by `save_matrices`. |
 | `save_heatingvideo` | Save a video of incremental heating? | `0` | `1 = yes`, `0 = no` |
 | `save_Ipa` | Save the pulse-average intensity (Ipa) NIfTI map? | `1` | Suppressed automatically when `timing.pd` is absent. |

@@ -12,7 +12,8 @@ function [parameters] = prestus_pipeline(parameters, options)
 %   3. Grid & head model grid_stage — reorientation, rescaling, smoothing,
 %                        and cropping of the segmented head to the simulation grid
 %   4. Medium setup      medium_stage — assignment of acoustic/thermal tissue
-%                        properties (density, sound speed, attenuation, …)
+%                        properties (density, sound speed, attenuation, …);
+%                        medium and transducer-model NIfTI export
 %   5. Source setup      Construction of the transducer source array
 %                        (kWaveArray or analytical; annular or matrix)
 %   6. Acoustic sim      acoustic_stage — k-Wave / jwave / BabelBrain
@@ -214,6 +215,12 @@ function [parameters] = prestus_pipeline(parameters, options)
     clear medium_maps
     log_timer('stop', 'nifti_medium');
     clear bone_mask
+
+    % Model of the planned transducer in T1 space (io.save_transducer_nii),
+    % written before the source setup so placement can be checked without simulating
+    log_timer('start', 'nifti_transducer', parameters.io.dir_output);
+    nifti_transducer(parameters, planimg);
+    log_timer('stop', 'nifti_transducer');
 
     % ====================================================================
     %% ACOUSTIC FOV CROP  (between medium and source setup)

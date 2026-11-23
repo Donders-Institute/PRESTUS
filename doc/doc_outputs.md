@@ -34,7 +34,7 @@ sub-XXX_<medium><affix>.csv               ← quantitative metrics
 sub-XXX_<medium><affix>_targeting.csv     ← targeting accuracy (layered or phantom)
 sub-XXX_placement<affix>.json             ← resolved transducer positions (T1 voxels; every placement mode)
 
-nii/                                       ← NIfTI maps (medium, acoustic, thermal); not created with modules.run_nifti_creation: 0
+nii/                                       ← NIfTI maps (medium, transducer model, acoustic, thermal); not created with modules.run_nifti_creation: 0
 img/                                       ← PNG figures (acoustic, thermal, preprocessing)
 babelbrain/                                ← BabelBrain inputs (io.export_babelbrain or acoustic_backend: babelbrain)
 
@@ -98,6 +98,11 @@ PRESTUS exports 3D volumes (2D for axisymmetric simulations) in subject-native T
     | `sound_speed` | nearest | Speed of sound [m/s]; edges filled with water value |
     | `density` | nearest | Mass density [kg/m³]; edges filled with water value |
     | `alpha_coeff` | nearest | Attenuation coefficient [dB/(cm·MHz^y)]; edges filled with water value |
+
+??? note "Transducer model (written after medium setup)"
+    | Type | Resampling | Description |
+    |---|---|---|
+    | `transducer` | none (built on the T1 grid) | Model of the planned transducer bowl(s), from the planned T1-voxel positions; the bowl's rear centre is at `trans_pos`. `1` = emitting face across the active aperture (smallest `elem_id_mm` to largest `elem_od_mm`), `0.5` = the display thickness behind it (`io.transducer_nii_back_mm`), `0` = elsewhere, including the central opening. The aperture edges follow the profile's mm limits, not whole voxels. Layered medium, annular transducers, `io.save_transducer_nii`. T1 space only. |
 
 ??? note "Acoustic maps (written after acoustic analysis)"
     | Type | Description |
