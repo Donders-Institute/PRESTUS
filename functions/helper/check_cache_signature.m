@@ -69,11 +69,13 @@ function [ok, diffs] = check_cache_signature(filename, stored, current, paramete
         stored.grid = rmfield(stored.grid, g(startsWith(g, 'acoustic_fov_')));
     end
 
-    % Keys added to the signatures later (phantom file identity, the
-    % axisymmetric transpose flag of the grid stage) are not compared with
-    % caches that predate them.
-    if isfield(current, 'phantom_file') && ~isfield(stored, 'phantom_file')
-        current = rmfield(current, 'phantom_file');
+    % Keys added to the signatures later (phantom file identity, the medium's
+    % initial temperature, the acoustic solver, the axisymmetric transpose flag
+    % of the grid stage) are not compared with caches that predate them.
+    for late = {'phantom_file', 'temp_0', 'acoustic_solver'}
+        if isfield(current, late{1}) && ~isfield(stored, late{1})
+            current = rmfield(current, late{1});
+        end
     end
     if isfield(current, 'grid') && isstruct(current.grid) && isfield(current.grid, 'axisym_transposed') && ...
             ~(isfield(stored, 'grid') && isstruct(stored.grid) && isfield(stored.grid, 'axisym_transposed'))

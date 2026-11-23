@@ -81,6 +81,10 @@ end
     if isfield(acoustic_provenance, 'input_signature')
         current_sig = acoustic_provenance.input_signature;
     end
+    if isfield(current_sig, 'acoustic_solver')
+        % a prior map is used as it is, whichever solver computed it
+        current_sig = rmfield(current_sig, 'acoustic_solver');
+    end
     if isempty(sidecar)
         check_sidecar_signature(file, [], current_sig, parameters, remedy);   % warns: unverified
     else
@@ -91,6 +95,7 @@ end
         else
             stored_sig = [];
             if isfield(sc, 'signature'); stored_sig = sc.signature; end
+            if isfield(stored_sig, 'acoustic_solver'); stored_sig = rmfield(stored_sig, 'acoustic_solver'); end
             check_sidecar_signature(sidecar, stored_sig, current_sig, parameters, remedy);
             if isfield(sc, 'isppa') && isstruct(sc.isppa)
                 level = positive_or_empty(sc.isppa, 'level_wcm2');

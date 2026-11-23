@@ -49,6 +49,9 @@ function [key, shareable] = acoustic_store_key(parameters, transducer_idx, p_aco
     if isfield(sig, 'transducer')
         sig.transducer = strip_stance_free(sig.transducer);
     end
+    if isfield(sig, 'acoustic_solver')
+        sig = rmfield(sig, 'acoustic_solver');   % the solver enters the key below, so kept fields keep their keys
+    end
     s.signature = sig;
 
     backend = 'kwave';

@@ -234,6 +234,50 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_cache_
             tc.verifyError(@() cache_signature(tc.params(), 'thermal'), 'cache_signature:badKind');
         end
 
+        function test_initial_temperature_in_medium_signature(tc)
+            p = tc.params();
+            p.thermal = struct('temp_0', struct('skull', 37));
+            stored = cache_signature(p, 'medium');
+            p.thermal.temp_0.skull = 36;
+            tc.verifyError(@() check_cache_signature('m.mat', stored, cache_signature(p, 'medium'), p), ...
+                'prestus:cache:signatureMismatch');
+            % a cache from before temp_0 was recorded is not compared on it
+            legacy = rmfield(stored, 'temp_0');
+            tc.verifyTrue(check_cache_signature('m.mat', legacy, cache_signature(p, 'medium'), p));
+        end
+
+        function test_fit_alpha_power_in_medium_signature(tc)
+            p = tc.params();
+            stored = cache_signature(p, 'medium');
+            tc.verifyFalse(isfield(stored, 'fit_alpha_power'));   % default 1: signature unchanged
+            p.fit_alpha_power = 0;
+            tc.verifyError(@() check_cache_signature('m.mat', stored, cache_signature(p, 'medium'), p), ...
+                'prestus:cache:signatureMismatch');
+            p.acoustic_backend = 'jwave';                          % jwave always refits with 1
+            tc.verifyFalse(isfield(cache_signature(p, 'medium'), 'fit_alpha_power'));
+        end
+
+        function test_acoustic_solver_in_acoustic_signature(tc)
+            p = tc.params();
+            p.simulation.code_type = 'matlab_gpu';
+            stored = cache_signature(p, 'acoustic');
+            for change = {{'acoustic_backend', 'jwave'}, {'code_type', 'cpp_cpu'}}
+                q = p;
+                if strcmp(change{1}{1}, 'code_type')
+                    q.simulation.code_type = change{1}{2};
+                else
+                    q.(change{1}{1}) = change{1}{2};
+                end
+                tc.verifyError(@() check_cache_signature('r.mat', stored, cache_signature(q, 'acoustic'), q), ...
+                    'prestus:cache:signatureMismatch', change{1}{1});
+            end
+            % not in the grid or medium signatures, and legacy fields are not compared on it
+            tc.verifyFalse(isfield(cache_signature(p, 'medium'), 'acoustic_solver'));
+            legacy = rmfield(stored, 'acoustic_solver');
+            q = p; q.acoustic_backend = 'jwave';
+            tc.verifyTrue(check_cache_signature('r.mat', legacy, cache_signature(q, 'acoustic'), q));
+        end
+
     end
 
 end

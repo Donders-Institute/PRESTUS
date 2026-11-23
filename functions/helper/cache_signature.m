@@ -75,12 +75,22 @@ function sig = cache_signature(parameters, kind)
             end
             % a tissue's medium uses absorption_coeff or absorption_fraction, whichever is set
             sig.medium_properties = drop_absorption_coeff(get_field(parameters, {'medium_properties'}), parameters);
+            % the initial temperature map is part of the medium cache (MEDIUM_SETUP)
+            sig.temp_0 = get_field(parameters, {'thermal', 'temp_0'});
+            % the k-Wave attenuation refit (MEDIUM_SETUP); jwave always uses 1;
+            % field only when it differs from 1, so existing caches keep their signature
+            fap = get_field(parameters, {'fit_alpha_power'}, 1);
+            if strcmpi(char(get_field(parameters, {'acoustic_backend'}, 'kwave')), 'jwave'), fap = 1; end
+            if ~isequal(fap, 1), sig.fit_alpha_power = fap; end
         case 'acoustic'
             % A pressure map reused by a later run (path.acoustic_input): its
             % grid and medium, but not the thermal-only grid settings, so the
             % thermal stage can be re-run on another grid.
             sig.subject_id = get_field(parameters, {'subject_id'});
             sig.medium_properties = drop_absorption_coeff(get_field(parameters, {'medium_properties'}), []);
+            % the solver that computed the field (as ACOUSTIC_STORE_KEY); a run
+            % starting from the map (LOAD_ACOUSTIC_INPUT) does not compare it
+            sig.acoustic_solver = acoustic_solver(parameters);
             if isstruct(sig.grid)
                 g = fieldnames(sig.grid);
                 sig.grid = rmfield(sig.grid, g(startsWith(g, 'thermal_')));
@@ -103,6 +113,19 @@ function sig = cache_signature(parameters, kind)
         otherwise
             error('cache_signature:badKind', 'Unknown cache kind ''%s'' (grid | medium | acoustic | headmodel).', kind);
     end
+end
+
+function s = acoustic_solver(parameters)
+% Backend, its settings block, and the k-Wave code type and precision
+    s = struct();
+    s.backend = char(get_field(parameters, {'acoustic_backend'}, 'kwave'));
+    if isempty(s.backend), s.backend = 'kwave'; end
+    blocks = struct('jwave', 'jwave', 'babelbrain', 'babelbrain', 'kwave_elastic', 'elastic');
+    if isfield(blocks, s.backend)
+        s.settings = get_field(parameters, {blocks.(s.backend)});
+    end
+    s.code_type = get_field(parameters, {'simulation', 'code_type'});
+    s.precision = get_field(parameters, {'simulation', 'precision'});
 end
 
 function id = segmentation_identity(parameters)
