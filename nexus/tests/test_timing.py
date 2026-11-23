@@ -154,6 +154,35 @@ def test_timing_fields_fold_under_the_diagram(schema, tmp_path):
     w.close()
 
 
+def test_fields_shown_when_no_protocol_can_be_drawn(schema, tmp_path):
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    pytest.importorskip("PyQt6")
+    from pathlib import Path
+    from PyQt6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from prestus_nexus.model import ConfigModel
+    from prestus_nexus.session import Session
+    from prestus_nexus.ui.main_window import MainWindow
+    w = MainWindow(ConfigModel(schema), Session(tmp_path / "s.yaml"), Path(__file__).resolve().parents[2])
+    rows = {r.node.path: r for r in w.pages["timing"].rows}
+    assert not tm.Protocol.from_model(w.model.get).has_pulse
+    assert w.timing_panel.fold_button.isChecked()                         # empty on opening
+    assert not rows["timing.pd"].block.isHidden()
+    for k, v in {"timing.pd": 0.02, "timing.pri": 0.2, "timing.ptd": 1, "timing.ptri": 3, "timing.ptrd": 12}.items():
+        w.model.set(k, v)
+    w.timing_panel.refresh()
+    w.timing_panel.fold_button.setChecked(False)                          # hidden once drawn
+    assert rows["timing.pd"].block.isHidden()
+    w.model.set("timing.pd", None)                                        # cleared again
+    w.timing_panel.refresh()
+    assert not rows["timing.pd"].block.isHidden()
+    w.timing_panel.fold_button.setChecked(False)                          # the user may still hide them
+    w.timing_panel.refresh()
+    assert not w.timing_panel.fold_button.isChecked()
+    w.close()
+
+
 def test_values_equal_on_screen_are_not_flagged():
     # 700 ms typed with a unit used to be 0.7000000000000001 s, so 'PD > PRI' stayed on screen
     assert tm.parse_duration("700 ms") == 0.7

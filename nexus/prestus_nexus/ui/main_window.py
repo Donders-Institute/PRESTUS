@@ -936,7 +936,8 @@ class MainWindow(QMainWindow):
                     self.timing_panel = TimingPanel(self.model)
                     self.timing_panel.changed.connect(self._changed)
                     page.add_extra(self.timing_panel)
-                    page.set_fold(TimingPanel.FOLDED, open_=False)      # edited in the diagram
+                    page.set_fold(TimingPanel.FOLDED,                   # edited in the diagram
+                                  open_=self.timing_panel.fold_button.isChecked())
                     self.timing_panel.fold_toggled.connect(
                         lambda shown, pg=page: (setattr(pg, "fold_open", shown), pg.refresh()))
                     from .sequence_card import SequenceCard

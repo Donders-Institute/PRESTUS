@@ -492,6 +492,7 @@ class TimingPanel(QWidget):
             row.addWidget(b)
         row.addStretch(1)
         v.addLayout(row)
+        self._had_pulse = True                 # an empty protocol on opening shows the fields too
         self.refresh()
 
     def _fold_toggled(self, shown: bool) -> None:
@@ -543,6 +544,9 @@ class TimingPanel(QWidget):
 
     def refresh(self) -> None:
         p = self.protocol()
+        if not p.has_pulse and self._had_pulse:   # nothing to draw: show the fields to type into
+            self.fold_button.setChecked(True)
+        self._had_pulse = p.has_pulse
         sched = tm.AsyncSchedule.from_model(self.model)
         heads = None
         if sched is not None:
