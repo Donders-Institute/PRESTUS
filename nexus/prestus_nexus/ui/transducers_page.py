@@ -55,7 +55,7 @@ def _fmt_vec(v, nd: int = 1) -> str:
     if isinstance(v, (list, tuple, np.ndarray)) and len(v) == 3:
         try:
             return ", ".join(f"{float(x):.{nd}f}".rstrip("0").rstrip(".") for x in v)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError):  # best-effort: a vector that is not numeric shows as a dash
             pass
     return "—"
 

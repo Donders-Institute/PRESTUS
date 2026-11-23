@@ -21,6 +21,7 @@ from ..undo import History
 from . import icons, style
 from .readout import muted, readout, status
 from .empty_state import EmptyStack
+from .errors import log_current
 from .ortho_view import load_volume_async
 
 
@@ -482,7 +483,7 @@ class PlacementPage(QWidget):
                 def done(_f, k=key, r=relay):
                     try:
                         r.done.emit(k)
-                    except RuntimeError:          # page closed meanwhile
+                    except RuntimeError:  # best-effort: page closed meanwhile
                         pass
                 f.add_done_callback(done)
 
@@ -493,7 +494,8 @@ class PlacementPage(QWidget):
         for role, (path, fut) in futures.items():
             try:
                 vol = fut.result()
-            except Exception as exc:
+            except Exception as exc:  # reported: the T1 error on the page; every layer in the log
+                log_current(f"placement viewer: cannot read {path}")
                 if role == "t1":
                     self._t1_error = f"{path}: {exc}"
                 vol = None
@@ -1486,7 +1488,7 @@ class PlacementPage(QWidget):
             return
         try:
             traj = pl.read_trajectory(path, t1=self.t1)
-        except Exception as exc:
+        except Exception as exc:  # reported: in a warning dialog
             QMessageBox.warning(self, "Import trajectory", str(exc))
             return
         if traj.transducer is not None:

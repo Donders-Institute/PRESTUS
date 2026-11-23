@@ -154,7 +154,7 @@ def _read_header(path: Path):
             if hdr["magic"].item() not in (b"n+1", b"n+2"):
                 return None
             return hdr
-    except Exception:
+    except Exception:  # best-effort: None hands the file to nibabel, which reports a real error
         return None
     return None
 
@@ -170,7 +170,7 @@ def _read_voxels(path: Path, load_img) -> np.ndarray:
             data = np.load(cached, allow_pickle=False)
             os.utime(cached)                      # most recently used: kept longest
             return data
-        except Exception:
+        except (OSError, ValueError, EOFError):  # best-effort: a broken cache file is read again from the NIfTI
             pass
     data = _read_voxels_from(path, load_img())
     if cached is not None:
@@ -182,7 +182,7 @@ def _read_voxels(path: Path, load_img) -> np.ndarray:
             old = sorted(cached.parent.glob("*.npy"), key=lambda p: p.stat().st_mtime, reverse=True)
             for stale in old[VOXEL_CACHE_KEEP:]:
                 stale.unlink(missing_ok=True)
-        except Exception:
+        except (OSError, ValueError):  # best-effort: voxel cache only; the data are returned
             pass
     return data
 
@@ -195,7 +195,7 @@ def _read_voxels_from(path: Path, img) -> np.ndarray:
             import gzip
             whole = type(img).from_bytes(gzip.decompress(path.read_bytes()))
             return np.asanyarray(whole.dataobj)
-        except Exception:
+        except Exception:  # best-effort: nibabel's reader below reads the file or reports the error
             pass
     return np.asanyarray(img.dataobj)
 

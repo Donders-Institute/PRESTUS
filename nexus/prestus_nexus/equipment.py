@@ -19,6 +19,7 @@ from typing import Any
 
 from . import yamlio
 from .localcopy import cache_root
+from .ui.errors import log_current
 
 
 @dataclass
@@ -220,12 +221,14 @@ class EquipmentLibrary:
                 if not folder.is_dir() or folder.resolve() == self.equipment_dir.resolve():
                     continue
                 files = sorted([*folder.rglob("*_transducer.yaml"), *folder.rglob("*_driver.yaml")])
-            except OSError:
+            except OSError:                    # this library folder is skipped
+                log_current(f"equipment: cannot list {folder}")
                 continue
             for f in files:
                 try:
                     entries[f"user:{n - 1 - rank:03d}:{f}"] = yamlio.load_file_cached(f) or {}
-                except Exception:
+                except yamlio.LOAD_ERRORS:     # this entry is skipped
+                    log_current(f"equipment: cannot read {f}")
                     continue
         return entries
 
@@ -288,7 +291,7 @@ class EquipmentLibrary:
             str(self.equipment_dir.resolve()).encode()).hexdigest()[:10] + ".pkl")
         try:
             old = pickle.loads(cache.read_bytes())
-        except Exception:
+        except Exception:  # best-effort: a missing, old, or broken cache is rebuilt from the YAML files (unpickling raises many types)
             old = {}
         entries, fresh = {}, {}
         for name, stamp in stamps.items():
@@ -298,14 +301,15 @@ class EquipmentLibrary:
             else:
                 try:
                     fresh[name] = (stamp, yamlio.load_file(self.equipment_dir / name) or {})
-                except Exception:
+                except yamlio.LOAD_ERRORS:     # this entry is skipped
+                    log_current(f"equipment: cannot read {self.equipment_dir / name}")
                     continue
             entries[name] = fresh[name][1]
         if fresh != old:
             try:
                 cache.parent.mkdir(parents=True, exist_ok=True)
                 cache.write_bytes(pickle.dumps(fresh))
-            except Exception:
+            except (OSError, pickle.PicklingError):  # best-effort: cache only; the next start reads the YAML files again
                 pass
         return entries
 
@@ -398,7 +402,8 @@ class EquipmentLibrary:
         cal = Calibration(path=path, key=key, fallback=fallback)
         try:
             data = yamlio.load_file_cached(path) or {}
-        except Exception:
+        except yamlio.LOAD_ERRORS:             # described by its path only
+            log_current(f"equipment: cannot read the calibration {path}")
             return cal
         meta = data.get("meta", {}) or {}
         model = data.get("global_model", {}) or {}

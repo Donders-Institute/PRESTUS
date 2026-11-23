@@ -38,6 +38,7 @@ from ..outputs import dir_output
 from .tabbar import EmphasisTabBar, fit_to_width
 from . import style
 from .empty_state import EmptyStack
+from .errors import log_current
 from .heat_view import HeatPanel
 from .ortho_view import OrthoViewer, cached_volume
 from .pose_table import PoseTable
@@ -175,7 +176,7 @@ class OverviewPanel(QWidget):
             return                                       # another run is shown by now
         try:
             found = fut.result()
-        except Exception:                                # noqa: BLE001 — shown as not available
+        except Exception:  # reported: as not available
             found = {}
         for stem, value in list(self._widths.items()):
             if value == ir.PENDING:
@@ -241,7 +242,8 @@ def _measure_widths(todo) -> dict:
     for stem, (path, mask, trans, focus) in todo:
         try:
             out[stem] = fwm.measure(path, mask, trans, focus)
-        except Exception:                                # noqa: BLE001 — unreadable map
+        except Exception:  # best-effort: unreadable map: shown as not available
+            log_current(f"results: cannot measure focal widths in {path}")
             out[stem] = None
     return out
 
@@ -617,7 +619,8 @@ class ResultsPage(QWidget):
             return self._marker_cache[1]
         try:
             t1 = cached_volume(anat) or pl.Volume(anat)     # the header is enough here
-        except Exception:
+        except Exception:  # best-effort: no transducer markers drawn (nibabel raises many types)
+            log_current(f"results: cannot read {anat}")
             return []
         positions = rs.placement_positions(run)
         if not positions and self.window.model.get("placement.manual.coordinate_space") in (None, "", "voxel"):

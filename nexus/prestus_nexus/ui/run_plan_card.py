@@ -259,7 +259,7 @@ class RunPlanCard(QFrame):
     def update_plan(self, model: ConfigModel) -> None:
         try:
             text = plan_html(model, self.view.document())
-        except Exception as exc:          # a half-edited config must not break the Run tab
+        except Exception as exc:  # reported: in the card; a half-edited config must not break the Run tab
             text = f"<p>Could not summarise this config: {html.escape(str(exc))}</p>"
         if text != self._shown:
             self._shown = text

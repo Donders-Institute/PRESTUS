@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .fsio import write_text_atomic
+from .ui.errors import log_current
 
 ALLOWED = ("nexus_calibration", "nexus_equipment", "nexus_neuronav", "nexus_pct", "nexus_ping")
 IDLE_TIMEOUT_S = 1800          # MATLAB ends after this long without requests (it holds a licence)
@@ -112,7 +113,7 @@ class BridgeClient:
             except (OSError, ValueError) as exc:
                 try:                           # still being renamed into place, or broken
                     age = time.time() - f.stat().st_mtime
-                except OSError:
+                except OSError:  # best-effort: the response file is gone already
                     continue
                 if age < STALE_RESPONSE_S:
                     continue
@@ -120,8 +121,8 @@ class BridgeClient:
                         "error": f"MATLAB's answer could not be read ({exc}).", "report": "", "log": ""}
             try:
                 f.unlink(missing_ok=True)
-            except OSError:
-                pass
+            except OSError:                    # left in place, it would be delivered again
+                log_current("bridge: cannot remove a read response")
             out.append(data)
         return out
 
@@ -205,7 +206,7 @@ class _Heartbeat:
         while not self._stop.is_set():
             try:
                 self._client.heartbeat()
-            except OSError:
+            except OSError:  # best-effort: a missed heartbeat is retried next interval
                 pass
             self._stop.wait(self._every)
 
@@ -313,7 +314,7 @@ class MatlabBridge(QObject):
         if self.client is not None:
             try:
                 self.client.stop()
-            except OSError:
+            except OSError:  # best-effort: the process tree is ended below if the session does not stop
                 pass
         if self.proc is None:
             return
@@ -344,7 +345,7 @@ class MatlabBridge(QObject):
         if self.client is not None:
             try:
                 self.client.stop()
-            except OSError:
+            except OSError:  # best-effort: the process tree is killed next
                 pass
         if self.proc is not None:
             pid = int(self.proc.processId() or 0)
@@ -391,7 +392,7 @@ class MatlabBridge(QObject):
             for sig in (proc.readyReadStandardOutput, proc.finished, proc.errorOccurred):
                 try:
                     sig.disconnect()
-                except (TypeError, RuntimeError):
+                except (TypeError, RuntimeError):  # best-effort: already disconnected or deleted at teardown
                     pass
             proc.deleteLater()
         self._timer.stop()

@@ -25,7 +25,7 @@ class _Worker(QThread):
     def run(self) -> None:
         try:
             self.done.emit(self._fn(self.line.emit))
-        except Exception as err:               # shown in the dialog, never lost in the thread
+        except Exception as err:  # reported: in the dialog, never lost in the thread
             self.done.emit(err)
 
 

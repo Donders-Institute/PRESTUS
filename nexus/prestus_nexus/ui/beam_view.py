@@ -23,6 +23,7 @@ from ..outputs import (axial_profile_paths, dir_output, placement_record_path, r
                        read_placement_record)
 from . import style
 from .empty_state import EmptyStack
+from .errors import log_current
 from .export import subject_stem
 from .readout import muted, readout, status
 
@@ -106,7 +107,8 @@ def _read_run_outputs(medium_path: Path | None, profile_paths, record_path: Path
             try:
                 vol = pl.Volume(medium_path)
                 vol.data                                # read now, not on the GUI thread
-            except Exception:
+            except Exception:  # best-effort: the beam is drawn without the medium (nibabel raises many types)
+                log_current(f"beam view: cannot read {medium_path}")
                 vol = None
     profile = read_axial_profile(*profile_paths) if profile_paths is not None else None
     record = read_placement_record(record_path) if record_path is not None else None
@@ -273,7 +275,8 @@ class BeamPage(QWidget):
         future, self._io = self._io, None
         try:
             changed = self._take_outputs(future.result())
-        except Exception:
+        except Exception:  # best-effort: the view keeps what it shows; logged
+            log_current("beam view: cannot read the run outputs")
             changed = not self._outputs_read
             self._outputs_read = True
         if self._io_again:

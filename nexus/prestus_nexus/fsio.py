@@ -28,20 +28,20 @@ def _replace_from_temp(path: Path, fill) -> None:
             fh.flush()
             try:
                 os.fsync(fh.fileno())
-            except OSError:              # some network file systems refuse fsync; the replace still holds
+            except OSError:  # best-effort: some network file systems refuse fsync; the replace still holds
                 pass
         try:
             if path.exists():
                 shutil.copymode(path, tmp)
             else:                        # mkstemp makes 0600; a new file gets the usual mode
                 os.chmod(tmp, 0o666 & ~_umask())
-        except OSError:
+        except OSError:  # best-effort: mode bits only; the content is written below
             pass
         os.replace(tmp, path)
     except BaseException:
         try:
             os.unlink(tmp)
-        except OSError:
+        except OSError:  # best-effort: temp file cleanup; the original error is raised
             pass
         raise
 
@@ -67,5 +67,5 @@ def copy_atomic(src: str | Path, dst: str | Path) -> None:
     _replace_from_temp(dst, fill)
     try:
         shutil.copystat(src, dst)
-    except OSError:
+    except OSError:  # best-effort: timestamps only; the content is copied
         pass

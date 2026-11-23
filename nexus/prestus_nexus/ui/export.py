@@ -58,7 +58,7 @@ def subject_stem(model, view: str) -> Callable[[], str]:
             m = model() if callable(model) and not hasattr(model, "get") else model
             sid = m.get("subject_id")
             affix = sanitize_affix(m.get("io.output_affix") or "")
-        except Exception:                   # noqa: BLE001 — a hint must never fail
+        except Exception:  # best-effort: a file name hint must never fail
             return view
         if isinstance(sid, (int, float)) and not isinstance(sid, bool):
             return f"sub-{int(sid):03d}_{view}{affix}"
@@ -304,7 +304,7 @@ class ExportButton(QToolButton):
         if self.filename_hint is not None:
             try:
                 stem = self.filename_hint() or self.view
-            except Exception:               # noqa: BLE001
+            except Exception:  # best-effort: a file name hint must never fail
                 stem = self.view
         return f"{stem}.{fmt}"
 
@@ -320,7 +320,7 @@ class ExportButton(QToolButton):
             path = path.with_suffix(f".{fmt}")
         try:
             self.export(path, fmt, dpi)
-        except Exception as exc:            # noqa: BLE001 — report, never crash the app
+        except Exception as exc:  # reported: in a dialog; exporting must never crash the app
             QMessageBox.warning(self.window(), "Export figure", f"Could not export the figure:\n{exc}")
             return None
         return path

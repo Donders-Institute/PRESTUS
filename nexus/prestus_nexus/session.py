@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 
 from .fsio import write_text_atomic
+from .ui.errors import log_current
 
 MAX_RECENT = 10
 
@@ -28,8 +29,10 @@ class Session:
             loaded = yaml.safe_load(self.path.read_text(encoding="utf-8"))
             if isinstance(loaded, dict):
                 self.data = loaded
-        except (OSError, yaml.YAMLError):
+        except FileNotFoundError:  # best-effort: first start: an empty session
             pass
+        except (OSError, ValueError, yaml.YAMLError):     # starts empty; the file is rewritten on save
+            log_current(f"session: cannot read {self.path}")
 
     def get(self, key: str, default: Any = None) -> Any:
         return self.data.get(key, default)
@@ -49,5 +52,5 @@ class Session:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             write_text_atomic(self.path, yaml.safe_dump(self.data, sort_keys=True))
-        except OSError:
-            pass
+        except OSError:                # recent files and settings are not kept
+            log_current(f"session: cannot write {self.path}")

@@ -53,7 +53,7 @@ def package_dir(bin_path: str | Path) -> Path | None:
             m = _WRAPPED.search(charm.read_text(errors="ignore"))
             if m and Path(m.group(1)).is_dir():
                 return Path(m.group(1))
-    except OSError:
+    except OSError:  # best-effort: not a readable wrapper: look for a conda environment next
         pass
     # conda environment: charm is a console script of the environment itself
     bins = [Path(bin_path), charm.resolve().parent]
@@ -185,7 +185,7 @@ def charm_python(bin_path: str | Path, inst: Install | None = None) -> str:
     try:
         if charm is not None and charm.stat().st_size < 64_000:
             text = charm.read_text(errors="ignore")
-    except OSError:
+    except OSError:  # best-effort: unreadable script: the environment's python is used below
         pass
     first = text.splitlines()[0] if text else ""
     if first.startswith("#!") and "/env " not in first:
@@ -329,7 +329,7 @@ def find_installs(home: Path | None = None) -> list[Install]:
     for b in candidate_bins(home):
         try:
             key = str(Path(b).resolve())
-        except OSError:
+        except OSError:  # best-effort: a path that cannot be resolved is not an install
             continue
         if key in seen:
             continue
@@ -409,6 +409,7 @@ def differences(state: SegmentationState, inst: Install | None, settings_file: s
         if req is not None and state.settings is not None and normalised_settings(state.settings) != req:
             out.append("made with other charm settings than "
                        + ("segmentation.settings_file" if settings_file else "the selected install's defaults"))
-    except OSError:
-        pass
+    except OSError:                    # the settings comparison is left out
+        from .ui.errors import log_current
+        log_current("SimNIBS: cannot read the charm settings to compare")
     return out

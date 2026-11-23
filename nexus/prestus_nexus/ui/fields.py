@@ -147,7 +147,7 @@ class TextEditor(FieldEditor):
             return
         try:
             value = self.parse(text)
-        except Exception as exc:          # YAML or number parse error
+        except Exception as exc:  # reported: next to the field (YAML or number parse error)
             self.set_error(f"Cannot parse: {exc}")
             return
         problem = check_value(self.node, value)

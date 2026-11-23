@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .model import ConfigModel, is_empty
 from .paths import m2m_dir
+from .ui.errors import log_current
 
 
 _TEXT_CACHE: dict[str, tuple[tuple[int, int], str]] = {}
@@ -209,6 +210,8 @@ def read_axial_profile(path: Path, targeting: Path) -> dict | None:
         first = next(csv.DictReader(io.StringIO(_read_text(targeting), newline="")), None)
         if first is not None:
             out["planned_ep"] = num(first.get("focal_distance_ep_planned_mm"))
-    except (OSError, UnicodeDecodeError):
+    except FileNotFoundError:  # best-effort: no targeting table: no planned depth
         pass
+    except (OSError, UnicodeDecodeError):
+        log_current(f"outputs: cannot read {targeting}")
     return out

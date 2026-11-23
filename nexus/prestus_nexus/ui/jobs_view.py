@@ -306,7 +306,7 @@ class JobsView(QWidget):
             return
         try:
             path, text = fut.result()
-        except Exception as exc:
+        except Exception as exc:  # reported: in the log header
             path, text = "", ""
             self.path_label.setText(f"Job {job.job_id}: cannot read the {key} log ({exc}).")
             self.timer.start()

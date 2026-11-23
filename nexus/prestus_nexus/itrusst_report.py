@@ -38,6 +38,7 @@ from pathlib import Path
 from . import focal_widths as fwm
 from . import results as rs
 from .model import ConfigModel, is_empty
+from .ui.errors import log_current
 
 NA = "not available"
 PENDING = "measuring…"
@@ -141,7 +142,7 @@ def risk_status(value: float | None, limit: float) -> str:
 def _get(model: ConfigModel, key: str, ti: int = 0):
     try:
         return model.get(key, ti)
-    except Exception:            # noqa: BLE001 — a key this config does not have
+    except (KeyError, IndexError):  # a key or transducer this config does not have
         return None
 
 
@@ -153,7 +154,7 @@ def _tx(model: ConfigModel, key: str, ti: int):
     dev = None
     try:
         dev = model.device(ti)
-    except Exception:            # noqa: BLE001
+    except (KeyError, IndexError):  # no such transducer: no library geometry
         dev = None
     node = dev.geometry if dev is not None else None
     for part in key.split("."):
@@ -175,7 +176,10 @@ def placement_record(run: rs.Run) -> dict:
         p = run.base / f"{run.tag}_placement{affix}.json"
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
+        except FileNotFoundError:  # best-effort: no record under this affix: try the next
+            continue
         except (OSError, ValueError):
+            log_current(f"ITRUSST report: cannot read {p}")
             continue
         if isinstance(data, dict):
             return data
@@ -197,7 +201,7 @@ def _transducer_section(model: ConfigModel, metrics: dict, ti: int, n: int) -> S
     dev = None
     try:
         dev = model.device(ti)
-    except Exception:            # noqa: BLE001
+    except (KeyError, IndexError):  # no such transducer: no library entry
         dev = None
     serial = _tx(model, "serial", ti)
     name = _tx(model, "name", ti)

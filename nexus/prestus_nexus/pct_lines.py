@@ -71,7 +71,7 @@ def ute_line(model, prestus_root: str | Path, pct_dir: Path | None) -> UteLine:
             try:
                 vals = [float(ln.split()[0]) for ln in fit.read_text().splitlines() if ln.strip()][:2]
                 return UteLine(mapping, vals[0], vals[1], f"this subject's fit ({fit.name})")
-            except (ValueError, IndexError):
+            except (ValueError, IndexError):  # best-effort: malformed fit file: the per-subject fit is described generically
                 pass
         return UteLine(mapping, None, None, "fitted per subject from the UTE histograms when the pseudo-CT is made")
     try:

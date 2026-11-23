@@ -76,7 +76,7 @@ def _find_m2m(anat: Path, sid: int, siblings: bool) -> Path | None:
     for base in ((anat, anat.parent) if siblings else (anat,)):
         try:
             subs = [p for p in base.iterdir() if p.is_dir()]
-        except OSError:
+        except OSError:  # best-effort: an unreadable folder holds no subject to offer
             continue
         for d in sorted(subs):
             if (d / name).is_dir():

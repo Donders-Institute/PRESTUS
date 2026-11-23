@@ -22,6 +22,6 @@ def notify(window: QWidget, title: str, text: str) -> bool:
             _tray.show()
             _tray.showMessage(title, text, QSystemTrayIcon.MessageIcon.Information, 10_000)
         QApplication.alert(window)
-    except Exception:                    # a notification must never break the Nexus
+    except Exception:  # best-effort: a notification must never break the Nexus
         return False
     return True

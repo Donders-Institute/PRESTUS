@@ -23,7 +23,7 @@ def new_session(proc) -> None:
         params = QProcess.UnixProcessParameters()
         params.flags = QProcess.UnixProcessFlag.CreateNewSession
         proc.setUnixProcessParameters(params)
-    except (AttributeError, ImportError, TypeError):
+    except (AttributeError, ImportError, TypeError):  # best-effort: older PyQt6 lacks UnixProcessParameters
         pass
 
 
@@ -36,7 +36,7 @@ def descendants(pid: int) -> list[int]:
     try:
         out = subprocess.run(["ps", "-A", "-o", "pid=", "-o", "ppid="], capture_output=True,
                              text=True, timeout=5, check=False).stdout
-    except Exception:
+    except (OSError, subprocess.SubprocessError, ValueError):
         return []
     children: dict[int, list[int]] = {}
     for line in out.splitlines():
@@ -60,7 +60,7 @@ def kill_tree(pid: int, sig: int | None = None) -> None:
         try:
             subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True,
                            timeout=15, check=False, **_no_window())
-        except Exception:
+        except (OSError, subprocess.SubprocessError, ValueError):  # best-effort: never raises; the process may be gone
             pass
         return
     sig = signal.SIGKILL if sig is None else sig
@@ -68,12 +68,12 @@ def kill_tree(pid: int, sig: int | None = None) -> None:
     try:
         if os.getpgid(pid) == pid:           # started with new_session: its own group
             os.killpg(pid, sig)
-    except OSError:
+    except OSError:  # best-effort: not a group leader or gone; killed one by one below
         pass
     for p in [pid] + tree:
         try:
             os.kill(p, sig)
-        except OSError:
+        except OSError:  # best-effort: the process has ended already
             pass
 
 
@@ -105,7 +105,7 @@ def kill_group(pgid: int) -> None:
         return
     try:
         os.killpg(pgid, signal.SIGKILL)
-    except OSError:
+    except OSError:  # best-effort: the group has ended already
         pass
 
 
@@ -116,7 +116,7 @@ def alive(pid: int) -> bool:
         try:
             out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True,
                                  text=True, timeout=10, check=False, **_no_window()).stdout
-        except Exception:
+        except (OSError, subprocess.SubprocessError, ValueError):
             return False
         return str(pid) in out
     try:
@@ -135,6 +135,6 @@ def _zombie(pid: int) -> bool:
     try:
         out = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True,
                              text=True, timeout=5, check=False).stdout
-    except Exception:
+    except (OSError, subprocess.SubprocessError, ValueError):
         return False
     return out.strip().startswith("Z")

@@ -18,6 +18,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.colors import to_hex, to_rgba
 
 from . import style
+from .errors import log_current
 
 _BG, _INK = "_nexus_bg", "_nexus_ink"
 # containers drawn as cards (style.py: a surface background); a canvas elsewhere is on the page
@@ -204,8 +205,8 @@ class ThemedCanvas(FigureCanvasQTAgg):
             # (role True: matplotlib's default white; 'surface': the card colour set on purpose)
             if getattr(self.figure.patch, _BG, None) in (True, "surface") and not self._in_card():
                 self.figure.patch.set_facecolor(style.active()["bg"])
-        except Exception:               # noqa: BLE001 — theming must never stop a plot
-            pass
+        except Exception:  # best-effort: theming must never stop a plot
+            log_current("plot theme")
         super().draw()
         if self.export_button is not None:
             self.export_button.set_available(any(ax.get_visible() for ax in self.figure.axes))

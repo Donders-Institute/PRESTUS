@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import progress as prog
+from .ui.errors import log_current
 
 SUBMITTED = re.compile(r'Job "([^"]*)" \(ID: ([^)\s]+)\) submitted successfully')
 
@@ -107,7 +108,7 @@ def _run(argv: list[str], timeout: float = 15) -> str:
     try:
         out = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8",
                              errors="replace", timeout=timeout, check=False, **kwargs)
-    except Exception:                    # OSError, TimeoutExpired, ValueError, ...
+    except (OSError, subprocess.SubprocessError, ValueError):  # TimeoutExpired is a SubprocessError
         return ""
     return out.stdout or ""
 
@@ -347,7 +348,7 @@ def read_progress(jobs: list[Job], remote=None) -> list[Job]:
             if hits:
                 try:
                     _set_progress(job, prog.relevant_lines(_tail_file(hits[-1], PROGRESS_TAIL_BYTES)))
-                except OSError:
+                except OSError:  # best-effort: progress is optional; the next poll reads the log again
                     pass
         elif remote is not None:
             over_ssh.append(job)
@@ -398,8 +399,8 @@ def poll(jobs: list[Job], kind: str | None = None, remote=None) -> list[Job]:
     if (kind or (None if remote else scheduler())) == "slurm":
         try:
             read_progress(jobs, remote)
-        except Exception:                # progress must never stop the job polling
-            pass
+        except Exception:  # best-effort: progress must never stop the job polling
+            log_current("jobs: cannot read the progress logs")
     return jobs
 
 

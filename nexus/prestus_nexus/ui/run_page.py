@@ -49,7 +49,7 @@ class Relay(QObject):
         def emit(f, t=tag):
             try:
                 self.done.emit(t, f)
-            except RuntimeError:              # the receiver was closed meanwhile
+            except RuntimeError:  # best-effort: the receiver was closed meanwhile
                 pass
         fut.add_done_callback(emit)
 
@@ -381,7 +381,7 @@ class RunPage(QWidget):
             p = Path(cfg).resolve()
             try:
                 child = ConfigModel.from_file(self.model.schema, p, self.model.library)
-            except Exception as e:          # noqa: BLE001 — reported, the user decides
+            except Exception as e:  # reported: in a dialog; the user decides
                 QMessageBox.warning(self, "Submit over SSH", f"Cannot read the sequential config {p}:\n{e}")
                 return
             seq_over[str(p)], child_unmapped = rmt.path_overrides(child, r)
@@ -782,7 +782,7 @@ class RunPage(QWidget):
             if pred.total() is None:
                 return None
             return workload.expected_seconds(pred) or None
-        except Exception:                 # the prediction is a convenience, never a blocker
+        except Exception:  # best-effort: the prediction is a convenience, never a blocker
             return None
 
     # ── the job list across sessions ────────────────────────────────────
@@ -838,7 +838,7 @@ class RunPage(QWidget):
             self._jobs_poll = None
             try:
                 updated = fut.result()
-            except Exception as exc:              # keep the last known state
+            except Exception as exc:  # reported: in the run log; the last known state is kept
                 self._append(f"Could not query the scheduler: {exc}", style.active()["amber"])
                 updated = []
             self._jobs_polled(updated)
@@ -846,7 +846,7 @@ class RunPage(QWidget):
             self._jobs_poll = None
             try:
                 out = fut.result()
-            except Exception as exc:
+            except Exception as exc:  # reported: in the run log
                 out = f"Cancel failed: {exc}"
             if out.strip():
                 self._append(out, "#777")

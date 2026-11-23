@@ -277,7 +277,7 @@ class OrthoViewer(QWidget):
             def done(f, r=role, t=token):
                 try:
                     relay.done.emit((r, t), f)
-                except RuntimeError:          # viewer closed meanwhile
+                except RuntimeError:  # best-effort: viewer closed meanwhile
                     pass
             fut.add_done_callback(done)
 
@@ -292,7 +292,7 @@ class OrthoViewer(QWidget):
             try:
                 vol = fut.result()
                 self.status.setText("")
-            except Exception as exc:
+            except Exception as exc:  # reported: in the status line
                 self.status.setText(f"Cannot read {'anatomy' if role == 'anat' else 'overlay'}: {exc}")
         if self._pending.get(role) is token:
             del self._pending[role]

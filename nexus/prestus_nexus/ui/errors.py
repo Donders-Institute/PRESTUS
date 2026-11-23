@@ -30,7 +30,7 @@ def log_path() -> Path | None:
     try:
         from ..localcopy import cache_root
         root = cache_root()
-    except Exception:
+    except Exception:  # best-effort: the error log must never cause an error
         return None
     return root / LOG_NAME if root.is_dir() else None
 
@@ -41,7 +41,7 @@ def log_exception(exc_type, exc, tb, context: str = "") -> str:
     head = time.strftime("%Y-%m-%d %H:%M:%S") + (f" {context}" if context else "")
     try:
         sys.stderr.write(f"[PRESTUS Nexus] {head}\n{text}")
-    except Exception:
+    except Exception:  # best-effort: stderr may be closed or None (pythonw)
         pass
     path = log_path()
     if path is not None:
@@ -50,9 +50,26 @@ def log_exception(exc_type, exc, tb, context: str = "") -> str:
                 path.replace(path.with_suffix(".log.1"))
             with open(path, "a", encoding="utf-8") as fh:
                 fh.write(f"── {head}\n{text}\n")
-        except OSError:
+        except OSError:  # best-effort: the log file is optional; stderr has the traceback
             pass
     return text
+
+
+_logged_once: set[tuple[str, str, str]] = set()
+
+
+def log_current(context: str) -> None:
+    """Log the exception being handled (call inside an except block) without a dialog,
+    for errors the Nexus works around but that should not vanish. The same error in the
+    same context is logged once per session, so a repeated poll does not flood the log."""
+    exc_type, exc, tb = sys.exc_info()
+    if exc_type is None:
+        return
+    key = (context, exc_type.__name__, str(exc))
+    if key in _logged_once:
+        return
+    _logged_once.add(key)
+    log_exception(exc_type, exc, tb, context)
 
 
 def short_message(exc: BaseException) -> str:
@@ -81,7 +98,7 @@ def show_error(parent, title: str, message: str, details: str = "") -> None:
         if details:
             box.setDetailedText(details)
         box.exec()
-    except Exception:
+    except Exception:  # best-effort: an error dialog must never raise
         pass
     finally:
         _showing.on = False
@@ -101,14 +118,14 @@ def install_excepthook(parent_for=lambda: None) -> None:
             parent = None
             try:
                 parent = parent_for()
-            except Exception:
+            except Exception:  # best-effort: no parent window: the dialog opens on its own
                 pass
             where = log_path()
             note = f"\n\nDetails were written to {where}." if where else ""
             show_error(parent, "PRESTUS Nexus: unexpected error",
                        "Something went wrong; the Nexus keeps running, but save your study "
                        f"before you continue.\n\n{short_message(exc)}{note}", details)
-        except Exception:                # the hook itself must never fail
+        except Exception:  # best-effort: the hook must never fail; Python's own hook reports it
             previous(exc_type, exc, tb)
 
     sys.excepthook = hook
@@ -128,7 +145,7 @@ def action_errors() -> tuple[type[BaseException], ...]:
     try:
         import yaml
         errors.append(yaml.YAMLError)
-    except ImportError:
+    except ImportError:  # best-effort: without PyYAML there are no YAML errors to catch
         pass
     return tuple(errors)
 

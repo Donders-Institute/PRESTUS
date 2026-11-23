@@ -63,7 +63,7 @@ def load_records(path: str | Path | None) -> list[dict]:
     for line in text.splitlines():
         try:
             rec = json.loads(line)
-        except ValueError:
+        except ValueError:  # best-effort: a partly written or foreign line is not a record
             continue
         if isinstance(rec, dict):
             out.append(rec)

@@ -65,6 +65,11 @@ def load(text: str) -> Any:
     return yaml.load(text, Loader=_FAST_LOADER)
 
 
+# What reading a YAML file can raise: file system, decoding (UnicodeDecodeError is a
+# ValueError, as are bad timestamps or numbers), and YAML syntax or construction errors.
+LOAD_ERRORS: tuple[type[BaseException], ...] = (OSError, ValueError, yaml.YAMLError)
+
+
 def load_file(path: str | Path) -> Any:
     with open(path, encoding="utf-8") as fh:
         return load(fh.read())

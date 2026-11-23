@@ -105,7 +105,7 @@ def study_depths(model: ConfigModel, serial: str, ds: str, manifest=None) -> lis
             for row in manifest.rows:
                 try:
                     out.add(round(float(row.get(col, "")), 2))
-                except (TypeError, ValueError):
+                except (TypeError, ValueError):  # best-effort: a row without a number in this column adds no depth
                     pass
     return sorted(out)
 

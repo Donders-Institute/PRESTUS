@@ -68,7 +68,7 @@ def candidates(run_dir: str | Path, subject_id: int, target_name: str) -> list[C
                     mean_dist_skull=float(r["mean_dist_skull"]),
                     var_dist_skull=float(r["var_dist_skull"]),
                 ))
-            except (KeyError, ValueError):
+            except (KeyError, ValueError):  # best-effort: a row without these numbers is not a candidate
                 continue
     return out
 
@@ -84,8 +84,8 @@ def selected(run_dir: str | Path, subject_id: int, target_name: str) -> Selected
                 continue
             try:
                 kv[row[0].strip()] = float(row[1])
-            except ValueError:
-                continue       # section-header rows (e.g. "RAS_Transducer_mm") and blanks
+            except ValueError:  # best-effort: section-header rows (e.g. "RAS_Transducer_mm") and blanks
+                continue
 
     def vec(keys: tuple[str, str, str]) -> np.ndarray | None:
         vals = [kv.get(k) for k in keys]

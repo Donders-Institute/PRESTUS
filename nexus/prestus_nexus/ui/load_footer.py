@@ -54,7 +54,7 @@ class LoadFooter(QFrame):
             return
         try:
             pred = predict(self.model)
-        except Exception:                    # a half-edited config must not break the tab
+        except Exception:  # reported: as not available; a half-edited config must not break the tab
             self.text.setText("Not available for the current settings.")
             self.setToolTip("")
             return

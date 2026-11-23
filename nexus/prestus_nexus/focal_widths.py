@@ -177,7 +177,9 @@ def measure(map_path: Path, mask_path: Path | None, trans_vox1, focus_vox1) -> F
     if mask_path is not None:
         try:
             mask = Volume(mask_path).data
-        except Exception:          # noqa: BLE001 — fall back to the map maximum
+        except Exception:  # best-effort: fall back to the map maximum (nibabel raises many types)
+            from .ui.errors import log_current
+            log_current(f"focal widths: cannot read the focal mask {mask_path}")
             mask = None
     if mask is None:
         note = "peak is the map maximum (no focal mask map)"
@@ -194,7 +196,7 @@ def measure(map_path: Path, mask_path: Path | None, trans_vox1, focus_vox1) -> F
             path = _cache_file(key)
             path.parent.mkdir(parents=True, exist_ok=True)
             write_text_atomic(path, json.dumps(asdict(fw)))
-        except OSError:
+        except OSError:  # best-effort: disk cache only; the result is kept in memory
             pass
     return fw
 

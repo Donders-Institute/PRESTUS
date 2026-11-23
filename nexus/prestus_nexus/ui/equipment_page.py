@@ -26,6 +26,7 @@ from .. import equipment_editor as ed
 from .. import yamlio
 from . import style
 from .calibration_page import _step
+from .errors import log_current
 from .transducer_view import TransducerSchematic
 
 BLANK = "(blank)"
@@ -531,7 +532,8 @@ class EquipmentPage(QWidget):
         if keep and dev.file:
             try:
                 raw = yamlio.load_file(dev.file)
-            except Exception:
+            except yamlio.LOAD_ERRORS:     # the form starts from the library's parsed entry
+                log_current(f"equipment editor: cannot read {dev.file}")
                 raw = None
         form, base = ed.form_from_device(dev, raw, keep) if dev else (ed.TransducerForm(), None)
         self.base, self.base_dev = base, (dev if keep else None)

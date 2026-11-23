@@ -366,7 +366,7 @@ class MediumPanel(QWidget):
         self._count = None
         try:
             future.result()
-        except Exception as e:                  # unreadable file: say so, keep the table as is
+        except Exception as e:  # reported: in the note; the table stays as is
             self.census, self.census_state = None, "failed"
             self._census_error = f"{type(e).__name__}: {e}"
             self._failed_key = _stat_key(f)

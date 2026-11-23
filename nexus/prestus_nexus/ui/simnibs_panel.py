@@ -37,7 +37,7 @@ def load_remote_installs(session) -> None:
     for host, rows in (session.get(SESSION_KEY, {}) or {}).items():
         try:
             sn.set_remote_installs(host, [sn.Install.from_dict(r) for r in rows])
-        except (KeyError, TypeError):
+        except (KeyError, TypeError):  # best-effort: session rows in an older format are dropped
             continue
 
 

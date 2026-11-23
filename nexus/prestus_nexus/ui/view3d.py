@@ -21,6 +21,7 @@ from .. import mesh3d as m3
 from .. import placement as pl
 from . import style
 from .empty_state import EmptyStack
+from .errors import log_current
 
 try:
     from PyQt6.QtCore import pyqtProperty
@@ -341,7 +342,8 @@ class Placement3DPage(QWidget):
             try:
                 vol = pl.Volume(path)
                 self._mask = (key, m3.mask_surface(vol.data, vol.affine))
-            except Exception:                 # noqa: BLE001 — unreadable mask: not drawn
+            except Exception:  # best-effort: unreadable mask: not drawn
+                log_current(f"3D view: cannot read the mask {path}")
                 self._mask = None
         found = self._mask is not None and len(self._mask[1][1]) > 0
         self.show_mask.setVisible(found)

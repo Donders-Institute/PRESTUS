@@ -21,6 +21,7 @@ from .. import mesh3d as m3
 from .. import plantus as pt
 from . import style
 from .empty_state import EmptyStack
+from .errors import log_current
 from .medium_selector import setup_note
 from .view3d import HAVE_Q3D, can_render, from_scene, look_rotation, to_scene
 
@@ -280,7 +281,7 @@ class PlantusPage(QWidget):
         if key != self._loaded_key:
             try:
                 self.maps = pt.load(path)
-            except Exception as exc:          # noqa: BLE001 — shown, not raised
+            except Exception as exc:  # reported: on the page
                 self.maps = None
                 self._loaded_key = None
                 self.stack.show_empty("Could not read the PlanTUS maps", f"{path}: {exc}")
@@ -350,7 +351,8 @@ class PlantusPage(QWidget):
             try:
                 viewer._load_images()
                 seg = viewer.seg
-            except Exception:                 # noqa: BLE001 — no segmentation: draw unscrambled
+            except Exception:  # best-effort: no segmentation: draw unscrambled
+                log_current("PlanTUS: cannot load the segmentation")
                 seg = None
         if seg is None:
             return None
@@ -388,7 +390,7 @@ class PlantusPage(QWidget):
         lib = getattr(model, "library", None)
         try:
             txs = model.effective_transducers()
-        except Exception:                     # noqa: BLE001 — no housing rather than no preview
+        except Exception:  # best-effort: no housing rather than no preview
             return {}
         return lib.housing(txs[0].get("serial")) if lib is not None and txs else {}
 

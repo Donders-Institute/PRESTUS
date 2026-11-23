@@ -23,6 +23,7 @@ from .model import ConfigModel
 from .outputs import _subject_id, dir_output
 from .predict_outputs import predict
 from .study import sanitize_affix
+from .ui.errors import log_current
 
 # Overlay maps: label -> NIfTI map names to try, newest name first.
 MAPS: dict[str, tuple[str, ...]] = {
@@ -259,7 +260,10 @@ def placement_positions(run: Run) -> list[tuple[list[float] | None, list[float] 
         p = run.base / f"{run.tag}_placement{affix}.json"
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
+        except FileNotFoundError:  # best-effort: no record under this affix: try the next
+            continue
         except (OSError, ValueError):
+            log_current(f"results: cannot read {p}")
             continue
         txs = data.get("transducers") if isinstance(data, dict) else None
         if isinstance(txs, dict):
@@ -396,7 +400,7 @@ def _load_mat(path: Path) -> dict:
             d = sio.loadmat(str(path), squeeze_me=True, struct_as_record=False,
                             variable_names=HEAT_VARIABLES)
             return {k: _from_scipy(v) for k, v in d.items() if not k.startswith("__")}
-        except NotImplementedError:    # -v7.3
+        except NotImplementedError:  # best-effort: -v7.3 files are read with h5py below
             pass
     try:
         import h5py
@@ -459,7 +463,7 @@ def _lineage_of(path: Path, size: int, mtime: int) -> "LineageLink | None":
         if rec:
             try:
                 data = yamlio.load(text) or {}
-            except Exception:              # noqa: BLE001 — a broken YAML has no lineage to show
+            except yamlio.LOAD_ERRORS:  # a broken YAML has no lineage to show
                 data = {}
             raw = (data.get("io") or {}).get("output_affix") if isinstance(data, dict) else ""
             link = LineageLink(path, sanitize_affix(raw if isinstance(raw, str) else ""),

@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (QButtonGroup, QHBoxLayout, QLabel, QSizePolicy, QSt
 
 from ..labels import plural
 from . import style
+from .errors import log_current
 from .export import PaintedExportable, attach_painted
 
 try:
@@ -226,7 +227,8 @@ def load_entry(library, serial: str, ds: str = "", library_path: str = "") -> tu
     try:
         data = yamlio.load_file_cached(cal.path)    # the project volume can be slow: read once
         return (data if isinstance(data, dict) else None), cal.path
-    except Exception:
+    except yamlio.LOAD_ERRORS:
+        log_current(f"calibration plots: cannot read {cal.path}")
         return None, cal.path
 
 
@@ -263,7 +265,7 @@ def csv_focal_depths(path: str | Path) -> list[float]:
     for x in rows[1][1:]:
         try:
             out.append(float(x))
-        except ValueError:
+        except ValueError:  # best-effort: a cell that is not a number is not a depth
             continue
     return out
 

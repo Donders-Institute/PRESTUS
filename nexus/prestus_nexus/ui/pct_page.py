@@ -390,7 +390,7 @@ class PctPage(QWidget):
             return
         try:
             stats = json.loads(stats_file.read_text())
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
             self.canvas.hide()
             self.stats_note.setText(f"Could not read {stats_file}: {exc}")
             self.stats_note.show()

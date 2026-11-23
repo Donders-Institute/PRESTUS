@@ -23,6 +23,7 @@ from pathlib import Path
 import numpy as np
 
 from .study import Manifest
+from .ui.errors import log_current
 
 _SUB = re.compile(r"^sub-(\d+)$")
 
@@ -87,7 +88,8 @@ def scan(localite_post: str | Path) -> list[Entry]:
             continue          # the summary has this session (with the real target names)
         try:
             data = json.loads(js.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError):     # this session is not offered
+            log_current(f"neuronav import: cannot read {js}")
             continue
         if isinstance(data, dict):
             for t in data:

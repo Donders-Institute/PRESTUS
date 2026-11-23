@@ -26,6 +26,7 @@ from ..bridge import BridgeError, as_columns, as_floats, as_list
 from ..model import TX, is_empty
 from . import calibration_plots as cplots
 from . import icons, style
+from .errors import log_current
 from .file_badge import FileBadge, fit_combo_to_items
 from .matlab_status import MatlabStatus
 
@@ -830,7 +831,7 @@ class CalibrationPage(QWidget):
         sel = self.show_depth.currentText()
         try:
             self.strip.select(None if sel in ("All depths", "") else float(sel))
-        except ValueError:
+        except ValueError:  # best-effort: not a depth: the selection stays
             pass
         self._draw()
 
@@ -1271,7 +1272,8 @@ class CalibrationPage(QWidget):
         viewer = self.window.pages.get(VIEWER)
         try:
             return viewer.target_depth_ep(ti) if viewer is not None else None
-        except Exception:                       # unreadable T1 etc.: no target depth
+        except Exception:  # best-effort: unreadable T1 etc.: no target depth
+            log_current("calibration: cannot compute the target depth")
             return None
 
     def _prefill_depths(self, fallback: list[float] | None = None) -> bool:

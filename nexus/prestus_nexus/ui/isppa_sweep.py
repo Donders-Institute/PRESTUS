@@ -124,7 +124,7 @@ class IsppaSweepEditor(TextEditor):
     def _edit_sweep(self) -> None:
         try:
             current = self.parse(self.edit.text())
-        except Exception:                     # noqa: BLE001 — unparsable text: start empty
+        except Exception:  # best-effort: unparsable text: the sweep starts empty
             current = []
         values = current if isinstance(current, list) else [current]
         dlg = SweepDialog([v for v in values if isinstance(v, (int, float))], *self._context(), parent=self)

@@ -63,7 +63,7 @@ def load(doc_dir: Path) -> dict:
     try:
         gen = (doc_dir / GENERATION).read_text(encoding="utf-8")
         out["skull_mapping"] = table_rows(_section(gen, "Choosing the UTE-to-HU Mapping"))
-    except OSError:
+    except OSError:  # best-effort: without the docs the choices have no descriptions
         pass
     try:
         maps = (doc_dir / MAPPINGS).read_text(encoding="utf-8")
@@ -132,7 +132,7 @@ def _render(tex: str, colour: str, size: int) -> QImage | None:
         painter.end()
         img.setDevicePixelRatio(dpr)
         return img
-    except Exception:            # unsupported LaTeX: show the source instead
+    except Exception:  # best-effort: unsupported LaTeX: the source is shown instead
         return None
 
 

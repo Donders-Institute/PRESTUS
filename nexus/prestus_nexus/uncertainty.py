@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from .merge import is_empty, mergestruct
-from .yamlio import load_file
+from .yamlio import LOAD_ERRORS, load_file
 
 # ITRUSST tissue-property overview: the reference values and bounds the variants take
 ITRUSST_PROPERTIES_URL = "https://itrusst.github.io/itrusst_properties/"
@@ -225,7 +225,7 @@ def property_sets(model, prestus_root: str | Path) -> PropertySets:
             continue
         try:
             data = load_file(path) or {}
-        except Exception as exc:
+        except LOAD_ERRORS as exc:
             out.errors[variant] = f"cannot read {path.name}: {exc}"
             continue
         listed = data.get("medium_properties") if isinstance(data, dict) else None

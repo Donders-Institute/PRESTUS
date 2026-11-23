@@ -238,7 +238,7 @@ def read_settings(path: str | Path) -> dict:
         data = json.loads(text)
         if isinstance(data, dict):
             return data
-    except json.JSONDecodeError:
+    except json.JSONDecodeError:  # best-effort: not JSON: read as the YAML export below
         pass
     out: dict[str, Any] = {}
     for line in text.splitlines():
