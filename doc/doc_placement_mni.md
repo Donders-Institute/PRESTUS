@@ -26,14 +26,9 @@ A SimNIBS `m2m_sub-XXX` folder (under `path.seg`) is required: the conversion re
 
 ## How a Position Is Resolved
 
-1. **Coordinate conversion.** Both points are mapped MNI → subject RAS+ → grid voxel, each with the SimNIBS transform suited to where it sits:
+1. **Coordinate conversion.** Both points are mapped MNI → subject RAS+ → grid voxel with charm's nonlinear warp (`nonl`), the only MNI transform SimNIBS 4 writes; the focus as the heuristic target.
 
-    | Point | Transform | Why |
-    |---|---|---|
-    | `focus_pos_mm` | **nonlinear** (`nonl`) | A deep in-brain target; the nonlinear warp is most accurate here, identical to the heuristic target. |
-    | `trans_pos_mm` | **linear** (`12dof` affine) | The transducer is outside the brain (scalp), where the nonlinear deformation field is extrapolated and unreliable. The affine is defined everywhere. |
-
-2. **Snap to scalp.** The converted transducer voxel is snapped to the nearest scalp voxel, so a slightly off MNI entry coordinate still lands on the head surface.
+2. **Snap to scalp.** The warp is less exact near the scalp, so the converted transducer voxel is snapped to the nearest scalp voxel; a slightly off MNI entry coordinate still lands on the head surface.
 
 3. **Standoff.** The transducer is offset outward from the scalp along the focal axis (target → scalp) so that its exit plane lies `placement.skin_gap_mm` (default 5 mm) off the scalp, as in the heuristic. The bowl apex sits a further `curv_radius_mm − dist_geom_ep_mm` behind the exit plane.
 

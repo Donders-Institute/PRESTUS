@@ -25,7 +25,7 @@ See [Manual placement](doc_placement_manual.md#entering-coordinates).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `coordinate_space` | Space of `transducer.trans_pos` / `focus_pos` in `mode='manual'`. | `'voxel'` | `'voxel'` (1-based T1 voxels), `'ras'` (subject RAS+ mm), `'mni'` (MNI mm; transducer via 12dof, focus via nonlinear warp, no scalp snapping). Converted per transducer in the placement stage, which must be enabled. |
+| `coordinate_space` | Space of `transducer.trans_pos` / `focus_pos` in `mode='manual'`. | `'voxel'` | `'voxel'` (1-based T1 voxels), `'ras'` (subject RAS+ mm), `'mni'` (MNI mm; both via charm's nonlinear warp, no scalp snapping). Converted per transducer in the placement stage, which must be enabled. |
 
 ### Localite Placement (`placement.localite`)
 
@@ -84,7 +84,7 @@ See [MNI Transducer Placement](doc_placement_mni.md).
 
 | **Parameter** | **Description** | **Default** | **Comments** |
 |---|---|---|---|
-| `trans_pos_mm` | Desired transducer (scalp entry) position [MNI mm]. | `[]` | Required for `mode='mni'`. Converted with the linear (12dof) transform, then snapped to scalp. |
+| `trans_pos_mm` | Desired transducer (scalp entry) position [MNI mm]. | `[]` | Required for `mode='mni'`. Converted with charm's nonlinear warp, then snapped to the scalp. |
 | `focus_pos_mm` | Focus / target position [MNI mm]. | `[]` | Required for `mode='mni'`. Converted with the nonlinear (nonl) transform, like the heuristic target. |
 
 ### PlanTUS Placement (`placement.plantus`)

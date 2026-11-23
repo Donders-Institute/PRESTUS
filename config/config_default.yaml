@@ -359,8 +359,8 @@ placement:
     coordinate_space: 'voxel' # Space of transducer.trans_pos / focus_pos in mode='manual':
                               #   'voxel' (1-based T1 voxel indices) |
                               #   'ras'   (subject RAS+ mm of the T1; converted with ras_to_grid) |
-                              #   'mni'   (MNI mm; transducer via the 12dof transform, focus via the
-                              #            nonlinear warp; no scalp snapping, unlike mode='mni').
+                              #   'mni'   (MNI mm; both via charm's nonlinear warp; no scalp snapping,
+                              #            unlike mode='mni').
                               # ras/mni are converted to T1 voxels in the placement stage, per transducer.
   localite:
     enabled: 0        # Use Localite neuronavigation to position the transducer in head preprocessing? Older switch; placement.mode: 'localite' is the placement-stage equivalent
@@ -407,7 +407,7 @@ placement:
     # nearest scalp voxel and offset outward by placement.skin_gap_mm using the same geometry
     # as the heuristic; the focus is used as-is. Requires a SimNIBS m2m_sub-XXX folder.
     trans_pos_mm: []     # [x y z] desired transducer (scalp entry) position in MNI mm (required for mode='mni')
-                         # Converted with the LINEAR (12dof) MNI->subject transform (it is outside the brain).
+                         # Converted with charm's nonlinear warp, then snapped to the scalp.
     focus_pos_mm: []     # [x y z] focus / target position in MNI mm (required for mode='mni')
                          # Converted with the NONLINEAR (nonl) transform, like the heuristic target.
 

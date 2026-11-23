@@ -264,14 +264,11 @@ class PlacementPage(QWidget):
         self.coord_space.addItem("MNI mm", "mni")
         self.coord_space.setCurrentIndex({"ras": 0, "voxel": 1, "mni": 2}.get(self._space(), 1))
         self.coord_space.setToolTip("MNI mm is converted to this subject's space with SimNIBS's "
-                                    "mni2subject_coords; RAS and voxel need no conversion. Both "
-                                    "the nonlinear and affine transform come from SimNIBS (charm) "
-                                    "having already been run for this subject -- the m2m folder "
-                                    "must exist either way, setting startup.simnibs_bin_path alone "
-                                    "is not enough. For the focus this uses the nonlinear warp "
-                                    "(most accurate in-brain); for the transducer it uses the "
-                                    "affine, which also still works if that m2m folder's nonlinear "
-                                    "warp specifically failed or was never produced.")
+                                    "mni2subject_coords; RAS and voxel need no conversion. MNI "
+                                    "needs this subject's charm segmentation (its m2m folder): the "
+                                    "conversion uses charm's nonlinear warp, for the focus and the "
+                                    "transducer alike. Setting startup.simnibs_bin_path alone is "
+                                    "not enough.")
         coords.addWidget(self.coord_space)
         self.cx = QDoubleSpinBox(minimum=-500, maximum=500, decimals=2)
         self.cy = QDoubleSpinBox(minimum=-500, maximum=500, decimals=2)
@@ -1332,9 +1329,8 @@ class PlacementPage(QWidget):
 
     def _entry_ras(self, transformation_type: str = "nonl") -> np.ndarray | None:
         """RAS mm for the typed X/Y/Z in the chosen entry space, or None (after a message) if
-        it can't be resolved yet. For MNI, `transformation_type` picks the SimNIBS transform:
-        'nonl' (nonlinear warp, most accurate in-brain) or '12dof'/'6dof' (affine, well-defined
-        everywhere including outside the brain) -- see doc_placement_mni.md."""
+        it can't be resolved yet. For MNI, charm's nonlinear warp (the only MNI transform
+        SimNIBS 4 writes) -- see doc_placement_mni.md."""
         xyz = np.array([self.cx.value(), self.cy.value(), self.cz.value()])
         space = self.coord_space.currentData()
         if space == "ras":
@@ -1355,8 +1351,8 @@ class PlacementPage(QWidget):
         if not m2m.is_dir():
             QMessageBox.information(self, "MNI coordinates", f"{m2m.name} not found under "
                                     f"{seg_root}. SimNIBS (charm) must be run for this subject "
-                                    "before MNI coordinates can be converted here -- both the "
-                                    "nonlinear and affine transform come from that output; "
+                                    "before MNI coordinates can be converted here -- the "
+                                    "nonlinear warp comes from that output; "
                                     "setting startup.simnibs_bin_path alone is not enough.")
             return None
         if is_empty(simnibs):
@@ -1367,25 +1363,13 @@ class PlacementPage(QWidget):
         try:
             return pl.mni_to_subject(xyz, m2m, simnibs, ld_lib, transformation_type)
         except pl.SimnibsCoordError as exc:
-            if transformation_type != "nonl":
-                QMessageBox.warning(self, "MNI coordinates", str(exc))
-                return None
-            try:                                            # nonlinear warp missing/failed: fall
-                ras = pl.mni_to_subject(xyz, m2m, simnibs, ld_lib, "12dof")          # back to the
-            except pl.SimnibsCoordError:                                            # affine, which
-                QMessageBox.warning(self, "MNI coordinates", str(exc))              # SimNIBS always
-                return None                                                         # produces
-            QMessageBox.warning(self, "MNI coordinates", f"The nonlinear transform failed ({exc}); "
-                                "used the affine (12dof) transform instead, which is less accurate "
-                                "for an in-brain point.")
-            return ras
+            QMessageBox.warning(self, "MNI coordinates", str(exc))
+            return None
 
     def _transform_for(self, key: str) -> str:
-        """PRESTUS's own convention for MNI conversion (doc_placement_mni.md): the nonlinear
-        warp for an in-brain focus, the affine for a transducer/scalp point (where the nonlinear
-        field is unreliable/extrapolated, and which the affine covers without needing SimNIBS's
-        nonlinear registration to have succeeded)."""
-        return "12dof" if key == "trans_pos" else "nonl"
+        """MNI transform for a point, as PRESTUS converts it (doc_placement_mni.md): charm's
+        nonlinear warp for the focus and the transducer point alike (SimNIBS 4 writes no affine)."""
+        return "nonl"
 
     def _goto_coords(self) -> None:
         key = "trans_pos" if self.rb_trans.isChecked() else "focus_pos"

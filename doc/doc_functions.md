@@ -655,7 +655,6 @@ On this page:
 | `convert_2d_to_axisymmetric`            | Extract the right half-plane of a 2D medium for axisymmetric simulation |
 | `convert_axisymmetric_to_2d`            | Mirror axisymmetric simulation fields into a full 2D cross-section |
 | `convert_axisymmetric_to_3d`            | Expand all axisymmetric simulation fields from 2D to 3D |
-| `convert_final_to_MNI_matlab`           | Transform a 3D image from subject simulation space to MNI space |
 | `convert_final_to_MNI_simnibs`          | Transform one or more images to MNI space |
 | `ensure_ras_plus`                       | Reorient a NIfTI volume to RAS+ if needed |
 | `grid_mm_to_voxel`                      | Grid position in mm to a 1-based voxel index |

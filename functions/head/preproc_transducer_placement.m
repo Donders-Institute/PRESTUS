@@ -7,8 +7,8 @@ function parameters = preproc_transducer_placement(parameters)
 %   'manual'    Use trans_pos / focus_pos already in parameters (default).
 %               placement.manual.coordinate_space sets their space:
 %               'voxel' (default; 1-based T1 voxel indices), 'ras' (subject
-%               RAS+ mm of the T1) or 'mni' (MNI mm; transducer via the 12dof
-%               transform, focus via the nonlinear warp, no scalp snapping).
+%               RAS+ mm of the T1) or 'mni' (MNI mm; both points via charm's
+%               nonlinear warp, no scalp snapping).
 %               ras/mni are converted to T1 voxels here, per transducer.
 %
 %   'localite'  Derive trans_pos / focus_pos from a recorded Localite
@@ -29,11 +29,10 @@ function parameters = preproc_transducer_placement(parameters)
 %
 %   'mni'       Place the transducer and focus directly from MNI coordinates.
 %               Requires placement.mni.trans_pos_mm and placement.mni.focus_pos_mm
-%               ([1x3] MNI mm). The focus is converted with the nonlinear (nonl)
-%               SimNIBS transform (like the heuristic target); the transducer
-%               point is converted with the linear (12dof) transform because it
-%               lies outside the brain where the nonlinear warp is unreliable.
-%               The transducer is then snapped to the nearest scalp voxel and
+%               ([1x3] MNI mm). Both points are converted with charm's nonlinear
+%               (nonl) warp, the only MNI transform SimNIBS 4 writes; near the
+%               scalp it is less exact than in the brain, so the transducer is
+%               then snapped to the nearest scalp voxel and
 %               offset outward so its exit plane lies placement.skin_gap_mm off
 %               the scalp, as in the heuristic (no search).
 %
@@ -287,9 +286,9 @@ function parameters = run_manual_placement(parameters)
         input_focus(ti,:) = tr.focus_pos(:)';
 
         if strcmp(cs, 'mni')
-            % Transducer lies outside the brain: linear 12dof (nonl unreliable).
-            % Focus lies inside the brain: nonlinear warp, as the heuristic.
-            trans_ras = mni2subject_coords_LDfix(input_trans(ti,:), m2m, parameters, '12dof');
+            % charm's nonlinear warp, the only MNI transform SimNIBS 4 writes
+            % (less exact near the scalp; positions are used as given)
+            trans_ras = mni2subject_coords_LDfix(input_trans(ti,:), m2m, parameters, 'nonl');
             focus_ras = mni2subject_coords_LDfix(input_focus(ti,:), m2m, parameters, 'nonl');
         else
             trans_ras = input_trans(ti,:);
@@ -490,11 +489,10 @@ end
 function parameters = run_mni_placement(parameters)
 % Place the transducer and focus directly from MNI coordinates.
 %
-% The focus (an in-brain target) is converted with the nonlinear (nonl)
-% SimNIBS transform, identical to the heuristic. The transducer point lies
-% outside the brain, so it is converted with the linear (12dof) transform
-% (where the nonlinear warp is unreliable), then snapped to the nearest scalp
-% voxel and offset outward by placement.skin_gap_mm using the heuristic's
+% Both points are converted with charm's nonlinear (nonl) warp, the only MNI
+% transform SimNIBS 4 writes; the focus as the heuristic target. The warp is
+% less exact near the scalp, so the transducer point is then snapped to the
+% nearest scalp voxel and offset outward by placement.skin_gap_mm using the heuristic's
 % standoff geometry (transducer_scalp_geometry). No search is performed.
 
     % Validate required config
@@ -525,14 +523,10 @@ function parameters = run_mni_placement(parameters)
     img_header = niftiinfo(seg_file);
     pixel_size = mean(img_header.PixelDimensions(1:3));
 
-    % ── Coordinate conversion (per-point transform type) ──────────────────
-    % Transducer scalp point -> LINEAR 12dof (outside brain; nonl unreliable).
-    % transform_coordinates hardcodes nonl in its 'mni' branch, so do the
-    % MNI->RAS+ step explicitly with '12dof', then RAS+->grid via the affine.
-    trans_ras = mni2subject_coords_LDfix(mni.trans_pos_mm(:)', m2m, parameters, '12dof');
-    trans_vox = transform_coordinates(parameters, trans_ras, 'ras_plus', 'grid', img_header);
-
-    % Focus -> NONLINEAR nonl, identical to the heuristic target.
+    % ── Coordinate conversion: charm's nonlinear warp for both points ─────
+    % The transducer point is snapped to the scalp below, which corrects the
+    % warp's lower accuracy outside the brain.
+    trans_vox = transform_coordinates(parameters, mni.trans_pos_mm(:)', 'mni', 'grid', img_header);
     focus_pos = transform_coordinates(parameters, mni.focus_pos_mm(:)', 'mni', 'grid', img_header);
     if any(~isfinite(trans_vox)) || any(~isfinite(focus_pos))
         error('PRESTUS:placement:mniUnmapped', ['MNI placement: SimNIBS could not map %s to this subject ' ...

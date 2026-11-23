@@ -687,6 +687,10 @@ def mni_to_subject(mni_pt, m2m: Path, simnibs_bin: str, ld_library_path: str | N
     startup.simnibs_bin_path and the subject's m2m folder. Has a large per-call overhead
     (a few seconds); call once per user action, never from a redraw/scroll handler.
     """
+    if transformation_type != "nonl":   # SimNIBS 4 (charm) writes only the nonlinear warp
+        raise SimnibsCoordError(f"Transform '{transformation_type}' needs a SimNIBS 3 (headreco) "
+                                "segmentation; charm segmentations (SimNIBS 4) hold only the "
+                                "nonlinear warp: use 'nonl'.")
     exe = Path(simnibs_bin) / "mni2subject_coords"
     if not exe.is_file():
         raise SimnibsCoordError(f"mni2subject_coords not found in {simnibs_bin}")

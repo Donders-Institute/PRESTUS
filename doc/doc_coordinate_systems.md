@@ -98,7 +98,7 @@ PRESTUS reuses nonlinear warp fields produced by SimNIBS/[charm](https://simnibs
 
 The segmentation (`final_tissues.nii.gz`) is the spatial anchor for these warps. If the planning T1 differs from the segmentation T1, the affine mismatch is handled in `neuronav_convert_native_to_MNI`.
 
-For point (coordinate) transforms, `mni2subject_coords_LDfix` / `subject2mni_coords_LDfix` wrap the SimNIBS CLI and accept a transform type: `nonl` (nonlinear warp), `12dof` (linear affine), or `6dof` (rigid). The nonlinear warp is most accurate **inside the brain** but is unreliable/extrapolated **outside** it. Accordingly, `mni` transducer placement (see [MNI placement](doc_placement_mni.md)) converts the in-brain focus via `mni → nonl warp → RAS+ → grid` (as the heuristic), and the out-of-brain transducer point via `mni → 12dof affine → RAS+ → grid`.
+For point (coordinate) transforms, `mni2subject_coords_LDfix` / `subject2mni_coords_LDfix` wrap the SimNIBS CLI with charm's nonlinear warp (`nonl`), the only MNI transform SimNIBS 4 writes. The warp is most accurate **inside the brain** and less exact near the scalp, so `mni` transducer placement (see [MNI placement](doc_placement_mni.md)) converts both points via `mni → nonl warp → RAS+ → grid` and then snaps the transducer point to the scalp.
 
 ## NIfTI Affine in MATLAB
 

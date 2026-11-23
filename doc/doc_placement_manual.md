@@ -27,7 +27,7 @@ transducer:
 ```
 
 - `ras`: subject RAS+ mm of the T1 (read from a viewer or neuronavigation), converted with `ras_to_grid()` via the T1 affine.
-- `mni`: MNI mm. The transducer point is converted with the linear (12dof) transform and the focus with the nonlinear warp, as in [MNI placement](doc_placement_mni.md), but the transducer is **not** snapped to the scalp. The points are used exactly as given. Requires the SimNIBS `m2m_sub-XXX` folder.
+- `mni`: MNI mm. Both points are converted with charm's nonlinear warp, as in [MNI placement](doc_placement_mni.md), but the transducer is **not** snapped to the scalp, and the warp is less exact near the scalp: check the placement figure. The points are used exactly as given. Requires the SimNIBS `m2m_sub-XXX` folder.
 
 Conversion happens once per transducer in the placement stage, so `modules.run_transducer_placement` must be `1`.
 

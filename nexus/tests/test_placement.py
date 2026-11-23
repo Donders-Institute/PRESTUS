@@ -347,3 +347,14 @@ def test_voxel_cache_keeps_the_most_recent_volumes(tmp_path, monkeypatch):
         pl.Volume(path).data
     folder = pl._voxel_cache_file(path).parent
     assert len(list(folder.glob("*.npy"))) == 2
+
+
+@pytest.mark.parametrize("affine", ["12dof", "6dof"])
+def test_mni_to_subject_refuses_affine_transforms(tmp_path, affine):
+    """charm segmentations (SimNIBS 4) hold only the nonlinear warp: the affine transforms of
+    SimNIBS 3 stop before SimNIBS is called (no install needed here)."""
+    with pytest.raises(pl.SimnibsCoordError, match="SimNIBS 3"):
+        pl.mni_to_subject([0, 0, 0], tmp_path, str(tmp_path / "no_simnibs"), None, affine)
+    # negative control: 'nonl' passes that check and fails on the missing install instead
+    with pytest.raises(pl.SimnibsCoordError, match="not found"):
+        pl.mni_to_subject([0, 0, 0], tmp_path, str(tmp_path / "no_simnibs"), None, "nonl")

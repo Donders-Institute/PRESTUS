@@ -18,7 +18,8 @@ function coords_sub = mni2subject_coords_LDfix(coords_mni, subdir, parameters, t
 %   subdir              - path to SimNIBS m2m subject directory (e.g. 'm2m_ernie/')
 %   parameters          - PRESTUS config; uses hpc.ld_library_path and
 %                         startup.simnibs_bin_path
-%   transformation_type - transform type: 'nonl' | '12dof' | '6dof'
+%   transformation_type - 'nonl' (charm's nonlinear warp; the only transform
+%                         SimNIBS 4 writes)
 %                         (optional, default: 'nonl')
 %
 % Output:
@@ -29,8 +30,11 @@ function coords_sub = mni2subject_coords_LDfix(coords_mni, subdir, parameters, t
 if nargin < 4
     transformation_type = 'nonl';
 end
-if ~any(strcmp(transformation_type, {'nonl', '12dof', '6dof'}))
-    error('transformation_type must be nonl, 12dof, or 6dof')
+if ~strcmp(transformation_type, 'nonl')
+    error('prestus:transform:simnibs4Only', ...
+        ['Transform ''%s'' needs the affine files of a SimNIBS 3 (headreco) segmentation. ' ...
+         'PRESTUS uses charm segmentations (SimNIBS 4 and later), which hold only the ' ...
+         'nonlinear warp: use ''nonl''.'], transformation_type);
 end
 assert(size(coords_mni, 2) == 3, 'coords_mni must be in Nx3 format');
 assert(exist(subdir, 'dir') == 7, ['Could not find directory ' subdir])

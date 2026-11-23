@@ -131,8 +131,8 @@ def test_coordinate_entry_ras_and_voxel(app, schema, prestus_root, subject):
 
 
 @pytest.mark.posix
-def test_mni_entry_uses_nonl_for_focus_and_affine_for_transducer(app, schema, prestus_root,
-                                                                 subject, tmp_path, monkeypatch):
+def test_mni_entry_uses_nonl_for_focus_and_transducer(app, schema, prestus_root,
+                                                      subject, tmp_path, monkeypatch):
     from PyQt6.QtWidgets import QMessageBox
     monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: pytest.fail(str(a[2:])))
     bin_dir = tmp_path / "bin"
@@ -146,7 +146,7 @@ def test_mni_entry_uses_nonl_for_focus_and_affine_for_transducer(app, schema, pr
     page.cz.setValue(0.0)
 
     assert page._transform_for("focus_pos") == "nonl"
-    assert page._transform_for("trans_pos") == "12dof"
+    assert page._transform_for("trans_pos") == "nonl"          # SimNIBS 4: no affine
     page._set_coords("focus_pos")
     np.testing.assert_allclose(m.get("transducer.focus_pos"), [5.0, 5.0, 5.0])
     page._set_coords("trans_pos")
@@ -154,8 +154,9 @@ def test_mni_entry_uses_nonl_for_focus_and_affine_for_transducer(app, schema, pr
 
 
 @pytest.mark.posix
-def test_mni_entry_falls_back_to_affine_when_nonlinear_fails(app, schema, prestus_root, subject,
-                                                              tmp_path, monkeypatch):
+def test_mni_entry_reports_a_failed_nonlinear_warp(app, schema, prestus_root, subject,
+                                                   tmp_path, monkeypatch):
+    """No affine fallback (SimNIBS 4 writes none): a failed warp is reported, nothing is set."""
     from PyQt6.QtWidgets import QMessageBox
     warnings = []
     monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: warnings.append(a[2]))
@@ -168,15 +169,14 @@ def test_mni_entry_falls_back_to_affine_when_nonlinear_fails(app, schema, prestu
     page.cx.setValue(0.0)
     page.cy.setValue(0.0)
     page.cz.setValue(0.0)
-    page._set_coords("focus_pos")                           # nonl fails -> falls back to 12dof
-    np.testing.assert_allclose(m.get("transducer.focus_pos"), [5.0, 5.0, 5.0])
-    assert warnings and "affine" in warnings[0]
+    page._set_coords("focus_pos")
+    assert not m.get("transducer.focus_pos")                # nothing written
+    assert len(warnings) == 1 and "affine" not in warnings[0]
 
 
-def test_mni_entry_without_simnibs_having_run_is_not_helped_by_the_affine_fallback(
+def test_mni_entry_without_simnibs_having_run_names_charm(
         app, schema, prestus_root, tmp_path, monkeypatch):
-    """Both the nonlinear and affine transform come from SimNIBS/charm's output -- if charm was
-    never run (no m2m folder), the fallback to the affine can't help either; the message must say
+    """The nonlinear warp comes from charm's output: without an m2m folder the message must say
     so, distinctly from just 'startup.simnibs_bin_path is unset'."""
     from PyQt6.QtWidgets import QMessageBox
     infos = []

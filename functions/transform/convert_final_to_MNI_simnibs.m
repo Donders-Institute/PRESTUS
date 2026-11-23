@@ -15,13 +15,6 @@ function convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_out
 %   Equivalent to SimNIBS nonl transformation at order 0 (nearest) or 1
 %   (linear); higher orders are not supported and silently fall back to 1.
 %
-%   Contrast with CONVERT_FINAL_TO_MNI_MATLAB, which applies the 12-DOF
-%   affine registration (MNI2conform_12DOF.txt) to an in-memory array and
-%   returns the transformed volume, composite affine, and MNI header.
-%   Use that function when image data is already in memory or the affine
-%   matrix is needed for downstream calculations. Use this function (either
-%   method) when writing final result NIfTIs to disk via nonlinear warp.
-%
 %   Set parameters.analysis.mni_warp_method = 'native' to activate the
 %   native path globally; PRESTUS callers propagate this via options.method.
 %
@@ -51,7 +44,7 @@ function convert_final_to_MNI_simnibs(path_to_input_img, m2m_folder, path_to_out
 %                        out-of-FOV voxels (default: [] = no fill)
 %   options.method     - 'simnibs' (default) or 'native'
 %
-% See also: SIMULATION_NIFTI, CONVERT_FINAL_TO_MNI_MATLAB, SUBJECT2MNI_COORDS_LDFIX
+% See also: SIMULATION_NIFTI, SUBJECT2MNI_COORDS_LDFIX
 
     arguments
         path_to_input_img
