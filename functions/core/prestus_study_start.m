@@ -148,6 +148,7 @@ end
         if runs.status(i) == "config error"; continue; end
         fprintf('\n──── Run %d/%d: %s (row %d, affix "%s") ────\n', i, n, runs.label(i), ...
             runs.row(i), runs.affix(i));
+        prestus_progress('batch', i, n, char(runs.label(i)));   % the Nexus' run counter
         try
             job_id = prestus_pipeline_start(params{i});
             if isempty(job_id)

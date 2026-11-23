@@ -359,11 +359,37 @@ thermal_diff_obj = kWaveDiffusion(...
 source.Q = [];      % the schedule loop sets thermal_diff_obj.Q from Q_src
 
 % In interactive mode, open a single figure that will be reused for all thermal updates
-if parameters.simulation.interactive
+show_thermal = parameters.simulation.interactive;
+h_thermal_fig = [];
+if show_thermal
     h_thermal_fig = figure('Name', 'kWave Thermal Simulation');
     thermal_diff_obj.plotTemp;
     drawnow;
 end
+% Live view (simulation.live_view): the temperature in the plane through the
+% transducer (as the focal-plane frames below), saved as data frames for the
+% Nexus (LIVE_VIEW); no figure is drawn for it
+live_on = live_view('enabled', parameters);
+if live_on
+    if kgrid.dim == 3
+        live_axes = [1 3];
+        live_plane = @() squeeze(thermal_diff_obj.T(:, tr.trans_pos(2), :));
+        live_spacing = [kgrid.dx, kgrid.dz] * 1e3;
+    else
+        live_axes = [1 2];
+        live_plane = @() thermal_diff_obj.T;
+        live_spacing = [kgrid.dx, kgrid.dy] * 1e3;
+    end
+    live_meta = struct('quantity', 'temperature', 'units', '°C', 'label', 'Temperature', ...
+        'spacing_mm', live_spacing, 'markers', struct());
+    for live_m = {'trans_pos', 'focus_pos'}
+        if isfield(tr, live_m{1}) && numel(tr.(live_m{1})) >= max(live_axes)
+            live_meta.markers.(strrep(live_m{1}, '_pos', '')) = double(tr.(live_m{1})(live_axes)) - 1;
+        end
+    end
+    live_view('data', parameters, 'thermal', live_plane, live_meta, true);
+end
+prestus_progress('thermal', 0, 1, 'solver kWaveDiffusion');
 
 % initialize field temperature
 if strcmp(parameters.simulation.code_type, 'matlab_gpu') || strcmp(parameters.simulation.code_type, 'cpp_gpu')
@@ -625,8 +651,11 @@ for seg_i = 1:n_seg
     else
         evalc('thermal_diff_obj.takeTimeStep(n_steps_i, step_dur_i)');
     end
-    if parameters.simulation.interactive && ishandle(h_thermal_fig)
+    if show_thermal && ishandle(h_thermal_fig)
         figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
+    end
+    if live_on
+        live_view('data', parameters, 'thermal', live_plane, live_meta, seg_i == n_seg);
     end
 
     % CEM43 iso update — R uses T_max so that any voxel that has previously
@@ -656,6 +685,9 @@ for seg_i = 1:n_seg
     CEM43_max     = max(CEM43_max,     CEM43_cur);
     CEM43_iso_max = max(CEM43_iso_max, CEM43_iso_cur);
     timeseries = thermal_update_timeseries(parameters, ts_masks, timeseries, T_cur, CEM43_cur, CEM43_iso_cur);
+    % Simulated time and the peak temperature so far (computed only when the line is printed)
+    prestus_progress('thermal', seg_i, n_seg, @() sprintf('t=%.2fs Tmax=%.2fC', ...
+        sched.t0(seg_i) + sched.dur(seg_i), gather(max(T_max(:)))));
 end
 
 % Protocol on/off sequence for thermal_plot_sim: the initial state, then one

@@ -293,6 +293,133 @@ def test_thermal_details_peak_so_far_and_current():
     assert P.describe_detail("Tnow=38.10C") == "now 38.10 °C"
 
 
+# ── BabelBrain sampler (functions/babelbrain/bb_progress.py) ─────────────
+
+@pytest.fixture
+def bbp(prestus_root, monkeypatch):
+    monkeypatch.syspath_prepend(str(prestus_root / "functions" / "babelbrain"))
+    import importlib
+    mod = importlib.import_module("bb_progress")
+    return importlib.reload(mod)
+
+
+def _sample(bbp, monkeypatch, capsys, stage, frames, sampler=None):
+    monkeypatch.setattr(bbp, "_frames", lambda: frames)
+    sampler = sampler or bbp._Sampler(stage, "")
+    sampler.sample()
+    return sampler, capsys.readouterr().out
+
+
+def test_bb_acoustic_sampler_prints_steps_per_fdtd_run(bbp, monkeypatch, capsys):
+    args1, args2 = {"TimeSteps": 1000}, {"TimeSteps": 400}
+    s, out = _sample(bbp, monkeypatch, capsys, "acoustic", {"_Execution": {"nStep": 249, "arguments": args1}})
+    assert out.startswith("[progress] acoustic 250/1000 @") and out.rstrip().endswith("FDTD run 1")
+    s, out = _sample(bbp, monkeypatch, capsys, "acoustic", {"_Execution": {"nStep": 249, "arguments": args1}}, s)
+    assert out == ""                                     # unchanged: not printed again
+    s, out = _sample(bbp, monkeypatch, capsys, "acoustic", {"_Execution": {"nStep": 9, "arguments": args2}}, s)
+    assert "10/400" in out and "FDTD run 2" in out
+    _, out = _sample(bbp, monkeypatch, capsys, "acoustic", {"other": {}})
+    assert out == ""                                     # not in the solver loop: nothing
+
+
+def test_bb_thermal_sampler_counts_on_and_off_phases(bbp, monkeypatch, capsys):
+    p0, field = object(), object()
+    cyc = {"nCurrent": 1, "TotalIterations": 3, "TotalDurationSteps": 100, "TotalDurationStepsOff": 50, "p0": p0}
+    on = {"n": 9, "TotalDurationSteps": 100, "d_T0": None, "Pressure": field}
+    _, out = _sample(bbp, monkeypatch, capsys, "thermal", {"BHTE": on, "RunBHTECycles": cyc})
+    assert "[progress] thermal 160/450 @" in out         # 1 x 150 + 10
+    off = {"n": 4, "TotalDurationSteps": 50, "d_T0": None, "Pressure": p0}
+    _, out = _sample(bbp, monkeypatch, capsys, "thermal", {"BHTE": off, "RunBHTECycles": cyc})
+    assert "[progress] thermal 255/450 @" in out         # 1 x 150 + 100 + 5
+    multi = {"n": 0, "TotalDurationSteps": 100, "d_T0": None}
+    _, out = _sample(bbp, monkeypatch, capsys, "thermal", {"BHTEMultiplePressureFields": multi})
+    assert "[progress] thermal 1/100 @" in out           # without the cycle loop: this call
+    _, out = _sample(bbp, monkeypatch, capsys, "thermal", {"BHTE": {"n": 3}})
+    assert out == ""                                     # before the time loop (no d_T0)
+
+
+def test_bb_sampler_lines_parse_in_the_nexus(bbp, monkeypatch, capsys):
+    s, out1 = _sample(bbp, monkeypatch, capsys, "acoustic", {"_Execution": {"nStep": 99, "arguments": {"TimeSteps": 1000}}})
+    p = P.RunProgress.from_text(_solver("babelbrain") + out1)
+    assert p.estimate(time.time()).fraction == pytest.approx(0.1)
+
+
+def test_bb_frames_need_cupy(bbp):
+    np = pytest.importorskip("numpy")
+    a = np.ones((4, 4, 4))
+    assert bbp._cupy_max(a) is None and bbp._cupy_plane(a, lambda x: x) is None
+
+
+def test_bb_thermal_children_get_a_sampler(bbp, monkeypatch):
+    import sys
+    import types
+    started = []
+    monkeypatch.setattr(bbp, "start", lambda stage: started.append(stage))
+    mods = {}
+    for name in ("BabelBrain", "BabelBrain.Babel_Thermal", "BabelBrain.Babel_Thermal.CalculateThermalProcess",
+                 "ThermalModeling", "ThermalModeling.CalculateTemperatureEffects"):
+        mods[name] = types.ModuleType(name)
+        monkeypatch.setitem(sys.modules, name, mods[name])
+    mods["BabelBrain.Babel_Thermal.CalculateThermalProcess"].SubProcess = lambda *a: "sub"
+    mods["ThermalModeling.CalculateTemperatureEffects"].RunInProcess = lambda *a: "chunk"
+    bbp.patch_thermal_children()
+    bbp.patch_thermal_children()                         # idempotent
+    assert mods["BabelBrain.Babel_Thermal.CalculateThermalProcess"].SubProcess(1) == "sub"
+    assert mods["ThermalModeling.CalculateTemperatureEffects"].RunInProcess() == "chunk"
+    assert started == ["thermal", "thermal"]
+
+
+# ── jwave runner helpers (functions/jwave/run_jwave_sim.py) ─────────────
+# The script imports jax and h5py at the top; its progress and frame helpers need only
+# numpy, so they are taken from its source.
+
+@pytest.fixture
+def jw(prestus_root, tmp_path):
+    import ast
+    import types
+    np = pytest.importorskip("numpy")
+    src = (prestus_root / "functions" / "jwave" / "run_jwave_sim.py").read_text(encoding="utf-8")
+    wanted = {"_progress", "_write_data", "_live_frame", "_progress_last", "_live_state",
+              "LIVE_INTERVAL_S"}
+    nodes = [n for n in ast.parse(src).body
+             if (isinstance(n, ast.FunctionDef) and n.name in wanted)
+             or (isinstance(n, ast.Assign) and any(getattr(t, "id", "") in wanted for t in n.targets))]
+    mod = types.ModuleType("jw_helpers")
+    mod.np, mod.os = np, os
+    mod.LIVE_FILE = str(tmp_path / "live" / "acoustic_sub-001.json")
+    exec(compile(ast.Module(body=nodes, type_ignores=[]), "run_jwave_sim.py", "exec"), mod.__dict__)
+    return mod
+
+
+def test_jwave_progress_lines_rate_limited_and_parsed(jw, capsys):
+    jw._progress(1, 1000, "jwave")
+    for k in range(2, 1000):
+        jw._progress(k, 1000, "jwave")             # fast loop: limited
+    jw._progress(1000, 1000, "jwave")
+    lines = capsys.readouterr().out.strip().splitlines()
+    assert lines[0].startswith("[progress] acoustic 1/1000 @") and lines[-1].startswith("[progress] acoustic 1000/1000 @")
+    assert len(lines) < 10
+    p = P.RunProgress.from_text(_solver("jwave_pseudo_spectral") + "\n".join(lines) + "\n")
+    assert p.estimate(time.time()).fraction == 1.0
+
+
+def test_jwave_live_frame_is_a_data_frame_announced_once(jw, capsys):
+    from prestus_nexus.ui.live_field import load_frame
+    np = jw.np
+    field = np.outer(np.hanning(20), np.hanning(30)) * 2e6          # |p| [Pa]
+    jw._live_state["spacing_mm"] = [0.5, 0.5]
+    jw._live_frame(field, force=True)
+    jw._live_frame(field * 2, force=True)
+    out = capsys.readouterr().out
+    assert out.count("[live] acoustic ") == 1
+    meta, plane = load_frame(jw.LIVE_FILE)
+    assert meta["units"] == "MPa" and meta["spacing_mm"] == [0.5, 0.5] and plane.shape == (20, 30)
+    assert abs(plane.max() - 2 * field.max() / 1e6) < 1e-3           # the second frame, in MPa
+    assert not list(Path(jw.LIVE_FILE).parent.glob("*.part"))
+    jw._live_frame(field)                              # within 5 s and not forced: skipped
+    assert capsys.readouterr().out == ""
+
+
 def test_jobs_view_live_frames_in_the_live_view_tab(page, tmp_path):
     from PyQt6.QtGui import QColor, QImage
     frame = tmp_path / "thermal_sub-001.png"

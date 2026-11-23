@@ -63,15 +63,33 @@ end
 %   4: C++ GPU code 'cpp_gpu'
 %   5: C++ Apple Silicon GPU code 'cpp_mlx' (kspaceFirstOrder-MLX)
 
-% Disable k-Wave's PlotSim when not interactive or when using C++ backends
-% (which run out-of-process). Interactive MATLAB runs keep the real-time
-% animation.
-cpp_backend = ismember(parameters.simulation.code_type, {'cpp_cpu', 'cpp_gpu', 'cpp_mlx'});
-if ~parameters.simulation.interactive || cpp_backend
+% Disable k-Wave's PlotSim unless interactive or live view (simulation.live_view),
+% and always for the C++ backends (which run out-of-process). Interactive
+% MATLAB runs keep the real-time animation; with live view, LIVE_VIEW saves
+% the animation as image frames for the Nexus.
+% The elastic model always runs pstdElastic in MATLAB (ACOUSTIC_SIMULATION_ELASTIC).
+is_elastic = isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'kwave_elastic');
+cpp_backend = ~is_elastic && ismember(parameters.simulation.code_type, {'cpp_cpu', 'cpp_gpu', 'cpp_mlx'});
+show_sim = parameters.simulation.interactive || live_view('enabled', parameters);
+if ~show_sim || cpp_backend
     input_args.PlotSim = false;
-    if parameters.simulation.interactive
-        disp('Interactive acoustic visualization is not available for C++ backends (cpp_cpu/cpp_gpu/cpp_mlx).');
+    if show_sim
+        disp('Live acoustic visualization is not available for C++ backends (cpp_cpu/cpp_gpu/cpp_mlx).');
     end
+end
+if is_elastic
+    prestus_progress('acoustic', 0, 1, 'solver kwave_elastic');
+else
+    prestus_progress('acoustic', 0, 1, ['solver ' char(parameters.simulation.code_type)]);
+end
+if show_sim && ~cpp_backend && live_view('enabled', parameters)
+    % k-Wave redraws every 10 steps by default; frames are saved every 5 s, so
+    % about 100 redraws per simulation keep the plotting overhead down
+    if ~parameters.simulation.interactive && ~isfield(input_args, 'PlotFreq')
+        input_args.PlotFreq = max(10, ceil(kgrid.Nt / 100));
+    end
+    live_timer = live_view('watch', parameters, 'acoustic');
+    stop_live = onCleanup(@() live_view('stop', parameters, live_timer)); %#ok<NASGU>
 end
 
 % Remove fields that are not recognized for acoustic simulations
@@ -120,7 +138,7 @@ end
 
 % Elastic (shear-wave) skull model: pstdElastic2D/3D instead of kspaceFirstOrder*.
 % Also taken by the free-water baseline, so both runs share one forward model.
-if isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'kwave_elastic')
+if is_elastic
     sensor_data = acoustic_simulation_elastic(kgrid, medium, source, sensor, input_args, parameters);
     sensor_data = fit_complex(sensor_data, kgrid, p_complex_freqs, p_window);
     return

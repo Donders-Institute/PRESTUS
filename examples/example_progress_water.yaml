@@ -1,0 +1,57 @@
+# Study config to try the Nexus progress bar and live view: a small free-water run
+# (no MRI, no SimNIBS) with an acoustic and a thermal simulation, a few minutes on a CPU.
+# Only the values that differ from config/config_default.yaml are listed.
+# Replace the three paths (path.sim, path.anat, path.seg) before running. Open this file in the Nexus, then
+# Run tab: Run locally (platform matlab), or set platform: slurm and Submit to cluster.
+
+subject_id: 1
+platform: matlab                 # 'slurm' to submit it as a cluster job
+
+path:
+  sim: /path/to/progress_demo    # PRESTUS outputs; live frames go to <output>/live/
+  anat: /path/to/progress_demo   # not read for water, but must be set
+  seg: /path/to/progress_demo    # not read for water, but must be set
+
+simulation:
+  medium: water
+  code_type: matlab_cpu          # k-Wave MATLAB: pressure frames in the live view and an
+                                 # estimated progress; cpp_cpu/cpp_gpu: exact progress, no frames
+  live_view: 1                   # plot the evolving fields and save them for the Nexus
+
+io:
+  overwrite_files: always
+  output_affix: _progress_demo
+
+grid:
+  resolution_mm: 1.0             # small grid, same as the water integration test
+  default_dims: [72, 72, 128]
+  axisymmetric: 0
+
+modules:
+  run_heating_sims: 1            # a thermal simulation after the acoustic one
+  generate_report: 0
+
+transducer:                      # single-element 250 kHz bowl, positions in grid voxels
+  type: annular
+  freq_hz: 250000
+  annular:
+    elem_n: 1
+    elem_id_mm: 0
+    elem_od_mm: 32.0
+    curv_radius_mm: 63.2
+    dist_geom_ep_mm: 52.38
+    elem_p_amp: 91590
+    elem_phase_deg: 0
+  trans_pos: [36, 36, 5]
+  focus_pos: [36, 36, 64]
+  # target_isppa_wcm2 (default 30) adds a free-water baseline simulation before the run
+
+timing:                          # 4 s of 20 ms pulses at 5 Hz, then 4 s of cooling
+  pd: 0.02
+  pri: 0.2
+  ptd: 4
+  pt_timestep: 0.02
+  ptri: 4
+  ptrd: 4
+  post_ptri_dur: 4
+  post_pt_timestep: 1

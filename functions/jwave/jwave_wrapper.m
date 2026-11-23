@@ -383,6 +383,12 @@ if using_gpu_env
 else
     env_overrides.JAX_PLATFORMS = 'cpu';
 end
+% Live view (simulation.live_view): run_jwave_sim.py saves the field there; with the
+% Helmholtz solver it then solves in chunks of GMRES restart cycles to report progress
+live_file = live_view('file', parameters, 'acoustic');
+if ~isempty(live_file)
+    env_overrides.PRESTUS_LIVE_FILE = live_file;
+end
 
 % run_command invokes python directly via argv, no shell at all --
 % input_h5/output_h5/parameters.io.log_file reach the process (or are
@@ -407,6 +413,7 @@ end
 jwave_argv = cellfun(@char, jwave_argv, 'UniformOutput', false);
 
 fprintf('[jwave_wrapper] Launching jwave simulation...\n');
+prestus_progress('acoustic', 0, 1, ['solver jwave_' char(solver)]);
 fprintf('[jwave_wrapper] Command:\n  %s\n', strjoin(jwave_argv, ' '));
 
 % Echo=true streams the Python subprocess's stdout/stderr to the MATLAB

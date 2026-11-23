@@ -27,6 +27,7 @@ simulation:
                         #   C++ Apple Silicon GPU code 'cpp_mlx' (macOS; kspaceFirstOrder-MLX)
   precision: 'single' # Computational precision for both acoustic and thermal simulations
   interactive: 0      # Run in interactive mode (ask for user input when necessary, plot evolving figures)
+  live_view: 0        # Plot the evolving pressure (k-Wave MATLAB solvers) and temperature fields, also without the desktop, and save them as live/<stage>_sub-<id>.png every 5 s (shown by the Nexus)? Slows the solver down.
   debug: 0            # Activate debug mode with additional intermediate outputs?
   debug_stages: all   # With debug: stages that write debug outputs: all, or a list of preproc, medium, source, babelbrain
   debug_figures: 1    # With debug: write diagnostic figures (PNG)?

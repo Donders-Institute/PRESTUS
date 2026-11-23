@@ -354,6 +354,8 @@ def build_medium_and_domain(inp, use_fourier_series=False):
     N  = tuple(inp['N'].tolist())
     dx = tuple(inp['dx'].tolist())
     domain = Domain(N, dx)
+    # live view: grid spacing [mm] of the plane shown (axes 1 and 3 in 3D)
+    _live_state['spacing_mm'] = [1e3 * float(dx[0]), 1e3 * float(dx[-1])]
 
     def to_field(val):
         if np.isscalar(val):
@@ -419,6 +421,8 @@ def build_medium_and_domain_fd(inp, accuracy=8):
     N  = tuple(inp['N'].tolist())
     dx = tuple(inp['dx'].tolist())
     domain = Domain(N, dx)
+    # live view: grid spacing [mm] of the plane shown (axes 1 and 3 in 3D)
+    _live_state['spacing_mm'] = [1e3 * float(dx[0]), 1e3 * float(dx[-1])]
 
     def to_fd_field(val):
         if np.isscalar(val):
@@ -727,7 +731,10 @@ def run_pseudo_spectral(inp):
     report_interval = max(1, Nt // 10)
     _eta_state = {}
 
+    _live_state['label'] = '|p| now (maximum over the 2nd axis)'
+
     def _progress_cb(n):
+        _progress(int(n) + 1, Nt, 'jwave')
         if n % report_interval == 0:
             print(f'[run_jwave_sim]   step {int(n):>{len(str(Nt))}}/{Nt}', flush=True)
             # k-Wave-style ETA: time the interval between the 1st and 2nd
@@ -779,6 +786,7 @@ def run_pseudo_spectral(inp):
             w_n = jnp.where(recording, proj[jnp.clip(n - record_start, 0, n_rec - 1)], 0.0)
             acc = acc + p_arr[..., None] * w_n
 
+        _live_hook(n, p_arr, Nt)
         step_absmax = jnp.max(jnp.abs(p_arr))
         return (p, u, rho, p_max, p_min, acc), step_absmax
 
@@ -874,7 +882,10 @@ def run_finite_differences(inp, accuracy=8):
     report_interval = max(1, Nt // 10)
     _eta_state = {}
 
+    _live_state['label'] = '|p| now (maximum over the 2nd axis)'
+
     def _progress_cb(n):
+        _progress(int(n) + 1, Nt, 'jwave')
         if n % report_interval == 0:
             print(f'[run_jwave_sim]   step {int(n):>{len(str(Nt))}}/{Nt}', flush=True)
             # k-Wave-style ETA: time the interval between the 1st and 2nd
@@ -921,6 +932,7 @@ def run_finite_differences(inp, accuracy=8):
             w_n = jnp.where(recording, proj[jnp.clip(n - record_start, 0, n_rec - 1)], 0.0)
             acc = acc + p_arr[..., None] * w_n
 
+        _live_hook(n, p_arr, Nt)
         step_absmax = jnp.max(jnp.abs(p_arr))
         return (p, u, rho, p_max, p_min, acc), step_absmax
 
@@ -1009,6 +1021,85 @@ def scaled_source_local_c(source_field, inp, domain):
     return FourierSeries(params=jnp.array(rhs[..., np.newaxis], dtype=jnp.complex64), domain=domain)
 
 
+# ── progress and live view for the PRESTUS Nexus ──────────────────────────
+# '[progress] acoustic k/n @<unix time> <detail>' lines (as prestus_progress.m prints them),
+# rate-limited; with PRESTUS_LIVE_FILE set (simulation.live_view, jwave_wrapper), a PNG of
+# the field every LIVE_INTERVAL_S and '[live] acoustic <path>' once. Neither may break a run.
+
+LIVE_FILE = os.environ.get('PRESTUS_LIVE_FILE', '')
+LIVE_INTERVAL_S = 5.0
+_progress_last = {'t': 0.0, 'k': -1, 'n': 0}
+_live_state = {'t': 0.0, 'announced': False}
+
+
+def _progress(k, n, detail=''):
+    """Print a progress line: at the start and end, else after >= 1 % and >= 2 s."""
+    import time as _t
+    now = _t.time()
+    last = _progress_last
+    if 0 < k < n and last['n'] == n and (k - last['k'] < n / 100 or now - last['t'] < 2):
+        return
+    last.update(t=now, k=k, n=n)
+    print(f'[progress] acoustic {int(k)}/{int(n)} @{now:.1f} {detail}'.rstrip(), flush=True)
+
+
+def _write_data(path, plane, meta):
+    """A data frame as live_view.m writes it ('data'): the plane as little-endian float32
+    (row-major, 'order': 'C') and its JSON description, each via a temporary file and a
+    rename, the description last."""
+    import json
+    a = np.ascontiguousarray(np.asarray(plane, dtype='<f4'))
+    folder = os.path.dirname(path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+    raw = path[:-5] + '.f32'
+    a.tofile(raw + '.part')
+    os.replace(raw + '.part', raw)
+    meta = dict(meta, data=os.path.basename(raw), shape=list(a.shape), order='C',
+                min=float(np.nanmin(a)), max=float(np.nanmax(a)))
+    with open(path + '.part', 'w', encoding='utf-8') as fh:
+        json.dump(meta, fh)
+    os.replace(path + '.part', path)
+
+
+def _live_frame(plane, force=False):
+    """Save |p| [Pa] of a 2D plane (or projection) as the live-view data frame, in MPa."""
+    import time as _t
+    if not LIVE_FILE or (not force and _t.time() - _live_state['t'] < LIVE_INTERVAL_S):
+        return
+    _live_state['t'] = _t.time()
+    try:
+        _write_data(LIVE_FILE, np.asarray(plane, dtype=float) / 1e6,
+                    {'quantity': 'pressure', 'units': 'MPa',
+                     'label': _live_state.get('label', 'Pressure amplitude'),
+                     'spacing_mm': _live_state.get('spacing_mm', [1.0, 1.0]), 'markers': {}})
+        if not _live_state['announced']:
+            _live_state['announced'] = True
+            print(f'[live] acoustic {LIVE_FILE}', flush=True)
+    except Exception as e:
+        if not _live_state['announced']:
+            _live_state['announced'] = True
+            print(f'[run_jwave_sim] Live view frame not written: {e}', flush=True)
+
+
+def _project(field):
+    """|field| of a 2D grid, or its maximum over the 2nd axis of a 3D grid (x-z view)."""
+    import jax.numpy as jnp
+    a = jnp.abs(field)
+    return jnp.max(a, axis=1) if a.ndim == 3 else a
+
+
+def _live_hook(n, p_arr, Nt):
+    """Inside a time-domain scan step: every Nt/100 steps hand the projected pressure to
+    the host (only with live view, so the scan is unchanged otherwise)."""
+    if not LIVE_FILE:
+        return
+    every = max(1, Nt // 100)
+    jax.lax.cond(n % every == 0,
+                 lambda x: jax.debug.callback(_live_frame, _project(x)),
+                 lambda x: None, p_arr)
+
+
 def conservative_residual(P_raw, rhs, medium, omega, parts):
     """Relative residual ||A u - b|| / ||b|| of the conservative solve, u = P/(-i omega)."""
     u   = P_raw / (-1j * omega)
@@ -1016,6 +1107,47 @@ def conservative_residual(P_raw, rhs, medium, omega, parts):
     b   = np.array(rhs.params[..., 0])
     nb  = np.linalg.norm(b)
     return float('nan') if nb == 0 else float(np.linalg.norm(res) / nb)
+
+
+GMRES_CHUNK_CYCLES = 10      # restart cycles per chunk of the live-view Helmholtz solve
+
+
+def _chunked_conservative_forward(omega, gmres_restart, gmres_maxiter, gmres_tol):
+    """The conservative Helmholtz solve in chunks of GMRES_CHUNK_CYCLES restart cycles, each
+    continuing from the previous iterate (live view only).
+
+    Restarted GMRES keeps nothing but the iterate across a restart, and jax's gmres tests
+    convergence (||b - A x|| <= tol ||b||) at every restart, so the chunks take the same
+    steps as one call with maxiter = gmres_maxiter. Between chunks the relative residual
+    gives the progress (its decrease on a log scale towards tol) and the iterate the frame.
+    """
+    from jax.scipy.sparse.linalg import gmres
+    chunk = max(1, min(GMRES_CHUNK_CYCLES, gmres_maxiter))
+
+    @jax.jit
+    def cycles(medium, source, parts, u0):
+        helm = jax.checkpoint(lambda u: conservative_helmholtz(u, medium, omega, parts))
+        return gmres(helm, source, u0, tol=gmres_tol, restart=gmres_restart,
+                     maxiter=chunk, solve_method='batched')[0]
+
+    def forward(medium, source, parts):
+        _live_state['label'] = 'Pressure amplitude, current GMRES iterate (maximum over the 2nd axis)'
+        u = source * 0
+        done = 0
+        log_goal = -np.log10(gmres_tol)
+        while done < gmres_maxiter:
+            u = cycles(medium, source, parts, u)
+            done += chunk
+            res = conservative_residual(-1j * omega * u, source, medium, omega, parts)
+            frac = 0.0 if not np.isfinite(res) or res >= 1 else min(1.0, -np.log10(res) / log_goal)
+            _progress(int(round(999 * frac)) + 1, 1000,
+                      f'GMRES residual {res:.2e} (tol {gmres_tol:g}, {done * gmres_restart} iterations)')
+            converged = bool(np.isfinite(res) and res <= gmres_tol)
+            _live_frame(np.asarray(_project(omega * u.params[..., 0])), force=converged)
+            if converged:
+                break
+        return -1j * omega * u
+    return forward
 
 
 def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, debug=False,
@@ -1159,6 +1291,8 @@ def run_helmholtz(inp, gmres_restart=10, gmres_maxiter=1000, gmres_tol=1e-3, deb
             u = gmres(helm, source, source * 0, tol=gmres_tol, restart=gmres_restart,
                       maxiter=gmres_maxiter, solve_method='batched')[0]
             return -1j * omega * u
+        if LIVE_FILE:
+            forward = _chunked_conservative_forward(omega, gmres_restart, gmres_maxiter, gmres_tol)
         jw_source_in, params_in = rhs, parts
     else:
         print('[run_jwave_sim] Helmholtz operator: jwave built-in (non-conservative density term)')

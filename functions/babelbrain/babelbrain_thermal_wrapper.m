@@ -203,8 +203,15 @@ fprintf(['[babelbrain_thermal_wrapper] Timing: DC=%.3f  PRF=%.0f Hz  duration=%.
 fprintf('[babelbrain_thermal_wrapper] ISPPA: %.2f W/cm²\n', bb.isppa_w_per_cm2);
 fprintf('[babelbrain_thermal_wrapper] Command:\n  %s\n', strjoin(thermal_argv, ' '));
 
+prestus_progress('thermal', 0, 1, 'solver babelbrain');
+% Live view: bb_progress.py saves the temperature there (CUDA only)
+bb_env = struct();
+live_file = live_view('file', parameters, 'thermal');
+if ~isempty(live_file)
+    bb_env.PRESTUS_LIVE_FILE = live_file;
+end
 t0     = tic;
-[status, cmd_out] = run_command(thermal_argv, 'Echo', true);
+[status, cmd_out] = run_command(thermal_argv, 'Echo', true, 'Env', bb_env);
 elapsed = toc(t0);
 
 if status ~= 0

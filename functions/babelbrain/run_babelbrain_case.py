@@ -1764,6 +1764,11 @@ def main():
           f'(bUseRayleighForWater={not args.no_rayleigh_for_water})')
 
     _start_memory_monitor()
+    try:                              # progress (and live view) lines for the Nexus
+        import bb_progress
+        bb_progress.start('acoustic')
+    except Exception as e:
+        print(f'[run_babelbrain_case] No progress reporting: {e}', flush=True)
     try:
         output_files = R.RunCases(**kw)
     except Exception as e:

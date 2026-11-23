@@ -99,6 +99,7 @@ fields:
         - {key: time_reversal.enabled, in: [1, true]}
   simulation.precision: {choices: [single, double]}
   simulation.interactive: {kind: flag}
+  simulation.live_view: {kind: flag}
   simulation.debug: {kind: flag}
   simulation.debug_stages:
     kind: strlist

@@ -112,6 +112,7 @@ function [lib, report, sims] = kwave_calibrate_drive(lib, prof, options)
         assert(~isempty(m) && isfinite(ramp(m)), 'kwave_calibrate_drive:depth', ...
             'Depth %.2f mm has no refinement drive.', d);
         if ~isempty(progress); progress(k, n, d); end
+        prestus_progress('calibration', k, n, sprintf('%.1f mm', d));   % the Nexus' depth counter
 
         % Simulate what a study resolves from the uncorrected entry
         yaml.dumpFile(fullfile(lib_dir, [key '.yaml']), lib);

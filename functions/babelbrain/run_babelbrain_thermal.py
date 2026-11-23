@@ -151,6 +151,15 @@ def main():
         print(f'[run_babelbrain_thermal] Import error: {e}', file=sys.stderr)
         sys.exit(1)
 
+    # Progress (and live view) lines for the Nexus, also from the child processes
+    # BabelBrain runs the solver in (bb_progress.patch_thermal_children; before the fork)
+    try:
+        import bb_progress
+        bb_progress.patch_thermal_children()
+        bb_progress.start('thermal')
+    except Exception as e:
+        print(f'[run_babelbrain_thermal] No progress reporting: {e}', flush=True)
+
     # BabelBrain expects a dummy queue for GUI messaging; use a simple substitute
     import queue
     q = queue.Queue()

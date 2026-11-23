@@ -988,11 +988,18 @@ end
 % MATLAB's share so an OOM kill can be attributed (the child logs its own).
 log_memory_usage('before BabelBrain launch');
 
+prestus_progress('acoustic', 0, 1, 'solver babelbrain');
+% Live view: bb_progress.py saves the field there (CUDA only); progress is always reported
+bb_env = struct();
+live_file = live_view('file', parameters, 'acoustic');
+if ~isempty(live_file)
+    bb_env.PRESTUS_LIVE_FILE = live_file;
+end
 t0     = tic;
 % Echo=true streams output live to the console, matching the original
 % single-output `status = system(cmd_args)` (which prints stdout/stderr to
 % the Command Window in real time when its output isn't captured).
-[status, cmd_out] = run_command(babelbrain_argv, 'Echo', true);
+[status, cmd_out] = run_command(babelbrain_argv, 'Echo', true, 'Env', bb_env);
 elapsed = toc(t0);
 mem_after = log_memory_usage('after BabelBrain exit');
 log_memory_summary('BabelBrain', cmd_out, mem_after);
