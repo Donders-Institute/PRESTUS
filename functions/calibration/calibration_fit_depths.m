@@ -23,6 +23,13 @@ function fits = calibration_fit_depths(tran, prof, fit_options, progress)
 %
 % See also: FIT_TRANSDUCER_MODEL, CALIBRATION_FIT_OPTIONS, LIBRARY_REFINEMENT_FROM_FITS
 
+arguments
+    tran (1,1) struct
+    prof (1,1) struct
+    fit_options
+    progress = []
+end
+
     if nargin < 4; progress = []; end
     n     = numel(prof.depths_ep_mm);
     typed = isfield(prof, 'profile_type');

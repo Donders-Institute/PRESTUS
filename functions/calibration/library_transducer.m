@@ -22,6 +22,11 @@ function tran = library_transducer(tran, lib)
 %
 % See also: RING_PROFILE_TRANSDUCER, FIT_RING_PROFILE, LIBRARY_MODEL_AT_DEPTH
 
+arguments
+    tran (1,1) struct
+    lib
+end
+
     rp = library_ring_profile(lib);
     if ~isempty(rp)
         tran = ring_profile_transducer(tran, rp);

@@ -21,6 +21,11 @@ function folders = transducer_library_folders(parameters, t_i)
 %
 % See also: LOAD_EQUIPMENT_CONFIG, LIBRARY_ENTRY_FILE, RESOLVE_TRANSDUCER_FROM_SERIAL
 
+arguments
+    parameters (1,1) struct = struct()
+    t_i {mustBeNumeric} = []
+end
+
     if nargin < 1; parameters = struct(); end
     if nargin < 2; t_i = []; end
     folders = {};

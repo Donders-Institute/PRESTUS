@@ -29,6 +29,13 @@ function T = library_settings_table(tran, lib, depths_ep_mm, options)
 %
 % See also: LIBRARY_MODEL_AT_DEPTH, EVALUATE_LIBRARY_ENTRY, LOAD_TRANSDUCER_FROM_LIBRARY
 
+arguments
+    tran (1,1) struct
+    lib
+    depths_ep_mm {mustBeNumeric}
+    options (1,1) struct = struct()
+end
+
     if nargin < 4; options = struct(); end
     csv   = '';
     ptype = {};

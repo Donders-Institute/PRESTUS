@@ -23,6 +23,10 @@ function report = check_equipment_config(equipment_path)
 %
 % See also: LOAD_EQUIPMENT_CONFIG, VALIDATE_TRANSDUCER_LIBRARY
 
+arguments
+    equipment_path = fullfile(get_prestus_path(), 'config', 'equipment')
+end
+
     if nargin < 1 || isempty(equipment_path)
         equipment_path = fullfile(get_prestus_path(), 'config', 'equipment');
     end

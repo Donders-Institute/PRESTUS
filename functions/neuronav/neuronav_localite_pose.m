@@ -45,6 +45,10 @@ function [coord_matrix, info] = neuronav_localite_pose(parameters)
 % See also: LOCALITE_MATRIX_TO_POSITIONS, NEURONAV_LOCALITE_FILE_SERIES, NEURONAV_INGEST_MARKERS,
 %           NEURONAV_SELECT_LOCALITE, NEURONAV_RESOLVE_PATHS
 
+arguments
+    parameters (1,1) struct
+end
+
     lc = struct();
     if isfield(parameters, 'placement') && isfield(parameters.placement, 'localite')
         lc = parameters.placement.localite;

@@ -19,6 +19,10 @@ function out = nexus_pct(args)
 %
 % See also: NEXUS_BRIDGE, PCT_PREDICT_SKULL_PROPERTIES
 
+arguments
+    args (1,1) struct
+end
+
     if isfield(args, 'config') && ~isempty(args.config)
         p = load_parameters(char(args.config));
     else

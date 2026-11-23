@@ -36,6 +36,13 @@ function [sc, T] = build_steering_correction(parameters, tr, meas_file, opts)
 %
 % See also: FIT_STEERING_CORRECTION, MATRIX_FOCAL_PEAK, RESOLVE_TRANSDUCER_FROM_SERIAL
 
+arguments
+    parameters
+    tr (1,1) struct
+    meas_file {mustBeTextScalar}
+    opts (1,1) struct = struct()
+end
+
     if nargin < 4; opts = struct(); end
     T = read_steering_measurements(meas_file);
     X = [T.target_x_mm, T.target_y_mm, T.target_z_mm];

@@ -21,6 +21,11 @@ function k = steering_correction_factor(sc, targets_mm)
 %
 % See also: FIT_STEERING_CORRECTION, CREATE_MATRIX_KARRAY
 
+arguments
+    sc (1,1) struct
+    targets_mm {mustBeNumeric}
+end
+
     N = size(targets_mm, 1);
     switch char(sc.model)
         case 'scale'

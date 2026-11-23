@@ -20,6 +20,13 @@ function fig = plot_ring_profile(tran, rp, info, out_file)
 %
 % See also: FIT_RING_PROFILE, RING_PROFILE_TRANSDUCER
 
+arguments
+    tran (1,1) struct
+    rp (1,1) struct
+    info = []
+    out_file {mustBeTextScalar} = ''
+end
+
     if nargin < 3; info = []; end
     if nargin < 4; out_file = ''; end
     trp = ring_profile_transducer(tran, rp);

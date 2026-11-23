@@ -32,6 +32,12 @@ function D = neuronav_detect_series(parameters, sub_id, ses_id)
 %
 % See also: NEURONAV_NAME_SERIES, NEURONAV_INGEST_BATCH, NEURONAV_INGEST_MARKERS
 
+arguments
+    parameters (1,1) struct
+    sub_id     {mustBeTextScalar}
+    ses_id
+end
+
     if isnumeric(ses_id), ses_id = sprintf('ses-%02d', double(ses_id)); end
     ses_id = char(ses_id);
     sub_id = char(sub_id);

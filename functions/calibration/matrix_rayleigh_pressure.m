@@ -33,6 +33,16 @@ function p = matrix_rayleigh_pressure(L, freq_hz, c, amp_pa, phase_rad, pts_m, o
 %
 % See also: MATRIX_ELEMENT_LAYOUT, MATRIX_FOCAL_PEAK, RAYLEIGH_AXIAL_INTENSITY
 
+arguments
+    L (1,1) struct
+    freq_hz (1,1) {mustBeNumeric}
+    c (1,1) {mustBeNumeric}
+    amp_pa {mustBeNumeric}
+    phase_rad {mustBeNumeric}
+    pts_m {mustBeNumeric}
+    opts (1,1) struct = struct()
+end
+
     if nargin < 7; opts = struct(); end
     ppl = get_opt(opts, 'patch_per_lambda', 6);
     chunk = get_opt(opts, 'chunk', 1000);

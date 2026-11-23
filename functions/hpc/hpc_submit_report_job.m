@@ -21,6 +21,14 @@ function report_job_id = hpc_submit_report_job(main_job_id, platform, parameters
 %
 % See also: HPC_JOB_REPORT, HPC_SUBMIT_JOB
 
+arguments
+    main_job_id
+    platform {mustBeTextScalar}
+    parameters (1,1) struct
+    log_dir {mustBeTextScalar}
+    prestus_path {mustBeTextScalar}
+end
+
 report_job_id = [];
 
 if ~strcmpi(platform, 'slurm')

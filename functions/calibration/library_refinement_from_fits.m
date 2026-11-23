@@ -24,6 +24,16 @@ function lib = library_refinement_from_fits(lib, fits, isppa_wcm2, blend_mm, sou
 %
 % See also: LIBRARY_ADD_REFINEMENTS, REFINE_TRANSDUCER_LIBRARY, KWAVE_CALIBRATE_DRIVE
 
+arguments
+    lib
+    fits cell
+    isppa_wcm2 {mustBeNumeric}
+    blend_mm = []
+    source {mustBeTextScalar} = ''
+    c_water {mustBeNumeric} = 1500
+    rho_water {mustBeNumeric} = 994
+end
+
     if nargin < 4; blend_mm = []; end
     if nargin < 5; source = ''; end
     if nargin < 6 || isempty(c_water);   c_water   = 1500; end

@@ -19,6 +19,11 @@ function parameters = hpc_add_dependency(parameters, job_ids)
 %
 % See also: HPC_SUBMIT_JOB, UNCERTAINTY_PIPELINE, MULTI_ISPPA_PIPELINE
 
+arguments
+    parameters (1,1) struct
+    job_ids
+end
+
     ids = job_ids(:)';
     if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'depend_job_ids')
         ids = [parameters.hpc.depend_job_ids(:)', ids];

@@ -29,6 +29,14 @@ function tr = resolve_transducer_from_serial(tr, equip_param, library_path, t_i,
 % See also: LOAD_EQUIPMENT_CONFIG, LOAD_TRANSDUCER_FROM_LIBRARY,
 %           LOAD_TRANSDUCER_PARAMETERS
 
+arguments
+    tr (1,1) struct
+    equip_param (1,1) struct
+    library_path {mustBeTextScalar}
+    t_i (1,1) {mustBeNumeric}
+    user_libraries = {}
+end
+
     serial = char(tr.serial);
     if nargin < 5 || isempty(user_libraries)
         user_libs = {};

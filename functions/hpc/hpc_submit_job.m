@@ -28,6 +28,13 @@ function [job_id, parameters] = hpc_submit_job(hpc_type, temp_m_file, parameters
 %
 % See also: HPC_DETECT_SYSTEM, HPC_SETUP_TEMP_FILES, HPC_WAIT_FOR_COMPLETION
 
+arguments
+    hpc_type {mustBeTextScalar}
+    temp_m_file {mustBeTextScalar}
+    parameters (1,1) struct
+    log_dir {mustBeTextScalar}
+end
+
 switch hpc_type
     case 'slurm'
         temp_slurm_path = fullfile(log_dir, sprintf('temp_slurm_%s.sh', datestr(now, 'yyyymmdd_HHMMSS')));

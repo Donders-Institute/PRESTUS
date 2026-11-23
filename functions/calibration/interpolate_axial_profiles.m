@@ -52,6 +52,12 @@ function out = interpolate_axial_profiles(prof, depths_ep_mm, options)
 % See also: READ_AXIAL_PROFILES, WRITE_AXIAL_PROFILES, EXTRACT_REAL_INTENSITY_PROFILE,
 %           REFINE_TRANSDUCER_LIBRARY, CALIBRATION_GUI
 
+arguments
+    prof (1,1) struct
+    depths_ep_mm {mustBeNumeric}
+    options (1,1) struct = struct()
+end
+
     if nargin < 3; options = struct(); end
     align   = opt(options, 'Align', 'label');
     max_ext = opt(options, 'MaxExtrapolationMm', 0);

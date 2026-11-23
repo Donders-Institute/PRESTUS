@@ -27,6 +27,12 @@ function fig = plot_transducer_library(combo_name, library_path, equip_param)
 %
 % See also: LIBRARY_SETTINGS_TABLE, GENERATE_CALIBRATION_REPORT, VALIDATE_TRANSDUCER_LIBRARY
 
+arguments
+    combo_name {mustBeTextScalar}
+    library_path = fullfile(get_prestus_path(), 'config', 'calibration')
+    equip_param = []
+end
+
     if nargin < 2 || isempty(library_path)
         library_path = fullfile(get_prestus_path(), 'config', 'calibration');
     end

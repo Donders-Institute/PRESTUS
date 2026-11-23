@@ -23,6 +23,12 @@ function ann = ring_profile_drive(ann, elem_phase_deg, elem_p_amp)
 %
 % See also: RING_PROFILE_TRANSDUCER, LOAD_TRANSDUCER_FROM_LIBRARY
 
+arguments
+    ann (1,1) struct
+    elem_phase_deg {mustBeNumeric}
+    elem_p_amp {mustBeNumeric}
+end
+
     ph = reshape(double(elem_phase_deg), 1, []);
     pa = reshape(double(elem_p_amp), 1, []);
     if isfield(ann, 'elem_weight') && ~isempty(ann.elem_weight)

@@ -18,6 +18,10 @@ function prof = read_axial_profiles(csv_path)
 %
 % See also: FIT_TRANSDUCER_MODEL, REFINE_TRANSDUCER_LIBRARY
 
+arguments
+    csv_path {mustBeTextScalar}
+end
+
     raw = readmatrix(csv_path, 'NumHeaderLines', 1);
     depths = round(raw(1, 2:end), 2);
     z      = raw(2:end, 1);

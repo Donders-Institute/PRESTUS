@@ -29,6 +29,11 @@ function fo = calibration_fit_options(preset, overrides)
 %
 % See also: FIT_TRANSDUCER_MODEL, CALIBRATION_FIT_DEPTHS, CALIBRATE_LIBRARY_ENTRY
 
+arguments
+    preset = 'rayleigh_phase_gain'
+    overrides = struct()
+end
+
     if nargin < 1 || isempty(preset); preset = 'rayleigh_phase_gain'; end
     if nargin < 2 || isempty(overrides); overrides = struct(); end
 

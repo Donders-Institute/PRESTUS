@@ -20,6 +20,11 @@ function parameters = hpc_validate_parameters(parameters, hpc_type)
 %
 % See also: HPC_DETECT_SYSTEM, HPC_SUBMIT_JOB
 
+arguments
+    parameters (1,1) struct
+    hpc_type {mustBeTextScalar}
+end
+
 if parameters.simulation.interactive
     warn('Interactive mode disabled for %s jobs.', upper(hpc_type));
     parameters.simulation.interactive = false;

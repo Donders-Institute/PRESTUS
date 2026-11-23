@@ -56,6 +56,13 @@ function [xml_path, json_path, results] = neuronav_ingest_markers(parameters, su
 %
 % See also: NEURONAV_SELECT_LOCALITE, NEURONAV_COMPUTE_SERIES_STATISTICS
 
+arguments
+    parameters (1,1) struct
+    sub_id     {mustBeTextScalar}
+    ses_id
+    target_map
+end
+
     % ------------------------------------------------------------------
     % Resolve settings from parameters
     % ------------------------------------------------------------------

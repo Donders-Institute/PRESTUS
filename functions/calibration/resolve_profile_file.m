@@ -17,6 +17,14 @@ function f = resolve_profile_file(rel, equip, serial, user_libraries, profile_ro
 %
 % See also: TRANSDUCER_LIBRARY_FOLDERS, LOAD_EQUIPMENT_CONFIG
 
+arguments
+    rel {mustBeTextScalar}
+    equip
+    serial {mustBeTextScalar}
+    user_libraries = {}
+    profile_root = fullfile(get_prestus_path(), 'local', 'profiles')
+end
+
     if nargin < 4 || isempty(user_libraries); user_libraries = transducer_library_folders(); end
     if nargin < 5 || isempty(profile_root); profile_root = fullfile(get_prestus_path(), 'local', 'profiles'); end
     rel = char(rel);

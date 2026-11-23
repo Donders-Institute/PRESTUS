@@ -34,6 +34,10 @@ function [parameters, cleanup] = hpc_scratch_setup(parameters)
 %
 % See also: HPC_SCRATCH_FINALIZE, HPC_SUBMIT_JOB, ACOUSTIC_SIMULATION
 
+arguments
+    parameters (1,1) struct
+end
+
 cleanup = [];
 tmp_gb = get_nonempty_field(parameters, {'hpc', 'tmp_gb'}, 0);
 if ~isnumeric(tmp_gb) || ~isscalar(tmp_gb) || tmp_gb <= 0

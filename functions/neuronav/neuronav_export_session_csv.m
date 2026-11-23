@@ -56,6 +56,24 @@ function neuronav_export_session_csv( ...
 % See also: NEURONAV_CONVERT_NATIVE_TO_MNI, NEURONAV_CONVERT_TRIGGER_TO_VOXELS,
 %           NEURONAV_READ_ENTRY_TARGET
 
+arguments
+    sub_id              {mustBeTextScalar}
+    session             {mustBeTextScalar}
+    session_target
+    outputs_folder      {mustBeTextScalar}
+    trans_vox           {mustBeNumeric}
+    target_vox          {mustBeNumeric}
+    trans_mm            {mustBeNumeric}
+    target_projected_mm {mustBeNumeric}
+    trans_mni_vox       {mustBeNumeric}
+    target_mni_vox      {mustBeNumeric}
+    trans_mni_mm        {mustBeNumeric}
+    target_mni_mm       {mustBeNumeric}
+    interpolated        {mustBeNumericOrLogical}
+    target_localite_mm  = []
+    target_source       = []
+end
+
 N = size(trans_vox, 1);
 
 % Allow optional / empty args

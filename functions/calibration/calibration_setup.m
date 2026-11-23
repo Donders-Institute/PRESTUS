@@ -16,6 +16,11 @@ function calibration_setup(parameters, equip_param)
 %
 % See also: CALIBRATION_TRANSDUCER, CALIBRATION_PIPELINE_START, CALIBRATE_LIBRARY_ENTRY
 
+arguments
+    parameters (1,1) struct
+    equip_param (1,1) struct
+end
+
 if ~isfolder(parameters.calibration.path_output)
     mkdir(parameters.calibration.path_output);
 end

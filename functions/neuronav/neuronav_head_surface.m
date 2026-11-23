@@ -20,6 +20,10 @@ function [F, V] = neuronav_head_surface(file)
 %
 % See also: NEURONAV_FIND_MNI_TEMPLATE, NEURONAV_SUMMARY_TO_MNI
 
+arguments
+    file {mustBeTextScalar}
+end
+
     info = niftiinfo(file);
     vol = double(niftiread(info));
     vol = vol(:, :, :, 1);

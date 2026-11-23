@@ -19,6 +19,10 @@ function fp = equipment_geometry_fingerprint(tran)
 %
 % See also: LOAD_TRANSDUCER_FROM_LIBRARY, LOAD_EQUIPMENT_CONFIG
 
+arguments
+    tran
+end
+
     if isfield(tran, 'transducer'); tran = tran.transducer; end
     fp = '';
     if ~isfield(tran, 'annular') || ~isstruct(tran.annular)

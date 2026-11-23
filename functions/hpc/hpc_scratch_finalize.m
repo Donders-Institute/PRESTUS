@@ -18,6 +18,11 @@ function hpc_scratch_finalize(scratch_dir, created_root)
 %
 % See also: HPC_SCRATCH_SETUP
 
+arguments
+    scratch_dir {mustBeTextScalar}
+    created_root = ''
+end
+
 if nargin < 2
     created_root = '';
 end

@@ -22,6 +22,14 @@ function lib = library_entry_from_model(lib, model, isppa_wcm2, c_water, rho_wat
 %
 % See also: FIT_TRANSDUCER_MODEL, LOAD_TRANSDUCER_FROM_LIBRARY
 
+arguments
+    lib
+    model (1,1) struct
+    isppa_wcm2 {mustBeNumeric}
+    c_water = 1500
+    rho_water = 994
+end
+
     if nargin < 4 || isempty(c_water);   c_water   = 1500; end
     if nargin < 5 || isempty(rho_water); rho_water = 994;  end
     if ~isfield(lib, 'global_model') || ~isstruct(lib.global_model); lib.global_model = struct(); end

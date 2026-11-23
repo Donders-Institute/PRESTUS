@@ -20,6 +20,14 @@ function lib = save_library_entry(lib, out_file, mode, report, extra_meta)
 %
 % See also: CALIBRATE_LIBRARY_ENTRY, REFINE_TRANSDUCER_LIBRARY, CALIBRATION_TRANSDUCER
 
+arguments
+    lib (1,1) struct
+    out_file {mustBeTextScalar}
+    mode {mustBeTextScalar}
+    report
+    extra_meta (1,1) struct = struct()
+end
+
     if nargin < 5; extra_meta = struct(); end
     lib.meta.calibration_type = 'user_empirical';
     lib.meta.last_updated     = datestr(now, 'yyyy-mm-dd'); %#ok<TNOW1,DATST>

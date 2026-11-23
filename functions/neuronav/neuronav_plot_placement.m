@@ -37,6 +37,18 @@ function fig = neuronav_plot_placement(sub_id, session, active_sides, trans_pos,
 %
 % See also: SHOW_3D_HEAD, NEURONAV_CONVERT_TRIGGER_TO_VOXELS
 
+arguments
+    sub_id       {mustBeTextScalar}
+    session      {mustBeTextScalar}
+    active_sides {mustBeNumeric}
+    trans_pos    {mustBeNumeric}
+    target_pos   {mustBeNumeric}
+    target_map   struct
+    parameters   (1,1) struct
+    output_dir   {mustBeTextScalar}
+    params_plot  = parameters
+end
+
     if nargin < 9 || isempty(params_plot)
         params_plot = parameters;
     end

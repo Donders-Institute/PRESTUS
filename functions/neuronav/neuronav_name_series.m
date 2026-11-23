@@ -34,6 +34,11 @@ function N = neuronav_name_series(D, parameters)
 %
 % See also: NEURONAV_DETECT_SERIES, NEURONAV_SUGGEST_TARGET_NAMES, NEURONAV_MAP_LABEL
 
+arguments
+    D          (1,1) struct
+    parameters (1,1) struct
+end
+
     opt = naming_options(parameters);
     n = numel(D.results);
     N = repmat(struct('name', '', 'rule', 'default', 'label', '', 'source', '', ...

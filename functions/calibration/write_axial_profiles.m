@@ -22,6 +22,12 @@ function write_axial_profiles(prof, csv_path, meta)
 %
 % See also: READ_AXIAL_PROFILES, INTERPOLATE_AXIAL_PROFILES
 
+arguments
+    prof (1,1) struct
+    csv_path {mustBeTextScalar}
+    meta (1,1) struct = struct()
+end
+
     if nargin < 3; meta = struct(); end
     keep = any(isfinite(prof.I), 1);
     d = prof.depths_ep_mm(keep);

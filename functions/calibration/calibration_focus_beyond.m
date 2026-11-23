@@ -17,6 +17,12 @@ function f = calibration_focus_beyond(I, z, skip_mm)
 %
 % See also: COMPUTE_FLHM_CENTER, CALIBRATION_EVALUATE
 
+arguments
+    I {mustBeNumeric}
+    z {mustBeNumeric}
+    skip_mm (1,1) {mustBeNumeric}
+end
+
     k = z >= skip_mm;
     f = arrayfun(@(j) compute_flhm_center(I(k, j), z(k)), 1:size(I, 2));
 end

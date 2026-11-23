@@ -24,6 +24,13 @@ function [native_target_mm, native_trans_mm, target_pos, trans_pos] = ...
 %
 % See also: NEURONAV_CONVERT_NATIVE_TO_MNI, LOCALITE_MATRIX_TO_POSITIONS
 
+arguments
+    sub_id     {mustBeTextScalar}
+    parameters (1,1) struct
+    trans_mm   {mustBeNumeric}
+    targ_mm    {mustBeNumeric}
+end
+
     Npos = size(trans_mm,1); % Number of positions
 
     t1seg_info = niftiinfo(fullfile(parameters.path.seg, sprintf('m2m_%s', sub_id), 'final_tissues.nii.gz'));

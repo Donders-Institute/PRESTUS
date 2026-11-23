@@ -26,6 +26,10 @@ function [log_dir, prestus_path, temp_data_path, temp_m_path, temp_m_file] = ...
 %
 % See also: HPC_SUBMIT_JOB, GET_OUTPUT_DIR, GET_PRESTUS_PATH
 
+arguments
+    parameters (1,1) struct
+end
+
 % Setup output directory
 output_dir = get_output_dir(parameters);
 if ~isfolder(output_dir), mkdir(output_dir); end

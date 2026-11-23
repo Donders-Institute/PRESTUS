@@ -11,6 +11,10 @@ function s = library_static_model(lib)
 %
 % See also: FIT_TRANSDUCER_MODEL, REFINE_TRANSDUCER_LIBRARY
 
+arguments
+    lib
+end
+
     s = struct();
     if ~isfield(lib, 'global_model') || ~isstruct(lib.global_model); return; end
     gm  = lib.global_model;

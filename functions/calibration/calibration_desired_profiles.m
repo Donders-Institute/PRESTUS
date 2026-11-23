@@ -32,6 +32,13 @@ function p = calibration_desired_profiles(tran, meas, depths, options)
 %
 % See also: INTERPOLATE_AXIAL_PROFILES, CALIBRATION_EVALUATE, CALIBRATION_FIT
 
+arguments
+    tran (1,1) struct
+    meas
+    depths {mustBeNumeric}
+    options (1,1) struct = struct()
+end
+
     if nargin < 4; options = struct(); end
     dep  = unique(round(double(depths(:)'), 2));
     zmax = ceil(1.5 * max([dep, tran.transducer.annular.dist_geom_ep_mm]));

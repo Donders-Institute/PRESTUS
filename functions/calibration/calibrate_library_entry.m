@@ -75,6 +75,13 @@ function [lib, fits, report, prof, diag] = calibrate_library_entry(lib, tran, me
 % See also: REFINE_TRANSDUCER_LIBRARY, CALIBRATION_TRANSDUCER, CALIBRATION_FIT_OPTIONS,
 %           CALIBRATION_FIT_DEPTHS, INTERPOLATE_AXIAL_PROFILES, KWAVE_CALIBRATE_DRIVE
 
+arguments
+    lib (1,1) struct
+    tran (1,1) struct
+    meas (1,1) struct
+    options (1,1) struct = struct()
+end
+
     if nargin < 4; options = struct(); end
     mode      = opt(options, 'Mode', 'per_depth');
     preset    = opt(options, 'Preset', 'rayleigh_phase_gain');

@@ -39,6 +39,13 @@ function sc = fit_steering_correction(targets_mm, p_model, p_measured, opts)
 %
 % See also: STEERING_CORRECTION_FACTOR, BUILD_STEERING_CORRECTION, MATRIX_FOCAL_PEAK
 
+arguments
+    targets_mm {mustBeNumeric}
+    p_model {mustBeNumeric}
+    p_measured {mustBeNumeric}
+    opts (1,1) struct = struct()
+end
+
     if nargin < 4; opts = struct(); end
     model = char(get_opt(opts, 'model', 'auto'));
     min_n = get_opt(opts, 'min_targets', 15);

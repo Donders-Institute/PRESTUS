@@ -14,6 +14,11 @@ function t1_path = neuronav_find_planning_t1(sub_id, parameters)
 %
 % See also: NEURONAV_RESOLVE_PATHS, NEURONAV_CONVERT_TRIGGER_TO_VOXELS
 
+arguments
+    sub_id     {mustBeTextScalar}
+    parameters (1,1) struct
+end
+
     paths = neuronav_resolve_paths(parameters);
     if isempty(paths.t1)
         error('neuronav_find_planning_t1:noFolder', ...

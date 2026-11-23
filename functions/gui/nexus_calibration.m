@@ -42,6 +42,10 @@ function out = nexus_calibration(args)
 %
 % See also: NEXUS_BRIDGE, CALIBRATION_GUI, CALIBRATION_FIT, CALIBRATION_EVALUATE
 
+arguments
+    args (1,1) struct
+end
+
     persistent sessions
     if isempty(sessions); sessions = containers.Map(); end
     action = char(args.action);

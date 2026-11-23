@@ -29,6 +29,14 @@ function hpc_wait_for_completion(job_id, hpc_type, max_checks, parameters, log_d
 %
 % See also: HPC_SUBMIT_JOB, HPC_DETECT_SYSTEM, HPC_JOB_REPORT
 
+arguments
+    job_id
+    hpc_type {mustBeTextScalar}
+    max_checks = 540
+    parameters = []
+    log_dir = []
+end
+
 if nargin < 3 || isempty(max_checks)
     max_checks = 540;  % default: ~3 hours at 1 check/20s
 end

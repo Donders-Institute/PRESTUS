@@ -25,6 +25,11 @@ function L = matrix_element_layout(parameters, tr)
 %
 % See also: MATRIX_RAYLEIGH_PRESSURE, MATRIX_FOCAL_PEAK, CREATE_MATRIX_KARRAY
 
+arguments
+    parameters (1,1) struct
+    tr (1,1) struct
+end
+
     m = tr.matrix;
     if isfield(m, 'is_clover_setup') && isequal(m.is_clover_setup, true)
         error('matrix_element_layout:clover', 'Clover setups are not supported.');

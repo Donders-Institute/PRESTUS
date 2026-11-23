@@ -21,6 +21,11 @@ function lib = library_set_ring_profile(lib, rp)
 %
 % See also: FIT_RING_PROFILE, LIBRARY_TRANSDUCER, CALIBRATE_LIBRARY_ENTRY, CALIBRATION_FIT_ENTRY
 
+arguments
+    lib
+    rp
+end
+
     if isempty(lib); lib = struct(); end
     old = [];
     if isfield(lib, 'global_model') && isfield(lib.global_model, 'ring_profile'); old = lib.global_model.ring_profile; end

@@ -37,6 +37,14 @@ function H = axial_transfer_matrix(tran, z_bowl_mm, c, rho, forward_model)
 %
 % See also: RAYLEIGH_AXIAL_INTENSITY, FIT_TRANSDUCER_MODEL
 
+arguments
+    tran (1,1) struct
+    z_bowl_mm {mustBeNumeric}
+    c (1,1) {mustBeNumeric}
+    rho (1,1) {mustBeNumeric}
+    forward_model = 'rayleigh'
+end
+
     if nargin < 5 || isempty(forward_model); forward_model = 'rayleigh'; end
     ann  = tran.transducer.annular;
     n    = ann.elem_n;

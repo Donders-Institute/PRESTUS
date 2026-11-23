@@ -37,6 +37,11 @@ function equip = load_equipment_config(equipment_path, user_folders)
 %   equip.files   — struct keyed by tran_serial: the file each entry came from
 %   equip.user    — struct keyed by tran_serial: true for entries from a user folder
 
+arguments
+    equipment_path = fullfile(get_prestus_path(), 'config', 'equipment')
+    user_folders = {}
+end
+
     if nargin < 1 || isempty(equipment_path)
         equipment_path = fullfile(get_prestus_path(), 'config', 'equipment');
     end

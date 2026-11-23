@@ -32,6 +32,13 @@ function [file, prof_csv] = calibration_save_entry(lib, fit, out_dir, options)
 % See also: CALIBRATION_FIT, CALIBRATION_FIT_ENTRY, WRITE_AXIAL_PROFILES,
 %           RESOLVE_TRANSDUCER_FROM_SERIAL
 
+arguments
+    lib (1,1) struct
+    fit (1,1) struct
+    out_dir {mustBeTextScalar}
+    options (1,1) struct = struct()
+end
+
     if nargin < 4; options = struct(); end
     assert(~isempty(out_dir), 'calibration_save_entry:noFolder', 'No folder to save the entry to.');
     shipped = opt(options, 'ShippedLibraryPath', fullfile(get_prestus_path(), 'config', 'calibration'));

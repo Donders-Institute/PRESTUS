@@ -23,6 +23,11 @@ function [mean_mni_trans_mm, mean_mni_targ_mm, mean_mni_trans_vox, mean_mni_targ
 %
 % See also: NEURONAV_EXPORT_SESSION_CSV, NEURONAV_CONVERT_NATIVE_TO_MNI
 
+arguments
+    session_target
+    parameters     (1,1) struct
+end
+
 % Load all subject session CSVs
 csv_files = dir(fullfile(parameters.path.sim, 'sub-*', '*_info.csv'));
 

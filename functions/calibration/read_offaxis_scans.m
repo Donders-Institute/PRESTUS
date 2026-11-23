@@ -65,6 +65,11 @@ function [oa, planes] = read_offaxis_scans(src, options)
 %
 % See also: FIT_RING_PROFILE, FIELD_TRANSFER_MATRIX, READ_AXIAL_PROFILES, CALIBRATION_FIT
 
+arguments
+    src {mustBeTextScalar}
+    options (1,1) struct = struct()
+end
+
     if nargin < 2; options = struct(); end
     kind_sel = cellstr(opt(options, 'Kind', 'all'));
     if any(strcmp(kind_sel, 'all')); kind_sel = {'transverse', 'axial', 'volume'}; end

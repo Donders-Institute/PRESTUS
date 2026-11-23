@@ -34,6 +34,15 @@ function m = kwave_drive_metrics(z_meas, I_meas, z_sim, I_sim, isppa_ref, option
 %
 % See also: KWAVE_CALIBRATE_DRIVE, COMPUTE_FLHM_CENTER
 
+arguments
+    z_meas {mustBeNumeric}
+    I_meas {mustBeNumeric}
+    z_sim {mustBeNumeric}
+    I_sim {mustBeNumeric}
+    isppa_ref {mustBeNumeric}
+    options (1,1) struct = struct()
+end
+
     if nargin < 6; options = struct(); end
     skip = opt(options, 'NearFieldSkipMm', 10);
     z_meas = z_meas(:); I_meas = I_meas(:); z_sim = z_sim(:); I_sim = I_sim(:);

@@ -31,6 +31,12 @@ function [sessions, labels] = neuronav_scan_sessions(parameters, subjects, sessi
 %
 % See also: NEURONAV_INGEST_BATCH, NEURONAV_MAP_LABEL, NEURONAV_LABEL_MAP_FROM_SCAN
 
+arguments
+    parameters  (1,1) struct
+    subjects    = []
+    session_ids = []
+end
+
     if nargin < 2, subjects = []; end
     if nargin < 3, session_ids = []; end
 

@@ -28,6 +28,13 @@ function [transducer_ras, transducer_pos, target_ras, target_pos, t1_image] = ..
 %
 % See also: NEURONAV_COMPUTE_SERIES_STATISTICS, LOCALITE_MATRIX_TO_POSITIONS
 
+arguments
+    sub_id       {mustBeTextScalar}
+    positions    {mustBeNumeric}
+    outputStruct cell
+    parameters   (1,1) struct
+end
+
     % --- Load the neuronavigation planning T1 ---
     t1_path   = neuronav_find_planning_t1(sub_id, parameters);
     t1_header = niftiinfo(t1_path);

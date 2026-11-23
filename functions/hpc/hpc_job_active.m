@@ -18,6 +18,11 @@ function tf = hpc_job_active(platform, job_id)
 %
 % See also: HPC_WAIT_FOR_COMPLETION, ASYNC_TRANSDUCER_PIPELINE
 
+arguments
+    platform {mustBeTextScalar}
+    job_id
+end
+
     tf = false;
     if isnumeric(job_id)
         job_id = num2str(job_id);

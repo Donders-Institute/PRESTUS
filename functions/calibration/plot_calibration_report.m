@@ -15,6 +15,14 @@ function plot_calibration_report(prof, report, diag, title_str, png_path)
 %
 % See also: CALIBRATE_LIBRARY_ENTRY, REFINE_TRANSDUCER_LIBRARY, CALIBRATION_TRANSDUCER
 
+arguments
+    prof (1,1) struct
+    report
+    diag (1,1) struct
+    title_str {mustBeTextScalar}
+    png_path {mustBeTextScalar}
+end
+
     before = diag.before;
     n  = numel(prof.depths_ep_mm);
     fh = figure('Color', 'w', 'Visible', 'off', 'Position', [50 50 min(1800, 330 * n) 320]);

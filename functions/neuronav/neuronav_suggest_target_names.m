@@ -51,6 +51,14 @@ function suggestions = neuronav_suggest_target_names(results, candidates, tolera
 %
 % See also: NEURONAV_READ_LABEL_CANDIDATES, NEURONAV_INGEST_MARKERS
 
+arguments
+    results
+    candidates
+    tolerance_mm  {mustBeNumeric} = 10
+    depth_mm      {mustBeNumeric} = [0 Inf]
+    target_labels = []
+end
+
     if nargin < 3 || isempty(tolerance_mm), tolerance_mm = 10; end
     if nargin < 4 || isempty(depth_mm), depth_mm = [0 Inf]; end
     if nargin < 5, target_labels = []; end

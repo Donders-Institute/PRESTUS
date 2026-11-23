@@ -89,6 +89,13 @@ function [out_file, fits, report] = refine_transducer_library(combo_name, profil
 % See also: CALIBRATE_LIBRARY_ENTRY, FIT_TRANSDUCER_MODEL, LOAD_TRANSDUCER_FROM_LIBRARY, KWAVE_CALIBRATE_DRIVE,
 %           LIBRARY_ENTRY_FROM_MODEL, READ_AXIAL_PROFILES, CALIBRATION_GUI
 
+arguments
+    combo_name {mustBeTextScalar}
+    profile_csv {mustBeTextScalar}
+    out_library_path {mustBeTextScalar}
+    options (1,1) struct = struct()
+end
+
     if nargin < 4; options = struct(); end
     mode      = opt(options, 'Mode', 'per_depth');
     intensity = opt(options, 'Intensity', 30);

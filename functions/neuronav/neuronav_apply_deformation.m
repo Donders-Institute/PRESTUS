@@ -31,6 +31,13 @@ function mni_ras = neuronav_apply_deformation(ras_seg, warp_field, warp_affine, 
 %
 % See also: NEURONAV_BUILD_DEFORMATION_CACHE, NEURONAV_CONVERT_NATIVE_TO_MNI
 
+arguments
+    ras_seg     {mustBeNumeric}
+    warp_field  {mustBeNumeric}
+    warp_affine (4,4) {mustBeNumeric}
+    nearest_idx {mustBeNumeric}
+end
+
     N = size(ras_seg, 1);
     dims = size(warp_field, 1:3);
     mni_ras = nan(N, 3);

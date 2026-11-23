@@ -25,6 +25,14 @@ function s = library_condition(lib, tran, label, desired_intensity, source_label
 %
 % See also: LIBRARY_ADD_CONDITIONS, LOAD_TRANSDUCER_FROM_LIBRARY
 
+arguments
+    lib
+    tran (1,1) struct
+    label {mustBeTextScalar}
+    desired_intensity {mustBeNumeric}
+    source_label = '(in-memory entry)'
+end
+
     if nargin < 5 || isempty(source_label); source_label = '(in-memory entry)'; end
     label = char(label);
     if ~isfield(lib, 'conditions') || ~isstruct(lib.conditions) || ~isfield(lib.conditions, label)

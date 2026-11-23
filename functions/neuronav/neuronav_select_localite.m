@@ -24,6 +24,13 @@ function localite = neuronav_select_localite(parameters, sub_id, ses_id, target_
 %
 % See also: NEURONAV_INGEST_MARKERS, NEURONAV_COMPUTE_SERIES_STATISTICS
 
+arguments
+    parameters  (1,1) struct
+    sub_id      {mustBeTextScalar}
+    ses_id
+    target_name = ''
+end
+
     localite = [];
 
     % Harmonise session string

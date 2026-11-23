@@ -59,6 +59,14 @@ function s = library_model_at_depth(lib, tran, focal_distance_ep, desired_intens
 % See also: LOAD_TRANSDUCER_FROM_LIBRARY, LIBRARY_STATIC_MODEL, LIBRARY_ADD_REFINEMENTS,
 %           KWAVE_CALIBRATE_DRIVE
 
+arguments
+    lib
+    tran (1,1) struct
+    focal_distance_ep {mustBeNumeric}
+    desired_intensity {mustBeNumeric}
+    source_label = '(in-memory entry)'
+end
+
     if nargin < 5 || isempty(source_label); source_label = '(in-memory entry)'; end
     tran   = library_transducer(tran, lib);   % sub-ring geometry if the entry has a ring profile
     n_elem = tran.transducer.annular.elem_n;

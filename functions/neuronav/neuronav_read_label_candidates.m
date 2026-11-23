@@ -28,6 +28,13 @@ function candidates = neuronav_read_label_candidates(raw_root, sub_id, session, 
 %
 % See also: NEURONAV_SUGGEST_TARGET_NAMES, NEURONAV_READ_ENTRY_TARGET
 
+arguments
+    raw_root   {mustBeTextScalar}
+    sub_id     {mustBeTextScalar}
+    session
+    loc_folder = 'loc'
+end
+
     if nargin < 4, loc_folder = 'loc'; end   % '' = markers directly under ses-XX/
     if isnumeric(session), session = sprintf('ses-%02d', double(session)); end
     session = char(session);

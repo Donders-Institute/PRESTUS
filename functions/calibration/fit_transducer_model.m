@@ -140,6 +140,12 @@ function model = fit_transducer_model(tran, prof, options)
 % See also: AXIAL_TRANSFER_MATRIX, REFINE_TRANSDUCER_LIBRARY,
 %           LOAD_TRANSDUCER_FROM_LIBRARY, CALIBRATION_GUI, PERFORM_GLOBAL_SEARCH
 
+arguments
+    tran (1,1) struct
+    prof (1,1) struct
+    options (1,1) struct = struct()
+end
+
     if nargin < 3; options = struct(); end
     o.FreeParams      = {'phase', 'amp', 'z_shift'};
     o.ForwardModel    = 'rayleigh';

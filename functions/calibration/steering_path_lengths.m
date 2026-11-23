@@ -17,6 +17,11 @@ function d = steering_path_lengths(tran, depths_ep_mm)
 %
 % See also: COMPUTE_PHASES, FIT_TRANSDUCER_MODEL
 
+arguments
+    tran (1,1) struct
+    depths_ep_mm {mustBeNumeric}
+end
+
     ann   = tran.transducer.annular;
     R_c   = ann.curv_radius_mm;
     r_mid = (ann.elem_id_mm(:)' / 2 + ann.elem_od_mm(:)' / 2) / 2;

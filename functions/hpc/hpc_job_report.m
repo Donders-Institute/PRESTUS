@@ -99,6 +99,15 @@ function report = hpc_job_report(job_id, hpc_type, parameters, log_dir, carbon_p
 %
 % See also: HPC_WAIT_FOR_COMPLETION, HPC_SUBMIT_JOB, HPC_JOB_INFO
 
+arguments
+    job_id
+    hpc_type {mustBeTextScalar}
+    parameters (1,1) struct
+    log_dir = ''
+    carbon_params = []
+    cost_params = []
+end
+
 % ---- Carbon constants (Green Algorithms framework defaults for Donders) ----
 cp.pue                = 1.67;   % implied from cluster report: 40% overhead
 cp.carbon_intensity   = 270;    % gCO2e/kWh, Netherlands electricity 2026

@@ -31,6 +31,16 @@ function display_info = hpc_job_info(platform, job_id, job_name, ...
 %
 % See also: HPC_SUBMIT_JOB, HPC_JOB_NAME
 
+arguments
+    platform {mustBeTextScalar}
+    job_id
+    job_name {mustBeTextScalar}
+    memory_gb
+    timelimit
+    log_dir
+    visualize (1,1) {mustBeNumericOrLogical}
+end
+
     % Format job ID
     if strcmp(platform, 'slurm') && isnumeric(job_id)
         display_info.id = sprintf('%d', job_id);

@@ -29,6 +29,13 @@ function T = matrix_focal_peak(parameters, tr, targets_mm, opts)
 %
 % See also: MATRIX_RAYLEIGH_PRESSURE, FIT_STEERING_CORRECTION, BUILD_STEERING_CORRECTION
 
+arguments
+    parameters (1,1) struct
+    tr (1,1) struct
+    targets_mm {mustBeNumeric}
+    opts = struct()
+end
+
     if nargin < 4; opts = struct(); end
     hw0 = get_opt(opts, 'half_width_mm', 10);
     step = get_opt(opts, 'step_mm', 0.5);

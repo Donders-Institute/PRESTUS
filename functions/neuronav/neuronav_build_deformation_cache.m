@@ -24,6 +24,10 @@ function nearest_idx = neuronav_build_deformation_cache(warp_field)
 %
 % See also: NEURONAV_APPLY_DEFORMATION, NEURONAV_CONVERT_NATIVE_TO_MNI
 
+arguments
+    warp_field {mustBeNumeric}
+end
+
     valid_mask = ~all(warp_field == 0, 4);
     [~, nearest_idx] = bwdist(valid_mask);
 end

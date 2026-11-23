@@ -30,6 +30,12 @@ function update_transducer_library(combo_name, calibration_output_folder, librar
 %
 % See also: SCAN_AND_INGEST_CALIBRATIONS, LOAD_TRANSDUCER_FROM_LIBRARY
 
+arguments
+    combo_name {mustBeTextScalar}
+    calibration_output_folder = pwd()
+    library_path = fullfile(get_prestus_path(), 'config', 'calibration')
+end
+
     if nargin < 2 || isempty(calibration_output_folder)
         calibration_output_folder = pwd();
     end

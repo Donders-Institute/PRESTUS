@@ -27,6 +27,14 @@ function [file, found, index] = library_entry_file(library_path, key, tran_seria
 %
 % See also: LOAD_TRANSDUCER_FROM_LIBRARY, LOAD_EQUIPMENT_CONFIG
 
+arguments
+    library_path {mustBeTextScalar}
+    key = ''
+    tran_serial = ''
+    ds_serial = ''
+    model = ''
+end
+
     if nargin < 3; tran_serial = ''; end
     if nargin < 4; ds_serial = ''; end
     if nargin < 5; model = ''; end

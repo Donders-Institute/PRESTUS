@@ -56,6 +56,12 @@ function [fit, msg] = calibration_fit(tran, prof, options)
 % See also: CALIBRATION_FIT_DEPTHS, FIT_TRANSDUCER_MODEL, CALIBRATION_FIT_ENTRY,
 %           CALIBRATION_SAVE_ENTRY, CALIBRATION_EVALUATE, CALIBRATION_GUI
 
+arguments
+    tran (1,1) struct
+    prof (1,1) struct
+    options (1,1) struct = struct()
+end
+
     if nargin < 3; options = struct(); end
     mode = char(opt(options, 'Mode', 'per_depth'));
     assert(strcmp(mode, 'per_depth'), 'calibration_fit:mode', ...

@@ -77,6 +77,12 @@ function [rp, info] = fit_ring_profile(tran, prof, options)
 % See also: RING_PROFILE_TRANSDUCER, LIBRARY_TRANSDUCER, PLOT_RING_PROFILE,
 %           CALIBRATE_LIBRARY_ENTRY, FIT_TRANSDUCER_MODEL
 
+arguments
+    tran (1,1) struct
+    prof (1,1) struct
+    options (1,1) struct = struct()
+end
+
     if nargin < 3; options = struct(); end
     fixed   = opt(options, 'Profile', []);
     M       = opt(options, 'NSub', 4);

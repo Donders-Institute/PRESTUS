@@ -29,6 +29,13 @@ function targets = neuronav_read_entry_target(raw_root, sub_id, session, loc_fol
 %   They are NOT in physical scanner RAS space. Use the planning T1 header
 %   and ras_to_grid to convert to voxel indices if needed.
 
+arguments
+    raw_root   {mustBeTextScalar}
+    sub_id     {mustBeTextScalar}
+    session    {mustBeTextScalar}
+    loc_folder = 'loc'
+end
+
     if nargin < 4, loc_folder = 'loc'; end   % '' = markers directly under ses-XX/
 
     targets = struct('index', {}, 'description', {}, 'xyz', {});

@@ -37,6 +37,15 @@ function job_id = calibration_pipeline_start(...
 %
 % See also: CALIBRATION_TRANSDUCER, PRESTUS_PIPELINE_START, HPC_SUBMIT_JOB
 
+arguments
+    profile_empirical
+    equipment_name {mustBeTextScalar}
+    desired_intensity {mustBeNumeric}
+    desired_focal_distance_ep {mustBeNumeric}
+    parameters (1,1) struct
+    sim_id (1,1) {mustBeNumeric}
+end
+
     %% Platform selection
     if ~isfield(parameters, 'platform') || strcmp(parameters.platform, 'auto')
         platform = hpc_detect_system();

@@ -15,6 +15,10 @@ function f = neuronav_find_mni_template(parameters)
 %
 % See also: NEURONAV_HEAD_SURFACE, NEURONAV_SUMMARY_TO_MNI
 
+arguments
+    parameters (1,1) struct
+end
+
     f = '';
     roots = {};
     bin = char(get_nested(parameters, {'startup', 'simnibs_bin_path'}, ''));

@@ -23,6 +23,13 @@ function [kgrid_b, source_b, sensor_b, offset] = water_baseline_box(parameters, 
 %
 % See also: WATER_BASELINE
 
+arguments
+    parameters (1,1) struct
+    kgrid
+    source (1,1) struct
+    sensor
+end
+
     nd = kgrid.dim;
     dims = [kgrid.Nx, kgrid.Ny, kgrid.Nz]; dims = dims(1:nd);
     kgrid_b = kgrid; source_b = source; sensor_b = sensor; offset = zeros(1, nd);

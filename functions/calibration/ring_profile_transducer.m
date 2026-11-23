@@ -32,6 +32,11 @@ function tran = ring_profile_transducer(tran, rp)
 % See also: LIBRARY_TRANSDUCER, FIT_RING_PROFILE, AXIAL_TRANSFER_MATRIX,
 %           LOAD_TRANSDUCER_FROM_LIBRARY
 
+arguments
+    tran (1,1) struct
+    rp = []
+end
+
     if nargin < 2 || isempty(rp) || ~isstruct(rp) || ~isfield(rp, 'n_sub') || double(rp.n_sub) <= 1
         return;
     end

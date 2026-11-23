@@ -54,6 +54,13 @@ function [lib, report] = library_add_conditions(lib, tran, conds, options)
 %
 % See also: LIBRARY_CONDITION, LIBRARY_INGEST_CONDITIONS, LIBRARY_MODEL_AT_DEPTH
 
+arguments
+    lib
+    tran (1,1) struct
+    conds struct
+    options (1,1) struct = struct()
+end
+
     if nargin < 4; options = struct(); end
     o = struct('IsppaWcm2', 30, 'InheritCorrection', true, 'Profile', [], ...
                'SourceCsv', '', 'NearFieldSkipMm', 10, 'CWater', 1500, 'Rho', 994, ...

@@ -21,6 +21,11 @@ function scan_and_ingest_calibrations(calibration_output_folder, library_path)
 %
 % See also: UPDATE_TRANSDUCER_LIBRARY, LOAD_TRANSDUCER_FROM_LIBRARY
 
+arguments
+    calibration_output_folder = pwd()
+    library_path = fullfile(get_prestus_path(), 'config', 'calibration')
+end
+
     if nargin < 1 || isempty(calibration_output_folder)
         calibration_output_folder = pwd();
     end

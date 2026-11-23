@@ -94,6 +94,15 @@ function parameters = load_transducer_from_library(combo_name, focal_distance_ep
 % See also: LIBRARY_MODEL_AT_DEPTH, SET_REAL_PHASES, UPDATE_TRANSDUCER_LIBRARY,
 %           REFINE_TRANSDUCER_LIBRARY, BUILD_TRANSDUCER_LIBRARY
 
+arguments
+    combo_name {mustBeTextScalar}
+    focal_distance_ep {mustBeNumeric}
+    desired_intensity {mustBeNumeric}
+    equip_param (1,1) struct
+    library_path = fullfile(get_prestus_path(), 'config', 'calibration')
+    condition {mustBeTextScalar} = ''
+end
+
     if nargin < 5 || isempty(library_path)
         library_path = fullfile(get_prestus_path(), 'config', 'calibration');
     end

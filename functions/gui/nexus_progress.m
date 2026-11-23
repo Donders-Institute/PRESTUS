@@ -13,6 +13,10 @@ function nexus_progress(msg)
 %
 % See also: NEXUS_BRIDGE
 
+arguments
+    msg {mustBeTextScalar}
+end
+
     f = getappdata(0, 'nexus_bridge_progress');
     if isempty(f); return; end
     fid = fopen([f '.tmp'], 'w', 'n', 'UTF-8');

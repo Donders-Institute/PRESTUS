@@ -29,6 +29,15 @@ function H = field_transfer_matrix(tran, r_mm, z_bowl_mm, c, rho, n_phi)
 %
 % See also: AXIAL_TRANSFER_MATRIX, FIT_RING_PROFILE, RING_PROFILE_TRANSDUCER
 
+arguments
+    tran (1,1) struct
+    r_mm {mustBeNumeric}
+    z_bowl_mm {mustBeNumeric}
+    c (1,1) {mustBeNumeric}
+    rho (1,1) {mustBeNumeric}
+    n_phi = []
+end
+
     ann = tran.transducer.annular;
     n   = ann.elem_n;
     f   = tran.transducer.freq_hz;

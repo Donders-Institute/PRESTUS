@@ -21,6 +21,10 @@ function job_name = hpc_job_name(parameters)
 %
 % See also: HPC_SUBMIT_JOB, PRESTUS_PIPELINE_START
 
+arguments
+    parameters (1,1) struct
+end
+
     % Allow callers to supply a fully-formed job name (e.g. uncertainty pipeline).
     if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'job_name') && ...
             ~isempty(parameters.hpc.job_name)

@@ -32,6 +32,13 @@ function [lib, report] = library_ingest_conditions(lib_file, csv_path, equip_par
 %
 % See also: LIBRARY_ADD_CONDITIONS, LIBRARY_CONDITION, READ_AXIAL_PROFILES
 
+arguments
+    lib_file {mustBeTextScalar}
+    csv_path {mustBeTextScalar}
+    equip_param = []
+    options (1,1) struct = struct()
+end
+
     if nargin < 3 || isempty(equip_param); equip_param = load_equipment_config(); end
     if nargin < 4; options = struct(); end
     dry_run = isfield(options, 'DryRun') && options.DryRun;

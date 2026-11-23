@@ -12,5 +12,9 @@ function A = steering_quad_terms(Z)
 %
 % See also: FIT_STEERING_CORRECTION, STEERING_CORRECTION_FACTOR
 
+arguments
+    Z {mustBeNumeric}
+end
+
     A = [ones(size(Z, 1), 1), Z, Z.^2, Z(:, 1) .* Z(:, 2), Z(:, 1) .* Z(:, 3), Z(:, 2) .* Z(:, 3)];
 end

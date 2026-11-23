@@ -46,6 +46,13 @@ function ev = evaluate_library_entry(tran, lib, prof, options)
 % See also: LIBRARY_MODEL_AT_DEPTH, LOAD_TRANSDUCER_FROM_LIBRARY, FIT_TRANSDUCER_MODEL,
 %           CALIBRATION_GUI
 
+arguments
+    tran (1,1) struct
+    lib
+    prof (1,1) struct
+    options (1,1) struct = struct()
+end
+
     if nargin < 4; options = struct(); end
     tran  = library_transducer(tran, lib);    % sub-ring geometry if the entry has a ring profile
     isppa = NaN;

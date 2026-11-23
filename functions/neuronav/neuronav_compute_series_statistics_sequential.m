@@ -38,6 +38,14 @@ function stats = neuronav_compute_series_statistics_sequential(localite, voxel_s
 %
 % See also: POSITION_TRANSDUCER_LOCALITE, NEURONAV_CONVERT_TRIGGER_TO_VOXELS
 
+arguments
+    localite                (1,1) struct
+    voxel_size              {mustBeNumeric}
+    expected_segment_length = []
+    markertype              = 'TriggerMarkers'
+    gap_threshold_s         = []
+end
+
     if nargin < 5, gap_threshold_s = []; end          % [] = adaptive (3×median gap)
     if nargin < 4 || isempty(markertype)
         markertype = 'TriggerMarkers';

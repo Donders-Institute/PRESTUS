@@ -24,6 +24,10 @@ function paths = neuronav_resolve_paths(parameters)
 %
 % See also: NEURONAV_INGEST_MARKERS, NEURONAV_SELECT_LOCALITE, NEURONAV_LOCALITE_POSE
 
+arguments
+    parameters (1,1) struct
+end
+
     p = struct();
     if isfield(parameters, 'path') && isstruct(parameters.path)
         p = parameters.path;

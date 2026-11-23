@@ -28,6 +28,13 @@ function html_path = generate_calibration_report(combo_name, library_path, outpu
 %
 % See also: LIBRARY_SETTINGS_TABLE, PLOT_TRANSDUCER_LIBRARY, LOAD_TRANSDUCER_FROM_LIBRARY
 
+arguments
+    combo_name {mustBeTextScalar}
+    library_path = fullfile(get_prestus_path(), 'config', 'calibration')
+    output_path = ''
+    equip_param = []
+end
+
     if nargin < 2 || isempty(library_path)
         library_path = fullfile(get_prestus_path(), 'config', 'calibration');
     end

@@ -20,6 +20,15 @@ function lib = calibration_fit_entry(lib, fit, tran_serial, ds_serial, isppa_wcm
 %
 % See also: CALIBRATION_FIT, CALIBRATION_SAVE_ENTRY, LIBRARY_REFINEMENT_FROM_FITS
 
+arguments
+    lib
+    fit (1,1) struct
+    tran_serial {mustBeTextScalar}
+    ds_serial {mustBeTextScalar}
+    isppa_wcm2 {mustBeNumeric}
+    source {mustBeTextScalar} = ''
+end
+
     if nargin < 6; source = ''; end
     if isempty(lib); lib = struct(); end
     if ~isempty(tran_serial); lib.meta.tran_serial = tran_serial; end

@@ -40,6 +40,15 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
 % See also: INTERPOLATE_AXIAL_PROFILES, WRITE_AXIAL_PROFILES, CALIBRATE_LIBRARY_ENTRY,
 %           CALIBRATION_TRANSDUCER
 
+arguments
+    parameters (1,1) struct
+    available_foci_wrt_exit_plane {mustBeNumeric}
+    desired_focal_distance_ep {mustBeNumeric}
+    intens_data {mustBeNumeric}
+    equipment_name {mustBeTextScalar}
+    dist_from_exit_plane {mustBeNumeric}
+end
+
     cal = parameters.calibration;
     io  = struct('Align', get_or(cal, 'profile_align', 'label'), ...
                  'MaxExtrapolationMm', get_or(cal, 'max_extrapolation_mm', 0), ...

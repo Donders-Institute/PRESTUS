@@ -28,6 +28,13 @@ function stats = neuronav_compute_series_statistics(localite, voxel_size, expect
 %
 % See also: POSITION_TRANSDUCER_LOCALITE, NEURONAV_CONVERT_TRIGGER_TO_VOXELS
 
+arguments
+    localite                (1,1) struct
+    voxel_size              {mustBeNumeric}
+    expected_segment_length = []
+    markertype              = 'TriggerMarkers'
+end
+
     if nargin < 4 || isempty(markertype)
         markertype = 'TriggerMarkers';
     end

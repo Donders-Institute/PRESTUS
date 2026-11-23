@@ -32,6 +32,10 @@ function out = nexus_neuronav(args)
 % See also: NEXUS_BRIDGE, NEURONAV_GUI, NEURONAV_DETECT_SERIES, NEURONAV_INGEST_MARKERS,
 %           NEURONAV_LOCALITE_FILE_SERIES
 
+arguments
+    args (1,1) struct
+end
+
     p = load_parameters(char(args.config));
     switch char(args.action)
         case 'sessions'

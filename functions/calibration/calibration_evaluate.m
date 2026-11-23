@@ -40,6 +40,12 @@ function [res, msg] = calibration_evaluate(tran, prof, options)
 % See also: CALIBRATION_DESIRED_PROFILES, CALIBRATION_FIT, EVALUATE_LIBRARY_ENTRY,
 %           FIT_TRANSDUCER_MODEL, CALIBRATION_FOCUS_BEYOND
 
+arguments
+    tran (1,1) struct
+    prof (1,1) struct
+    options (1,1) struct = struct()
+end
+
     if nargin < 3; options = struct(); end
     predicted = logical(opt(options, 'Predicted', false));
     lib   = opt(options, 'Library', []);

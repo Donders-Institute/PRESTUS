@@ -26,6 +26,10 @@ function out = nexus_equipment(args)
 %
 % See also: CHECK_EQUIPMENT_CONFIG, CALIBRATION_GUI, NEXUS_BRIDGE
 
+arguments
+    args (1,1) struct
+end
+
     switch args.action
         case 'check'
             [~, rep] = evalc('check_equipment_config(char(args.folder))');

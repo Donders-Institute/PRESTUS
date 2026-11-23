@@ -30,6 +30,11 @@ function report = validate_transducer_library(library_path, equipment_path)
 %
 % See also: UPDATE_TRANSDUCER_LIBRARY, CHECK_EQUIPMENT_CONFIG
 
+arguments
+    library_path = fullfile(get_prestus_path(), 'config', 'calibration')
+    equipment_path = fullfile(get_prestus_path(), 'config', 'equipment')
+end
+
     if nargin < 1 || isempty(library_path)
         library_path = fullfile(get_prestus_path(), 'config', 'calibration');
     end

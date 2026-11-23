@@ -24,6 +24,10 @@ function T = read_steering_measurements(file)
 %
 % See also: BUILD_STEERING_CORRECTION, FIT_STEERING_CORRECTION
 
+arguments
+    file {mustBeTextScalar}
+end
+
     T = readtable(file, 'VariableNamingRule', 'preserve');
     need = {'target_x_mm', 'target_y_mm', 'target_z_mm', 'peak_pressure_mpa'};
     miss = setdiff(need, T.Properties.VariableNames);

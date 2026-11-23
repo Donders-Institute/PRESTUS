@@ -41,6 +41,16 @@ function lib = library_add_refinements(lib, depths_ep_mm, offsets_deg, blend_mm,
 %
 % See also: LOAD_TRANSDUCER_FROM_LIBRARY, REFINE_TRANSDUCER_LIBRARY, KWAVE_CALIBRATE_DRIVE
 
+arguments
+    lib
+    depths_ep_mm {mustBeNumeric}
+    offsets_deg cell
+    blend_mm = []
+    forward_model = ''
+    source = ''
+    amp = []
+end
+
     if nargin < 4; blend_mm = []; end
     if nargin < 5; forward_model = ''; end
     if nargin < 6; source = ''; end

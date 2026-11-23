@@ -64,6 +64,12 @@ function [lib, report, sims] = kwave_calibrate_drive(lib, prof, options)
 % See also: REFINE_TRANSDUCER_LIBRARY, LIBRARY_REFINEMENT_FROM_FITS,
 %           CALIBRATION_GUI, PRESTUS_PIPELINE_START
 
+arguments
+    lib (1,1) struct
+    prof (1,1) struct
+    options (1,1) struct = struct()
+end
+
     if nargin < 3; options = struct(); end
     assert(isfield(lib, 'refinement') && isfield(lib.refinement, 'depths_ep_mm') && ...
         isfield(lib.refinement, 'elem_p_amp'), ...

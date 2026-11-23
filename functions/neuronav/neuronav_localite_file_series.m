@@ -32,6 +32,11 @@ function [series, markertype] = neuronav_localite_file_series(file, seg_len)
 % See also: NEURONAV_LOCALITE_POSE, NEURONAV_COMPUTE_SERIES_STATISTICS,
 %           LOCALITE_MATRIX_TO_POSITIONS
 
+arguments
+    file    {mustBeTextScalar}
+    seg_len
+end
+
     localite = readstruct(file);
     if isfield(localite, 'TriggerMarker')
         markertype = 'TriggerMarkers';

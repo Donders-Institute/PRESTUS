@@ -81,6 +81,15 @@ function [lib, report, out] = calibration_transducer(...
 % See also: CALIBRATE_LIBRARY_ENTRY, CALIBRATION_SETUP, CALIBRATION_PIPELINE_START,
 %           REFINE_TRANSDUCER_LIBRARY, CALIBRATION_FIT_OPTIONS
 
+arguments
+    profile_empirical
+    equipment_name {mustBeTextScalar}
+    desired_intensity {mustBeNumeric}
+    desired_focal_distance_ep {mustBeNumeric}
+    parameters (1,1) struct
+    sim_id = 1
+end
+
     if nargin < 6 || isempty(sim_id); sim_id = 1; end
     % calibration settings may come from an older calibration_config.yaml loaded directly
     tmp   = upgrade_config_keys(struct('calibration', parameters.calibration), 'parameters.calibration');

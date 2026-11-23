@@ -18,6 +18,10 @@ function job_id = parse_sbatch_job_id(out)
 %
 % See also: HPC_SUBMIT_JOB, HPC_SUBMIT_REPORT_JOB
 
+arguments
+    out {mustBeTextScalar}
+end
+
     job_id = NaN;
     text = strtrim(char(out));
     if isempty(text)
