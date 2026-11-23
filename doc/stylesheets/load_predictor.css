@@ -16,3 +16,26 @@
 .lp-swatch { box-sizing: border-box; border: 1px solid var(--md-default-fg-color--lighter, #bbb); display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; margin-right: .4rem; vertical-align: -.05rem; }
 .lp-note { color: var(--md-default-fg-color--light, #666); font-size: .64rem; }
 .md-typeset .lp-table { font-size: inherit; }
+/* Comparison of pinned setups */
+.lp-cmp { margin-top: 1rem; border-top: 1px solid var(--md-default-fg-color--lightest, #ddd); padding-top: .7rem; }
+.lp-cmp-head { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; }
+.lp-cmp-head .lp-check { display: flex; align-items: center; gap: .35rem; }
+.lp-cmp-head .lp-check[hidden], .lp-btn[hidden] { display: none; }
+.lp-btn { font: inherit; cursor: pointer; color: var(--md-primary-bg-color, #fff); background: var(--md-primary-fg-color, #0e7490);
+  border: 0; border-radius: 4px; padding: .3rem .7rem; }
+.lp-btn-quiet { color: var(--md-default-fg-color--light, #666); background: transparent; border: 1px solid var(--md-default-fg-color--lightest, #ccc); padding: .15rem .5rem; }
+.lp-cmp-chart { display: block; width: 100%; max-width: 640px; height: auto; margin: .6rem 0 .3rem; }
+.lp-cmp-chart .lp-grid { stroke: var(--md-default-fg-color--lightest, #ddd); stroke-width: 1; }
+.lp-cmp-chart .lp-axis { fill: var(--md-default-fg-color--light, #666); font-size: 11px; }
+.lp-cmp-chart .lp-num { fill: var(--md-default-fg-color, #222); font-weight: 700; }
+.lp-cmp-chart .lp-whisk { stroke: var(--md-default-fg-color, #222); stroke-width: 1.2; fill: none; }
+.lp-cmp-chart .lp-tot { fill: #0e7490; }
+.lp-legend { display: flex; flex-wrap: wrap; gap: .2rem .9rem; margin-bottom: .5rem; color: var(--md-default-fg-color--light, #666); }
+.md-typeset ol.lp-setups, ol.lp-setups { list-style: none; margin: 0; padding: 0; }
+.md-typeset ol.lp-setups li, ol.lp-setups li { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .6rem; margin: 0; padding: .3rem 0;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest, #eee); }
+.lp-setups .lp-num { font-weight: 700; min-width: 1.8rem; }
+.lp-setups .lp-set { flex: 1 1 22rem; }
+.lp-setups .lp-settot { font-weight: 600; white-space: nowrap; }
+.lp-rowbtns { display: inline-flex; gap: .25rem; }
+.lp-btn:disabled { opacity: .35; cursor: default; }

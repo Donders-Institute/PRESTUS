@@ -1,4 +1,4 @@
-// Load calculator (doc_hpc.md, Resource Estimates): the expected time of each stage of a run,
+// Load calculator (doc_run-time.md): the expected time of each stage of a run,
 // as the Nexus predicts it (nexus/prestus_nexus/workload.py). Data: load_model_data.js, generated
 // from throughput.yaml by tests/docs/gen_load_data.py. Loaded on every page via extra_javascript;
 // does nothing on pages without the #load-predictor container.
@@ -82,7 +82,11 @@
     '<label data-only="head" class="lp-check"><input data-k="base" type="checkbox" checked>Free-water baseline</label>' +
     '<label class="lp-check"><input data-k="heat" type="checkbox">Heating</label>' +
     '<label data-only="heat">Thermal steps<input data-k="nth" type="number" min="1" step="1" value="200"></label>' +
-    '</div><div class="lp-out" aria-live="polite"></div>';
+    '</div><div class="lp-out" aria-live="polite"></div>' +
+    '<div class="lp-cmp"><div class="lp-cmp-head"><button type="button" class="lp-btn" data-act="pin">Pin setup to compare</button>' +
+    '<label class="lp-check" hidden><input type="checkbox" data-act="log">Log scale (totals only)</label>' +
+    '<button type="button" class="lp-btn lp-btn-quiet" data-act="clear" hidden>Clear all</button></div>' +
+    '<div class="lp-cmp-out" aria-live="polite"></div></div>';
   const ctl = {};
   root.querySelectorAll('[data-k]').forEach((el) => { ctl[el.dataset.k] = el; });
   const out = root.querySelector('.lp-out');
@@ -141,6 +145,17 @@
     const total = [0, 1, 2].map((i) => timed.reduce((a, x) => a + x[1][i], 0));
     const mem = d.kind === 'gpu' ? 40 * pts * 4 / 1e9 : null;
     render(rows, total, { dims, pts, nt, mem, d, r, medium, fov });
+    // the settings that define this setup, for the comparison (label, value)
+    const set = [['Solver', SOLVERS.find((x) => x[0] === ctl.solver.value)[1]], ['Device', d.label], ['Medium', medium],
+      ['Resolution', dx + ' mm']];
+    if (medium === 'head') set.push(['Acoustic grid', fov ? 'limited FOV' : 'full head']);
+    if (fov || medium === 'water') set.push(['Aperture', ap + ' mm'], ['Bowl to focus', fb + ' mm']);
+    if (fov) set.push(['FOV', (+ctl.fovd.value || ap) + ' × ' + (+ctl.fovl.value || fb + M.z_beyond_focus_mm) + ' mm']);
+    if (medium === 'head') set.push(['Head model', ctl.pre.value === 'preproc' ? 'built per run' : 'shared'],
+      ['Free-water baseline', ctl.base.checked ? 'on' : 'off']);
+    set.push(['Heating', heat ? +ctl.nth.value + ' thermal steps' : 'off']);
+    current = { set, total, mem, incomplete: rows.some((x) => !x[1] && x[2] !== 'none'),
+      stages: rows.filter((x) => x[1] && x[2] !== 'opt').map((x) => [x[0], x[1][0], x[3]]) };
   }
 
   // ── rendering ──────────────────────────────────────────────────────────
@@ -175,9 +190,107 @@
       (info.r ? esc(info.r.basis) : 'none') + '.</p>';
   }
 
+  // ── comparison: pinned setups as vertical stacked bars ─────────────────
+  let current = null, pinned = [];
+  const KEY = 'prestus-load-compare';
+  try { pinned = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { pinned = []; }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(pinned)); } catch (e) { /* storage off: keep in memory */ } };
+  const cmp = root.querySelector('.lp-cmp-out');
+  const logBox = root.querySelector('[data-act="log"]');
+  function niceTicks(max) {          // linear axis: 4–6 ticks at 1, 2, or 5 × 10^k seconds, or whole minutes / hours
+    const units = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400];
+    const step = units.find((u) => max / u <= 5) || Math.ceil(max / 5 / 86400) * 86400;
+    const t = [];
+    for (let v = 0; v <= max + 1e-9; v += step) t.push(v);
+    if (t[t.length - 1] < max) t.push(t[t.length - 1] + step);
+    return t;
+  }
+  function renderCompare() {
+    root.querySelector('[data-act="clear"]').hidden = pinned.length === 0;
+    logBox.parentElement.hidden = pinned.length < 2;
+    if (!pinned.length) { cmp.innerHTML = ''; return; }
+    const log = logBox.checked;
+    const W = 640, H = 260, L = 56, B = 22, T = 10, bw = Math.min(70, (W - L - 10) / pinned.length * 0.6);
+    const slot = (W - L - 10) / pinned.length;
+    const maxT = Math.max.apply(null, pinned.map((p) => p.total[2]));
+    let ticks, y;
+    if (log) {
+      const minT = Math.min.apply(null, pinned.map((p) => p.total[1]));
+      const LOG_TICKS = [1, 10, 60, 600, 3600, 36000, 86400, 864000];   // 1 s, 10 s, 1 min, 10 min, 1 h, 10 h, 1 d, 10 d
+      const i0 = Math.max(LOG_TICKS.filter((v) => v <= minT).length - 1, 0);
+      const i1 = Math.max(LOG_TICKS.findIndex((v) => v >= maxT), i0 + 1);
+      ticks = LOG_TICKS.slice(i0, (i1 < 0 ? LOG_TICKS.length - 1 : i1) + 1);
+      const a = Math.log10(ticks[0]), b = Math.log10(ticks[ticks.length - 1]);
+      y = (v) => T + (H - T - B) * (1 - (Math.log10(Math.max(v, ticks[0])) - a) / (b - a));
+    } else {
+      ticks = niceTicks(maxT);
+      y = (v) => T + (H - T - B) * (1 - v / ticks[ticks.length - 1]);
+    }
+    let svg = '';
+    ticks.forEach((v) => {
+      svg += '<line class="lp-grid" x1="' + L + '" x2="' + W + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '"/>' +
+        '<text class="lp-axis" x="' + (L - 6) + '" y="' + (y(v) + 3).toFixed(1) + '" text-anchor="end">' + (v === 0 ? '0' : log ? ({ 1: '1 s', 10: '10 s', 60: '1 min', 600: '10 min', 3600: '1 h', 36000: '10 h', 86400: '1 d', 864000: '10 d' })[v] : hms(v)) + '</text>';
+    });
+    pinned.forEach((p, i) => {
+      const cx = L + slot * (i + 0.5), x0 = (cx - bw / 2).toFixed(1);
+      if (log) {
+        svg += '<rect x="' + x0 + '" y="' + y(p.total[0]).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' +
+          (H - B - y(p.total[0])).toFixed(1) + '" class="lp-tot"><title>#' + (i + 1) + ': ' + span(p.total) + '</title></rect>';
+      } else {
+        let acc = 0;
+        p.stages.forEach((s) => {
+          const y1 = y(acc + s[1]), y0 = y(acc);
+          svg += '<rect x="' + x0 + '" y="' + y1.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(y0 - y1, 0).toFixed(1) +
+            '" fill="' + s[2] + '"><title>#' + (i + 1) + ' ' + esc(s[0]) + ': ' + hms(s[1]) + '</title></rect>';
+          acc += s[1];
+        });
+      }
+      // whisker: p10–p90 of the total
+      const wl = y(p.total[1]), wh = y(p.total[2]);
+      svg += '<path class="lp-whisk" d="M' + cx.toFixed(1) + ' ' + wl.toFixed(1) + 'V' + wh.toFixed(1) +
+        'M' + (cx - 6).toFixed(1) + ' ' + wh.toFixed(1) + 'h12M' + (cx - 6).toFixed(1) + ' ' + wl.toFixed(1) + 'h12"/>' +
+        '<text class="lp-axis lp-num" x="' + cx.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">#' + (i + 1) + '</text>' +
+        '<text class="lp-axis" x="' + cx.toFixed(1) + '" y="' + (Math.min(wh, y(p.total[0])) - 4).toFixed(1) + '" text-anchor="middle">' + hms(p.total[0]) + '</text>';
+    });
+    // legend: one swatch per stage name, coloured as in the setups
+    const seen = {};
+    pinned.forEach((p) => p.stages.forEach((s) => { if (!(s[0] in seen)) seen[s[0]] = s[2]; }));
+    const legend = log ? '' : '<div class="lp-legend">' + Object.keys(seen).map((n) =>
+      '<span><span class="lp-swatch" style="background:' + seen[n] + '"></span>' + esc(n) + '</span>').join('') + '</div>';
+    // settings next to each number; from #2 on, what differs from #1 in bold
+    const ref = {}; pinned[0].set.forEach((s) => { ref[s[0]] = s[1]; });
+    const list = pinned.map((p, i) => '<li><span class="lp-num">#' + (i + 1) + '</span><span class="lp-set">' +
+      p.set.map((s) => { const diff = i > 0 && ref[s[0]] !== s[1];
+        return (diff ? '<b>' : '') + esc(s[0]) + ': ' + esc(s[1]) + (diff ? '</b>' : ''); }).join(' · ') +
+      '</span><span class="lp-settot">' + span(p.total) + (p.incomplete ? ' (timed stages)' : '') +
+      (p.mem !== null ? ' · GPU ~' + (p.mem >= 10 ? p.mem.toFixed(0) : p.mem.toFixed(1)) + ' GB' : '') + '</span>' +
+      '<span class="lp-rowbtns"><button type="button" class="lp-btn lp-btn-quiet" data-mv="' + i + ':-1" aria-label="Move setup ' + (i + 1) +
+      ' up"' + (i === 0 ? ' disabled' : '') + '>↑</button><button type="button" class="lp-btn lp-btn-quiet" data-mv="' + i + ':1" aria-label="Move setup ' +
+      (i + 1) + ' down"' + (i === pinned.length - 1 ? ' disabled' : '') + '>↓</button>' +
+      '<button type="button" class="lp-btn lp-btn-quiet" data-rm="' + i + '" aria-label="Remove setup ' + (i + 1) + '">Remove</button></span></li>').join('');
+    cmp.innerHTML = '<svg class="lp-cmp-chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Predicted time per pinned setup">' +
+      svg + '</svg>' + legend + '<ol class="lp-setups">' + list + '</ol>' +
+      '<p class="lp-note">Bars stack the stages in the total; whiskers span the 10th–90th percentile of the total. ' +
+      (log ? 'On the log scale, bars show the total only. ' : '') + '↑ and ↓ reorder; setup 1 is the reference for the settings in bold. Pinned setups are kept in this browser only.</p>';
+    cmp.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => {
+      pinned.splice(+b.dataset.rm, 1); save(); renderCompare(); }));
+    cmp.querySelectorAll('[data-mv]').forEach((b) => b.addEventListener('click', () => {
+      const [i, d] = b.dataset.mv.split(':').map(Number), j = i + d;
+      if (j < 0 || j >= pinned.length) return;
+      [pinned[i], pinned[j]] = [pinned[j], pinned[i]]; save(); renderCompare();
+      const f = cmp.querySelector('[data-mv="' + j + ':' + d + '"]') || cmp.querySelector('[data-mv="' + j + ':' + (-d) + '"]');
+      if (f) f.focus(); }));
+  }
+  root.querySelector('[data-act="pin"]').addEventListener('click', () => {
+    if (current && current.stages.length) { pinned.push(JSON.parse(JSON.stringify(current))); save(); renderCompare(); }
+  });
+  root.querySelector('[data-act="clear"]').addEventListener('click', () => { pinned = []; save(); renderCompare(); });
+  logBox.addEventListener('change', renderCompare);
+
   ctl.solver.addEventListener('change', () => { fillDevices(); compute(); });
   root.querySelectorAll('[data-k]').forEach((el) => { if (el !== ctl.solver) el.addEventListener('input', compute); });
   root.querySelectorAll('select[data-k]').forEach((el) => { if (el !== ctl.solver) el.addEventListener('change', compute); });
   fillDevices();
   compute();
+  renderCompare();
 })();

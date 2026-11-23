@@ -2,7 +2,7 @@
 
 A simulation run can take a few minutes on a GPU or many hours on a CPU, and its memory decides which GPUs can run it. Knowing this before a run helps to choose the resolution, solver, and device, to request job resources, and to plan a study. PRESTUS predicts the time and memory of a run from its config, and records what each run used.
 
-The calculator below shows the expected time of each stage of a typical run, from the same table the Nexus uses. A head uses the reference head, or with a [limited field of view](doc_partial-fov.md) a cylinder around the beam; a free-water grid is sized to the transducer aperture and focal distance. A partial FOV shortens the acoustic simulation from minutes to seconds, but the head is still preprocessed in full, so the CPU stages then take most of the time. The Nexus computes the same prediction from a full config and the subject's own grid.
+The calculator below shows the expected time of each stage of a typical run, from the same table the Nexus uses. A head uses the reference head, or with a [limited field of view](doc_partial-fov.md) a cylinder around the beam; a free-water grid is sized to the transducer aperture and focal distance. A partial FOV shortens the acoustic simulation from minutes to seconds, but the head is still preprocessed in full, so the CPU stages then take most of the time. The Nexus computes the same prediction from a full config and the subject's own grid. To compare setups, pin each one: the pinned setups appear side by side as stacked bars, numbered, with their settings listed and the settings that differ from setup 1 in bold. The arrows next to each setup reorder them.
 
 <div id="load-predictor"><noscript>The load calculator needs JavaScript.</noscript></div>
 
