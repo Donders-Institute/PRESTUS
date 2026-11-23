@@ -226,6 +226,7 @@ html:not([data-dev="on"]) .prestus-dev-nav {
 /* Version banner (development and release versions): dark text and link on the yellow warning box. */
 .md-banner--warning, .md-banner--warning .md-banner__inner a, .md-banner--warning .md-banner__inner a:hover { color: var(--md-warning-fg-color, rgba(0, 0, 0, 0.87)); }
 .md-banner--warning .md-banner__inner a { text-decoration: underline; }
+.md-banner--warning .md-banner__inner { text-align: center; }
 /* Navigation section headings (Get Started, Head Model, ...): full text colour, not the light grey. */
 .md-nav--primary .md-nav__item--section > .md-nav__link { color: var(--md-default-fg-color); }
 /* Titles: light, as the published v0.6 site. */
@@ -320,3 +321,7 @@ html:not([data-dev="on"]) .prestus-dev-nav {
 
 /* Tables: a lone code name in the first column (parameter, key, function) stays on one line */
 .md-typeset table:not([class]) td:first-child > code:only-child { white-space: nowrap; }
+/* Version selector: smaller text; only the main entry in bold (the header title makes all of them bold by default). */
+.md-version { font-size: 0.65rem; }
+.md-version__current, .md-version__link { font-weight: 400; }
+.md-version__link[href$="/main/"], .md-version__link[href$="/main"] { font-weight: 700; }

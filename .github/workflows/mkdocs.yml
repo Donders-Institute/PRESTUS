@@ -67,10 +67,11 @@ jobs:
             ver=$(tr -d '[:space:]' < src/VERSION 2>/dev/null || true)
             tag=$(git -C src describe --tags --exact-match 2>/dev/null || true)
             if [ -n "$ver" ] && [ "$tag" = "$ver" ]; then title="main ($ver)"
-            elif [ -n "$ver" ]; then title="main ($ver + later changes)"
+            elif [ -n "$ver" ]; then title="main ($ver+)"
             else title="main"; fi ;;
           development)
-            name=development; title="development (unreleased)" ;;
+            name=development; title="development"
+            banner="These pages describe the development branch." ;;
           v[0-9]*)
             name="$ref"; title="$ref"
             banner="This is the documentation of release $ref, as tagged." ;;
