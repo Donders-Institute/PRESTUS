@@ -95,6 +95,16 @@ arguments
     medium_masks {mustBeNumericOrLogical}
 end
 
+% A handoff that names a missing map stops the run: it would otherwise start
+% from baseline temperature and zero dose and report them as cumulative.
+for adopted = {'adopted_heatmap', 'adopted_cem43', 'adopted_cem43_iso'}
+    if isfield(parameters.io, adopted{1}) && ~isempty(parameters.io.(adopted{1})) && ~isfile(parameters.io.(adopted{1}))
+        error('thermal_simulation:adoptedMissing', ...
+            'io.%s names a file that does not exist: %s (written by the NIfTI stage of the previous run).', ...
+            adopted{1}, char(parameters.io.(adopted{1})));
+    end
+end
+
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 % Notes:                                                            %
 %                                                                   %

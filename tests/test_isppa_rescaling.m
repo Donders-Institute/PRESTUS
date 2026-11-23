@@ -41,7 +41,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'water'}) test_isppa
         function test_output_csv_created_per_target(tc)
             % One output CSV should be written per ISPPA target
             multi_isppa_pipeline(tc.Parameters);
-            targets = tc.Parameters.calibration.target_isppa_wcm2;
+            targets = tc.Parameters.transducer.target_isppa_wcm2;
             for ti = 1:numel(targets)
                 affix   = sprintf('_isppa%03d', round(targets(ti)));
                 pattern = fullfile(tc.SimPath, '**', ...
@@ -57,7 +57,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'water'}) test_isppa
             % The focal Isppa in each output table should be approximately
             % proportional to the target (linear regime: I ∝ p², p ∝ scaling factor).
             multi_isppa_pipeline(tc.Parameters);
-            targets = tc.Parameters.calibration.target_isppa_wcm2;
+            targets = tc.Parameters.transducer.target_isppa_wcm2;
 
             isppa_vals = zeros(1, numel(targets));
             for ti = 1:numel(targets)
@@ -84,7 +84,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'water'}) test_isppa
         function test_each_output_isppa_positive(tc)
             % Both thermal outputs should have positive focal intensity
             multi_isppa_pipeline(tc.Parameters);
-            targets = tc.Parameters.calibration.target_isppa_wcm2;
+            targets = tc.Parameters.transducer.target_isppa_wcm2;
             for ti = 1:numel(targets)
                 affix   = sprintf('_isppa%03d', round(targets(ti)));
                 pattern = fullfile(tc.SimPath, '**', ...
@@ -114,9 +114,9 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'water'}) test_isppa
             % A scalar target_isppa_wcm2 should raise an error from multi_isppa_pipeline
             % (it requires at least two targets — scalar use goes via prestus_pipeline).
             p = tc.Parameters;
-            p.calibration.target_isppa_wcm2 = 10;
+            p.transducer.target_isppa_wcm2 = 10;
             tc.verifyError(@() multi_isppa_pipeline(p), ...
-                'multi_isppa_pipeline:*');
+                'multi_isppa_pipeline:tooFewTargets');
         end
 
     end
@@ -138,7 +138,7 @@ function parameters = make_isppa_parameters(sim_path)
     parameters.modules.generate_report      = 0;   % skip HTML for speed
 
     % Two ISPPA targets — triggers multi_isppa_pipeline dispatch
-    parameters.calibration.target_isppa_wcm2 = [5, 20];
+    parameters.transducer.target_isppa_wcm2 = [5, 20];
 
     % Overwrite to keep the test hermetic
     parameters.io.overwrite_files  = 'always';
