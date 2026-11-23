@@ -39,6 +39,8 @@ jobs:
         run: pip install -r requirements-docs.txt
       - name: Function index is up to date
         run: python tests/docs/gen_function_index.py --check
+      - name: Test map is up to date
+        run: python tests/docs/gen_test_map.py --check
       - name: Option icons match the Nexus drawings
         run: python tests/docs/gen_doc_icons.py --check
       - name: Load calculator data matches throughput.yaml

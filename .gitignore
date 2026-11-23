@@ -99,3 +99,8 @@ core.*
 # Local site data (profiles, user library) #
 ##########################################
 /local/
+
+#################################################
+# Local unit-test coverage (tests/coverage_unit_job.m) #
+#################################################
+/tests/coverage/
