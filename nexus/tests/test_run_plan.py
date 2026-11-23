@@ -1,5 +1,7 @@
 """run_plan.plan: the stages prestus_pipeline.m runs for a config."""
 
+import pytest
+
 from prestus_nexus import run_plan as rp
 from prestus_nexus.model import ConfigModel
 
@@ -82,6 +84,28 @@ def test_save_items(schema):
     m.set("io.save_matrices", 1)
     acoustic = {i.label: i for i in save_items(m)}["acoustic matrices"]
     assert acoustic.saved and "follows io.save_matrices: 1" in acoustic.reason
+
+
+@pytest.mark.parametrize("setting, applies", [
+    ({}, True),                                                        # layered, annular, 3D
+    ({"simulation.medium": "water"}, False),
+    ({"transducer.type": "matrix"}, False),
+    ({"grid.axisymmetric": 1}, False),
+    ({"modules.run_nifti_creation": 0}, False),
+])
+def test_save_items_transducer_model(schema, setting, applies):
+    from prestus_nexus.predict_outputs import save_items
+    m = ConfigModel(schema)
+    m.set("subject_id", 3)
+    for k, v in setting.items():
+        m.set(k, v)
+    item = {i.label: i for i in save_items(m)}["transducer model"]
+    assert item.applies == applies
+    assert item.saved                                                   # save_transducer_nii: 1
+    medium = setting.get("simulation.medium", "layered")
+    assert item.where == f"nii/sub-003_{medium}_T1w_transducer.nii.gz"
+    m.set("io.save_transducer_nii", 0)
+    assert not {i.label: i for i in save_items(m)}["transducer model"].saved
 
 
 def test_existing_outputs(schema, tmp_path):

@@ -125,6 +125,8 @@ fields:
   path.t2_pattern: {visible_if: {key: simulation.medium, in: [layered]}}
   startup.simnibs_bin_path: {visible_if: {any_of: [{key: simulation.medium, in: [layered, phantom]}, {key: placement.mode, not_in: [manual]}, {key: placement.manual.coordinate_space, in: [mni]}]}}
   io.save_MNI: {visible_if: {key: simulation.medium, in: [layered]}}
+  io.save_transducer_nii: {visible_if: {key: simulation.medium, in: [layered]}}
+  io.transducer_nii_back_mm: {visible_if: {key: simulation.medium, in: [layered]}}
   analysis: {visible_if: {key: simulation.medium, in: [layered, phantom]}}
   modules.run_targeting_analysis: {visible_if: {key: simulation.medium, in: [layered, phantom]}}
   modules.run_posthoc_water_sims: {visible_if: {key: simulation.medium, in: [layered, phantom]}}
@@ -980,6 +982,8 @@ display:
   io.save_thermal_matrices: {label: Save thermal matrices}
   io.save_heatingvideo: {label: Save heating video}
   io.save_property_maps: {label: Save medium property maps}
+  io.save_transducer_nii: {label: Save transducer model NIfTI}
+  io.transducer_nii_back_mm: {label: "Transducer model thickness (mm)", advanced: true}
   io.save_Ipa: {label: Save pulse-average intensity map}
   io.save_Ita: {label: Save time-average intensity map}
   io.save_p_complex: {label: Save complex pressure field}

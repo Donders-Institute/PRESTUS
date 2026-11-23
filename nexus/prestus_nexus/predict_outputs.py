@@ -329,6 +329,8 @@ def save_items(model: ConfigModel) -> list[SaveItem]:
 
     heating = on("modules.run_heating_sims", False)
     nifti = on("modules.run_nifti_creation")
+    annular = all(g("transducer.type", ti) != "matrix" for ti in range(model.n_transducers))
+    axisym = on("grid.axisymmetric", False)
     babelbrain = str(g("acoustic_backend") or "kwave").lower() == "babelbrain"
     timing_pd = not is_empty(g("timing.pd"))
     timing_pri = not is_empty(g("timing.pri"))
@@ -373,6 +375,10 @@ def save_items(model: ConfigModel) -> list[SaveItem]:
         ("save_MNI", "MNI-space maps", "file", f"nii/{stem}_MNI{affix}_*.nii.gz", f"nii/{stem}_MNI{affix}_*.nii*",
          "the NIfTI maps also in MNI space (needs the SimNIBS m2m folder)",
          layered and nifti, "layered medium with NIfTI maps only"),
+        ("save_transducer_nii", "transducer model", "file", f"nii/{stem}_T1w{affix}_transducer.nii.gz",
+         f"nii/{stem}_T1w{affix}_transducer.nii*", "the planned transducer bowl on the T1 grid (T1w only)",
+         layered and nifti and annular and not axisym,
+         "layered medium, annular transducers, 3D grid, NIfTI maps only"),
         ("save_Ipa", "pulse-average intensity (Ipa) map", "file", f"nii/{stem}_T1w{affix}_Ipa.nii.gz",
          f"nii/{stem}_T1w{affix}_Ipa.nii*", "", nifti and timing_pd, "needs timing.pd" if nifti else "no NIfTI maps"),
         ("save_Ita", "time-average intensity (Ita) map", "file", f"nii/{stem}_T1w{affix}_Ita.nii.gz",

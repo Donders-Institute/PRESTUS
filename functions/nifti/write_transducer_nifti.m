@@ -59,9 +59,14 @@ for ti = 1:n
     fpos(ti,:) = round(1 + (reshape(double(parameters.transducer(ti).focus_pos), 1, 3) - 1) .* scale);
 end
 
-% Padded isotropic working grid so the whole bowl fits (40 mm covers apertures up to ~75 mm)
+% Padded isotropic working grid so the whole bowl fits: r reaches from trans_pos
+% to the farthest bowl point (rim of the makeBowl diameter, at its sagitta) plus back_mm
+reach = 0;
+for ti = 1:n
+    reach = max(reach, bowl_reach_mm(parameters.transducer(ti), vox));
+end
 sz       = ceil(sz_t1 .* scale);
-r        = ceil((40 + back_mm) / vox);
+r        = ceil((reach + back_mm) / vox) + 1;
 pad_pre  = max(0, r + 1 - min(tpos, [], 1));
 pad_post = max(0, max(tpos, [], 1) + r - sz);
 sz_pad   = sz + pad_pre + pad_post;
@@ -95,6 +100,15 @@ hdr.BitsPerPixel          = 32;
 hdr.MultiplicativeScaling = 1;
 hdr.AdditiveOffset        = 0;
 niftiwrite_gz(out, regexprep(char(out_file), '\.nii\.gz$', ''), hdr);
+end
+
+function reach = bowl_reach_mm(tr, vox)
+% Distance [mm] from the bowl's rear centre to the rim of the bowl that
+% APERTURE_FACE builds (same makeBowl diameter), at the rim's sagitta.
+R     = double(tr.annular.curv_radius_mm);
+r_out = max(double(tr.annular.elem_od_mm)) / 2;
+rho   = min((2 * floor(2 * r_out / vox / 2) + 3) * vox / 2, R);
+reach = hypot(rho, R - sqrt(R^2 - rho^2));
 end
 
 function face = aperture_face(tr, tpos, fpos, sz, vox)

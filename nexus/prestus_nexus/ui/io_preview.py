@@ -16,7 +16,7 @@ from ..predict_outputs import predict
 from . import icons, style
 
 _COMMON_NOTES = {
-    "nii/": "property/acoustic/thermal maps (T1w + MNI)",
+    "nii/": "property/transducer/acoustic/thermal maps (T1w + MNI)",
     "img/": "intensity/temperature overlay PNGs",
     "log/": "pipeline diary log",
     "cache/": "regenerable intermediates (.mat)",
