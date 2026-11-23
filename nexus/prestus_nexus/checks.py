@@ -204,6 +204,7 @@ def _subject_issues(model: ConfigModel) -> list[Issue]:
         simnibs = g("startup.simnibs_bin_path")
         if m2m.is_dir():
             issues.append(Issue("info", "path.seg", f"Segmentation found: {m2m}"))
+            issues += _air_cavity_issues(model, m2m)
             mesh = m2m / f"sub-{sid:03d}.msh"
             if mode == "plantus" and not mesh.is_file():
                 issues.append(Issue("error", "path.seg",
@@ -216,6 +217,22 @@ def _subject_issues(model: ConfigModel) -> list[Issue]:
             issues.append(Issue("info", "path.seg", f"{m2m.name} not found; charm will run"))
         issues += _simnibs_issues(model, m2m)
     return issues
+
+
+def _air_cavity_issues(model: ConfigModel, m2m: Path) -> list[Issue]:
+    """headmodel.air_cavities.source 'simnibs' reads charm's atlas labelling
+    (air_cavity_charm.m). charm writes it with every segmentation, so an existing m2m
+    folder lacks it only when it was removed afterwards."""
+    g = model.get
+    if g("simulation.medium") != "layered" or g("headmodel.air_cavities.source") != "simnibs":
+        return []
+    if not (m2m / "final_tissues.nii.gz").is_file() or g("io.overwrite_simnibs") in (1, True):
+        return []                                   # charm runs first and writes it
+    if (m2m / "segmentation" / "labeling.nii.gz").is_file():
+        return []
+    return [Issue("warning", "headmodel.air_cavities.source",
+                  f"{m2m.name} has no segmentation/labeling.nii.gz, so the air-cavity check is skipped: "
+                  "re-run the SimNIBS segmentation, or choose CT HU window or Off")]
 
 
 def _simnibs_issues(model: ConfigModel, m2m: Path) -> list[Issue]:

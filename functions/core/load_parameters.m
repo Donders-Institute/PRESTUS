@@ -403,6 +403,45 @@ function parameters = load_parameters(varargin)
         end
     end
 
+    %% Air-cavity beam-path check (headmodel.air_cavities): fail at config load
+    ac = get_field(parameters, {'headmodel', 'air_cavities'}, struct());
+    if isstruct(ac) && isfield(ac, 'source')
+        src = char(ac.source);
+        if ~ismember(src, {'none', 'simnibs', 'segmentation', 'hu'})
+            error('prestus:airCavitiesSource', ...
+                'headmodel.air_cavities.source must be ''none'', ''simnibs'', ''segmentation'' or ''hu''; got ''%s''.', src);
+        end
+        sl = get_field(ac, {'simnibs_labels'}, 501);
+        if strcmp(src, 'simnibs') && (isempty(sl) || ~isnumeric(sl) || ...
+                any(sl(:) ~= round(sl(:))) || any(sl(:) <= 0))
+            error('prestus:airCavitiesSimnibsLabels', ...
+                ['headmodel.air_cavities.simnibs_labels must list positive label indices of the charm ' ...
+                 'labelling (501 = Air-Internal).']);
+        end
+        labels = get_field(ac, {'labels'}, []);
+        if strcmp(src, 'segmentation') && (isempty(labels) || ~isnumeric(labels) || ...
+                any(labels(:) ~= round(labels(:))) || any(labels(:) <= 0))
+            error('prestus:airCavitiesLabels', ...
+                ['headmodel.air_cavities.labels must list the positive segmentation label indices of internal air ' ...
+                 '(source ''segmentation''); label 0 is the background around the head.']);
+        end
+        if strcmp(src, 'hu')
+            if ~logical(get_field(parameters, {'pct', 'enabled'}, 0))
+                error('prestus:airCavitiesNeedsCT', ...
+                    'headmodel.air_cavities.source ''hu'' needs a CT or pseudo-CT (pct.enabled: 1).');
+            end
+            win = get_field(ac, {'hu_window'}, []);
+            if ~isnumeric(win) || numel(win) ~= 2 || win(1) >= win(2)
+                error('prestus:airCavitiesHuWindow', ...
+                    'headmodel.air_cavities.hu_window must be [low, high] HU with low < high.');
+            end
+        end
+        frac = get_field(ac, {'warn_beam_fraction'}, 0.1);
+        if ~isnumeric(frac) || ~isscalar(frac) || frac < 0 || frac > 1
+            error('prestus:airCavitiesFraction', 'headmodel.air_cavities.warn_beam_fraction must be in [0, 1].');
+        end
+    end
+
     %% kwave_elastic compatibility: no axisymmetric grids, no C++ solvers
     % Fail at config load rather than after grid/medium setup.
     if isfield(parameters, 'acoustic_backend') && strcmpi(parameters.acoustic_backend, 'kwave_elastic')

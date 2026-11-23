@@ -314,6 +314,13 @@ fields:
   headmodel.skull_fill_method: {choices: [rubberwrap, imclose, 'off']}
   headmodel.skull_wrap_radius_mm: {unit: mm, visible_if: {key: headmodel.skull_fill_method, in: [rubberwrap]}}
   headmodel.skull_wrap_visualize: {kind: flag, visible_if: {key: headmodel.skull_fill_method, in: [rubberwrap]}}
+  headmodel.air_cavities.source: {choices: [none, simnibs, segmentation, hu]}
+  headmodel.air_cavities.simnibs_labels: {kind: yaml, visible_if: {key: headmodel.air_cavities.source, in: [simnibs]}}
+  headmodel.air_cavities.labels: {kind: yaml, visible_if: {key: headmodel.air_cavities.source, in: [segmentation]}}
+  headmodel.air_cavities.hu_window: {kind: numbers, unit: HU, visible_if: {key: headmodel.air_cavities.source, in: [hu]}}
+  headmodel.air_cavities.keep_boundary: {kind: bool, visible_if: {key: headmodel.air_cavities.source, in: [hu]}}
+  headmodel.air_cavities.warn_db: {kind: number, unit: dB, visible_if: {key: headmodel.air_cavities.source, not_in: [none]}}
+  headmodel.air_cavities.warn_beam_fraction: {kind: number, min: 0, max: 1, visible_if: {key: headmodel.air_cavities.source, not_in: [none]}}
 
   pct.enabled: {kind: flag}
   # The mapping settings apply only with pct.enabled
@@ -1290,6 +1297,14 @@ display:
   headmodel.skull_fill_method: {label: "Skull hole filling"}
   headmodel.skull_wrap_radius_mm: {label: "Rubber-wrap radius"}
   headmodel.reuse_across_placements: {label: "Reuse the head model across placements"}
+  headmodel.air_cavities: {label: "Air-cavity check"}
+  headmodel.air_cavities.source: {label: "Air cavities from"}
+  headmodel.air_cavities.simnibs_labels: {label: "Charm air labels", advanced: true}
+  headmodel.air_cavities.labels: {label: "Air-cavity labels"}
+  headmodel.air_cavities.hu_window: {label: "Air HU window", advanced: true}
+  headmodel.air_cavities.keep_boundary: {label: "Keep air at the grid edge", advanced: true}
+  headmodel.air_cavities.warn_db: {label: "Warn above (re brain peak)", advanced: true}
+  headmodel.air_cavities.warn_beam_fraction: {label: "Warn above beam share", advanced: true}
   pct.enabled: {label: "Use CT-based skull mapping"}
   pct.skull_mapping: {label: "UTE-to-HU mapping"}
   pct.custom_slope: {label: "Custom mapping slope"}
@@ -1410,6 +1425,7 @@ choice_labels:
   grid.water_baseline_grid: {beam: Beam box, full: Full grid}
   headmodel.smooth_method: {gaussian: Gaussian, box: Box, 'off': 'Off'}
   headmodel.skull_fill_method: {rubberwrap: Rubber wrap, imclose: Morphological closing, 'off': 'Off'}
+  headmodel.air_cavities.source: {none: 'Off', simnibs: SimNIBS air label, segmentation: Segmentation labels, hu: CT HU window}
   pct.skull_mapping: {miscouridou: Miscouridou, carpino: Carpino (deprecated), wiesinger: Wiesinger, treeby: Treeby, kosciessa: Kosciessa, custom: Custom}
   pct.mapping_density: {k-plan: k-Plan, k-wave: k-Wave, marsac: Marsac, marsac-babelbrain: Marsac (BabelBrain), aubry: Aubry, air-tissue: Air/tissue, none: None}
   pct.mapping_soundspeed: {k-plan: k-Plan, marsac: Marsac, aubry: Aubry, webb: Webb, pichardo: Pichardo, mcdannold: McDannold, none: None}

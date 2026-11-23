@@ -67,6 +67,19 @@ COMPARE_COLUMNS = (
     ("CEM43_brain", "CEM43 brain [min]"),
 )
 
+# Shown only when a run has them (headmodel.air_cavities)
+OPTIONAL_COMPARE_COLUMNS = (
+    ("aircav_flag", "Air cavity flagged"),
+    ("aircav_rel_db", "Air cavity peak [dB re brain]"),
+    ("aircav_beam_frac_max", "Air cavity beam share"),
+)
+
+
+def compare_columns(metrics: list[dict]) -> tuple:
+    """COMPARE_COLUMNS plus the optional columns present in any of the runs' metrics."""
+    extra = tuple(c for c in OPTIONAL_COMPARE_COLUMNS if any(c[0] in m for m in metrics))
+    return COMPARE_COLUMNS + extra
+
 # Columns of earlier versions -> current names (*_bowl_mm: from the bowl apex)
 _RENAMED_COLUMNS = {"real_focal_distance_mm": "real_focal_distance_bowl_mm"}
 

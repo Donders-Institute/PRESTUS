@@ -255,3 +255,31 @@ def test_transducers_at_different_frequencies_allowed(schema):
     for coupling in ("async", "coherent"):
         m.set("simulation.transducer_coupling", coupling)
         assert not [i for i in checks.all_issues(m) if i.path == "transducer.freq_hz" and i.level == "error"]
+
+
+def test_air_cavity_needs_charm_labelling(schema, tmp_path):
+    """source 'simnibs' (the default) warns when an existing m2m folder lacks charm's
+    labelling, and not when it has it, charm runs first, the check is off, or the medium
+    is not a head."""
+    key = ("headmodel.air_cavities.source", "warning")
+    m = _subject(schema, tmp_path / "a", m2m=SEG)
+    m.set("simulation.medium", "layered")
+    assert m.get("headmodel.air_cavities.source") == "simnibs"
+    assert key in _msgs(checks.subject_issues(m))
+    checks.clear_status_cache()
+    m.set("io.overwrite_simnibs", 1)                    # charm re-runs and writes it
+    assert key not in _msgs(checks.subject_issues(m))
+    m.set("io.overwrite_simnibs", 0)
+    for setting, value in (("headmodel.air_cavities.source", "hu"),
+                           ("headmodel.air_cavities.source", "none"),
+                           ("simulation.medium", "water")):
+        m.set(setting, value)
+        assert key not in _msgs(checks.subject_issues(m)), (setting, value)
+        m.set("simulation.medium", "layered")
+        m.set("headmodel.air_cavities.source", "simnibs")
+    ok = _subject(schema, tmp_path / "b", m2m=SEG + ("segmentation/labeling.nii.gz",))
+    ok.set("simulation.medium", "layered")
+    assert key not in _msgs(checks.subject_issues(ok))
+    none = _subject(schema, tmp_path / "c")             # no segmentation yet: charm runs first
+    none.set("simulation.medium", "layered")
+    assert key not in _msgs(checks.subject_issues(none))

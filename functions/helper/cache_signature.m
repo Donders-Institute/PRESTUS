@@ -41,6 +41,11 @@ function sig = cache_signature(parameters, kind)
     for f = {'grid', 'layers', 'headmodel', 'pct'}
         sig.(f{1}) = get_field(parameters, f);
     end
+    % headmodel.air_cavities is a read-out (ACOUSTIC_ANALYSIS) that leaves the
+    % medium and field unchanged, so it never invalidates a cache
+    if isstruct(sig.headmodel) && isfield(sig.headmodel, 'air_cavities')
+        sig.headmodel = rmfield(sig.headmodel, 'air_cavities');
+    end
     % The bone-mask settings (SKULL_RECONCILE) count only with pct.bone_source
     % 'hu' or 'mask', so caches of segmentation-skull runs keep their signature
     bone_keys = {'bone_source', 'bone_hu_threshold', 'bone_median_mm', 'bone_open_mm', 'bone_close_mm', 'bone_soft_layer'};

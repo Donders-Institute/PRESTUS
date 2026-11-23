@@ -116,6 +116,18 @@ def test_read_metrics_last_row(tmp_path):
     assert rs.read_metrics(run.csv)["riseT_brain"] == "0.2"
 
 
+def test_compare_columns_optional():
+    """Each optional column appears when any run has it, and not otherwise."""
+    base = rs.compare_columns([{}, {"Isppa": "1"}])
+    assert base == rs.COMPARE_COLUMNS
+    for key, label in rs.OPTIONAL_COMPARE_COLUMNS:
+        cols = rs.compare_columns([{}, {key: "1"}])
+        assert cols[: len(rs.COMPARE_COLUMNS)] == rs.COMPARE_COLUMNS
+        assert cols[len(rs.COMPARE_COLUMNS):] == ((key, label),)
+    every = rs.compare_columns([{k: "1" for k, _ in rs.OPTIONAL_COMPARE_COLUMNS}])
+    assert every == rs.COMPARE_COLUMNS + rs.OPTIONAL_COMPARE_COLUMNS
+
+
 def test_results_page_lists_runs(schema, tmp_path):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PyQt6")

@@ -674,13 +674,13 @@ class ResultsPage(QWidget):
         self.table.resizeColumnsToContents()
 
     def _fill_compare(self) -> None:
-        cols = rs.COMPARE_COLUMNS
+        all_metrics = [rs.read_metrics(run.csv) for run in self.runs]
+        cols = rs.compare_columns(all_metrics)
         self.compare.clear()
         self.compare.setColumnCount(len(cols) + 1)
         self.compare.setRowCount(len(self.runs))
         self.compare.setHorizontalHeaderLabels(["Run"] + [label for _, label in cols])
-        for ri, run in enumerate(self.runs):
-            metrics = rs.read_metrics(run.csv)
+        for ri, (run, metrics) in enumerate(zip(self.runs, all_metrics)):
             self.compare.setItem(ri, 0, QTableWidgetItem(run.label))
             for ci, (key, _) in enumerate(cols, start=1):
                 self.compare.setItem(ri, ci, QTableWidgetItem(_fmt(metrics.get(key, ""))))

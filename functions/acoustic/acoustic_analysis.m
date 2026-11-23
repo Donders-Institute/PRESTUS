@@ -1,6 +1,6 @@
 function [results, acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
             acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, ...
-                                segmentation, source_labels, reserved, provenance)
+                                segmentation, source_labels, aircav_mask, provenance)
 % ACOUSTIC_ANALYSIS  Compute acoustic intensity metrics and generate output plots and tables
 %
 % Derives spatial pressure, intensity, and mechanical index (MI) maps from
@@ -20,7 +20,7 @@ function [results, acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoust
 %   [results, acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
 %       acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, ...
 %                         segmentation, source_labels)
-%   [results, ...] = acoustic_analysis(..., [], provenance)
+%   [results, ...] = acoustic_analysis(..., aircav_mask, provenance)
 %
 % Input:
 %   parameters   - PRESTUS config with transducer, grid, analysis, io fields
@@ -29,13 +29,15 @@ function [results, acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoust
 %   sensor_data  - k-Wave output; requires p_max_all [Pa] and p_min_all [Pa] (for MI)
 %   segmentation - CHARM tissue label map
 %   source_labels- transducer element label map (for overlay plots)
-%   reserved     - unused placeholder (pass [] or omit)
+%   aircav_mask  - logical internal air-cavity mask on the grid (AIR_CAVITY_MASK),
+%                  or [] for no air-cavity check (default)
 %   provenance   - acoustic provenance struct from prestus_pipeline (optional)
 %
 % Output:
 %   results          - struct with fields: Isptp, Isppa, [Ispta], Isppa_after_exit_plane,
 %                      Psptp, Ipa_target, Ipa_target_radius, real_focal_distance_bowl, and
-%                      per-tissue Isppa/Psptp/MI fields for layered/phantom media.
+%                      per-tissue Isppa/Psptp/MI fields for layered/phantom media;
+%                      with aircav_mask, the air-cavity fields aircav_* (AIR_CAVITY_METRICS).
 %                      ITRUSST focal metrics (Martin et al., 2025, Brain Stimulation)
 %                      are computed for both layered (brain-masked) and free-field
 %                      (after-exit-plane-masked) simulations:
@@ -62,7 +64,7 @@ arguments
     sensor_data  (1,1) struct
     segmentation {mustBeNumericOrLogical}
     source_labels{mustBeNumericOrLogical}
-    reserved     = []    %#ok<INUSA>
+    aircav_mask  = []
     provenance   struct  = struct()
 end
 
@@ -380,6 +382,26 @@ end
             results.MI_tc = NaN; % intracranial tissues not modelled
         end
 
+        % Air-cavity beam-path check (headmodel.air_cavities): how much of the
+        % beam enters the internal air cavities, which the medium fills as their layer
+        aircav = [];
+        if ~isempty(aircav_mask)
+            if isequal(size(aircav_mask), size(acoustic_pressure))
+                aircav = aircav_check(parameters, acoustic_pressure, aircav_mask, results.Psptp_brain);
+                results.aircav_n_vox              = aircav.n_vox;
+                results.Psptp_aircav              = aircav.Psptp_aircav;
+                results.aircav_rel_db             = aircav.rel_db;
+                results.aircav_beam_frac_max      = aircav.beam_frac_max;
+                results.aircav_beam_frac_depth_mm = aircav.beam_frac_depth_mm;
+                results.aircav_beam_frac_vol      = aircav.beam_frac_vol;
+                results.aircav_flag               = aircav.flag;
+            else
+                warning('acoustic_analysis:aircavSize', ...
+                    'Air-cavity mask [%s] does not match the field [%s]; air-cavity check skipped.', ...
+                    num2str(size(aircav_mask)), num2str(size(acoustic_pressure)));
+            end
+        end
+
         % Free-field ISPPA from provenance (BabelBrain water run, or NaN otherwise).
         % Enables normalized comparison across solvers: Isppa_brain / freefield_isppa_wcm2.
         freefield_isppa_wcm2 = NaN;
@@ -391,7 +413,7 @@ end
         Isptp_val = results.Isptp;
         Ispta_val = NaN; if isfield(results, 'Ispta'), Ispta_val = results.Ispta; end
 
-        writetable(table(parameters.subject_id, freq_Hz, ...
+        T = table(parameters.subject_id, freq_Hz, ...
             Isptp_val, results.Isppa, Ispta_val, results.Isppa_after_exit_plane, ...
             real_focal_distance_bowl, results.Isppa_skin, results.Isppa_skull, ...
             results.Isppa_brain, results.Psptp_skin, results.Psptp_skull, ...
@@ -420,8 +442,17 @@ end
             'real_focal_distance_ep_mm', ...
             'focal_flhm_center_bowl_mm', 'focal_flhm_center_ep_mm', ...
             'freefield_isppa_wcm2', 'TIC', ...
-            'focal_fwhm_axial_mm', 'focal_fwhm_lateral_min_mm', 'focal_fwhm_lateral_max_mm'}), ...
-            parameters.io.filename_table);
+            'focal_fwhm_axial_mm', 'focal_fwhm_lateral_min_mm', 'focal_fwhm_lateral_max_mm'});
+        if ~isempty(aircav)
+            T.aircav_n_vox              = aircav.n_vox;
+            T.Psptp_aircav              = aircav.Psptp_aircav;
+            T.aircav_rel_db             = aircav.rel_db;
+            T.aircav_beam_frac_max      = aircav.beam_frac_max;
+            T.aircav_beam_frac_depth_mm = aircav.beam_frac_depth_mm;
+            T.aircav_beam_frac_vol      = aircav.beam_frac_vol;
+            T.aircav_flag               = aircav.flag;
+        end
+        writetable(T, parameters.io.filename_table);
     else
         % Free-field simulation: compute ITRUSST focal metrics using after-exit-plane mask.
         % Region mask restricts the focal zone to beyond the transducer exit plane.
@@ -605,6 +636,42 @@ end
 end
 
 % -------------------------------------------------------------------------
+function m = aircav_check(parameters, acoustic_pressure, aircav_mask, p_ref)
+% Air-cavity metrics (AIR_CAVITY_METRICS) for every transducer's beam, with the
+% thresholds of headmodel.air_cavities, and a log line / warning
+    cfg = get_field(parameters, {'headmodel', 'air_cavities'}, struct());
+    res = parameters.grid.resolution_mm;
+    n_tr = numel(parameters.transducer);
+    beams = repmat(struct('trans_pos', [], 'focus_pos', [], 'exit_offset_vox', 0, 'radius_vox', Inf), 1, n_tr);
+    for it = 1:n_tr
+        tr_it = parameters.transducer(it);
+        geom = struct();
+        if isfield(tr_it, 'type') && isfield(tr_it, tr_it.type), geom = tr_it.(tr_it.type); end
+        radius_mm = Inf;
+        if isfield(geom, 'outer_diameter_mm') && ~isempty(geom.outer_diameter_mm)
+            radius_mm = geom.outer_diameter_mm / 2;          % matrix aperture
+        elseif isfield(geom, 'elem_od_mm') && ~isempty(geom.elem_od_mm)
+            radius_mm = max(geom.elem_od_mm) / 2;            % annular: outer element
+        end
+        beams(it) = struct('trans_pos', tr_it.trans_pos, 'focus_pos', tr_it.focus_pos, ...
+            'exit_offset_vox', annular_bowl_depth_mm(geom) / res, 'radius_vox', radius_mm / res);
+    end
+    warn_db   = double(get_field(cfg, {'warn_db'}, -6));
+    warn_frac = double(get_field(cfg, {'warn_beam_fraction'}, 0.1));
+    m = air_cavity_metrics(acoustic_pressure, aircav_mask, p_ref, beams, res, warn_db, warn_frac);
+    fprintf(['[acoustic_analysis] Air cavities: %d voxels; peak %.3g Pa (%.1f dB re brain peak); ' ...
+             'largest share of the -6 dB beam cross-section %.0f%% (%.1f mm from the exit plane); ' ...
+             'prefocal -6 dB volume %.0f%%.\n'], m.n_vox, m.Psptp_aircav, m.rel_db, ...
+             100 * m.beam_frac_max, m.beam_frac_depth_mm, 100 * m.beam_frac_vol);
+    if m.flag
+        warning('acoustic_analysis:aircavInBeam', ...
+            ['The beam enters internal air cavities (%.1f dB re brain peak, up to %.0f%% of the beam ' ...
+             'cross-section). The simulation fills them as tissue/water; real air reflects nearly all ' ...
+             'of this energy, so the intracranial field is overestimated. Consider another placement.'], ...
+            m.rel_db, 100 * m.beam_frac_max);
+    end
+end
+
 function focal_reference = focal_reference_from_parameters(parameters)
 % Defensive lookup of calibration.focal_reference, matching
 % COMPUTE_FLHM_CENTER's own default so callers that construct parameters

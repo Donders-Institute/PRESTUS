@@ -580,6 +580,16 @@ headmodel:
   skull_wrap_radius_mm: 5 # Rubber-wrap radius [mm]; the wrap bridges skull holes up to about twice this width
   skull_wrap_visualize: 0 # Visualize rubber-wrap result? (Currently causes issues on HPC)
   reuse_across_placements: false # Build the smoothed head model once per subject (unrotated, at grid.resolution_mm; <dir_cache>/sub-XXX_<medium>_headmodel_<res>mm.mat) and only rotate and crop it for each transducer placement
+  # Internal air cavities (sinuses, mastoid air cells): a beam-path check, layered medium only. The cavities keep the
+  # properties of their layer (water unless layers assigns them); the run reports how much of the beam enters them.
+  air_cavities:
+    source: 'simnibs'       # Where the cavities come from: 'none' (off) | 'simnibs' (charm Air-Internal label, m2m segmentation/labeling.nii.gz) | 'segmentation' (the labels below) | 'hu' (CT/pseudo-CT voxels in hu_window; needs pct.enabled)
+    simnibs_labels: [501]   # source 'simnibs': label indices in the charm labelling (segmentation/labeling_LUT.txt; 501 = Air-Internal)
+    labels: []              # source 'segmentation': label indices of internal air in a segmentation that has them (SimNIBS final_tissues has none: air is 0); never 0
+    hu_window: [-1200, -400] # source 'hu': HU range classified as air (as babelbrain.air_hu_window)
+    keep_boundary: false    # source 'hu': keep air components touching the grid edge (default: removed with the air around the head)
+    warn_db: -6             # Flag the run when the peak pressure inside a cavity exceeds this level relative to the brain peak [dB]
+    warn_beam_fraction: 0.1 # Flag the run when, at any depth before the focus, cavities fill more than this share of the -6 dB beam cross-section
 
 #------------ (pseudo-)CT skull property mapping
 

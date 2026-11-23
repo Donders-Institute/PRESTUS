@@ -195,6 +195,13 @@ function [parameters] = prestus_pipeline(parameters, options)
 
     [parameters, planimg, medium_masks, segmentation, bone_mask, pseudoCT, trans_pos, focus_pos] = ...
         grid_stage(parameters);
+    % Internal air from the charm atlas labelling (headmodel.air_cavities.source
+    % 'simnibs', the default), mapped like the segmentation; [] for every other
+    % source and when the acoustic analysis does not run
+    charm_air = [];
+    if ~isfield(parameters.modules, 'run_acoustic_analysis') || parameters.modules.run_acoustic_analysis
+        charm_air = air_cavity_charm(parameters, planimg, size(segmentation));
+    end
 
     log_timer('stop','preproc');
 
@@ -246,6 +253,11 @@ function [parameters] = prestus_pipeline(parameters, options)
     if fov_state.active && ~isempty(pseudoCT) && isequal(size(pseudoCT), double(fov_state.full_dims))
         fov_end = fov_state.offset + parameters.grid.dims - 1;
         pseudoCT = pseudoCT(fov_state.offset(1):fov_end(1), fov_state.offset(2):fov_end(2), ...
+            fov_state.offset(3):fov_end(3));
+    end
+    if fov_state.active && ~isempty(charm_air) && isequal(size(charm_air), double(fov_state.full_dims))
+        fov_end = fov_state.offset + parameters.grid.dims - 1;
+        charm_air = charm_air(fov_state.offset(1):fov_end(1), fov_state.offset(2):fov_end(2), ...
             fov_state.offset(3):fov_end(3));
     end
 
@@ -374,7 +386,10 @@ function [parameters] = prestus_pipeline(parameters, options)
         acoustic_stage(parameters, kgrid, kwave_medium, source, sensor, ...
                        medium_masks, segmentation, source_labels, acoustic_provenance, ...
                        planimg, trans_pos, focus_pos, pseudoCT);
-    clear pseudoCT
+    % Internal air cavities for the beam-path check (headmodel.air_cavities),
+    % on the grid of the analysed field
+    aircav_mask = air_cavity_mask(parameters, segmentation, pseudoCT, charm_air);
+    clear pseudoCT charm_air
 
     log_timer('stop', 'acoustic');
 
@@ -398,7 +413,7 @@ function [parameters] = prestus_pipeline(parameters, options)
     if ~isfield(parameters.modules, 'run_acoustic_analysis') || parameters.modules.run_acoustic_analysis
         [results_acoustic, acoustic_Itp, acoustic_Ipa, acoustic_Ita, acoustic_MI, acoustic_pressure, highlighted_pos] = ...
             acoustic_analysis(parameters, kwave_medium, medium_masks, sensor_data, ...
-                              segmentation, source_labels, [], acoustic_provenance);
+                              segmentation, source_labels, aircav_mask, acoustic_provenance);
     else
         disp('No acoustic simulation results available (or requested). Skipping analysis...')
         results_acoustic  = [];

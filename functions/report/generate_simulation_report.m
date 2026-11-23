@@ -2019,6 +2019,7 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
             limits = get_risk_limits(is_layered);
             acoustic_cols = get_acoustic_columns();
             html = [html table2html(csv_table, limits, acoustic_cols)];
+            html = [html build_aircav_box(csv_table)];
 
             % For async joint runs show per-transducer Ipa at each transducer's focus
             % extracted from the joint combined intensity map.
@@ -2111,6 +2112,39 @@ function html = build_acoustic_section(csv_table, parameters, subject_id, medium
         end
     end
     html = [html '</div>'];
+end
+
+function html = build_aircav_box(csv_table)
+% Air-cavity beam-path check (headmodel.air_cavities; ACOUSTIC_ANALYSIS); '' when not run
+    html = '';
+    flag = csv_value(csv_table, 'aircav_flag');
+    if isnan(flag)
+        return
+    end
+    n_vox = csv_value(csv_table, 'aircav_n_vox');
+    if n_vox == 0
+        html = ['<div class="aircav"><strong>Air cavities:</strong> none on the simulation grid, ' ...
+            'so the beam-path check found nothing to test.</div>'];
+        return
+    end
+    rel_db = csv_value(csv_table, 'aircav_rel_db');
+    fmax   = csv_value(csv_table, 'aircav_beam_frac_max');
+    depth  = csv_value(csv_table, 'aircav_beam_frac_depth_mm');
+    fvol   = csv_value(csv_table, 'aircav_beam_frac_vol');
+    numbers = sprintf(['Peak pressure inside the cavities: %.1f dB relative to the brain peak. ' ...
+        'Largest share of the &minus;6 dB beam cross-section inside them: %.0f%%'], rel_db, 100 * fmax);
+    if isfinite(depth)
+        numbers = [numbers sprintf(' (%.1f mm from the exit plane)', depth)];
+    end
+    numbers = [numbers sprintf('; share of the prefocal &minus;6 dB beam volume: %.0f%%.', 100 * fvol)];
+    if flag
+        html = ['<div class="aircav flagged"><strong>The beam enters internal air cavities.</strong> ' ...
+            numbers ' The simulation fills the cavities as tissue or water. Real air reflects nearly all ' ...
+            'of the energy that reaches it, so the field beyond the cavities is overestimated. ' ...
+            'Consider another placement.</div>'];
+    else
+        html = ['<div class="aircav"><strong>Air cavities:</strong> below the warning thresholds. ' numbers '</div>'];
+    end
 end
 
 function html = build_focal_zone_table(csv_table)
@@ -2498,14 +2532,14 @@ function html = build_toc(parameters, is_layered, extra_html)
     end
 
     % Safety status dot: determine worst-case color
-    worst = 'green';
+    % Green only when the table was read and every metric is within its
+    % limit; a missing or unreadable table shows grey ('unknown'), never green.
+    worst = 'unknown';
     try
         if isfield(parameters.io, 'filename_table') && isfile(parameters.io.filename_table)
             csv_table = read_metrics_table(parameters.io.filename_table);
-            if is_layered
-                limits = get_risk_limits(is_layered);
-            else
-            end
+            limits = get_risk_limits(is_layered);   % global-only limits for water runs
+            worst = 'green';
             metric_names = fieldnames(limits);
             for i = 1:length(metric_names)
                 name = metric_names{i};
@@ -2525,7 +2559,9 @@ function html = build_toc(parameters, is_layered, extra_html)
         end
     catch
     end
-    html = [html sprintf('<span class="toc-status" style="background:var(--%s);" title="Overall NSR status: %s"></span>', worst, worst)];
+    dot_colour = worst;
+    if strcmp(worst, 'unknown'), dot_colour = 'ink-4'; end
+    html = [html sprintf('<span class="toc-status" style="background:var(--%s);" title="Overall NSR status: %s"></span>', dot_colour, worst)];
 
     % Always-present links
     links = {
