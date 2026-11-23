@@ -30,7 +30,7 @@ PRESTUS is a research tool, and we strive for transparency, reproducibility, and
 - Ensure (to the best of your ability) that your features work as expected and the pipeline remains functional. Unit tests have not yet been implemented, so please verify your changes manually and describe your testing process.
 - Submit a pull request to the `development` branch with a clear description. Before this pull request can be accepted, it will need to be reviewed by another contributor.
 - [Optional] Attach a log or summary to the pull request, stating that the "pipeline has finished successfully" or describing any issues encountered.
-- [Optional] Add yourself to the contributor list in the readme (you will automatically be recognized by GitHub's contribution tracker). Follow [these instructions](https://allcontributors.org/docs/en/bot/usage).
+- [Optional] Add yourself to the contributor list in the README: your avatar in the row of avatars and a line with your name and roles (code, docs, ideas, tutorials, maintenance, bug reports). GitHub's contribution tracker also recognizes you automatically.
 
 ## Code of Conduct
 Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.

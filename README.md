@@ -40,30 +40,31 @@ Kosciessa, J. Q., Chetverikov, A., Cornelissen, M., van der Zee, K., Carpino, E.
 # Contributors
 
 [![Contributors](https://img.shields.io/github/contributors/Donders-Institute/PRESTUS.svg?color=00B4D8&style=flat-square)](https://github.com/Donders-Institute/PRESTUS/graphs/contributors)
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
-<table>
-  <tbody>
-    <tr>
-      <td align="center" valign="top" width="10%"><a href="http://juliankosciessa.eu"><img src="https://avatars.githubusercontent.com/u/40263608?v=4?s=100" width="100px;" alt="Julian Kosciessa"/><br /><sub><b>Julian Kosciessa</b></sub></a><br /><a href="#code-jkosciessa" title="Code">💻</a> <a href="#ideas-jkosciessa" title="Ideas, Planning, & Feedback">🤔</a> <a href="#tutorial-jkosciessa" title="Tutorials">✅</a> <a href="#maintenance-jkosciessa" title="Maintenance">🚧</a> <a href="#bug-jkosciessa" title="Bug reports">🐛</a> <a href="#doc-jkosciessa" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="10%"><a href="http://andreychetverikov.org"><img src="https://avatars.githubusercontent.com/u/1465806?v=4?s=100" width="100px;" alt="Andrey Chetverikov"/><br /><sub><b>Andrey Chetverikov</b></sub></a><br /><a href="#code-achetverikov" title="Code">💻</a> <a href="#ideas-achetverikov" title="Ideas, Planning, & Feedback">🤔</a> <a href="#tutorial-achetverikov" title="Tutorials">✅</a></td>
-      <td align="center" valign="top" width="10%"><a href="https://github.com/KTZ228"><img src="https://avatars.githubusercontent.com/u/51954604?v=4?s=100" width="100px;" alt="Kenneth van der Zee"/><br /><sub><b>Kenneth van der Zee</b></sub></a><br /><a href="#code-KTZ228" title="Code">💻</a> <a href="#ideas-KTZ228" title="Ideas, Planning, & Feedback">🤔</a> <a href="#maintenance-KTZ228" title="Maintenance">🚧</a> <a href="#bug-KTZ228" title="Bug reports">🐛</a></td>
-      <td align="center" valign="top" width="10%"><a href="https://github.com/MaCuinea"><img src="https://avatars.githubusercontent.com/u/134381864?v=4?s=100" width="100px;" alt="Margely Cornelissen"/><br /><sub><b>Margely Cornelissen</b></sub></a><br /><a href="#code-MaCuinea" title="Code">💻</a> <a href="#maintenance-MaCuinea" title="Maintenance">🚧</a> <a href="#tutorial-MaCuinea" title="Tutorials">✅</a> <a href="#bug-MaCuinea" title="Bug reports">🐛</a></td>
-      <td align="center" valign="top" width="10%"><a href="https://github.com/eleonoracarpino"><img src="https://avatars.githubusercontent.com/u/123380299?v=4?s=100" width="100px;" alt="Eleonora Carpino"/><br /><sub><b>Eleonora Carpino</b></sub></a><br /><a href="#code-eleonoracarpino" title="Code">💻</a> <a href="#ideas-eleonoracarpino" title="Ideas, Planning, & Feedback">🤔</a></td>
-      <td align="center" valign="top" width="10%"><a href="https://github.com/sirmrmarty"><img src="https://avatars.githubusercontent.com/u/140894211?v=4?s=100" width="100px;" alt="Martin Wimmers"/><br /><sub><b>Martin Wimmers</b></sub></a><br /><a href="#code-sirmrmarty" title="Code">💻</a> <a href="#tutorial-sirmrmarty" title="Tutorials">✅</a> <a href="#bug-sirmrmarty" title="Bug reports">🐛</a></td>
-      <td align="center" valign="top" width="10%"><a href="https://github.com/neurodream"><img src="https://avatars.githubusercontent.com/u/117816806?v=4?s=100" width="100px;" alt="Nico Adelhöfer"/><br /><sub><b>Nico Adelhöfer</b></sub></a><br /><a href="#code-neurodream" title="Code">💻</a> <a href="#ideas-neurodream" title="Ideas, Planning, & Feedback">🤔</a></td>
-      <td align="center" valign="top" width="10%"><a href="https://github.com/meijer-s"><img src="https://avatars.githubusercontent.com/u/243970592?v=4&s=100" width="100px;" alt="meijer-s"/><br /><sub><b>meijer-s</b></sub></a><br /><a href="#code-meijer-s" title="Code">💻</a> <a href="#ideas-meijer-s" title="Ideas, Planning, & Feedback">🤔</a></td>
-      <td align="center" valign="top" width="10%"><a href="https://github.com/mekman"><img src="https://avatars.githubusercontent.com/u/139282?v=4?s=100" width="100px;" alt="Matthias Ekman"/><br /><sub><b>Matthias Ekman</b></sub></a><br /><a href="#bug-mekman" title="Bug reports">🐛</a></td>
-      <td align="center" valign="top" width="10%"><a href="http://lennartverhagen.com"><img src="https://avatars.githubusercontent.com/u/12236166?v=4?s=100" width="100px;" alt="Lennart Verhagen"/><br /><sub><b>Lennart Verhagen</b></sub></a><br /><a href="#ideas-lennartverhagen" title="Ideas, Planning, & Feedback">🤔</a></td>
-    </tr>
-  </tbody>
-</table>
+<p>
+  <a href="http://juliankosciessa.eu" title="Julian Kosciessa: code, ideas, tutorials, maintenance, bug reports, docs"><img src="https://avatars.githubusercontent.com/u/40263608?v=4&s=112" width="56" height="56" alt="Julian Kosciessa"/></a>
+  <a href="http://andreychetverikov.org" title="Andrey Chetverikov: code, ideas, tutorials"><img src="https://avatars.githubusercontent.com/u/1465806?v=4&s=112" width="56" height="56" alt="Andrey Chetverikov"/></a>
+  <a href="https://github.com/KTZ228" title="Kenneth van der Zee: code, ideas, maintenance, bug reports"><img src="https://avatars.githubusercontent.com/u/51954604?v=4&s=112" width="56" height="56" alt="Kenneth van der Zee"/></a>
+  <a href="https://github.com/MaCuinea" title="Margely Cornelissen: code, maintenance, tutorials, bug reports"><img src="https://avatars.githubusercontent.com/u/134381864?v=4&s=112" width="56" height="56" alt="Margely Cornelissen"/></a>
+  <a href="https://github.com/eleonoracarpino" title="Eleonora Carpino: code, ideas"><img src="https://avatars.githubusercontent.com/u/123380299?v=4&s=112" width="56" height="56" alt="Eleonora Carpino"/></a>
+  <a href="https://github.com/sirmrmarty" title="Martin Wimmers: code, ideas, tutorials, maintenance, bug reports"><img src="https://avatars.githubusercontent.com/u/140894211?v=4&s=112" width="56" height="56" alt="Martin Wimmers"/></a>
+  <a href="https://github.com/neurodream" title="Nico Adelhöfer: code, ideas"><img src="https://avatars.githubusercontent.com/u/117816806?v=4&s=112" width="56" height="56" alt="Nico Adelhöfer"/></a>
+  <a href="https://github.com/meijer-s" title="Sjoerd Meijer: code, ideas"><img src="https://avatars.githubusercontent.com/u/243970592?v=4&s=112" width="56" height="56" alt="Sjoerd Meijer"/></a>
+  <a href="https://github.com/Marwan-Engels" title="Marwan Engels: code, ideas, docs"><img src="https://avatars.githubusercontent.com/u/70513219?v=4&s=112" width="56" height="56" alt="Marwan Engels"/></a>
+  <a href="https://github.com/mekman" title="Matthias Ekman: bug reports"><img src="https://avatars.githubusercontent.com/u/139282?v=4&s=112" width="56" height="56" alt="Matthias Ekman"/></a>
+  <a href="http://lennartverhagen.com" title="Lennart Verhagen: ideas"><img src="https://avatars.githubusercontent.com/u/12236166?v=4&s=112" width="56" height="56" alt="Lennart Verhagen"/></a>
+</p>
 
-<!-- markdownlint-restore -->
-<!-- prettier-ignore-end -->
-
-<!-- ALL-CONTRIBUTORS-LIST:END -->
+- [Julian Kosciessa](http://juliankosciessa.eu): code, ideas, tutorials, maintenance, bug reports, docs
+- [Andrey Chetverikov](http://andreychetverikov.org): code, ideas, tutorials
+- [Kenneth van der Zee](https://github.com/KTZ228): code, ideas, maintenance, bug reports
+- [Margely Cornelissen](https://github.com/MaCuinea): code, maintenance, tutorials, bug reports
+- [Eleonora Carpino](https://github.com/eleonoracarpino): code, ideas
+- [Martin Wimmers](https://github.com/sirmrmarty): code, ideas, tutorials, maintenance, bug reports
+- [Nico Adelhöfer](https://github.com/neurodream): code, ideas
+- [Sjoerd Meijer](https://github.com/meijer-s): code, ideas
+- [Marwan Engels](https://github.com/Marwan-Engels): code, ideas, docs
+- [Matthias Ekman](https://github.com/mekman): bug reports
+- [Lennart Verhagen](http://lennartverhagen.com): ideas
 
 If you would like to assist the community development of this tool, please consider [CONTRIBUTING](CONTRIBUTING.md).
 
