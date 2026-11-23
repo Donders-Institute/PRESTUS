@@ -444,6 +444,12 @@ deprecated:
   run_acoustic_sims: {use: modules.run_acoustic_sims, kind: rename, since: v0.6.0}
   run_heating_sims: {use: modules.run_heating_sims, kind: rename, since: v0.6.0}
   run_posthoc_water_sims: {use: modules.run_posthoc_water_sims, kind: rename, since: v0.6.0}
+  # Development builds between v0.5.0 and v0.6.0 (e.g. 1682866) used these names:
+  run_grid_setup: {use: modules.run_grid_setup, kind: rename, since: v0.6.0}
+  run_medium_setup: {use: modules.run_medium_setup, kind: rename, since: v0.6.0}
+  run_acoustic_analysis: {use: modules.run_acoustic_analysis, kind: rename, since: v0.6.0}
+  run_thermal_analysis: {use: modules.run_thermal_analysis, kind: rename, since: v0.6.0}
+  run_nifti_creation: {use: modules.run_nifti_creation, kind: rename, since: v0.6.0}
   generate_report: {use: modules.generate_report, kind: rename, since: v0.6.0}
   hpc_submit_medium: {use: platform, kind: rename, since: v0.6.0}
   submit_medium: {use: platform, kind: rename, since: v0.6.0}
@@ -453,10 +459,14 @@ deprecated:
   hcp_partition: {use: hpc.partition, kind: rename, yield: true, since: v0.6.0}
   hpc_reservation: {use: hpc.reservation, kind: rename, since: v0.6.0}
   ld_library_path: {use: hpc.ld_library_path, kind: rename, since: v0.6.0}
+  hpc_wait_for_job: {use: hpc.wait_for_job, kind: rename, since: v0.6.0}
+  hpc_timelimit: {use: hpc.timelimit, kind: rename, since: v0.6.0}
+  hpc_memorylimit: {use: hpc.memorylimit, kind: rename, since: v0.6.0}
   slurm_job_prefix: {use: hpc.job_prefix, kind: rename, since: v0.6.0}
   qsub_job_prefix: {use: hpc.job_prefix, kind: rename, since: v0.6.0}
   focus_area_radius: {use: analysis.focus_area_radius, kind: rename, since: v0.6.0}
   usepseudoCT: {use: pct.enabled, kind: rename, since: v0.6.0}
+  use_pseudoCT: {use: pct.enabled, kind: rename, since: v0.6.0}
   pseudoCT_variant: {use: [pct.mapping_density, pct.mapping_soundspeed, pct.mapping_attenuation], kind: convert, convert: pct_mapping, since: v0.6.0, note: "set pct.mapping_density, pct.mapping_soundspeed, and pct.mapping_attenuation"}
   pct_skullmapping: {use: [pct.mapping_density, pct.mapping_soundspeed, pct.mapping_attenuation], kind: convert, convert: pct_mapping, since: v0.6.0, note: "set pct.mapping_density, pct.mapping_soundspeed, and pct.mapping_attenuation"}
   segmentation_software: {use: [], kind: removed, keep: charm, since: v0.6.0, note: "segmentation uses SimNIBS charm only"}
@@ -476,6 +486,7 @@ deprecated:
   axisymmetric: {use: grid.axisymmetric, kind: rename, since: v0.6.0}
   csf_mask_expansion_factor: {use: headmodel.csf_expansion, kind: rename, since: v0.6.0}
   smooth_method: {use: headmodel.smooth_method, kind: rename, since: v0.6.0}
+  smooth_fwhm_mm: {use: headmodel.smooth_fwhm_mm, kind: rename, since: v0.6.0}
   smooth_threshold_skull: {use: headmodel.smooth_threshold_skull, kind: rename, since: v0.6.0}
   smooth_threshold_other: {use: headmodel.smooth_threshold_other, kind: rename, since: v0.6.0}
   smooth_window: {use: headmodel.smooth_fwhm_mm, kind: error, since: v0.6.0, note: "set headmodel.smooth_fwhm_mm [mm]; the v0.5.0 3D Gaussian kernel had a FWHM of about 1.53 voxels for any window"}

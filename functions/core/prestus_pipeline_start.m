@@ -1,4 +1,4 @@
-function [job_id, jobs] = prestus_pipeline_start(parameters, options)
+function [job_id, jobs] = prestus_pipeline_start(parameters, options, legacy_options)
 % PRESTUS_PIPELINE_START  Universal PRESTUS pipeline launcher for MATLAB, SLURM, and qsub
 %
 % Auto-detects the execution platform (matlab / slurm / qsub) via
@@ -17,6 +17,7 @@ function [job_id, jobs] = prestus_pipeline_start(parameters, options)
 %   job_id = prestus_pipeline_start(parameters)
 %   job_id = prestus_pipeline_start(parameters, options)
 %   [job_id, jobs] = prestus_pipeline_start(...)
+%   prestus_pipeline_start(subject_id, parameters, options)  % before v0.6.0; warns
 %
 % Input:
 %   parameters - PRESTUS config; must contain subject_id; platform field
@@ -38,9 +39,12 @@ function [job_id, jobs] = prestus_pipeline_start(parameters, options)
 % See also: PRESTUS_PIPELINE, UNCERTAINTY_PIPELINE, LOAD_PARAMETERS, PATH_LOG_SETUP
 
     arguments
-        parameters struct
-        options struct = struct()
+        parameters                    % struct; a subject_id here is the pre-v0.6 call form
+        options = struct()
+        legacy_options = []           % options in the pre-v0.6 call form
     end
+    % Calls and parameter names of earlier versions (warns; see LEGACY_BRIDGE_ENTRY)
+    [parameters, options] = legacy_bridge_entry('prestus_pipeline_start', parameters, options, legacy_options);
 
     jobs = struct();
     if ~isfield(parameters, 'subject_id')

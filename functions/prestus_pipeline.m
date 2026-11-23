@@ -1,4 +1,4 @@
-function [parameters] = prestus_pipeline(parameters, options)
+function [parameters] = prestus_pipeline(parameters, options, legacy_options)
 % PRESTUS_PIPELINE  End-to-end transcranial focused ultrasound simulation pipeline
 %
 % Executes the full PRESTUS workflow for a single subject and transducer
@@ -31,6 +31,10 @@ function [parameters] = prestus_pipeline(parameters, options)
 % Use as:
 %   parameters = prestus_pipeline(parameters)
 %   parameters = prestus_pipeline(parameters, options)
+%   parameters = prestus_pipeline(subject_id, parameters, options)  % before v0.6.0; warns
+%
+% Old key names set on the struct after LOAD_PARAMETERS are converted with a
+% warning (LEGACY_BRIDGE_ENTRY).
 %
 % Input:
 %   parameters - struct built from config_default.yaml and subject-specific
@@ -48,9 +52,12 @@ function [parameters] = prestus_pipeline(parameters, options)
 %           SEQUENTIAL_PIPELINE
 
     arguments
-        parameters struct
-        options struct = struct()
+        parameters                    % struct; a subject_id here is the pre-v0.6 call form
+        options = struct()
+        legacy_options = []           % options in the pre-v0.6 call form
     end
+    % Calls and parameter names of earlier versions (warns; see LEGACY_BRIDGE_ENTRY)
+    [parameters, options] = legacy_bridge_entry('prestus_pipeline', parameters, options, legacy_options);
 
     % ====================================================================
     %% PATH & LOG SETUP

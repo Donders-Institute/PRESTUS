@@ -45,6 +45,7 @@ function cfg = upgrade_config_keys(cfg, source)
     if ~isstruct(cfg) || ~isscalar(cfg) || isempty(fieldnames(cfg))
         return
     end
+    cfg = legacy_bridge_layer(cfg, source);   % old keys the layer makes redundant (warns)
 
     log = struct('done', {{}}, 'errors', {{}});
     is_tr = startsWith({reg.key}, 'transducer.');
