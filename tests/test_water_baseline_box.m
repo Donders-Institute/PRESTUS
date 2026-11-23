@@ -1,10 +1,11 @@
-classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_water_baseline_box < matlab.unittest.TestCase
+classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'physics_axisym'}) test_water_baseline_box < matlab.unittest.TestCase
 % TEST_WATER_BASELINE_BOX  The free-water baseline on the beam box equals the full-grid one
 %
 % 2D k-Wave (MATLAB, CPU, seconds): a focused arc in water on a grid much
 % wider than the beam. WATER_BASELINE with grid.water_baseline_grid 'beam'
 % (WATER_BASELINE_BOX) and 'full' must give the same free-water ISPPA; the box
 % must keep every source point and be clearly smaller than the grid.
+% Level 'physics' (about 2 min of k-Wave, too slow for the unit level).
 %
 %   Run with:   results = runtests('tests/test_water_baseline_box.m');
 
