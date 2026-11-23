@@ -1,0 +1,2274 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="PREprocessing & Simulations Toolbox for transcranial Ultrasound neuromodulation">
+      
+      
+        <meta name="author" content="Donders Institute for Brain, Cognition and Behaviour">
+      
+      
+        <link rel="canonical" href="https://donders-institute.github.io/PRESTUS/v0.6.1/doc_async_transducer/">
+      
+      
+        <link rel="prev" href="../doc_multi_isppa/">
+      
+      
+        <link rel="next" href="../doc_group/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+    
+    
+      
+        <title>Async Multi-Transducer - PRESTUS - Ultrasound Simulation Toolbox</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#async-multi-transducer-mode" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  This is the documentation of release v0.6.1, as tagged.
+  <a href="../.."><strong>Go to the default documentation (main).</strong></a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL(".."),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="PRESTUS - Ultrasound Simulation Toolbox" class="md-header__button md-logo" aria-label="PRESTUS - Ultrasound Simulation Toolbox" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33m0-6h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2V6h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0C17.22 5.53 18.61 6 20 6m0 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PRESTUS - Ultrasound Simulation Toolbox
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Async Multi-Transducer
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="cyan"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="cyan"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Donders-Institute/PRESTUS" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Donders-Institute/PRESTUS
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="PRESTUS - Ultrasound Simulation Toolbox" class="md-nav__button md-logo" aria-label="PRESTUS - Ultrasound Simulation Toolbox" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33m0-6h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2V6h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0C17.22 5.53 18.61 6 20 6m0 12h2v2h-2c-1.38 0-2.74-.35-4-1-2.5 1.3-5.5 1.3-8 0-1.26.65-2.63 1-4 1H2v-2h2c1.39 0 2.78-.47 4-1.33 2.44 1.71 5.56 1.71 8 0 1.22.86 2.61 1.33 4 1.33"/></svg>
+
+    </a>
+    PRESTUS - Ultrasound Simulation Toolbox
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Donders-Institute/PRESTUS" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Donders-Institute/PRESTUS
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🏠 Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🚀 Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🚀 Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_gui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GUI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_usage-statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage Statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    📖 Documentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    📖 Documentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_transducer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transducer Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transducer Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transducer Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_heuristic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transducer Placement (Heuristic)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_neuronav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transducer Placement (Neuronavigation)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_plantus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transducer Placement (PLANTUS)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_coordinate_systems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coordinate Systems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_preproc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Head Processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_medium/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Medium Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🔬 Simulations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🔬 Simulations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_simulations-acoustic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acoustic
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_simulations-thermal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thermal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_pseudoCT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    (pseudo)CT
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Uncertainty
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    📚 References
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    📚 References
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_parameters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Parameters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Functions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🖥️ Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    🖥️ Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_hpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HPC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_multi_isppa/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-ISPPA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Async Multi-Transducer
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Async Multi-Transducer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-use-this-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use this mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#physical-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physical model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Physical model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#acoustic-safety-metrics-isppa-mi-peak-pressure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acoustic safety metrics (ISPPA, MI, peak pressure)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thermal-heat-deposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thermal heat deposition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-setup-two-transducers-one-thermal-target-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic setup — two transducers, one thermal target each
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-isppa-sweep-varying-intensity-across-sweep-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-ISPPA sweep — varying intensity across sweep points
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline stages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#activation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constraints-and-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraints and limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hpc-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HPC options
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resumption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resumption
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provenance
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_group/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Group
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    🆘 Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    📋 Community
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    📋 Community
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CODE_OF_CONDUCT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code of Conduct
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-use-this-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use this mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#physical-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physical model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Physical model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#acoustic-safety-metrics-isppa-mi-peak-pressure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acoustic safety metrics (ISPPA, MI, peak pressure)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#thermal-heat-deposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Thermal heat deposition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basic-setup-two-transducers-one-thermal-target-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic setup — two transducers, one thermal target each
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-isppa-sweep-varying-intensity-across-sweep-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-ISPPA sweep — varying intensity across sweep points
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline stages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#activation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constraints-and-limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constraints and limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hpc-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HPC options
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resumption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resumption
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provenance
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="async-multi-transducer-mode">Async multi-transducer mode<a class="headerlink" href="#async-multi-transducer-mode" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Experimental</strong> This mode is intended for setups where two or more
+transducers fire asynchronously — i.e., with non-overlapping duty cycles
+or alternating pulses — so that their pressure fields never superpose
+coherently. Configuring this mode requires a clear understanding of the
+intended acoustic exposure and the linear-regime assumptions described below.</p>
+</blockquote>
+<hr />
+<h2 id="when-to-use-this-mode">When to use this mode<a class="headerlink" href="#when-to-use-this-mode" title="Permanent link">&para;</a></h2>
+<p>PRESTUS supports two ways to model multiple transducers:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>When to use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Coherent</strong> (<code>transducer_coupling: coherent</code>, default)</td>
+<td>Transducers fire simultaneously; pressure fields interfere. Modelled in a single k-Wave run with all transducer sources active.</td>
+</tr>
+<tr>
+<td><strong>Async</strong> (<code>transducer_coupling: async</code>)</td>
+<td>Transducers fire in separate, non-overlapping windows; their pressure fields are independent. Each is simulated separately; intensities are summed for thermal analysis and the per-voxel pressure maximum is used for acoustic safety metrics.</td>
+</tr>
+</tbody>
+</table>
+<p>Use async mode when the firing timing of your system means the acoustic fields from different transducers never overlap in time (e.g., alternating duty cycles, sequential pulses). If the transducers fire simultaneously or with overlapping duty cycles, use the default coherent mode.</p>
+<hr />
+<h2 id="physical-model">Physical model<a class="headerlink" href="#physical-model" title="Permanent link">&para;</a></h2>
+<p>Because only one transducer is active at any instant, the two physically relevant quantities — acoustic safety and thermal heating — require different combination rules.</p>
+<h3 id="acoustic-safety-metrics-isppa-mi-peak-pressure">Acoustic safety metrics (ISPPA, MI, peak pressure)<a class="headerlink" href="#acoustic-safety-metrics-isppa-mi-peak-pressure" title="Permanent link">&para;</a></h3>
+<p>The instantaneous peak pressure at any voxel is the maximum over all transducer fields:</p>
+<div class="arithmatex">\[p_\mathrm{safety} = \max_i\bigl(p_{i,\mathrm{scaled}}\bigr)\]</div>
+<p>where <span class="arithmatex">\(p_{i,\mathrm{scaled}} = p_i \cdot \sqrt{I_{i,\mathrm{target}} / I_{i,\mathrm{baseline}}}\)</span>.</p>
+<p>ISPPA, MI, and peak-pressure metrics reported in the output CSV and plots are derived from <span class="arithmatex">\(p_\mathrm{safety}\)</span> (<code>sensor_data.p_max_async</code> in the combined cache). The focal ISPPA of the combined exposure therefore equals the higher of the two individual ISPPAs, not their sum.</p>
+<h3 id="thermal-heat-deposition">Thermal heat deposition<a class="headerlink" href="#thermal-heat-deposition" title="Permanent link">&para;</a></h3>
+<p>Time-averaged heat deposition accumulates from all transducers. Assuming equal, non-overlapping duty cycles that together fill the protocol duty cycle, the combined thermal heat source is the incoherent intensity sum:</p>
+<div class="arithmatex">\[Q_\mathrm{total} \propto \sum_{i=1}^{N} I_i = \sum_{i=1}^{N} \frac{p_{i,\mathrm{scaled}}^2}{2\rho c}\]</div>
+<p>This is converted to a thermal-equivalent pressure stored as <code>sensor_data.p_max_all</code> in the combined cache and passed directly to the bioheat solver:</p>
+<div class="arithmatex">\[p_\mathrm{thermal} = \sqrt{2 \cdot I_\mathrm{total} \cdot \rho c}\]</div>
+<blockquote>
+<p><strong>Limitation.</strong> The thermal model does not yet explicitly represent the relative firing schedule of the two transducers (e.g., T2 offset by half a PRI relative to T1). The intensity-sum approximation is exact when both DCs are equal and non-overlapping; it becomes an over-estimate when $\mathrm{DC}_1 + \mathrm{DC}_2 &lt; $ total protocol DC. Explicit interleaved bioheat modeling is planned as a future extension.</p>
+</blockquote>
+<hr />
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<h3 id="basic-setup-two-transducers-one-thermal-target-each">Basic setup — two transducers, one thermal target each<a class="headerlink" href="#basic-setup-two-transducers-one-thermal-target-each" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">simulation</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">transducer_coupling</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">async</span><span class="w">   </span><span class="c1"># activate async mode</span>
+
+<span class="nt">transducer</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CTX500-A</span>
+<span class="w">    </span><span class="nt">target_isppa_wcm2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5.0</span><span class="w">     </span><span class="c1"># target free-water ISPPA for this transducer</span>
+<span class="w">    </span><span class="nt">freq_hz</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">500000</span>
+<span class="w">    </span><span class="nt">trans_pos</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">x1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">y1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">z1</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">focus_pos</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">fx1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">fy1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">fz1</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">annular</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">elem_amp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100000</span>
+<span class="w">      </span><span class="c1"># ... other annular fields</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CTX500-B</span>
+<span class="w">    </span><span class="nt">target_isppa_wcm2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.0</span>
+<span class="w">    </span><span class="nt">freq_hz</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">500000</span>
+<span class="w">    </span><span class="nt">trans_pos</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">x2</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">y2</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">z2</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">focus_pos</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">fx2</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">fy2</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">fz2</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">annular</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">elem_amp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100000</span>
+<span class="w">      </span><span class="c1"># ... other annular fields</span>
+
+<span class="nt">modules</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">run_water_baseline</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span><span class="w">        </span><span class="c1"># required to record free-water ISPPA provenance</span>
+</code></pre></div>
+<p>Both transducers must share the same segmentation (same <code>subject_id</code>, <code>simulation.medium</code>, and output directory). The simulation grid is determined by the union of both transducer positions.</p>
+<h3 id="multi-isppa-sweep-varying-intensity-across-sweep-points">Multi-ISPPA sweep — varying intensity across sweep points<a class="headerlink" href="#multi-isppa-sweep-varying-intensity-across-sweep-points" title="Permanent link">&para;</a></h3>
+<p>Setting <code>target_isppa_wcm2</code> to a vector on one or more transducers triggers a sweep. Each sweep point runs an independent combine+thermal pair.</p>
+<p>All transducers must carry either a <strong>scalar</strong> target (held fixed across the sweep) or a <strong>vector of the same length</strong> as the sweep:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">transducer</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CTX500-A</span>
+<span class="w">    </span><span class="nt">target_isppa_wcm2</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">3.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">5.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">10.0</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># swept across 3 points</span>
+<span class="w">    </span><span class="c1"># ...</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CTX500-B</span>
+<span class="w">    </span><span class="nt">target_isppa_wcm2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2.0</span><span class="w">                  </span><span class="c1"># fixed across all 3 sweep points</span>
+<span class="w">    </span><span class="c1"># ...</span>
+</code></pre></div>
+<p>This produces three combine+thermal pairs:
+- Sweep 1: A → 3.0 W/cm², B → 2.0 W/cm²
+- Sweep 2: A → 5.0 W/cm², B → 2.0 W/cm²
+- Sweep 3: A → 10.0 W/cm², B → 2.0 W/cm²</p>
+<hr />
+<h2 id="pipeline-stages">Pipeline stages<a class="headerlink" href="#pipeline-stages" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>[Stage 1…N]    Acoustic simulation — one per transducer (parallel on HPC)
+               Each runs at its configured elem_amp and records a water baseline.
+               Affixes: _desc-t01, _desc-t02, …, _desc-tNN
+
+[Stage N+1…    Dual-field combination — one per sweep point j
+ N+M]          Scales each p_i to target_i(j); writes combined acoustic cache
+               containing p_max_all (intensity sum, for thermal) and
+               p_max_async (per-voxel pressure max, for acoustic safety).
+               Affixes: _desc-asyncCombined (M=1) or _desc-asyncCombinedS01… (M&gt;1)
+
+[Stage N+M+1…  Thermal simulation — one per sweep point j
+ N+2M]         Loads combined cache, runs kWaveDiffusion, generates report.
+               Affixes: _desc-asyncThermal (M=1) or _desc-asyncThermalS01… (M&gt;1)
+</code></pre></div>
+<p>On HPC (SLURM/qsub):
+- All N acoustic stages are submitted simultaneously (no inter-dependency).
+- Each combine stage depends on all N acoustic jobs (<code>afterok</code>).
+- Each thermal stage depends on its corresponding combine stage.</p>
+<hr />
+<h2 id="output-files">Output files<a class="headerlink" href="#output-files" title="Permanent link">&para;</a></h2>
+<p>For two transducers, single thermal target each:</p>
+<div class="highlight"><pre><span></span><code>cache/sub-001_layered_results_desc-t01.mat         ← acoustic cache, transducer 1
+cache/sub-001_layered_results_desc-t02.mat         ← acoustic cache, transducer 2
+cache/sub-001_layered_results_desc-asyncCombined.mat  ← combined intensity cache
+sub-001_layered_desc-asyncThermal.csv              ← thermal analysis table
+sub-001_layered_desc-asyncThermal_report.html      ← report
+</code></pre></div>
+<p>For a 3-point sweep:</p>
+<div class="highlight"><pre><span></span><code>cache/sub-001_layered_results_desc-t01.mat
+cache/sub-001_layered_results_desc-t02.mat
+cache/sub-001_layered_results_desc-asyncCombinedS01.mat
+cache/sub-001_layered_results_desc-asyncCombinedS02.mat
+cache/sub-001_layered_results_desc-asyncCombinedS03.mat
+sub-001_layered_desc-asyncThermalS01.csv
+sub-001_layered_desc-asyncThermalS02.csv
+sub-001_layered_desc-asyncThermalS03.csv
+</code></pre></div>
+<hr />
+<h2 id="activation">Activation<a class="headerlink" href="#activation" title="Permanent link">&para;</a></h2>
+<p>Async mode is activated automatically by <code>prestus_pipeline_start</code> when both conditions are met:</p>
+<div class="highlight"><pre><span></span><code><span class="n">parameters</span><span class="p">.</span><span class="n">simulation</span><span class="p">.</span><span class="n">transducer_coupling</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">'async'</span><span class="p">;</span><span class="w">  </span><span class="c">% and</span>
+<span class="nb">numel</span><span class="p">(</span><span class="n">parameters</span><span class="p">.</span><span class="n">transducer</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">1</span>
+</code></pre></div>
+<p>No special entry point is needed:</p>
+<div class="highlight"><pre><span></span><code><span class="n">parameters</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="n">load_parameters</span><span class="p">(</span><span class="s">'config_subject.yaml'</span><span class="p">,</span><span class="w"> </span><span class="n">subject_id</span><span class="p">);</span>
+<span class="n">prestus_pipeline_start</span><span class="p">(</span><span class="n">parameters</span><span class="p">);</span><span class="w">   </span><span class="c">% dispatches to async_transducer_pipeline</span>
+</code></pre></div>
+<hr />
+<h2 id="constraints-and-limitations">Constraints and limitations<a class="headerlink" href="#constraints-and-limitations" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>3-D grid required.</strong> Axisymmetric (2-D) simulations are not supported because two transducers at different positions cannot share a common axis of symmetry.</li>
+<li><strong>Shared head model.</strong> Both transducers must use the same segmented head grid (<code>subject_id</code>, <code>simulation.medium</code>, <code>io.dir_output</code>).</li>
+<li><strong>Linear regime.</strong> The same validity conditions as single-transducer ISPPA scaling apply (see <a href="../doc_calibration/">doc_calibration.md</a>). Each transducer's pressure field is scaled independently from its own free-water baseline.</li>
+<li><strong><code>modules.run_water_baseline: 1</code> is required.</strong> Without it, no <code>freefield_isppa_wcm2</code> provenance is recorded and pressure scaling is skipped (a warning is printed).</li>
+<li><strong>Async mode is mutually exclusive with uncertainty mode.</strong> The two cannot currently be combined. Use coherent mode with uncertainty if skull-property uncertainty quantification is required.</li>
+</ul>
+<hr />
+<h2 id="hpc-options">HPC options<a class="headerlink" href="#hpc-options" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">options</span><span class="p">.</span><span class="n">acoustic_timelimit</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="s">'06:00:00'</span><span class="p">;</span><span class="w">   </span><span class="c">% per acoustic job</span>
+<span class="n">options</span><span class="p">.</span><span class="n">combine_timelimit</span><span class="w">   </span><span class="p">=</span><span class="w"> </span><span class="s">'00:30:00'</span><span class="p">;</span><span class="w">   </span><span class="c">% per combine job (CPU-only, lightweight)</span>
+<span class="n">options</span><span class="p">.</span><span class="n">thermal_timelimit</span><span class="w">   </span><span class="p">=</span><span class="w"> </span><span class="s">'04:00:00'</span><span class="p">;</span><span class="w">   </span><span class="c">% per thermal job</span>
+<span class="n">options</span><span class="p">.</span><span class="n">acoustic_memorylimit</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="mi">60</span><span class="p">;</span><span class="w">           </span><span class="c">% GB</span>
+<span class="n">options</span><span class="p">.</span><span class="n">thermal_memorylimit</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="mi">40</span><span class="p">;</span><span class="w">           </span><span class="c">% GB</span>
+<span class="n">options</span><span class="p">.</span><span class="n">acoustic_partition</span><span class="w">  </span><span class="p">=</span><span class="w"> </span><span class="s">'gpu'</span><span class="p">;</span>
+<span class="n">options</span><span class="p">.</span><span class="n">combine_partition</span><span class="w">   </span><span class="p">=</span><span class="w"> </span><span class="s">'cpu'</span><span class="p">;</span><span class="w">         </span><span class="c">% combine stage needs no GPU</span>
+</code></pre></div>
+<hr />
+<h2 id="resumption">Resumption<a class="headerlink" href="#resumption" title="Permanent link">&para;</a></h2>
+<p>Each stage checks for its sentinel output file before submitting or running. Re-running <code>prestus_pipeline_start</code> with the same config resumes from the last incomplete stage.</p>
+<hr />
+<h2 id="provenance">Provenance<a class="headerlink" href="#provenance" title="Permanent link">&para;</a></h2>
+<p>The combined acoustic cache records the following fields in <code>acoustic_provenance</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>combined_from</code></td>
+<td>Cell array of source cache file paths</td>
+</tr>
+<tr>
+<td><code>combination_mode</code></td>
+<td><code>'async_dual_field'</code> — <code>p_max_all</code> holds the thermal intensity sum; <code>p_max_async</code> holds the per-voxel pressure maximum for acoustic safety</td>
+</tr>
+<tr>
+<td><code>combination_targets</code></td>
+<td>Per-transducer target ISPPAs used for scaling [W/cm²]</td>
+</tr>
+<tr>
+<td><code>combination_baselines</code></td>
+<td>Per-transducer free-water baselines at the simulated drive level [W/cm²]</td>
+</tr>
+<tr>
+<td><code>combination_time</code></td>
+<td>Timestamp of the combination step</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p>See also: <a href="../doc_calibration/">doc_calibration.md</a>, <a href="../doc_multi_isppa/">doc_multi_isppa.md</a>, <a href="../doc_modules/">doc_modules.md</a>, <a href="../doc_transducer/">doc_transducer.md</a></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "content.code.copy"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "main", "provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,12 @@
+/* Pulse-model illustration (doc_simulations-thermal.md; javascripts/thermal_pulse_model.js) */
+.thermal-pulse-model { background: var(--md-code-bg-color, #f5f5f5); border-radius: 8px; padding: .8rem; margin: 1rem 0; font-size: .68rem; }
+.tpm-controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: .5rem; margin-bottom: .6rem; }
+.tpm-controls label { display: flex; flex-direction: column; gap: .2rem; color: var(--md-default-fg-color--light, #666); }
+.tpm-controls input { font: inherit; color: var(--md-default-fg-color, #222); background: var(--md-default-bg-color, #fff);
+  border: 1px solid var(--md-default-fg-color--lightest, #ccc); border-radius: 4px; padding: .25rem .35rem; min-width: 0; }
+.tpm-legend { display: flex; gap: 1rem; color: var(--md-default-fg-color, #222); }
+.tpm-legend i { display: inline-block; width: .9rem; height: .2rem; margin-right: .35rem; vertical-align: .15rem; }
+.tpm-svg { width: 100%; height: auto; display: block; margin: .3rem 0; }
+.tpm-axis { stroke: var(--md-default-fg-color--lighter, #bbb); stroke-width: 1; }
+.tpm-label, .tpm-tick { fill: var(--md-default-fg-color--light, #666); font-size: 11px; }
+.tpm-out { color: var(--md-default-fg-color, #222); }

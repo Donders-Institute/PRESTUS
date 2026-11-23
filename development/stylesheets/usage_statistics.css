@@ -1,0 +1,11 @@
+/* Usage statistics page (doc_usage_statistics.md): live telemetry charts. */
+.telem-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:.75rem; margin:1.2rem 0; }
+.telem-stat  { background:var(--md-code-bg-color,#f5f5f5); border-radius:8px; padding:1rem; text-align:center; }
+.telem-stat .tv { font-size:1.8rem; font-weight:700; line-height:1.1; }
+.telem-stat .tl { font-size:.72rem; color:var(--md-default-fg-color--light,#666); text-transform:uppercase; letter-spacing:.04em; margin-top:.2rem; }
+.telem-charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:1rem; margin:1rem 0; }
+.telem-chart  { background:var(--md-code-bg-color,#f5f5f5); border-radius:8px; padding:1rem; }
+.telem-chart h4 { font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--md-default-fg-color--light,#666); margin:0 0 .75rem; }
+.telem-chart canvas { max-height:200px; }
+#telem-error { display:none; color:#c0392b; font-size:.85rem; padding:.5rem 0; }
+#telem-loading { color:var(--md-default-fg-color--light,#666); font-size:.85rem; }

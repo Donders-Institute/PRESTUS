@@ -1,0 +1,4974 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="PREprocessing &amp; Simulations Toolbox for transcranial Ultrasound neuromodulation">
+      
+      
+        <meta name="author" content="Donders Institute for Brain, Cognition and Behaviour">
+      
+      
+        <link rel="canonical" href="https://donders-institute.github.io/PRESTUS/development/doc_parameters_run/">
+      
+      
+      
+        <link rel="prev" href="../doc_parameters/">
+      
+      
+        <link rel="next" href="../doc_parameters_transducer/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/favicon_PRESTUS.png">
+      <meta name="generator" content="zensical-0.1.1">
+    
+    
+    <title>Run, Paths, and Outputs - PRESTUS</title>
+  
+
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/classic/main.0006804e.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/classic/palette.813d4b3f.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,500,500i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../stylesheets/usage_statistics.css">
+    
+      <link rel="stylesheet" href="../stylesheets/load_predictor.css">
+    
+      <link rel="stylesheet" href="../stylesheets/thermal_pulse_model.css">
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  These pages describe the development branch.
+  <a href="../.."><strong>Go to the default documentation (main).</strong></a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("..",location),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="PRESTUS - Ultrasound Simulation Toolbox" class="md-header__button md-logo" aria-label="PRESTUS - Ultrasound Simulation Toolbox" data-md-component="logo">
+      
+  <img src="https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/logo_PRESTUS_dark.png" alt="PRESTUS - Ultrasound Simulation Toolbox">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PRESTUS - Ultrasound Simulation Toolbox
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Run, Paths, and Outputs
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/Donders-Institute/PRESTUS" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Donders-Institute/PRESTUS
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="PRESTUS - Ultrasound Simulation Toolbox" class="md-nav__button md-logo" aria-label="PRESTUS - Ultrasound Simulation Toolbox" data-md-component="logo">
+      
+  <img src="https://github.com/jkosciessa/PRESTUS_bin/raw/main/img/logo_PRESTUS_dark.png" alt="PRESTUS - Ultrasound Simulation Toolbox">
+
+    </a>
+    PRESTUS - Ultrasound Simulation Toolbox
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Donders-Institute/PRESTUS" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Donders-Institute/PRESTUS
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🏠 Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🧭 Get Started
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_2">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🧭 Get Started
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Concepts
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Installation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_first-simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  First Simulation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Reading Your Results
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuring a Study
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_6" id="__nav_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  PRESTUS Nexus (GUI)
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_2_6">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  PRESTUS Nexus (GUI)
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_nexus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_nexus_tabs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Tabs and Pages
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🧠 Head Model
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🧠 Head Model
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_head-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Head Model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_medium/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Medium Properties
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  (pseudo-)CT
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  (pseudo-)CT
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_pseudoCT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_pseudoCT_generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  From UTE to Pseudo-HU
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_pseudoCT_property-mappings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Skull Property Mappings
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🔧 Transducer
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🔧 Transducer
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_transducer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Transducer Definition
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Transducer Library
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4_2">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Transducer Library
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_transducer_library/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_transducer_library_shipped/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Shipped Entries
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_transducer_library_maintenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Adding & Maintaining Entries
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Calibration
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Calibration
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_calibration_hydrophone-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Emulating Hydrophone Profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_calibration_profile-formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Profile File Formats
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_calibration_matrix-steering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Matrix Arrays: Steering Correction
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🎯 Placement
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🎯 Placement
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_manual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Manual
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_mni/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  MNI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_heuristic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Heuristic
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  PlanTUS
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_5">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  PlanTUS
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_plantus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_plantus_pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  How It Works
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_tus_entry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  TUS_entry
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_7" id="__nav_5_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Localite
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_7_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_7">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Localite
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_neuronav/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_neuronav_recorded-pose/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Placing from a Recorded Pose
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_neuronav_coordinates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Files, Offset, and Coordinates
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_neuronav_workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Ingestion (GUI & Script)
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_placement_neuronav_targets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Named Target Coordinates
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🖥️ Simulation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_6">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🖥️ Simulation
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_simulations-acoustic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Acoustic
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_simulations-thermal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Thermal
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_partial-fov/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Partial FOV
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_time_reversal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Time Reversal
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ▶️ Running & Outputs
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  ▶️ Running & Outputs
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_1" id="__nav_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Running on a Cluster
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_1_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_1">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Running on a Cluster
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_hpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_hpc_donders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Donders HPC
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_run-time/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Run Time and Resources
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_modules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Pipeline Modules
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Outputs & Reports
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Outputs & Reports
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_outputs_metrics-table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Metrics Table Columns
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_outputs_reuse/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Reusing Earlier Outputs and Caches
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Studies & Group Analysis
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7_5">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Studies & Group Analysis
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_group_study-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Study Setup
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_group/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Group Analysis
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  📊 Advanced Modes
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_8">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  📊 Advanced Modes
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_multiintensity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Multi-ISPPA
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Multi-Transducer
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_8_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Multi-Transducer
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_multitransducer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_multitransducer_async/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Async Mode
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_sequential/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Sequential
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Uncertainty Quantification
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ⚙️ Backends
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_9">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  ⚙️ Backends
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_9_2" id="__nav_9_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  k-Wave (Default)
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_9_2">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  k-Wave (Default)
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_kwave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_kwave_elastic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Elastic Skull
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_babelbrain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  BabelBrain
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_9_4" id="__nav_9_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  jwave
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_9_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  jwave
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_jwave/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_jwave_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  📚 Reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_10">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  📚 Reference
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Glossary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_10_2" id="__nav_10_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Parameters
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_10_2">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Parameters
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_parameters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+        <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Run, Paths, and Outputs
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Run, Paths, and Outputs
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#subject-and-platform-subject_id-platform" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Subject and Platform (<code>subject_id</code>, <code>platform</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-paths-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data Paths (<code>path</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-toolbox-paths-startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Environment &amp; Toolbox Paths (<code>startup</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#io-management-io" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        I/O Management (<code>io</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-modules-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pipeline Modules (<code>modules</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#report-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Report (<code>report</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#study-setup-study" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Study Setup (<code>study</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#high-performance-computing-hpc" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        High-Performance Computing (<code>hpc</code>)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="High-Performance Computing (hpc)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#snellius-gpu-partitions-snellius" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Snellius GPU Partitions (<code>snellius</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_parameters_transducer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Transducer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_parameters_calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Calibration
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_parameters_placement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Placement and Time Reversal
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_parameters_head-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Head Model and Grid
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_parameters_simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Simulation and Sonication
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_functions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Functions
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_coordinate_systems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Coordinate Systems
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  How PRESTUS Works
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🛟 Help
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🛟 Help
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Troubleshooting
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Changelog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  🛠️ Developers
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_12">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  🛠️ Developers
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_developer-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Developer Guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Contributing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_babelbrain_internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  BabelBrain Internals
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Telemetry
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc_usage_statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Usage Statistics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CODE_OF_CONDUCT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Code of Conduct
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#subject-and-platform-subject_id-platform" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Subject and Platform (<code>subject_id</code>, <code>platform</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-paths-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Data Paths (<code>path</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-toolbox-paths-startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Environment &amp; Toolbox Paths (<code>startup</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#io-management-io" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        I/O Management (<code>io</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-modules-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pipeline Modules (<code>modules</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#report-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Report (<code>report</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#study-setup-study" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Study Setup (<code>study</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#high-performance-computing-hpc" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        High-Performance Computing (<code>hpc</code>)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="High-Performance Computing (hpc)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#snellius-gpu-partitions-snellius" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Snellius GPU Partitions (<code>snellius</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+  
+  
+
+
+<h1 id="run-paths-and-outputs-parameters">Run, Paths, and Outputs Parameters<a class="headerlink" href="#run-paths-and-outputs-parameters" title="Permanent link">&para;</a></h1>
+<p>These parameters say which subject runs where, which files it reads and writes, which pipeline stages run, and how cluster jobs are sized.</p>
+<p>On this page:</p>
+<ul>
+<li><a href="#subject-and-platform-subject_id-platform">Subject and Platform (<code>subject_id</code>, <code>platform</code>)</a>: subject identifier and execution platform.</li>
+<li><a href="#data-paths-path">Data Paths (<code>path</code>)</a>: input, segmentation, simulation, and <a href="https://www.localite.de/">Localite</a> folders.</li>
+<li><a href="#environment-toolbox-paths-startup">Environment &amp; Toolbox Paths (<code>startup</code>)</a>: <a href="https://simnibs.github.io/simnibs/build/html/index.html">SimNIBS</a>, <a href="https://www.mathworks.com/products/matlab.html">MATLAB</a> and other external tool paths.</li>
+<li><a href="#io-management-io">I/O Management (<code>io</code>)</a>: output affix, overwriting, cache checks, and which matrices are saved.</li>
+<li><a href="#pipeline-modules-modules">Pipeline Modules (<code>modules</code>)</a>: which pipeline stages run.</li>
+<li><a href="#report-report">Report (<code>report</code>)</a>: the HTML reports a run writes.</li>
+<li><a href="#study-setup-study">Study Setup (<code>study</code>)</a>: study manifest and output folder name.</li>
+<li><a href="#high-performance-computing-hpc">High-Performance Computing (<code>hpc</code>)</a>: GPU, partition, time and memory limits for cluster jobs.</li>
+</ul>
+<h2 id="subject-and-platform-subject_id-platform">Subject and Platform (<code>subject_id</code>, <code>platform</code>)<a class="headerlink" href="#subject-and-platform-subject_id-platform" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Description</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>subject_id</code></td>
+<td>Subject identifier used for file naming and folder management.</td>
+<td><code>0</code></td>
+<td>Placeholder; must be set before calling <code>prestus_pipeline_start(parameters)</code>.</td>
+</tr>
+<tr>
+<td><code>platform</code></td>
+<td>Execution platform.</td>
+<td><code>'auto'</code></td>
+<td><code>auto</code> / <code>slurm</code> / <code>qsub</code> / <code>matlab</code>. <code>auto</code> detects <a href="https://slurm.schedmd.com/">SLURM</a> or qsub and errors when neither is installed; use <code>matlab</code> to run in the current session. See <a href="../doc_hpc/#where-a-run-executes">HPC</a>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="data-paths-path">Data Paths (<code>path</code>)<a class="headerlink" href="#data-paths-path" title="Permanent link">&para;</a></h2>
+<p>Give file and folder settings as absolute paths. A relative path in these settings, and in the other file and folder settings of a run, is taken from the PRESTUS folder; the <code>*_pattern</code> settings are relative to <code>path.anat</code>.</p>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Description</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>anat</code></td>
+<td>Absolute path to structural input data.</td>
+<td>none</td>
+<td>Mandatory</td>
+</tr>
+<tr>
+<td><code>sim</code></td>
+<td>Absolute path to simulation outputs.</td>
+<td>none</td>
+<td>Mandatory</td>
+</tr>
+<tr>
+<td><code>seg</code></td>
+<td>Absolute path to SimNIBS segmentations (m2m folders).</td>
+<td>none</td>
+<td>Mandatory</td>
+</tr>
+<tr>
+<td><code>placement</code></td>
+<td>Placement outputs: one folder per run, <code>&lt;placement&gt;/sub-XXX/&lt;mode&gt;/&lt;target_name&gt;/</code> (heuristic, <a href="https://github.com/mlueckel/PlanTUS">PlanTUS</a>, <a href="https://github.com/CyrilAtkinson/TUS_entry">TUS_entry</a>).</td>
+<td><code>''</code></td>
+<td>Empty = <code>&lt;sim&gt;/placement</code>. Share one folder across setups to reuse placements. See <a href="../doc_outputs/#where-outputs-live">Where outputs live</a>.</td>
+</tr>
+<tr>
+<td><code>localite_raw</code></td>
+<td>Raw Localite exports, <code>&lt;localite_raw&gt;/sub-XXX/ses-XX/[&lt;loc_folder&gt;/]…</code>.</td>
+<td><code>''</code></td>
+<td>See <a href="../doc_placement_neuronav_coordinates/#localite-file-layout">Localite I/O</a>.</td>
+</tr>
+<tr>
+<td><code>localite_post</code></td>
+<td>Ingested Localite markers, <code>&lt;localite_post&gt;/sub-XXX/ses-XX/InstrumentMarker_sub-XXX_ses-XX.xml/.json</code>.</td>
+<td><code>''</code></td>
+<td>Written by <code>neuronav_ingest_markers</code> / <code>neuronav_gui</code>; read by <code>placement.mode: 'localite'</code> (automatic mode).</td>
+</tr>
+<tr>
+<td><code>localite_t1</code></td>
+<td>Folder with the planning T1s loaded into Localite (<code>[sub-XXX/]&lt;localite_t1_pattern&gt;</code>).</td>
+<td><code>''</code></td>
+<td>Empty = <code>localite_raw</code>.</td>
+</tr>
+<tr>
+<td><code>localite_t1_pattern</code></td>
+<td>File-name template of the planning T1; <code>%s</code> = <code>sub-XXX</code>.</td>
+<td><code>'%s_*T1*.nii*'</code></td>
+<td>Replaces <code>neuronav_t1_pattern</code> (still read).</td>
+</tr>
+<tr>
+<td><code>localite_export</code></td>
+<td>Output folder for files to import into Localite (heuristic placement), per subject <code>sub-XXX/</code>.</td>
+<td><code>''</code></td>
+<td>Resolved into <code>io.dir_localite_export</code>.</td>
+</tr>
+<tr>
+<td><code>transducer_library</code></td>
+<td>Your own transducer library for every study of this project: equipment entries (<code>*_transducer.yaml</code>, <code>*_driver.yaml</code>), calibration entries, and <code>profiles/</code>.</td>
+<td><code>''</code></td>
+<td>A folder or a list of folders. Set it in the project copy of <code>config_default.yaml</code>. Checked after <code>transducer.library_path</code> and before the <code>PRESTUS_TRANSDUCER_LIBRARY</code> environment variable and the shipped library. See <a href="../doc_transducer_library/#your-own-transducers-and-calibrations">Your own transducers and calibrations</a>.</td>
+</tr>
+<tr>
+<td><code>pct</code></td>
+<td>Pseudo-CT outputs, per subject <code>&lt;pct&gt;/sub-NNN/</code>.</td>
+<td><code>''</code></td>
+<td>Empty = <code>&lt;parent of path.seg&gt;/pct/sub-NNN/</code>, next to the SimNIBS folder (never inside it). Resolved into <code>io.dir_pct</code>.</td>
+</tr>
+<tr>
+<td><code>acoustic_input</code></td>
+<td>Start from a prior pressure map instead of simulating: a peak-pressure NIfTI [Pa] in this subject's T1w space, e.g. an earlier run's <code>nii/*_T1w*_pressure.nii.gz</code>.</td>
+<td><code>''</code></td>
+<td>Its JSON sidecar is checked against the current settings and used to rescale the map to <code>transducer.target_isppa_wcm2</code>; acoustic analysis and thermal simulation then run as usual. Replaces <code>io.external_acoustic_nifti</code> (still read). See <a href="../doc_outputs_reuse/#starting-from-earlier-stage-outputs">Starting from earlier stage outputs</a>.</td>
+</tr>
+<tr>
+<td><code>localite</code></td>
+<td><strong>Deprecated.</strong></td>
+<td><code>''</code></td>
+<td>Read as <code>localite_raw</code> and as <code>localite_export</code> when those are empty.</td>
+</tr>
+<tr>
+<td><code>t1_pattern</code></td>
+<td>T1 image path template relative to <code>path.anat</code>.</td>
+<td><code>'sub-%1$03d_T1w.nii*'</code></td>
+<td>Supports <code>%03d</code>-style subject ID substitution</td>
+</tr>
+<tr>
+<td><code>t2_pattern</code></td>
+<td>T2 image path template relative to <code>path.anat</code>.</td>
+<td><code>''</code></td>
+<td>Optional; empty skips the T2 (e.g. <code>'sub-%1$03d_T2w.nii*'</code>).</td>
+</tr>
+<tr>
+<td><code>ct_pattern</code></td>
+<td>Measured CT path template relative to <code>path.anat</code>, read by the skull mapping when <code>pct.enabled</code> is 1.</td>
+<td><code>''</code></td>
+<td>In Hounsfield units and co-registered to the T1w. Empty = the pseudo-CT generated from the UTE image in <code>t2_pattern</code>. See <a href="../doc_pseudoCT/#using-a-measured-ct">Using a Measured CT</a>.</td>
+</tr>
+<tr>
+<td><code>bone_mask_pattern</code></td>
+<td>Bone mask file for <code>pct.bone_source: mask</code>, relative to <code>path.anat</code> unless absolute.</td>
+<td><code>''</code></td>
+<td>Nonzero voxels are bone; co-registered to the T1w, any voxel grid. See <a href="../doc_pseudoCT/#skull-from-the-ct">Skull from the CT</a>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="environment-toolbox-paths-startup">Environment &amp; Toolbox Paths (<code>startup</code>)<a class="headerlink" href="#environment-toolbox-paths-startup" title="Permanent link">&para;</a></h2>
+<p>Segmentation and MNI conversion need <code>startup.simnibs_bin_path</code>. The other paths are needed for pseudo-CT generation or to add folders to the MATLAB path.</p>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Description</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>simnibs_bin_path</code></td>
+<td>Absolute path to the bin folder of a SimNIBS 4 install (holds <code>charm</code>).</td>
+<td>Mandatory for segmentation and MNI conversion. Selects the SimNIBS version.</td>
+</tr>
+<tr>
+<td><code>matlab_bin_path</code></td>
+<td>Absolute path to MATLAB binary.</td>
+<td>Required for pseudo-CT generation on HPC (e.g. <code>/opt/matlab/R2024a/bin/matlab</code>). Local execution falls back to <code>matlabroot</code>.</td>
+</tr>
+<tr>
+<td><code>fsl_bin_path</code></td>
+<td>Absolute path to <a href="https://fsl.fmrib.ox.ac.uk/fsl/">FSL</a> bin directory.</td>
+<td>Required for pseudo-CT generation (e.g. <code>/opt/fsl/bin</code>). Prepended to PATH at runtime.</td>
+</tr>
+<tr>
+<td><code>ants_bin_path</code></td>
+<td>Absolute path to <a href="https://github.com/ANTsX/ANTs">ANTs</a> bin directory.</td>
+<td>Required for pseudo-CT generation (e.g. <code>/opt/ants/bin</code>). Prepended to PATH at runtime.</td>
+</tr>
+<tr>
+<td><code>ants_simg_path</code></td>
+<td>ANTs <a href="https://apptainer.org/">Singularity</a> image (<code>.simg</code>/<code>.sif</code>).</td>
+<td>When set, ANTs tools run via <code>singularity exec</code>.</td>
+</tr>
+<tr>
+<td><code>modules_to_load</code></td>
+<td>HPC environment modules loaded before pseudo-CT generation.</td>
+<td>e.g. <code>['matlab/R2023b', 'fsl/6.0.7', 'ants/2.5.3']</code></td>
+</tr>
+<tr>
+<td><code>paths_to_add</code></td>
+<td>Paths to add with <code>addpath()</code>.</td>
+<td>[cell] e.g. <code>{"path/to/x"}</code></td>
+</tr>
+<tr>
+<td><code>subpaths_to_add</code></td>
+<td>Paths to add recursively with <code>addpath(genpath())</code>.</td>
+<td>[cell]; relative to the MATLAB working directory</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="io-management-io">I/O Management (<code>io</code>)<a class="headerlink" href="#io-management-io" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Description</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>output_affix</code></td>
+<td>Optional affix for output file names.</td>
+<td><code>''</code></td>
+<td>Differentiates outputs for the same subject/transducer (e.g. different intensities or targets)</td>
+</tr>
+<tr>
+<td><code>overwrite_files</code></td>
+<td>File overwrite behaviour.</td>
+<td><code>'always'</code></td>
+<td><code>never</code> / <code>always</code> / <code>force</code> / <code>ask</code>. Does NOT apply to SimNIBS segmentations. In chained pipelines (async, multi-I<sub>SPPA</sub>, uncertainty), <code>always</code> re-runs only the output stages (CSV, NIfTI, HTML report) and reuses cached intermediates; <code>force</code> re-runs every stage. See <a href="../doc_outputs_reuse/#overwrite-behaviour">Overwrite behaviour</a>.</td>
+</tr>
+<tr>
+<td><code>cache_signature_check</code></td>
+<td>Response when a reused grid, medium, or acoustic cache, or a stage output a run starts from (placement run, pseudo-CT, pressure map), was built from different settings.</td>
+<td><code>'error'</code></td>
+<td><code>error</code> / <code>warn</code> (reuse anyway) / <code>off</code>. Caches: applies when one is reused because of <code>overwrite_files: never</code> (or a declined overwrite). See <a href="../doc_outputs_reuse/#cache-reuse-checks">Cache reuse checks</a> and <a href="../doc_outputs_reuse/#starting-from-earlier-stage-outputs">Starting from earlier stage outputs</a>.</td>
+</tr>
+<tr>
+<td><code>acoustic_cache_remap</code></td>
+<td>What a run does with a reused acoustic cache written on a different grid (e.g. the head model changed in between).</td>
+<td><code>0</code></td>
+<td><code>0</code>: re-simulate, or stop when the run sets up no source; <code>1</code>: map the field onto this grid through world space (pressures resampled as p²) and record the mapping in the acoustic provenance. 3-D runs only. See <a href="../doc_outputs_reuse/#cache-reuse-checks">Cache reuse checks</a>.</td>
+</tr>
+<tr>
+<td><code>overwrite_simnibs</code></td>
+<td>Overwrite SimNIBS segmentation results?</td>
+<td><code>0</code></td>
+<td><code>1 = yes</code>, <code>0 = no</code>. Re-runs charm (<code>--forcerun</code>), which deletes the m2m folder first. Without it, an existing segmentation is reused even when another SimNIBS version or other charm settings are selected (with a warning).</td>
+</tr>
+<tr>
+<td><code>save_matrices</code></td>
+<td>Save all intermediate matrices (<code>.mat</code> / cache files)?</td>
+<td><code>[]</code></td>
+<td><code>1</code> = save all, <code>0</code> = save none, <code>[]</code> = use the per-step defaults. Applies to every per-step matrix flag left empty; a per-step flag set to <code>0</code>/<code>1</code> always wins. <code>0</code> also triggers cleanup of uncertainty intermediates.</td>
+</tr>
+<tr>
+<td><code>save_source_matrices</code></td>
+<td>Save <code>kwave_source.mat</code> (transducer source array)?</td>
+<td><code>[]</code> → <code>1</code></td>
+<td><code>[]</code> inherits <code>save_matrices</code>, else default. Needed by multi-stage pipelines (e.g. uncertainty).</td>
+</tr>
+<tr>
+<td><code>save_acoustic_matrices</code></td>
+<td>Save acoustic results (<code>sensor_data</code>, <code>kgrid</code>, medium; can be very large)?</td>
+<td><code>[]</code> → <code>0</code></td>
+<td><code>[]</code> inherits <code>save_matrices</code>, else default. Needed to reload acoustics (e.g. separate thermal runs, calibration debugging).</td>
+</tr>
+<tr>
+<td><code>save_thermal_matrices</code></td>
+<td>Save <code>heating_res.mat</code> (temperature time series and field maps)?</td>
+<td><code>[]</code> → <code>1</code></td>
+<td><code>[]</code> inherits <code>save_matrices</code>, else default.</td>
+</tr>
+<tr>
+<td><code>save_grid_cache</code> / <code>save_medium_cache</code></td>
+<td>Save grid / medium caches?</td>
+<td>unset → <code>0</code></td>
+<td>Inherit <code>save_matrices</code> when unset.</td>
+</tr>
+<tr>
+<td><code>save_property_maps</code></td>
+<td>Save per-property NIfTIs to nii/properties/ (layered medium only)?</td>
+<td><code>0</code></td>
+<td>Not affected by <code>save_matrices</code>.</td>
+</tr>
+<tr>
+<td><code>save_transducer_nii</code></td>
+<td>Save a model of the planned transducer as a T1-space NIfTI (<code>nii/sub-XXX_&lt;medium&gt;_T1w&lt;affix&gt;_transducer.nii.gz</code>)?</td>
+<td><code>1</code></td>
+<td>Layered medium, annular transducers. Voxel values: <code>1</code> = emitting face (smallest <code>elem_id_mm</code> to largest <code>elem_od_mm</code>), <code>0.5</code> = the thickness behind it (<code>transducer_nii_back_mm</code>), <code>0</code> = elsewhere, including the central opening. Built from the planned T1-voxel positions, on the T1 voxel grid, for placement checks next to the T1 and the acoustic maps. No MNI copy. Not affected by <code>save_matrices</code>. See <a href="../doc_outputs/#nifti-images">NIfTI Images</a>.</td>
+</tr>
+<tr>
+<td><code>transducer_nii_back_mm</code></td>
+<td>Thickness added behind the emitting face in the transducer NIfTI [mm].</td>
+<td><code>3</code></td>
+<td>Display only, value <code>0.5</code>: the emitting face (value <code>1</code>) stays where PRESTUS places it. <code>0</code> gives the face alone.</td>
+</tr>
+<tr>
+<td><code>save_MNI</code></td>
+<td>Save NIfTI outputs in MNI space in addition to native T1w space (requires SimNIBS m2m folder)?</td>
+<td><code>1</code></td>
+<td>Not affected by <code>save_matrices</code>.</td>
+</tr>
+<tr>
+<td><code>save_heatingvideo</code></td>
+<td>Save a video of incremental heating?</td>
+<td><code>0</code></td>
+<td><code>1 = yes</code>, <code>0 = no</code></td>
+</tr>
+<tr>
+<td><code>save_Ipa</code></td>
+<td>Save the pulse-average intensity (Ipa) NIfTI map?</td>
+<td><code>1</code></td>
+<td>Suppressed automatically when <code>timing.pd</code> is absent.</td>
+</tr>
+<tr>
+<td><code>save_Ita</code></td>
+<td>Save the temporal-average intensity (Ita) NIfTI map?</td>
+<td><code>1</code></td>
+<td>Suppressed automatically when <code>timing.pd</code>/<code>timing.pri</code> are absent.</td>
+</tr>
+<tr>
+<td><code>save_p_complex</code></td>
+<td>Save the complex pressure field (<code>p_complex</code>) in the acoustic cache?</td>
+<td><code>0</code></td>
+<td><em>Experimental</em> for superposition. Every backend. k-Wave only: fitted over the last quarter period, and <code>p_max_all</code>/<code>p_min_all</code> become ± the fitted amplitude (<a href="../doc_multitransducer/#complex-pressure-field">Complex Pressure Field</a>).</td>
+</tr>
+<tr>
+<td><code>deface_plots</code></td>
+<td>Remove facial anatomy from all QC figures?</td>
+<td><code>1</code></td>
+<td><code>1 = yes</code>, <code>0 = no</code>. Uses the SimNIBS eye label to anchor the cut plane ~30 mm posterior to the eye socket (ear-canal level). Requires the SimNIBS segmentation (<code>path.seg</code>). Has no effect on saved NIfTIs; see <code>segmentation.deface</code> for that.</td>
+</tr>
+<tr>
+<td><code>adopted_heatmap</code></td>
+<td>Path to an existing <strong>temperature</strong> heatmap NIfTI (<code>heating_end.nii.gz</code>) to use as the thermal starting point for a follow-up simulation. Set automatically by the sequential dispatcher; can be overridden manually.</td>
+<td>none</td>
+<td>Optional. Used for sequential multi-target runs.</td>
+</tr>
+<tr>
+<td><code>adopted_cem43</code></td>
+<td>Path to an existing CEM43 heatmap NIfTI to accumulate heating across runs. Set automatically by the sequential dispatcher.</td>
+<td>none</td>
+<td>Optional. Used for sequential multi-target runs.</td>
+</tr>
+<tr>
+<td><code>adopted_cem43_iso</code></td>
+<td>Path to an existing ISO-variant CEM43 heatmap NIfTI (<code>CEM43_iso_end.nii.gz</code>) to accumulate across runs. Set automatically alongside <code>adopted_cem43</code> by the sequential dispatcher.</td>
+<td>none</td>
+<td>Optional. Used for sequential multi-target runs.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Runtime-derived (set by <code>path_log_setup</code>):</strong></p>
+<table>
+<thead>
+<tr>
+<th><strong>Field</strong></th>
+<th><strong>Description</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dir_output</code></td>
+<td>Resolved per-subject output directory. Set from <code>path.sim</code> (+ subject subfolder).</td>
+</tr>
+<tr>
+<td><code>dir_nii</code></td>
+<td>NIfTI output subfolder (<code>nii/</code>). Created automatically.</td>
+</tr>
+<tr>
+<td><code>dir_nii_T1w</code></td>
+<td>Alias for <code>dir_nii</code>; space encoded in filename.</td>
+</tr>
+<tr>
+<td><code>dir_nii_MNI</code></td>
+<td>Alias for <code>dir_nii</code>; space encoded in filename.</td>
+</tr>
+<tr>
+<td><code>dir_img</code></td>
+<td>Image/figure output subfolder (<code>img/</code>). Used for all acoustic, thermal, and preprocessing figures. Created automatically.</td>
+</tr>
+<tr>
+<td><code>dir_tabular</code></td>
+<td>Directory for per-subject CSV results tables (same as <code>dir_output</code>).</td>
+</tr>
+<tr>
+<td><code>dir_reports</code></td>
+<td>Directory for simulation reports (same as <code>dir_output</code>).</td>
+</tr>
+<tr>
+<td><code>dir_logs</code></td>
+<td>Log subfolder (<code>log/</code>). Created automatically.</td>
+</tr>
+<tr>
+<td><code>dir_cache</code></td>
+<td>Cache subfolder (<code>cache/</code>). Created automatically.</td>
+</tr>
+<tr>
+<td><code>dir_debug</code></td>
+<td>Debug subfolder (<code>debug/</code>). Created when <code>simulation.debug = 1</code>.</td>
+</tr>
+<tr>
+<td><code>dir_debug_preproc</code></td>
+<td>Debug subfolder for preprocessing (<code>debug/preproc/</code>).</td>
+</tr>
+<tr>
+<td><code>dir_debug_medium</code></td>
+<td>Debug subfolder for medium setup (<code>debug/medium/</code>).</td>
+</tr>
+<tr>
+<td><code>dir_debug_source</code></td>
+<td>Debug subfolder for source setup (<code>debug/source/</code>).</td>
+</tr>
+<tr>
+<td><code>dir_pct</code></td>
+<td>Resolved subject pCT directory (<code>get_pct_dir</code>): <code>&lt;path.pct&gt;/sub-NNN</code>, or <code>&lt;parent of path.seg&gt;/pct/sub-NNN</code>.</td>
+</tr>
+<tr>
+<td><code>dir_localite_export</code></td>
+<td>Per-subject Localite export folder (<code>&lt;path.localite_export&gt;/sub-XXX/</code>, fallback <code>path.localite</code>); <code>''</code> if unset.</td>
+</tr>
+<tr>
+<td><code>filename_table</code></td>
+<td>Path to the per-subject CSV results table.</td>
+</tr>
+<tr>
+<td><code>filename_kwave_source</code></td>
+<td>Path to cached k-Wave source <code>.mat</code> file. Set by <code>source_sensor_setup</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="pipeline-modules-modules">Pipeline Modules (<code>modules</code>)<a class="headerlink" href="#pipeline-modules-modules" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Description</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_transducer_placement</code></td>
+<td>Resolve <code>trans_pos</code>/<code>focus_pos</code> from <code>placement.mode</code>.</td>
+<td><code>1</code></td>
+<td>Required when <code>placement.manual.coordinate_space</code> is <code>ras</code> or <code>mni</code> (positions are converted here).</td>
+</tr>
+<tr>
+<td><code>run_grid_setup</code></td>
+<td>Setup grid and run head processing.</td>
+<td><code>1</code></td>
+<td>Mandatory for simulations.</td>
+</tr>
+<tr>
+<td><code>run_medium_setup</code></td>
+<td>Map medium acoustic properties.</td>
+<td><code>1</code></td>
+<td>Mandatory for simulations.</td>
+</tr>
+<tr>
+<td><code>run_source_setup</code></td>
+<td>Set up acoustic source.</td>
+<td><code>1</code></td>
+<td>Mandatory for simulations.</td>
+</tr>
+<tr>
+<td><code>run_water_baseline</code></td>
+<td>Run a free-water simulation that records the I<sub>SPPA</sub> of the current drive, for scaling to <code>transducer.target_isppa_wcm2</code>.</td>
+<td><code>'auto'</code></td>
+<td><code>auto</code>: when a target is set and the transducer has no calibration I<sub>SPPA</sub> or the target differs from it. <code>1</code>: always. <code>0</code>: only when the target differs from a calibration I<sub>SPPA</sub>. A target that cannot be met stops the run (<code>prestus:isppa:noBaseline</code>). See <a href="../doc_simulations-acoustic/#isppa-targeting">I<sub>SPPA</sub> targeting</a>.</td>
+</tr>
+<tr>
+<td><code>run_acoustic_sims</code></td>
+<td>Run acoustic simulations.</td>
+<td><code>1</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>run_acoustic_analysis</code></td>
+<td>Run acoustic analysis.</td>
+<td><code>1</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>run_heating_sims</code></td>
+<td>Run thermal simulations.</td>
+<td><code>0</code></td>
+<td>Enable after acoustic results are validated.</td>
+</tr>
+<tr>
+<td><code>run_thermal_analysis</code></td>
+<td>Run thermal analysis.</td>
+<td><code>1</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>run_nifti_creation</code></td>
+<td>Export results as NIfTI files.</td>
+<td><code>1</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>run_posthoc_water_sims</code></td>
+<td>Run free-water reference simulations after head simulations.</td>
+<td><code>1</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>generate_report</code></td>
+<td>Generate self-contained HTML simulation report.</td>
+<td><code>1</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>run_targeting_analysis</code></td>
+<td>Measure targeting accuracy from the focal-mask NIfTIs: simulated focus vs planned focus (native), vs MNI target / ROI (MNI). Writes <code>sub-XXX_&lt;medium&gt;&lt;affix&gt;_targeting.csv</code>.</td>
+<td><code>1</code></td>
+<td>Layered or phantom media; needs <code>run_nifti_creation</code>. See <a href="../doc_group/#targeting-accuracy">Targeting accuracy</a>.</td>
+</tr>
+<tr>
+<td><code>generate_group_report</code></td>
+<td>Aggregate completed subjects into a group HTML report at the end of the run.</td>
+<td><code>1</code></td>
+<td>Best-effort; auto-discovers subjects. Or run <code>prestus_group_report_start</code> manually. Switched off for runs started by <code>prestus_study_start</code>, which builds one study report at the end.</td>
+</tr>
+<tr>
+<td><code>segmentation_only</code></td>
+<td>Stop after segmentation; skip grid setup and all simulations.</td>
+<td><code>0</code></td>
+<td>Stops after the segmentation stage for every medium; only layered media are segmented, so water and phantom runs compute nothing.</td>
+</tr>
+</tbody>
+</table>
+<p>All flags: <code>1 = yes</code>, <code>0 = no</code>.</p>
+<hr />
+<h2 id="report-report">Report (<code>report</code>)<a class="headerlink" href="#report-report" title="Permanent link">&para;</a></h2>
+<p>Whether the simulation report is written is set by <code>modules.generate_report</code>; <code>style</code> and <code>style_switcher</code> change only how the reports look.</p>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Description</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>style</code></td>
+<td>Visual skin of the HTML report: <code>instrument</code>, <code>classic</code> (flat cards), <code>compact</code>, <code>paper</code>. Changes presentation only, not content.</td>
+<td><code>'instrument'</code></td>
+<td>Try skins on an existing output folder with <code>preview_report_styles(&lt;subject dir&gt;)</code>.</td>
+</tr>
+<tr>
+<td><code>style_switcher</code></td>
+<td>Embed all skins plus a dropdown to switch between them in the report.</td>
+<td><code>0</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>segmentation</code></td>
+<td>Write the <a href="../doc_head-model/#segmentation-report">segmentation report</a> <code>sub-XXX_layered_segmentation_report&lt;affix&gt;.html</code>.</td>
+<td><code>1</code></td>
+<td>Layered media. Shows each step from the SimNIBS segmentation to the simulation medium.</td>
+</tr>
+<tr>
+<td><code>debug</code></td>
+<td>Write the <a href="../doc_outputs/#debug-outputs">debug report</a> <code>sub-XXX_&lt;medium&gt;_debug_report&lt;affix&gt;.html</code>.</td>
+<td><code>1</code></td>
+<td>Only with <code>simulation.debug: 1</code>. Also written when the run fails.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="study-setup-study">Study Setup (<code>study</code>)<a class="headerlink" href="#study-setup-study" title="Permanent link">&para;</a></h2>
+<p>Multi-subject studies with per-run settings; see <a href="../doc_group_study-setup/#study-setup">Group analysis</a>.</p>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Description</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>manifest</code></td>
+<td>Study manifest (<code>.tsv</code>/<code>.csv</code>): one row per run (<code>subject_id</code>, optional <code>condition</code>, <code>include</code>, <code>config</code>) plus any config key as a column.</td>
+<td><code>''</code></td>
+<td>Relative paths resolve against the study config's folder. Run with <code>prestus_study_start(&lt;config&gt;)</code>; report with <code>prestus_group_report_start(&lt;config&gt;)</code>.</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>Name of the study outputs folder <code>&lt;path.sim&gt;/group/&lt;name&gt;/</code>.</td>
+<td><code>''</code></td>
+<td><code>''</code> = manifest file name without extension.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="high-performance-computing-hpc">High-Performance Computing (<code>hpc</code>)<a class="headerlink" href="#high-performance-computing-hpc" title="Permanent link">&para;</a></h2>
+<p>See <a href="../doc_kwave/">k-Wave</a> and <a href="../doc_hpc/">HPC</a>.</p>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Description</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gpu</code></td>
+<td>Request a specific GPU.</td>
+<td><code>''</code></td>
+<td>e.g. <code>"nvidia_a100-sxm4-40gb:1"</code>; usually not needed. <code>scontrol show nodes \| egrep -o gres/gpu:.*=[0-9] \| egrep -o 'nvidia_.*=' \| sort \| uniq \| sed 's/=//'</code> lists the available types. See <a href="../doc_hpc/#gpu-support">GPU support</a>.</td>
+</tr>
+<tr>
+<td><code>partition</code></td>
+<td>Request a dedicated queue partition.</td>
+<td><code>''</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>reservation</code></td>
+<td>Request a reserved queue.</td>
+<td><code>''</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>Cluster presets.</td>
+<td><code>'default'</code></td>
+<td><code>'snellius'</code> selects the <a href="https://www.surf.nl/en/services/compute/snellius-the-national-supercomputer">Snellius</a> partition presets (<code>snellius.*</code>, below).</td>
+</tr>
+<tr>
+<td><code>exclude</code></td>
+<td>Nodes to avoid, comma-separated (SLURM <code>sbatch --exclude</code>).</td>
+<td><code>''</code></td>
+<td>e.g. a node whose GPU is held by a stale process.</td>
+</tr>
+<tr>
+<td><code>cores</code></td>
+<td>CPU cores per job (SLURM <code>--cpus-per-task</code>).</td>
+<td><code>[]</code></td>
+<td><code>[]</code> = cluster default (often 1). The k-Wave CPU builds (<code>cpp_cpu</code>, <code>matlab_cpu</code>) use this many threads. Set by the presets with <code>hpc.name: 'snellius'</code>.</td>
+</tr>
+<tr>
+<td><code>wait_for_job</code></td>
+<td>Block MATLAB until the submitted HPC job completes?</td>
+<td><code>false</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>timelimit</code></td>
+<td>Job time limit.</td>
+<td><code>'04:00:00'</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>memorylimit</code></td>
+<td>Memory limit [GB].</td>
+<td><code>20</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>posthoc_water_timelimit</code></td>
+<td>Time limit of the post-hoc free-water jobs (<code>modules.run_posthoc_water_sims</code>).</td>
+<td><code>'05:00:00'</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>posthoc_water_memorylimit</code></td>
+<td>Memory limit of the post-hoc free-water jobs [GB].</td>
+<td><code>40</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>ld_library_path</code></td>
+<td>Prefixed to <code>LD_LIBRARY_PATH</code> for SimNIBS tools (charm, MNI conversion).</td>
+<td><code>''</code></td>
+<td><code>''</code> = the libraries of the install in <code>startup.simnibs_bin_path</code> (<code>&lt;simnibs package&gt;/external/lib/linux</code>), so it follows the selected environment. Set only to override, e.g. <code>/opt/gcc/7.2.0/lib64</code> for <code>undefined symbol</code> errors. The pseudo-CT job uses only a set value.</td>
+</tr>
+<tr>
+<td><code>job_prefix</code></td>
+<td>Prefix string for HPC job names.</td>
+<td><code>'PS'</code></td>
+<td>Keep short; the job name is capped at 20 characters. Overridden to <code>'TP'</code> for transducer positioning jobs.</td>
+</tr>
+<tr>
+<td><code>max_wait_checks</code></td>
+<td>Maximum number of job status checks when <code>wait_for_job = true</code>.</td>
+<td><code>540</code></td>
+<td>At 1 check/20 s, <code>540</code> ≈ 3 hours.</td>
+</tr>
+<tr>
+<td><code>tmp_gb</code></td>
+<td>Node-local disk per SLURM job [GB] (<code>sbatch --tmp</code>).</td>
+<td><code>0</code></td>
+<td><code>0</code> = off. With a value, the k-Wave C++ <code>.h5</code> files go to <code>scratch_dir</code> inside the job (<a href="../doc_hpc/#node-local-scratch">Node-local scratch</a>).</td>
+</tr>
+<tr>
+<td><code>scratch_dir</code></td>
+<td>Scratch root used with <code>tmp_gb &gt; 0</code>.</td>
+<td><code>'auto'</code></td>
+<td><code>'auto'</code> = first existing of <code>$PRESTUS_SCRATCH</code>, <code>$SLURM_TMPDIR</code>, <code>/scratch/$USER/$SLURM_JOB_NAME</code>, <code>/scratch/$USER/$SLURM_JOB_ID</code> (else created under <code>/scratch/$USER</code>), then <code>$TMPDIR</code>. Or a path; <code>$VAR</code> is expanded and the folder created.</td>
+</tr>
+<tr>
+<td><code>depend_type</code></td>
+<td>Scheduler dependency type for <code>depend_job_id(s)</code>.</td>
+<td><code>'afterok'</code></td>
+<td><code>'afterok'</code> or <code>'afterany'</code>. Internal (not in <code>config_default.yaml</code>); <code>prestus_study_start</code> uses <code>'afterany'</code> for the study-report job.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="snellius-gpu-partitions-snellius">Snellius GPU Partitions (<code>snellius</code>)<a class="headerlink" href="#snellius-gpu-partitions-snellius" title="Permanent link">&para;</a></h3>
+<p>Used when <code>hpc.name: 'snellius'</code>: <code>hpc.partition</code> selects one of these blocks, which sets the job's resources.</p>
+<table>
+<thead>
+<tr>
+<th><strong>Parameter</strong></th>
+<th><strong>Description</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Comments</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gpu_a100.cores</code></td>
+<td>CPU cores requested on <code>gpu_a100</code>.</td>
+<td><code>18</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>gpu_a100.memorylimit</code></td>
+<td>Memory [GB] on <code>gpu_a100</code>.</td>
+<td><code>120</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>gpu_a100.timelimit</code></td>
+<td>Wall time on <code>gpu_a100</code>.</td>
+<td><code>'120:00:00'</code></td>
+<td>Partition maximum.</td>
+</tr>
+<tr>
+<td><code>gpu_a100.n_gpu</code></td>
+<td>GPUs requested on <code>gpu_a100</code>.</td>
+<td><code>1</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>gpu_h100.cores</code></td>
+<td>CPU cores requested on <code>gpu_h100</code>.</td>
+<td><code>16</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>gpu_h100.memorylimit</code></td>
+<td>Memory [GB] on <code>gpu_h100</code>.</td>
+<td><code>180</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>gpu_h100.timelimit</code></td>
+<td>Wall time on <code>gpu_h100</code>.</td>
+<td><code>'120:00:00'</code></td>
+<td>Partition maximum.</td>
+</tr>
+<tr>
+<td><code>gpu_h100.n_gpu</code></td>
+<td>GPUs requested on <code>gpu_h100</code>.</td>
+<td><code>1</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2022–2026 PRESTUS contributors · <a href="https://github.com/Donders-Institute/PRESTUS/blob/main/LICENSE">GPL-3.0</a>
+    </div>
+  
+  
+    <div class="md-copyright__last-edited">Last edited: 23 November 2026</div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+          
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["navigation.sections","content.code.copy"],"redirect":"../redirect.json","search":"../assets/javascripts/workers/search.719e0d91.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"main","provider":"mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.3cb411a8.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+        <script src="../javascripts/header_home_link.js"></script>
+      
+        <script src="../javascripts/developer_details.js"></script>
+      
+        <script src="../javascripts/usage_statistics.js"></script>
+      
+        <script src="../javascripts/multitransducer_fields.js"></script>
+      
+        <script src="../javascripts/time_reversal_fields.js"></script>
+      
+        <script src="../javascripts/thermal_pulse_model.js"></script>
+      
+        <script src="../javascripts/load_model_data.js"></script>
+      
+        <script src="../javascripts/load_predictor.js"></script>
+      
+    
+  </body>
+</html>
