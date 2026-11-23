@@ -410,6 +410,21 @@ end
             results.freefield_isppa_wcm2 = freefield_isppa_wcm2;
         end
 
+        % Run outcomes into the run record (RUN_STATS; telemetry sends them,
+        % rounded, only with consent to the 'outcomes' level). The first field
+        % analysed in a run is kept (multi-intensity and sequential runs).
+        try
+            if ~isfield(run_stats('get'), 'outcome_isppa_brain_wcm2')
+                run_stats('set', ...
+                    'outcome_isppa_brain_wcm2',     results.Isppa_brain, ...
+                    'outcome_freefield_isppa_wcm2', freefield_isppa_wcm2, ...
+                    'outcome_mi_brain',             results.MI_brain, ...
+                    'outcome_focal_error_mm',       dist_mm(fm.centroid_3dB_vox, focus_pos));
+            end
+        catch
+            % bookkeeping must never fail the analysis
+        end
+
         Isptp_val = results.Isptp;
         Ispta_val = NaN; if isfield(results, 'Ispta'), Ispta_val = results.Ispta; end
 

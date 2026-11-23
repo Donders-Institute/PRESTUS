@@ -26,6 +26,7 @@ function levels = prestus_test_levels()
     levels('physics_3d')    = {'physics_3d'};
     levels('itrusst')       = {'itrusst'};
     levels('slurm_live')    = {'slurm_live'};
+    levels('telemetry_live') = {'telemetry_live'};
     levels('demo_inputs')   = demo0(1);
     levels('demo_config')   = demo0(1:2);
     levels('demo_localite') = demo0(1:3);

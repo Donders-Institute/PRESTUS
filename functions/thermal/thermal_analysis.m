@@ -113,6 +113,19 @@ end
         results_thermal.CEM43iso_end_brain = masked_max_3d(results_heating.CEM43_iso_end, mask.brain);
         results_thermal.CEM43iso_end_skull = masked_max_3d(results_heating.CEM43_iso_end, mask.skull);
         results_thermal.CEM43iso_end_skin  = masked_max_3d(results_heating.CEM43_iso_end, mask.skin);
+
+        % Run outcomes into the run record (RUN_STATS; telemetry sends them,
+        % rounded, only with consent to the 'outcomes' level); the first
+        % thermal field analysed in a run is kept.
+        try
+            if ~isfield(run_stats('get'), 'outcome_riset_skull_c')
+                run_stats('set', ...
+                    'outcome_riset_brain_c', results_thermal.riseT_brain, ...
+                    'outcome_riset_skull_c', results_thermal.riseT_skull);
+            end
+        catch
+            % bookkeeping must never fail the analysis
+        end
     end
     
     % Save overview table

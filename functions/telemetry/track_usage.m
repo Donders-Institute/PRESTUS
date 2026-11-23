@@ -1,10 +1,10 @@
 function track_usage(event, parameters, options, pipe_options)
 % TRACK_USAGE  Send anonymous usage statistics to the PRESTUS telemetry endpoint.
 %
-% Does nothing unless the user has explicitly opted in via telemetry_setup
-% or telemetry_set_consent, or PRESTUS_TELEMETRY=on/1/true is set for this
-% process. PRESTUS_TELEMETRY=off/0/false disables sending even after a
-% recorded opt-in (see TELEMETRY_ENV_OVERRIDE).
+% Sends only the levels the user shares (TELEMETRY_LEVELS: chosen via
+% telemetry_setup or telemetry_set_consent, or PRESTUS_TELEMETRY for this
+% process); nothing when none is shared. PRESTUS_TELEMETRY=off disables
+% sending even after a recorded opt-in (see TELEMETRY_ENV_OVERRIDE).
 % All network errors are silently swallowed – this function never interrupts
 % the pipeline. No personal data is transmitted; see doc/doc_telemetry.md.
 %
@@ -22,7 +22,7 @@ function track_usage(event, parameters, options, pipe_options)
 % pipe_options is the pipeline options struct (e.g. with sequential_configs)
 % used for pipeline mode detection; it is optional and never transmitted.
 %
-% See also: TELEMETRY_SETUP, TELEMETRY_SETUP_RESET, TELEMETRY_ENV_OVERRIDE, PRESTUS_VERSION
+% See also: TELEMETRY_SETUP, TELEMETRY_LEVELS, TELEMETRY_LEVEL_INFO, TELEMETRY_ENV_OVERRIDE, PRESTUS_VERSION
 
     arguments
         event        (1,:) char
@@ -31,13 +31,13 @@ function track_usage(event, parameters, options, pipe_options)
         pipe_options (1,1) struct = struct()
     end
 
-    [opted, notice] = telemetry_opted_in();
-    if ~opted
+    [levels, notice] = telemetry_levels();
+    if isempty(levels)
         return
     end
 
     try
-        payload = build_payload(event, parameters, options, pipe_options, notice);
+        payload = build_payload(event, parameters, options, pipe_options, levels, notice);
         send_payload(payload);
     catch
         % silently drop – telemetry must never interrupt the pipeline
@@ -48,131 +48,202 @@ end
 %% Internal helpers
 % =========================================================================
 
-function [opted, notice] = telemetry_opted_in()
-% PRESTUS_TELEMETRY=off always wins; a recorded decision comes next, so a
-% recorded opt-out is never overridden; PRESTUS_TELEMETRY=on applies only
-% when no decision is recorded. notice: the notice version the consent was
-% given to (TELEMETRY_NOTICE_VERSION; 1 for records without it, the current
-% version for PRESTUS_TELEMETRY=on).
-    env    = telemetry_env_override();
-    opted  = false;
-    notice = 1;
-    if strcmp(env, 'off'), return, end
-    cfg_file = fullfile(prefdir_prestus(), 'telemetry.json');
-    if isfile(cfg_file)
-        try
-            cfg   = jsondecode(fileread(cfg_file));
-            opted = isfield(cfg, 'opt_in') && isequal(cfg.opt_in, true);
-            if isfield(cfg, 'notice') && isnumeric(cfg.notice) && isscalar(cfg.notice)
-                notice = double(cfg.notice);
-            end
-        catch
-        end
-        return
-    end
-    opted = strcmp(env, 'on');
-    notice = telemetry_notice_version();
-end
+function payload = build_payload(event, parameters, options, pipe_options, levels, notice)
+% Every record carries the envelope; each shared level adds its fields
+% (FIELD_GROUPS). A field in several groups is sent when any of them is shared.
 
-% -------------------------------------------------------------------------
-function payload = build_payload(event, parameters, options, pipe_options, notice)
+    has = @(level) any(strcmp(levels, level));
+    p = struct();
 
-    % --- identity (all anonymous) ---
-    payload.event         = event;
-    payload.run_type      = telemetry_run_type();
-    payload.timestamp_utc = posixtime(datetime('now', 'TimeZone', 'UTC'));
-    payload.uuid          = get_or_create_uuid();
-    [payload.prestus_hash, payload.prestus_ver] = prestus_version();
+    % --- envelope (all anonymous) ---
+    p.event = event;
+    % event format version; raise it when a field's meaning or generation
+    % changes. 2: run_id and uuid drawn independently of MATLAB's rand.
+    % 3: fields grouped by consent level; outcomes added.
+    p.telemetry_schema = 3;
+    p.consent_levels   = levels;
+    p.consent_notice   = notice;
+    p.run_type         = telemetry_run_type();
+    p.uuid             = get_or_create_uuid();
+    [p.prestus_hash, p.prestus_ver] = prestus_version();
+    if isfield(options, 'run_id'),       p.run_id       = options.run_id;       end
+    if isfield(options, 'status'),       p.status       = options.status;       end
+
+    % --- usage and errors ---
     % development runs can be filtered out: run_type 'development'
     % (PRESTUS_RUN_TYPE), or a checkout off main or with local changes. The
     % provenance of this run (PATH_LOG_SETUP) is reused: no second git call.
     info = safe_get(parameters, {'io', 'prestus_version'}, struct());
-    payload.prestus_branch = branch_class(info);
-    payload.prestus_dirty  = safe_get(info, {'dirty'}, 'unknown');
-    payload.consent_notice = notice;
-    payload.matlab_ver    = version('-release');
-    payload.platform      = computer('arch');
-    try
-        info = getComputerInfo();
-        payload.kwave_ver = info.kwave_version;
-    catch
-        payload.kwave_ver = 'unknown';
-    end
-    payload.os_version    = get_os_version();
-    payload.cpu_model     = get_cpu_model();
-    payload.n_cpu_cores   = feature('numcores');
-    payload.ram_gb        = get_ram_gb();
-    payload.gpu_model     = get_gpu_model();
-    payload.toolboxes     = get_toolbox_names();
-
-    % --- execution environment ---
-    payload.sim_platform  = safe_get(parameters, {'platform'}, 'unknown');
-    payload.code_type     = safe_get(parameters, {'simulation', 'code_type'}, 'unknown');
-    payload.precision     = safe_get(parameters, {'simulation', 'precision'}, 'unknown');
-    payload.hpc_name      = safe_get(parameters, {'hpc', 'name'}, 'unknown');
-    payload.use_gpu       = ~isempty(safe_get(parameters, {'hpc', 'gpu'}, ''));
-    % requested job resources (scheduler runs): headroom and the limits runs hit
-    payload.hpc_timelimit_h = timelimit_hours(safe_get(parameters, {'hpc', 'timelimit'}, ''));
-    payload.hpc_memory_gb   = safe_get(parameters, {'hpc', 'memorylimit'}, NaN);
-    payload.hpc_gpu         = char(safe_get(parameters, {'hpc', 'gpu'}, ''));
-    payload.hpc_partition   = char(safe_get(parameters, {'hpc', 'partition'}, ''));
-
-    % --- simulation configuration ---
-    payload.medium        = safe_get(parameters, {'simulation', 'medium'}, 'unknown');
-    payload.pct_enabled   = logical(safe_get(parameters, {'pct', 'enabled'}, false));
-    payload.pct_density   = safe_get(parameters, {'pct', 'mapping_density'}, '');
-    payload.pct_speed     = safe_get(parameters, {'pct', 'mapping_soundspeed'}, '');
-    payload.pct_atten     = safe_get(parameters, {'pct', 'mapping_attenuation'}, '');
-    payload.layers        = get_layer_names(parameters);
-    % solver and grid settings that change run time
-    payload.thermal_backend       = safe_get(parameters, {'thermal_backend'}, 'kwave');
-    payload.fit_alpha_power       = safe_get(parameters, {'fit_alpha_power'}, 1);
-    payload.source_cfl            = safe_get(parameters, {'grid', 'source_cfl'}, NaN);
-    payload.source_ppw            = safe_get(parameters, {'grid', 'source_ppw'}, NaN);
-    payload.steady_state_transits = safe_get(parameters, {'grid', 'steady_state_transits'}, NaN);
-    payload.sim_time_us           = safe_get(parameters, {'grid', 'sim_time_us'}, NaN);
-    payload.acoustic_fov          = ~isempty(safe_get(parameters, {'grid', 'acoustic_fov_diameter_mm'}, [])) || ...
-                                    ~isempty(safe_get(parameters, {'grid', 'acoustic_fov_length_mm'}, []));
-    payload.headmodel_reuse       = logical(safe_get(parameters, {'headmodel', 'reuse_across_placements'}, false));
-
-    % --- pipeline mode ---
-    payload.pipeline_mode = detect_pipeline_mode(parameters, pipe_options);
-
-    % --- transducer (model/type only, no geometry) ---
-    payload.transducer_type       = safe_get(parameters, {'transducer', 'type'}, 'unknown');
-    payload.freq_hz               = safe_get(parameters, {'transducer', 'freq_hz'}, NaN);
-    payload.transducer_name       = safe_get(parameters, {'transducer', 'name'}, '');
-    payload.n_transducer_elements = get_elem_n(parameters);
-    payload.n_transducers         = numel(safe_get(parameters, {'transducer'}, struct([])));
-    payload.transducer_coupling   = char(safe_get(parameters, {'simulation', 'transducer_coupling'}, ''));
-
-    % --- modules enabled ---
-    mods = safe_get(parameters, {'modules'}, struct());
-    mod_fields = fieldnames(mods);
-    modules_on = {};
-    for i = 1:numel(mod_fields)
-        if isequal(mods.(mod_fields{i}), 1) || isequal(mods.(mod_fields{i}), true)
-            modules_on{end+1} = mod_fields{i}; %#ok<AGROW>
+    p.prestus_branch = branch_class(info);
+    p.prestus_dirty  = safe_get(info, {'dirty'}, 'unknown');
+    p.matlab_ver     = version('-release');
+    p.platform       = computer('arch');
+    if has('basic')
+        try
+            ci = getComputerInfo();
+            p.kwave_ver = ci.kwave_version;
+        catch
+            p.kwave_ver = 'unknown';
         end
     end
-    payload.modules_enabled = modules_on;
+    p.sim_platform     = safe_get(parameters, {'platform'}, 'unknown');
+    p.code_type        = safe_get(parameters, {'simulation', 'code_type'}, 'unknown');
+    p.acoustic_backend = safe_get(parameters, {'acoustic_backend'}, 'kwave');
+    p.thermal_backend  = safe_get(parameters, {'thermal_backend'}, 'kwave');
+    p.medium           = safe_get(parameters, {'simulation', 'medium'}, 'unknown');
+    p.pct_enabled      = logical(safe_get(parameters, {'pct', 'enabled'}, false));
+    p.pct_density      = safe_get(parameters, {'pct', 'mapping_density'}, '');
+    p.pct_speed        = safe_get(parameters, {'pct', 'mapping_soundspeed'}, '');
+    p.pct_atten        = safe_get(parameters, {'pct', 'mapping_attenuation'}, '');
+    p.pipeline_mode    = detect_pipeline_mode(parameters, pipe_options);
+    p.modules_enabled  = modules_on(parameters);
+    p.acoustic_fov     = ~isempty(safe_get(parameters, {'grid', 'acoustic_fov_diameter_mm'}, [])) || ...
+                         ~isempty(safe_get(parameters, {'grid', 'acoustic_fov_length_mm'}, []));
+    p.headmodel_reuse  = logical(safe_get(parameters, {'headmodel', 'reuse_across_placements'}, false));
+    % transducer: model and type only, no geometry
+    p.transducer_type       = safe_get(parameters, {'transducer', 'type'}, 'unknown');
+    p.transducer_model      = transducer_model(parameters);
+    p.freq_hz               = safe_get(parameters, {'transducer', 'freq_hz'}, NaN);
+    p.n_transducer_elements = get_elem_n(parameters);
+    p.n_transducers         = numel(safe_get(parameters, {'transducer'}, struct([])));
+    p.transducer_coupling   = char(safe_get(parameters, {'simulation', 'transducer_coupling'}, ''));
+    if isfield(options, 'duration_s'),   p.duration_s   = options.duration_s;   end
+    if isfield(options, 'error_id'),     p.error_id     = options.error_id;     end
+    if isfield(options, 'failed_stage'), p.failed_stage = options.failed_stage; end
 
-    % --- simulation size and duration (Nexus resource prediction) ---
-    % Allow-listed numeric fields of the run_stats record: grid size, time
-    % steps, stage durations, peak RAM. Never the host, paths or timestamps.
-    payload.resolution_mm    = safe_get(parameters, {'grid', 'resolution_mm'}, NaN);
-    payload.acoustic_backend = safe_get(parameters, {'acoustic_backend'}, 'kwave');
-    payload.n_cpu_alloc      = str2double(getenv('SLURM_CPUS_PER_TASK'));   % NaN outside SLURM
+    % --- performance (Nexus run-time estimates): hardware, resources, grid ---
+    if has('performance')
+        p.cpu_model = get_cpu_model();
+        p.ram_gb    = get_ram_gb();
+        p.gpu_model = get_gpu_model();
+    end
+    p.precision             = safe_get(parameters, {'simulation', 'precision'}, 'unknown');
+    p.hpc_timelimit_h       = timelimit_hours(safe_get(parameters, {'hpc', 'timelimit'}, ''));
+    p.hpc_memory_gb         = safe_get(parameters, {'hpc', 'memorylimit'}, NaN);
+    % partition class only: a partition name can identify the institution
+    p.hpc_partition         = partition_class(safe_get(parameters, {'hpc', 'partition'}, ''));
+    p.n_cpu_alloc           = str2double(getenv('SLURM_CPUS_PER_TASK'));   % NaN outside SLURM
+    p.resolution_mm         = safe_get(parameters, {'grid', 'resolution_mm'}, NaN);
+    p.fit_alpha_power       = safe_get(parameters, {'fit_alpha_power'}, 1);
+    p.source_cfl            = safe_get(parameters, {'grid', 'source_cfl'}, NaN);
+    p.source_ppw            = safe_get(parameters, {'grid', 'source_ppw'}, NaN);
+    p.steady_state_transits = safe_get(parameters, {'grid', 'steady_state_transits'}, NaN);
+    p.sim_time_us           = safe_get(parameters, {'grid', 'sim_time_us'}, NaN);
+    rec = struct();
     if isfield(options, 'sim_stats') && isstruct(options.sim_stats)
-        payload.sim_stats = sim_stats_fields(options.sim_stats, notice);
+        rec = options.sim_stats;
+        p.sim_stats = sim_stats_fields(rec, levels);
     end
 
-    % --- outcome fields (populated on run_end / run_error) ---
-    if isfield(options, 'run_id'),      payload.run_id      = options.run_id;       end
-    if isfield(options, 'duration_s'),  payload.duration_s  = options.duration_s;  end
-    if isfield(options, 'status'),      payload.status      = options.status;       end
-    if isfield(options, 'error_id'),    payload.error_id    = options.error_id;     end
-    if isfield(options, 'failed_stage'), payload.failed_stage = options.failed_stage; end
+    % --- simulation outcomes ---
+    if has('outcomes')
+        p.outcomes = outcome_fields(parameters, rec);
+    end
+
+    % keep the envelope and the fields of the shared levels
+    groups = field_groups();
+    keep = groups.envelope;
+    for k = 1:numel(levels)
+        if isfield(groups, levels{k})
+            keep = [keep, groups.(levels{k})]; %#ok<AGROW>
+        end
+    end
+    payload = struct();
+    fn = fieldnames(p);
+    for k = 1:numel(fn)
+        if any(strcmp(keep, fn{k}))
+            payload.(fn{k}) = p.(fn{k});
+        end
+    end
+end
+
+% -------------------------------------------------------------------------
+function g = field_groups()
+% Top-level payload fields per consent level (TELEMETRY_LEVEL_INFO). The
+% solver, medium and transducer fields sit in several levels: each level's
+% numbers need them to be read.
+    g.envelope = {'event', 'telemetry_schema', 'consent_levels', 'consent_notice', ...
+                  'run_type', 'uuid', 'prestus_hash', 'prestus_ver', 'run_id', 'status'};
+    shared = {'code_type', 'acoustic_backend', 'medium'};
+    g.basic = [shared, {'prestus_branch', 'prestus_dirty', 'matlab_ver', 'platform', ...
+               'kwave_ver', 'sim_platform', 'thermal_backend', 'pct_enabled', 'pct_density', ...
+               'pct_speed', 'pct_atten', 'pipeline_mode', 'modules_enabled', 'acoustic_fov', ...
+               'headmodel_reuse', 'transducer_type', 'transducer_model', 'freq_hz', ...
+               'n_transducer_elements', 'n_transducers', 'transducer_coupling', ...
+               'duration_s', 'error_id', 'failed_stage'}];
+    g.performance = [shared, {'cpu_model', 'ram_gb', 'gpu_model', 'precision', ...
+               'hpc_timelimit_h', 'hpc_memory_gb', 'hpc_partition', 'n_cpu_alloc', ...
+               'resolution_mm', 'fit_alpha_power', 'source_cfl', 'source_ppw', ...
+               'steady_state_transits', 'sim_time_us', 'sim_stats', 'duration_s'}];
+    g.outcomes = [shared, {'thermal_backend', 'pct_enabled', 'transducer_type', ...
+               'transducer_model', 'freq_hz', 'n_transducers', 'resolution_mm', ...
+               'sim_stats', 'outcomes'}];
+    g.skull = {'sim_stats'};      % notice-2 records: the skull medians only
+end
+
+% -------------------------------------------------------------------------
+function o = outcome_fields(parameters, rec)
+% Eight rounded summary statistics of the run (first transducer, first
+% analysed field): brain intensity, its ratio to free water, brain MI,
+% targeting error, peak brain and skull temperature rise, and the two
+% protocol numbers that the temperature rise depends on (overall duty cycle
+% and sonication duration). No maps, positions or target names; values a
+% run did not compute are left out.
+    sig = @(x) round(double(x), 2, 'significant');
+    o = struct();
+    map = {'outcome_isppa_brain_wcm2', 'isppa_brain_wcm2'; ...
+           'outcome_mi_brain',         'mi_brain'; ...
+           'outcome_focal_error_mm',   'focal_error_mm'};
+    for k = 1:size(map, 1)
+        v = safe_get(rec, map(k, 1), []);
+        if isnumeric(v) && isscalar(v) && isfinite(v)
+            o.(map{k, 2}) = sig(v);
+        end
+    end
+    ff = safe_get(rec, {'outcome_freefield_isppa_wcm2'}, []);
+    if isfield(o, 'isppa_brain_wcm2') && isnumeric(ff) && isscalar(ff) && isfinite(ff) && ff > 0
+        o.brain_transmission = sig(rec.outcome_isppa_brain_wcm2 / ff);
+    end
+    for f = {'brain', 'skull'}
+        v = safe_get(rec, {['outcome_riset_' f{1} '_c']}, []);
+        if isnumeric(v) && isscalar(v) && isfinite(v)
+            o.(['riset_' f{1} '_c']) = round(double(v), 1);
+        end
+    end
+    [duty, dur] = protocol_summary(safe_get(parameters, {'timing'}, struct()));
+    if isfinite(duty), o.duty_cycle = sig(duty); end
+    if isfinite(dur),  o.sonication_s = sig(dur); end
+end
+
+% -------------------------------------------------------------------------
+function [duty, dur] = protocol_summary(t)
+% Overall duty cycle (pulse duty x train duty) and total sonication time [s]
+% from timing.*; NaN when the protocol is not set.
+    num = @(f) double(safe_get(t, {f}, 0));
+    pd = num('pd'); pri = num('pri'); ptd = num('ptd'); ptri = num('ptri'); ptrd = num('ptrd');
+    duty = NaN;
+    dur = NaN;
+    if ~(isscalar(pd) && pd > 0), return, end
+    duty = 1;
+    if isscalar(pri) && pri > 0, duty = min(pd / pri, 1); end
+    if isscalar(ptd) && ptd > 0 && isscalar(ptri) && ptri > 0, duty = duty * min(ptd / ptri, 1); end
+    if isscalar(ptrd) && ptrd > 0
+        dur = ptrd;
+    elseif isscalar(ptd) && ptd > 0
+        dur = ptd;
+    end
+end
+
+% -------------------------------------------------------------------------
+function names = modules_on(parameters)
+    mods = safe_get(parameters, {'modules'}, struct());
+    fn = fieldnames(mods);
+    names = {};
+    for i = 1:numel(fn)
+        if isequal(mods.(fn{i}), 1) || isequal(mods.(fn{i}), true)
+            names{end+1} = fn{i}; %#ok<AGROW>
+        end
+    end
 end
 
 % -------------------------------------------------------------------------
@@ -218,31 +289,28 @@ end
 
 % -------------------------------------------------------------------------
 function uuid = get_or_create_uuid()
+% The anonymous install ID in <prefdir_prestus>/uuid.txt, created on first use.
+% Clients before 2026-11 drew it from MATLAB's rand at its default seed, so
+% many installs share the same ID (COLLIDED_ID); such a file gets a new one.
     uuid_file = fullfile(prefdir_prestus(), 'uuid.txt');
     if isfile(uuid_file)
         fid  = fopen(uuid_file, 'r');
         uuid = strtrim(fgetl(fid));
         fclose(fid);
-        if ~isempty(uuid), return, end
+        if ischar(uuid) && ~isempty(uuid) && ~strcmp(uuid, collided_id())
+            return
+        end
     end
-    % Generate a random UUID v4
-    bytes = uint8(floor(rand(1,16) * 256));
-    bytes(7) = bitor(bitand(bytes(7), uint8(15)), uint8(64));  % version 4
-    bytes(9) = bitor(bitand(bytes(9), uint8(63)), uint8(128)); % variant
-    uuid = sprintf('%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x', bytes);
+    uuid = generate_run_id();
     fid  = fopen(uuid_file, 'w');
     fprintf(fid, '%s\n', uuid);
     fclose(fid);
 end
 
-% -------------------------------------------------------------------------
-function names = get_layer_names(parameters)
-    layers = safe_get(parameters, {'layers'}, struct());
-    if isstruct(layers)
-        names = fieldnames(layers);
-    else
-        names = {};
-    end
+function id = collided_id()
+% The first rand(1,16) draw of a fresh MATLAB session as a UUID: the ID that
+% earlier clients gave every install and run created at the default seed.
+    id = 'd0e720e9-a118-478c-b5f7-28f8f57ccc24';
 end
 
 % -------------------------------------------------------------------------
@@ -277,14 +345,6 @@ function mode = detect_pipeline_mode(parameters, pipe_options)
 end
 
 % -------------------------------------------------------------------------
-function rid = generate_run_id()
-    bytes = uint8(floor(rand(1,16) * 256));
-    bytes(7) = bitor(bitand(bytes(7), uint8(15)), uint8(64));
-    bytes(9) = bitor(bitand(bytes(9), uint8(63)), uint8(128));
-    rid = sprintf('%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x', bytes);
-end
-
-% -------------------------------------------------------------------------
 function n = get_elem_n(parameters)
     tr_type = safe_get(parameters, {'transducer', 'type'}, '');
     switch tr_type
@@ -304,25 +364,6 @@ function n = get_elem_n(parameters)
             if ~isnan(nr) && ~isnan(nc), n = nr * nc; end
         otherwise
             n = NaN;
-    end
-end
-
-% -------------------------------------------------------------------------
-function v = get_os_version()
-    try
-        arch = computer('arch');
-        if contains(arch, 'mac')
-            [~, v] = run_command({'sw_vers', '-productVersion'});
-        elseif isunix
-            [~, v] = run_command({'uname', '-r'});
-        else
-            % 'ver' is a cmd.exe builtin, not a standalone executable --
-            % it needs the one shell layer run_shell_script provides.
-            [~, v] = run_shell_script('ver');
-        end
-        v = strtrim(v);
-    catch
-        v = 'unknown';
     end
 end
 
@@ -391,37 +432,80 @@ function name = get_gpu_model()
 end
 
 % -------------------------------------------------------------------------
-function names = get_toolbox_names()
-    try
-        info = ver;
-        names = {info.Name};
-        names = names(~strcmp(names, 'MATLAB'));
-    catch
-        names = {};
+function c = partition_class(partition)
+% '' (unset), 'gpu' (the name contains "gpu"), or 'other'; never the name.
+    partition = char(string(partition));
+    if isempty(partition)
+        c = '';
+    elseif contains(lower(partition), 'gpu')
+        c = 'gpu';
+    else
+        c = 'other';
     end
 end
 
 % -------------------------------------------------------------------------
-function out = sim_stats_fields(rec, notice)
-% Numeric run_stats fields only (see RUN_STATS); anything else is dropped.
-% Skull properties: the medians only, and only with consent to notice 2 or later.
-    keep = {'acoustic_voxels', 'acoustic_dims', 'acoustic_pml', 'axisymmetric', ...
-            'acoustic_nt', 'acoustic_s', 'thermal_voxels', 'thermal_steps', ...
-            'thermal_s', 'peak_ram_gb', 'n_cpu', 'gpu_mem_gb', 'queue_wait_s'};
-    if nargin > 1 && notice >= 2
-        keep = [keep, {'skull_c_median', 'skull_rho_median', 'skull_atten_median', ...
-                       'skull_path_c_median', 'skull_path_rho_median', 'skull_path_atten_median'}];
+function m = transducer_model(parameters)
+% Shipped equipment model of the first transducer (config/equipment/model-*),
+% matched by its serial or name; 'custom' for anything else, '' when neither is
+% set. Never the name or serial: a serial identifies one device, and a free-text
+% name can name a lab or a person.
+    m = '';
+    t = safe_get(parameters, {'transducer'}, struct());
+    if iscell(t) && ~isempty(t), t = t{1}; end
+    if ~isstruct(t) || isempty(t), return, end
+    t = t(1);
+    squash = @(x) lower(regexprep(char(string(x)), '[^A-Za-z0-9]', ''));
+    keys = {};
+    for f = {'serial', 'name'}
+        if isfield(t, f{1}) && (ischar(t.(f{1})) || isstring(t.(f{1}))) && strlength(string(t.(f{1}))) > 0
+            keys{end+1} = squash(t.(f{1})); %#ok<AGROW>
+        end
+    end
+    if isempty(keys), return, end
+    m = 'custom';
+    root  = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+    files = dir(fullfile(root, 'config', 'equipment', 'model-*', 'tran-*_transducer.yaml'));
+    for k = 1:numel(files)
+        [~, folder] = fileparts(files(k).folder);
+        model  = extractAfter(folder, 'model-');
+        serial = regexprep(files(k).name, '^tran-(.*)_transducer\.yaml$', '$1');
+        if any(strcmp(keys, squash(serial))) || any(strcmp(keys, squash(model)))
+            m = model;
+            return
+        end
+    end
+end
+
+% -------------------------------------------------------------------------
+function out = sim_stats_fields(rec, levels)
+% Allow-listed numeric fields of the run record (RUN_STATS); anything else is
+% dropped. Grid size, time steps, stage times and memory with 'performance';
+% the skull property medians (3 significant figures) with 'outcomes', or
+% with a notice-2 consent ('skull').
+    keep = {};
+    if any(strcmp(levels, 'performance'))
+        keep = {'acoustic_voxels', 'acoustic_dims', 'acoustic_pml', 'axisymmetric', ...
+                'acoustic_nt', 'acoustic_s', 'thermal_voxels', 'thermal_steps', ...
+                'thermal_s', 'peak_ram_gb', 'n_cpu', 'gpu_mem_gb', 'queue_wait_s'};
+        fn = fieldnames(rec);
+        stages = fn(~cellfun(@isempty, regexp(fn, '^stage_[a-z_]+_s$', 'once')));   % stage times
+        keep = [keep, stages(:)'];
+    end
+    skull = {};
+    if any(ismember(levels, {'outcomes', 'skull'}))
+        skull = {'skull_c_median', 'skull_rho_median', 'skull_atten_median', ...
+                 'skull_path_c_median', 'skull_path_rho_median', 'skull_path_atten_median'};
     end
     out = struct();
-    if ~isstruct(rec)
-        return
-    end
-    fn = fieldnames(rec);
-    stages = fn(~cellfun(@isempty, regexp(fn, '^stage_[a-z_]+_s$', 'once')));   % stage times
-    keep = [keep, stages(:)'];
     for k = 1:numel(keep)
         if isfield(rec, keep{k}) && isnumeric(rec.(keep{k}))
             out.(keep{k}) = double(rec.(keep{k}));
+        end
+    end
+    for k = 1:numel(skull)
+        if isfield(rec, skull{k}) && isnumeric(rec.(skull{k}))
+            out.(skull{k}) = round(double(rec.(skull{k})), 3, 'significant');
         end
     end
 end

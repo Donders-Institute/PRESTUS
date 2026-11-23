@@ -20,9 +20,31 @@ def test_record_matches_matlab_jsonencode(tmp_path):
     f = tmp_path / ".prestus" / "telemetry.json"
     telemetry.set_consent(True, None, f, today="2026-11-14")
     assert f.read_text(encoding="utf-8") == \
-        '{"opt_in":true,"decided_on":"2026-11-14","prestus_ver":"unknown","notice":2}\n'
+        ('{"opt_in":true,"levels":["basic","performance","outcomes"],"decided_on":"2026-11-14",'
+         '"prestus_ver":"unknown","notice":3}\n')
     c = telemetry.read_consent(f)
     assert c.opted_in and c.decided_on == "2026-11-14" and c.prestus_ver == "unknown"
+    assert c.levels == telemetry.LEVEL_NAMES
+
+
+def test_levels_round_trip_and_legacy_records(tmp_path):
+    """Every subset of levels round-trips in prompt order; none ticked shares nothing; a
+    record from before levels shares usage and performance (telemetry_levels.m)."""
+    import itertools
+    f = tmp_path / "telemetry.json"
+    for k in range(len(telemetry.LEVEL_NAMES) + 1):
+        for subset in itertools.combinations(telemetry.LEVEL_NAMES, k):
+            telemetry.set_consent(list(reversed(subset)), None, f)
+            c = telemetry.read_consent(f)
+            assert c.levels == subset and c.opted_in == bool(subset), subset
+            assert json.loads(f.read_text())["opt_in"] is bool(subset)
+    f.write_text('{"opt_in":true,"decided_on":"2026-01-01","notice":2}\n')
+    c = telemetry.read_consent(f)
+    assert c.levels == telemetry.LEGACY_LEVELS and telemetry.outdated(c)
+    f.write_text('{"opt_in":true,"levels":["outcomes","nonsense"],"notice":3}\n')
+    assert telemetry.read_consent(f).levels == ("outcomes",)
+    f.write_text('{"opt_in":true,"levels":[],"notice":3}\n')   # nothing ticked
+    assert telemetry.read_consent(f).state == "opted_out"
 
 
 def test_round_trip_and_reset(tmp_path, prestus_root):
@@ -59,6 +81,10 @@ def test_env_override(monkeypatch):
     assert telemetry.env_override() == "off"
     monkeypatch.setenv("PRESTUS_TELEMETRY", "maybe")
     assert telemetry.env_override() == ""
+    monkeypatch.setenv("PRESTUS_TELEMETRY", "basic, outcomes")       # a list of levels
+    assert telemetry.env_override() == "on"
+    monkeypatch.setenv("PRESTUS_TELEMETRY", "basic,maybe")
+    assert telemetry.env_override() == ""
 
 
 def _consent(tmp_path, text):
@@ -82,11 +108,17 @@ def test_status_text_for_every_state():
         ("opted_out", "on"): ("Not sharing", "amber"),          # a recorded opt-out wins
     }
     for (state, env), (words, colour) in cases.items():
-        text, tip, role = telemetry.status(telemetry.Consent(state, "2026-11-19", notice=2), env)
+        levels = telemetry.LEVEL_NAMES if state == "opted_in" else ()
+        c = telemetry.Consent(state, "2026-11-19", notice=telemetry.NOTICE_VERSION, levels=levels)
+        text, tip, role = telemetry.status(c, env)
         assert text.startswith(words + " usage statistics") and role == colour, (state, env, text)
         assert "Click" in tip
-    text, tip, role = telemetry.status(telemetry.Consent("opted_in", "2026-01-01", notice=1), "")
+    text, tip, role = telemetry.status(
+        telemetry.Consent("opted_in", "2026-01-01", notice=1, levels=telemetry.LEGACY_LEVELS), "")
     assert "notice updated" in text and role == "green"
+    text, tip, _ = telemetry.status(telemetry.Consent(
+        "opted_in", notice=telemetry.NOTICE_VERSION, levels=("outcomes",)), "")
+    assert "(1 of 3)" in text and "summary outcomes" in tip
     # declining under an old notice is not outdated: nothing is sent either way
     assert not telemetry.outdated(telemetry.Consent("opted_out", notice=1))
 
@@ -134,3 +166,30 @@ def test_window_shows_decision_and_prompts_once(app, schema, tmp_path, monkeypat
     w.usage_status.linkActivated.emit("usage")
     assert shown == [True, True, False]                        # click opens the dialog
     w.close()
+
+
+def test_dialog_share_all_follows_the_levels(app, tmp_path):
+    """Share all (bold) ticks or unticks every level; unticking one leaves it partly
+    ticked; the dialog has no Decline button, and saving none ticked shares nothing."""
+    from PyQt6.QtCore import Qt
+    f = tmp_path / "telemetry.json"
+    ui = telemetry.ConsentDialog(None, telemetry.read_consent(f), f, at_launch=True)
+    assert ui.all_box.font().bold() and ui.all_box.checkState() == Qt.CheckState.Checked
+    assert ui.levels() == telemetry.LEVEL_NAMES                      # all ticked by default
+    texts = [b.text() for b in ui.dialog.findChildren(type(ui.save))]
+    assert "Decline" not in " ".join(texts) and "Ask me later" in texts
+    ui.boxes["outcomes"].setChecked(False)
+    assert ui.all_box.checkState() == Qt.CheckState.PartiallyChecked
+    ui.all_box.click()                                              # partial -> all
+    assert ui.levels() == telemetry.LEVEL_NAMES
+    ui.all_box.click()                                              # all -> none
+    assert ui.levels() == () and ui.all_box.checkState() == Qt.CheckState.Unchecked
+    ui.boxes["basic"].setChecked(True)
+    assert ui.levels() == ("basic",)
+    # the dialog opens on the recorded levels; an Allow under an earlier notice opens on all
+    telemetry.set_consent(["performance"], None, f)
+    ui = telemetry.ConsentDialog(None, telemetry.read_consent(f), f, at_launch=False)
+    assert ui.levels() == ("performance",) and ui.forget.isEnabled()
+    f.write_text('{"opt_in":true,"notice":2}\n')
+    ui = telemetry.ConsentDialog(None, telemetry.read_consent(f), f, at_launch=True)
+    assert ui.levels() == telemetry.LEVEL_NAMES

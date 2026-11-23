@@ -15,6 +15,8 @@
 %                                % (needs PRESTUS_ITRUSST_DATA; 3D, GPU/HPC)
 %     run_all_tests('slurm_live') % submit a real SLURM job and check hpc_job_report output
 %                                 % (skipped automatically when sbatch is not on PATH)
+%     run_all_tests('telemetry_live') % post track_usage's events to the telemetry server
+%                                     % (network; adds 4 technical/development rows)
 %
 %   Demo-data levels (require PRESTUS_DEMO_DATA to point to prestus_testdata/):
 %     run_all_tests('demo_inputs')   % verify all demo input files exist

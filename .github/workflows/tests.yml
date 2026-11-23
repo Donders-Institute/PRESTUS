@@ -2,7 +2,7 @@ name: Tests
 
 # Level 0 (docs + Nexus) and level 1 (MATLAB unit tests) run on every push and
 # pull request; level 2 (free-water physics benchmarks, ~5 min CPU) runs weekly
-# and on demand. Levels 3-4 (demo subject, 3D benchmarks, backends) need data or
+# and on demand, as does the telemetry server check. Levels 3-4 (demo subject, 3D benchmarks, backends) need data or
 # a GPU and are run by maintainers before a release (doc/doc_testing.md).
 
 on:
@@ -17,6 +17,10 @@ on:
         description: Also run the physics benchmarks
         type: boolean
         default: true
+      telemetry:
+        description: Also check the telemetry server accepts PRESTUS's events (adds 4 rows)
+        type: boolean
+        default: false
 
 concurrency:
   group: tests-${{ github.ref }}
@@ -138,3 +142,19 @@ jobs:
       - uses: matlab-actions/run-command@v2
         with:
           command: cd tests; run_all_tests('physics')
+
+  matlab-telemetry-live:
+    name: Telemetry server accepts PRESTUS events
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.telemetry)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Submodules
+        run: git submodule update --init --depth 1 external/k-wave external/export_fig external/xml2struct external/FEX-minimize external/PlanTUS
+      - uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2023b
+      - uses: matlab-actions/run-command@v2
+        with:
+          command: cd tests; run_all_tests('telemetry_live')

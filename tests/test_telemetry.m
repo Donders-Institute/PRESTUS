@@ -17,8 +17,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_teleme
 % it, so results do not depend on whether the suite itself runs under
 % `matlab -batch`.
 %
-% Not covered: answering the interactive input() prompt and the GUI
-% uiconfirm dialog; both need a user.
+% The console prompt is answered by an input() stub. Not covered: the GUI
+% dialog (TELEMETRY_SETUP with a figure), which needs a display.
 %
 %   results = runtests('tests/test_telemetry.m');
 
@@ -125,13 +125,18 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_teleme
         end
 
         function test_env_override_values(tc)
-            vals = {'off', 'off'; '0', 'off'; 'FALSE', 'off'; ' Off ', 'off'; ...
-                    'on', 'on'; '1', 'on'; 'True', 'on'; '', ''; '  ', ''};
+            all3 = {'basic', 'performance', 'outcomes'};
+            vals = {'off', 'off', {}; '0', 'off', {}; 'FALSE', 'off', {}; ' Off ', 'off', {}; ...
+                    'on', 'on', all3; '1', 'on', all3; 'True', 'on', all3; '', '', {}; '  ', '', {}; ...
+                    'outcomes, Basic', 'on', {'basic', 'outcomes'}; 'performance', 'on', {'performance'}};
             for k = 1:size(vals, 1)
                 setenv('PRESTUS_TELEMETRY', vals{k, 1});
-                tc.verifyEqual(telemetry_env_override(), vals{k, 2}, ...
-                    sprintf('PRESTUS_TELEMETRY=''%s''', vals{k, 1}));
+                [mode, levels] = telemetry_env_override();
+                tc.verifyEqual(mode, vals{k, 2}, sprintf('PRESTUS_TELEMETRY="%s"', vals{k, 1}));
+                tc.verifyEqual(levels, vals{k, 3}, sprintf('levels of "%s"', vals{k, 1}));
             end
+            setenv('PRESTUS_TELEMETRY', 'basic,maybe');          % one unknown level: not valid
+            tc.verifyWarning(@() telemetry_env_override(), 'prestus:telemetry:invalidEnv');
         end
 
         function test_env_off_no_prompt_no_decision_file(tc)
@@ -142,7 +147,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_teleme
             setenv('PRESTUS_TELEMETRY', 'off');
             out = evalc('telemetry_setup()');
             tc.verifySubstring(out, 'Telemetry off for this process');
-            tc.verifyFalse(contains(out, 'What IS collected'), 'notice printed despite override');
+            tc.verifyFalse(contains(out, 'Never stored'), 'notice printed despite override');
             tc.verifyFalse(isfile(fullfile(prefdir_prestus(), 'telemetry.json')));
         end
 
@@ -184,7 +189,7 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_teleme
             track_usage('run_end', track_params(), struct('status', 'success'));
             tc.verifyFalse(isfile(tc.WebLog), 'PRESTUS_TELEMETRY=1 overrode a recorded opt-out');
             out = evalc('telemetry_setup()');
-            tc.verifySubstring(out, 'PRESTUS_TELEMETRY=on ignored');
+            tc.verifySubstring(out, 'PRESTUS_TELEMETRY ignored');
             tc.verifyEqual(fileread(f), before, 'recorded decision was changed');
         end
 
@@ -211,6 +216,12 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_teleme
             telemetry_set_consent_quiet(true);
             cfg = jsondecode(fileread(f));
             tc.verifyTrue(cfg.opt_in);
+            tc.verifyEqual(cfg.levels(:)', {'basic', 'performance', 'outcomes'});
+            tc.verifyEqual(cfg.notice, telemetry_notice_version());
+            telemetry_set_consent_quiet({'outcomes'});          % one level: still a JSON list
+            tc.verifySubstring(fileread(f), '"levels":["outcomes"]');
+            tc.verifyError(@() telemetry_set_consent({'everything'}), 'telemetry_set_consent:level');
+            telemetry_set_consent_quiet(true);
             tc.verifyMatches(cfg.decided_on, '^\d{4}-\d{2}-\d{2}$');
             telemetry_set_consent_quiet(false);
             cfg = jsondecode(fileread(f));
@@ -223,6 +234,38 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_teleme
             a = generate_run_id();
             tc.verifyMatches(a, '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$');
             tc.verifyNotEqual(a, generate_run_id());
+        end
+
+        function test_run_id_ignores_matlab_rng(tc)
+            % Every MATLAB session starts rand at the default seed: IDs drawn
+            % from it were the same in every new session (every batch job).
+            orig = rng;
+            tc.addTeardown(@() rng(orig));
+            rng('default');
+            a = generate_run_id();
+            rng('default');
+            b = generate_run_id();
+            tc.verifyNotEqual(a, b, 'two fresh sessions would share a run ID');
+            tc.verifyNotEqual(a, 'd0e720e9-a118-478c-b5f7-28f8f57ccc24');
+            rng('default');
+            before = rng;
+            generate_run_id();
+            tc.verifyEqual(rng, before, 'generate_run_id moved the global random stream');
+        end
+
+        function test_collided_install_id_is_replaced(tc)
+            tc.install_webwrite_stub();
+            telemetry_set_consent_quiet(true);
+            f = fullfile(prefdir_prestus(), 'uuid.txt');
+            bad = 'd0e720e9-a118-478c-b5f7-28f8f57ccc24';    % earlier clients' shared ID
+            fid = fopen(f, 'w'); fprintf(fid, '%s\n', bad); fclose(fid);
+            track_usage('run_end', track_params(), struct('status', 'success'));
+            sent = last_payload(tc.WebLog).uuid;
+            tc.verifyNotEqual(sent, bad, 'the shared install ID was sent');
+            tc.verifyEqual(strtrim(fileread(f)), sent, 'the new install ID was not kept');
+            % negative control: an install ID of its own is kept
+            track_usage('run_end', track_params(), struct('status', 'success'));
+            tc.verifyEqual(last_payload(tc.WebLog).uuid, sent);
         end
 
         function test_track_usage_sends_nothing_without_decision(tc)
@@ -253,9 +296,43 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_teleme
             tc.verifyEqual(payload.event, 'run_end');
             tc.verifyEqual(payload.run_type, 'technical');
             tc.verifyEqual(payload.status, 'success');
+            tc.verifyEqual(payload.telemetry_schema, 3, 'event format version');
+            tc.verifyEqual(payload.consent_levels(:)', {'basic', 'performance', 'outcomes'});
+            for f = {'toolboxes', 'timestamp_utc', 'hpc_gpu', 'transducer_name', 'os_version', ...
+                     'use_gpu', 'hpc_name', 'layers', 'n_cpu_cores'}
+                tc.verifyFalse(isfield(payload, f{1}), [f{1} ' is no longer sent']);
+            end
             tc.verifyFalse(contains(lines{2}, p.path.sim), 'payload contains a path');
             tc.verifyFalse(isfield(payload, 'subject_id'));
             tc.verifyTrue(isfile(fullfile(prefdir_prestus(), 'uuid.txt')));
+        end
+
+        function test_track_usage_sends_classes_not_free_text(tc)
+            % Free-text config values become classes; the typed text never leaves.
+            tc.install_webwrite_stub();
+            telemetry_set_consent_quiet(true);
+            cases = { ...  % serial, name, partition, hpc.name -> model, partition (hpc.name not sent)
+                'CTX_500_026', '', 'gpu40g', 'default', 'CTX_500', 'gpu', ''; ...
+                '', 'CTX500-026', 'batch', 'my-lab-cluster', 'CTX_500', 'other', ''; ...
+                '', 'Smith lab prototype', '', '', 'custom', '', ''};
+            for k = 1:size(cases, 1)
+                if isfile(tc.WebLog), delete(tc.WebLog); end
+                p = track_params();
+                p.transducer.serial = cases{k, 1};
+                p.transducer.name   = cases{k, 2};
+                p.hpc = struct('partition', cases{k, 3}, 'name', cases{k, 4});
+                track_usage('run_start', p, struct('run_id', 'abc'));
+                lines = strsplit(strtrim(fileread(tc.WebLog)), newline);
+                payload = jsondecode(lines{2});
+                tc.verifyEqual(payload.transducer_model, cases{k, 5}, sprintf('case %d model', k));
+                tc.verifyEqual(payload.hpc_partition, cases{k, 6}, sprintf('case %d partition', k));
+                tc.verifyFalse(isfield(payload, 'hpc_name'), sprintf('case %d hpc_name sent', k));
+                for typed = cases(k, [2 3 4])
+                    if ~isempty(typed{1}) && ~any(strcmp(typed{1}, cases(k, 5:7)))   % class values may appear
+                        tc.verifyFalse(contains(lines{2}, typed{1}), ['payload contains "' typed{1} '"']);
+                    end
+                end
+            end
         end
 
         function test_track_usage_sim_stats_allow_list(tc)
@@ -302,9 +379,154 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_teleme
             tc.verifyEqual(fieldnames(sent)', {'acoustic_nt'});
         end
 
+        function test_levels_select_the_fields(tc)
+            % Every subset of levels: the envelope always, each level's fields
+            % only when shared, and nothing at all when no level is shared.
+            tc.install_webwrite_stub();
+            names = {'basic', 'performance', 'outcomes'};
+            marker = struct('basic', 'modules_enabled', 'performance', 'cpu_model', ...
+                            'outcomes', 'outcomes');
+            rec = struct('acoustic_nt', 2871, 'skull_c_median', 2550, ...
+                         'outcome_isppa_brain_wcm2', 12.3, 'outcome_freefield_isppa_wcm2', 30);
+            for m = 0:7
+                levels = names(logical(bitget(m, 1:3)));
+                if isfile(tc.WebLog), delete(tc.WebLog); end
+                telemetry_set_consent_quiet(levels);
+                track_usage('run_end', track_params(), ...
+                    struct('run_id', 'r', 'status', 'success', 'sim_stats', rec));
+                if isempty(levels)
+                    tc.verifyFalse(isfile(tc.WebLog), 'sent with no level shared');
+                    continue
+                end
+                p = last_payload(tc.WebLog);
+                what = strjoin(levels, '+');
+                for f = {'event', 'uuid', 'run_id', 'status', 'prestus_ver', 'consent_levels'}
+                    tc.verifyTrue(isfield(p, f{1}), [what ': envelope lacks ' f{1}]);
+                end
+                for k = 1:3
+                    tc.verifyEqual(isfield(p, marker.(names{k})), ismember(names{k}, levels), ...
+                        sprintf('%s: %s', what, marker.(names{k})));
+                end
+                st = struct();
+                if isfield(p, 'sim_stats'), st = p.sim_stats; end
+                tc.verifyEqual(isfield(st, 'acoustic_nt'), ismember('performance', levels), [what ': grid']);
+                tc.verifyEqual(isfield(st, 'skull_c_median'), ismember('outcomes', levels), [what ': skull']);
+            end
+        end
+
+        function test_outcomes_are_rounded_summaries(tc)
+            tc.install_webwrite_stub();
+            telemetry_set_consent_quiet({'outcomes'});
+            p = track_params();
+            p.transducer.target_isppa_wcm2 = [30 40];
+            p.timing = struct('pd', 0.02, 'pri', 0.1, 'ptd', 80, 'ptri', 0, 'ptrd', 80);
+            rec = struct('outcome_isppa_brain_wcm2', 12.345, 'outcome_freefield_isppa_wcm2', 30.2, ...
+                'outcome_mi_brain', 0.5678, 'outcome_focal_vol_6db_mm3', 123.4, ...
+                'outcome_focal_error_mm', 3.1415, 'outcome_aircav_flag', 0, ...
+                'outcome_riset_brain_c', 0.2345, 'outcome_riset_skull_c', 1.2678, ...
+                'outcome_riset_skin_c', 0.04, 'outcome_cem43_skull_min', 0.01234, ...
+                'skull_path_mm', [6.54 7.1], 'skull_c_median', 2551.7);
+            track_usage('run_end', p, struct('status', 'success', 'sim_stats', rec));
+            o = last_payload(tc.WebLog).outcomes;
+            expect = struct('isppa_brain_wcm2', 12, 'brain_transmission', 0.41, ...
+                'mi_brain', 0.57, 'focal_error_mm', 3.1, 'riset_brain_c', 0.2, ...
+                'riset_skull_c', 1.3, 'duty_cycle', 0.2, 'sonication_s', 80);
+            tc.verifyEqual(sort(fieldnames(o)), sort(fieldnames(expect)), 'outcome fields');
+            for f = fieldnames(expect)'
+                tc.verifyEqual(o.(f{1}), expect.(f{1}), 'AbsTol', 1e-9, f{1});
+            end
+            tc.verifyEqual(last_payload(tc.WebLog).sim_stats.skull_c_median, 2550);
+            % a water run (no brain) sends no brain outcomes and no ratio
+            track_usage('run_end', track_params(), struct('status', 'success', ...
+                'sim_stats', struct('outcome_riset_skull_c', NaN)));
+            o = last_payload(tc.WebLog).outcomes;
+            tc.verifyFalse(any(isfield(o, {'isppa_brain_wcm2', 'brain_transmission', 'riset_skull_c'})));
+            % trains: duty = pulse duty x train duty; no protocol set: no protocol values
+            p.timing = struct('pd', 0.005, 'pri', 0.01, 'ptd', 30, 'ptri', 60, 'ptrd', 600);
+            track_usage('run_end', p, struct('status', 'success', 'sim_stats', struct()));
+            o = last_payload(tc.WebLog).outcomes;
+            tc.verifyEqual([o.duty_cycle, o.sonication_s], [0.25, 600], 'AbsTol', 1e-12);
+            track_usage('run_end', track_params(), struct('status', 'success'));
+            tc.verifyFalse(any(isfield(last_payload(tc.WebLog).outcomes, {'duty_cycle', 'sonication_s'})));
+        end
+
+        function test_console_prompt_records_the_typed_levels(tc)
+            % Enter shares all; numbers share those levels; 0 unticks all; an
+            % invalid reply asks again. input() answers from PRESTUS_TEST_INPUT.
+            tc.install_session_stub();
+            setenv('PRESTUS_TEST_BATCH', '0');
+            tc.install_input_answers();
+            f = fullfile(prefdir_prestus(), 'telemetry.json');
+            cases = {'', {'basic', 'performance', 'outcomes'}; '1 3', {'basic', 'outcomes'}; ...
+                     '3,2', {'performance', 'outcomes'}; '0', {}; 'x|9|2', {'performance'}};
+            for k = 1:size(cases, 1)
+                evalc('telemetry_setup_reset()');
+                setenv('PRESTUS_TEST_INPUT', cases{k, 1});
+                clear('input');
+                out = evalc('telemetry_setup()');
+                tc.verifySubstring(out, 'Share all (recommended)');
+                cfg = jsondecode(fileread(f));
+                got = {};
+                if ~isempty(cfg.levels), got = cellstr(cfg.levels)'; end
+                tc.verifyEqual(got, cases{k, 2}, sprintf('reply "%s"', cases{k, 1}));
+                tc.verifyEqual(cfg.opt_in, ~isempty(cases{k, 2}));
+            end
+        end
+
+        function test_earlier_opt_in_is_offered_levels_once(tc)
+            % An opt-in from before levels keeps sharing what it covered; an
+            % interactive session offers the levels once, a batch job never.
+            tc.install_webwrite_stub();
+            tc.install_session_stub();
+            tc.install_input_answers();
+            f = fullfile(prefdir_prestus(), 'telemetry.json');
+            legacy = '{"opt_in":true,"decided_on":"2026-11-01","prestus_ver":"x","notice":2}';
+            fid = fopen(f, 'w'); fprintf(fid, '%s\n', legacy); fclose(fid);
+            [levels, notice] = telemetry_levels();
+            tc.verifyEqual(levels, {'basic', 'performance', 'skull'});
+            tc.verifyEqual(notice, 2);
+            setenv('PRESTUS_TEST_BATCH', '1');
+            evalc('telemetry_setup()');
+            tc.verifyEqual(strtrim(fileread(f)), legacy, 'a batch job changed the record');
+            setenv('PRESTUS_TEST_BATCH', '0');
+            setenv('PRESTUS_TEST_INPUT', '');
+            clear('input');
+            out = evalc('telemetry_setup()');
+            tc.verifySubstring(out, 'now come in levels');
+            tc.verifyEqual(telemetry_levels(), {'basic', 'performance', 'outcomes'});
+            setenv('PRESTUS_TEST_INPUT', 'NO_SECOND_PROMPT');
+            out = evalc('telemetry_setup()');
+            tc.verifyFalse(contains(out, 'Share all'), 'offered a second time');
+        end
+
     end
 
     methods (Access = private)
+
+        function install_session_stub(tc)
+            % telemetry_is_noninteractive returns PRESTUS_TEST_BATCH == '1', so the
+            % prompt path does not depend on the test job's display or scheduler.
+            d = tc.install_stubs({'telemetry_is_noninteractive', { ...
+                'function tf = telemetry_is_noninteractive()', ...
+                'tf = strcmp(getenv(''PRESTUS_TEST_BATCH''), ''1'');', 'end'}});
+            tc.assertEqual(which('telemetry_is_noninteractive'), ...
+                fullfile(d, 'telemetry_is_noninteractive.m'), 'session stub not active');
+        end
+
+        function install_input_answers(tc)
+            % input() returns the next |-separated answer of PRESTUS_TEST_INPUT.
+            tc.preserve_env('PRESTUS_TEST_INPUT');
+            d = tc.install_stubs({'input', { ...
+                'function r = input(varargin)', ...
+                'persistent k', ...
+                'if isempty(k), k = 0; end', ...
+                'k = k + 1;', ...
+                'a = strsplit(getenv(''PRESTUS_TEST_INPUT''), ''|'', ''CollapseDelimiters'', false);', ...
+                'if k > numel(a), error(''test:telemetry:prompted'', ''no answer left''); end', ...
+                'r = a{k};', ...
+                'end'}});
+            tc.assertEqual(which('input'), fullfile(d, 'input.m'), 'input answers not active');
+        end
 
         function preserve_env(tc, name)
             old = getenv(name);
@@ -319,6 +541,12 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_teleme
                 'fprintf(fid, ''%s\n%s\n'', url, data);', ...
                 'fclose(fid);', ...
                 'out = [];', ...
+                'end'}; ...
+                'gpuDevice', { ...
+                'function g = gpuDevice(varargin)', ...
+                '% Test stub: the payload''s GPU model without initialising CUDA,', ...
+                '% which takes tens of seconds on a node without a GPU.', ...
+                'g = struct(''Name'', ''test_gpu'');', ...
                 'end'}});
             tc.WebLog = fullfile(tc.StubDir, 'requests.log');
             setenv('PRESTUS_TEST_WEBWRITE_LOG', tc.WebLog);

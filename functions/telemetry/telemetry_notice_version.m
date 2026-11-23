@@ -7,6 +7,10 @@ function v = telemetry_notice_version()
 %   1 - the original notice
 %   2 - (2026-11-17) adds the medians of the modelled skull sound speed,
 %       density, and attenuation, in all skull voxels and on the beam path
+%   3 - (2026-11-23) consent per level (TELEMETRY_LEVEL_INFO); adds the
+%       'outcomes' level: rounded brain intensity and transmission, brain MI,
+%       targeting error, brain and skull temperature rise, duty cycle and
+%       sonication time
 % The Nexus writes the same version (prestus_nexus/telemetry.py, NOTICE_VERSION).
 %
 % Use as:
@@ -16,5 +20,5 @@ function v = telemetry_notice_version()
 %   v - current notice version (integer)
 %
 % See also: TELEMETRY_SETUP, TELEMETRY_SET_CONSENT, TRACK_USAGE
-v = 2;
+v = 3;
 end

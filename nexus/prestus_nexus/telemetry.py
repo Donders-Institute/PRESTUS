@@ -2,14 +2,18 @@
 
 The Nexus runs MATLAB with ``matlab -batch``, where PRESTUS never asks for consent
 (telemetry_setup.m: non-interactive sessions only print a notice). This module reads and
-writes the same record that telemetry_set_consent.m and telemetry_setup_reset.m use:
+writes the same record that telemetry_write_consent.m and telemetry_setup_reset.m use:
 
-    ~/.prestus/telemetry.json   {"opt_in":true,"decided_on":"YYYY-MM-DD","prestus_ver":"<hash>"}
+    ~/.prestus/telemetry.json
+    {"opt_in":true,"levels":["basic","performance","outcomes"],"decided_on":"YYYY-MM-DD",
+     "prestus_ver":"<hash>","notice":3}
 
 (one line of MATLAB jsonencode output; prestus_ver is the short git hash that
-prestus_version() returns first). No record means undecided, which sends nothing. The
-Nexus itself never sends anything; PRESTUS sends events from MATLAB (track_usage.m) only
-when the record says opt_in: true.
+prestus_version() returns first). Consent is per level (LEVELS, as
+telemetry_level_info.m); a record without levels predates them and shares what its
+notice covered: usage and performance (telemetry_levels.m). No record means undecided,
+which sends nothing. The Nexus itself never sends anything; PRESTUS sends events from
+MATLAB (track_usage.m) for the shared levels only.
 """
 from __future__ import annotations
 
@@ -35,21 +39,47 @@ def consent_file() -> Path:
     return prefdir() / "telemetry.json"
 
 
+# (name, label, description), in prompt order, as telemetry_level_info.m
+LEVELS = (
+    ("basic", "Usage and errors",
+     "Which features, platforms, and versions are used, and whether runs succeed"),
+    ("performance", "Performance",
+     "Hardware, grid size, run times, and memory: improves run-time estimates"),
+    ("outcomes", "Summary outcomes (anonymous)",
+     "Rounded summary statistics: brain intensity, temperature rise, targeting error, and skull "
+     "properties (no maps, coordinates, or targets)"),
+)
+LEVEL_NAMES = tuple(name for name, _label, _desc in LEVELS)
+LEGACY_LEVELS = ("basic", "performance")    # an opt-in recorded before levels existed
+
+
 @dataclass
 class Consent:
     state: str                  # 'undecided' | 'opted_in' | 'opted_out' | 'unreadable'
     decided_on: str = ""
     prestus_ver: str = ""
     notice: int = 1             # notice version the decision was made under (1 when absent)
+    levels: tuple = ()          # shared levels (LEVEL_NAMES order); empty unless opted in
 
     @property
     def opted_in(self) -> bool:
         return self.state == "opted_in"
 
 
+def _known_levels(v) -> tuple:
+    """The known level names in v, in prompt order (telemetry_levels.m)."""
+    if isinstance(v, str):
+        v = [v]
+    if not isinstance(v, (list, tuple)):
+        return ()
+    asked = {str(x).strip().lower() for x in v}
+    return tuple(n for n in LEVEL_NAMES if n in asked)
+
+
 def read_consent(path: Path | None = None) -> Consent:
-    """The recorded decision. As track_usage.m: only opt_in == true counts as consent; an
-    unreadable file counts as no consent (and, unlike a missing one, as a decision)."""
+    """The recorded decision. As telemetry_levels.m: only opt_in == true with at least one
+    level counts as consent; a record without levels shares LEGACY_LEVELS; an unreadable
+    file counts as no consent (and, unlike a missing one, as a decision)."""
     path = path or consent_file()
     if not path.is_file():
         return Consent("undecided")
@@ -61,11 +91,12 @@ def read_consent(path: Path | None = None) -> Consent:
         return Consent("unreadable")
     v = cfg.get("opt_in")              # isequal(cfg.opt_in, true): true, or the number 1
     yes = v is True or (isinstance(v, (int, float)) and not isinstance(v, bool) and v == 1)
-    state = "opted_in" if yes else "opted_out"
-    n = cfg.get("notice")              # track_usage.m: a numeric scalar, else version 1
+    n = cfg.get("notice")              # a numeric scalar, else version 1
     notice = int(n) if isinstance(n, (int, float)) and not isinstance(n, bool) else 1
+    levels = (_known_levels(cfg["levels"]) if "levels" in cfg else LEGACY_LEVELS) if yes else ()
+    state = "opted_in" if levels else "opted_out"
     return Consent(state, str(cfg.get("decided_on") or ""), str(cfg.get("prestus_ver") or ""),
-                   notice)
+                   notice, levels)
 
 
 def prestus_hash(prestus_root: Path | None) -> str:
@@ -77,31 +108,38 @@ def prestus_hash(prestus_root: Path | None) -> str:
         out = subprocess.run(["git", "-C", str(prestus_root), "rev-parse", "--short", "HEAD"],
                              capture_output=True, text=True, encoding="utf-8", errors="replace",
                              timeout=10, check=False, **kwargs)
-    except Exception:
+    except (OSError, subprocess.SubprocessError, ValueError):
         return "unknown"
     return out.stdout.strip() if out.returncode == 0 and out.stdout.strip() else "unknown"
 
 
-NOTICE_VERSION = 2   # telemetry_notice_version.m: 2 adds the skull property medians (2026-11-17)
+NOTICE_VERSION = 3   # telemetry_notice_version.m: 3 adds consent per level and outcomes
 # what each notice version added (telemetry_notice_version.m), shown when consent predates it
-NOTICE_ADDS = {2: "the medians of the modelled skull sound speed, density, and attenuation"}
+NOTICE_ADDS = {2: "the medians of the modelled skull sound speed, density, and attenuation",
+               3: "a choice per level, and a new level: summary outcomes (rounded, anonymous)"}
 
 
-def encode_record(opt_in: bool, decided_on: str, prestus_ver: str) -> str:
-    """The file text as MATLAB's jsonencode(struct) + newline writes it (with the notice
-    version the decision was made under, as telemetry_set_consent.m)."""
-    cfg = {"opt_in": bool(opt_in), "decided_on": decided_on, "prestus_ver": prestus_ver,
-           "notice": NOTICE_VERSION}
+def encode_record(levels, decided_on: str, prestus_ver: str) -> str:
+    """The file text as telemetry_write_consent.m writes it (MATLAB jsonencode + newline):
+    the shared levels, and the notice version the decision was made under."""
+    levels = _known_levels(list(levels))
+    cfg = {"opt_in": bool(levels), "levels": list(levels), "decided_on": decided_on,
+           "prestus_ver": prestus_ver, "notice": NOTICE_VERSION}
     return json.dumps(cfg, separators=(",", ":"), ensure_ascii=False) + "\n"
 
 
-def set_consent(opt_in: bool, prestus_root: Path | None = None, path: Path | None = None,
+def set_consent(choice, prestus_root: Path | None = None, path: Path | None = None,
                 today: str | None = None) -> Path:
-    """telemetry_set_consent(opt_in): record the decision; returns the file."""
+    """telemetry_set_consent(choice): True shares every level, False none, a list of level
+    names those levels. Records the decision; returns the file."""
+    if isinstance(choice, bool):
+        levels = LEVEL_NAMES if choice else ()
+    else:
+        levels = _known_levels(list(choice))
     path = path or consent_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     today = today or _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
-    write_text_atomic(path, encode_record(opt_in, today, prestus_hash(prestus_root)))
+    write_text_atomic(path, encode_record(levels, today, prestus_hash(prestus_root)))
     return path
 
 
@@ -116,9 +154,13 @@ def reset_consent(path: Path | None = None) -> bool:
 
 
 def env_override() -> str:
-    """'on' / 'off' when PRESTUS_TELEMETRY is set for runs started from the Nexus, else ''."""
+    """'on' / 'off' when PRESTUS_TELEMETRY is set for runs started from the Nexus, else ''
+    (telemetry_env_override.m: on/1/true, or a comma-separated list of levels, is 'on')."""
     v = os.environ.get(ENV, "").strip().lower()
-    return {"on": "on", "1": "on", "true": "on", "off": "off", "0": "off", "false": "off"}.get(v, "")
+    mode = {"on": "on", "1": "on", "true": "on", "off": "off", "0": "off", "false": "off"}.get(v, "")
+    if not mode and v and all(p.strip() in LEVEL_NAMES for p in v.split(",")):
+        mode = "on"
+    return mode
 
 
 def outdated(c: Consent) -> bool:
@@ -136,11 +178,13 @@ def status(c: Consent, env: str | None = None) -> tuple[str, str, str]:
         return ("Not sharing usage statistics",
                 f"{ENV}=off is set, so runs started here send nothing." + click, "amber")
     if c.state == "opted_in":
+        shared = ", ".join(label.lower() for name, label, _d in LEVELS if name in c.levels)
         if outdated(c):
             return ("Sharing usage statistics · notice updated",
-                    f"You allowed{since}. The notice has changed since; "
-                    "click to read what is new and confirm." , "green")
-        return "Sharing usage statistics", f"You allowed{since}." + click, "green"
+                    f"You share {shared}{since}. The notice has changed since; "
+                    "click to read what is new and choose." , "green")
+        part = "" if len(c.levels) == len(LEVEL_NAMES) else f" ({len(c.levels)} of {len(LEVEL_NAMES)})"
+        return f"Sharing usage statistics{part}", f"You share {shared}{since}." + click, "green"
     if c.state == "undecided" and env == "on":
         return ("Sharing usage statistics (this session)",
                 f"{ENV}=on is set; no decision is recorded." + click, "green")
@@ -167,14 +211,16 @@ def should_prompt(c: Consent, env: str | None = None, asked_notice: int = 0) -> 
 
 
 NOTICE = (
-    "With your permission, each simulation run sends one anonymous record from MATLAB, so "
-    "the developers can see which features and platforms PRESTUS is used on. The Nexus "
-    "itself sends nothing.<br><br>"
-    "<b>Sent:</b> software versions and hardware; which modules, transducer, and medium "
-    "were used; grid size and run times; skull property medians; whether the run "
-    "succeeded; a random ID.<br>"
-    "<b>Never sent:</b> subject IDs, file paths, coordinates, free text, IP addresses, "
-    "host names, or simulation results.")
+    "Each simulation run can send one anonymous record from MATLAB to the PRESTUS "
+    "developers. It guides development, improves run-time estimates, and lets us publish "
+    "statistics across sites, such as skull transmission. "
+    "Every record holds a random ID, the PRESTUS version, and whether the run succeeded; "
+    "each level below adds its fields.")
+NEVER_SENT = ("<b>Never stored in the usage statistics:</b> subject IDs, file paths, "
+              "coordinates, target names, free text, IP addresses, host names, or any map or "
+              "image of the simulation. Like any web service, the hosting provider (Supabase) "
+              "keeps a request log with the sender's IP address and approximate location for "
+              "1 day; it is not linked to the statistics.")
 
 def _home_short(path: Path) -> str:
     try:
@@ -187,9 +233,17 @@ def _headline(c: Consent) -> str:
     """The one bold line: the decision as it stands."""
     since = f" (since {c.decided_on})" if c.decided_on else ""
     return {"opted_in": f"You share usage statistics{since}.",
-            "opted_out": f"You do not share usage statistics{since}.",
-            "unreadable": "Your saved decision cannot be read, so nothing is shared.",
+            "opted_out": f"You share no usage statistics{since}.",
+            "unreadable": "Your saved choice cannot be read, so nothing is shared.",
             "undecided": "Share anonymous usage statistics?"}[c.state]
+
+
+def initial_levels(c: Consent) -> tuple:
+    """The boxes ticked when the dialog opens: every level for a new choice (undecided, or
+    an Allow under an earlier notice), else the recorded levels."""
+    if c.state in ("undecided", "unreadable") or outdated(c):
+        return LEVEL_NAMES
+    return c.levels
 
 
 def _notes(c: Consent, path: Path) -> str:
@@ -197,8 +251,8 @@ def _notes(c: Consent, path: Path) -> str:
     out = []
     if outdated(c):
         adds = "; ".join(NOTICE_ADDS[v] for v in sorted(NOTICE_ADDS) if v > c.notice)
-        out.append(f"<b>New since you allowed:</b> {adds}. These are sent only once you "
-                   "allow again.")
+        out.append(f"<b>New since you allowed:</b> {adds}. Until you save a choice, runs "
+                   "keep sharing what you allowed then.")
     env = env_override()
     if env == "off":
         out.append(f"{ENV}=off is set, so runs started here send nothing.")
@@ -213,43 +267,107 @@ def _footer(c: Consent, path: Path) -> str:
             f"<a href='{DOC_URL}'>Full details</a></span>")
 
 
+class ConsentDialog:
+    """The consent dialog's widgets and logic, built on demand (PyQt6 imported here):
+    "Share all (recommended)" in bold, ticked, with one indented box per level below it;
+    unticking every level shares nothing. There is no Decline button."""
+
+    def __init__(self, parent, current: Consent, path: Path, at_launch: bool):
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox, QLabel,
+                                     QVBoxLayout, QWidget)
+        self.dialog = d = QDialog(parent)
+        d.setWindowTitle("PRESTUS usage statistics")
+        d.setMinimumWidth(520)
+        v = QVBoxLayout(d)
+        head = QLabel(f"<b>{_headline(current)}</b>")
+        v.addWidget(head)
+        text = QLabel(_notes(current, path) + NOTICE)
+        text.setWordWrap(True)
+        text.setTextFormat(Qt.TextFormat.RichText)
+        v.addWidget(text)
+        self.all_box = QCheckBox("Share all (recommended)")
+        f = self.all_box.font()
+        f.setBold(True)
+        self.all_box.setFont(f)
+        v.addWidget(self.all_box)
+        self.boxes = {}
+        ticked = initial_levels(current)
+        for name, label, desc in LEVELS:
+            row = QWidget()
+            h = QVBoxLayout(row)
+            h.setContentsMargins(24, 0, 0, 2)
+            h.setSpacing(0)
+            box = QCheckBox(label)
+            box.setChecked(name in ticked)
+            note = QLabel(desc)
+            note.setWordWrap(True)
+            note.setStyleSheet("color: gray;")
+            note.setContentsMargins(22, 0, 0, 0)
+            h.addWidget(box)
+            h.addWidget(note)
+            v.addWidget(row)
+            self.boxes[name] = box
+            box.toggled.connect(self._sync_all)
+        self.all_box.clicked.connect(self._set_all)
+        self._sync_all()
+        never = QLabel(NEVER_SENT)
+        never.setWordWrap(True)
+        never.setTextFormat(Qt.TextFormat.RichText)
+        v.addWidget(never)
+        foot = QLabel(_footer(current, path))
+        foot.setOpenExternalLinks(True)
+        foot.setTextFormat(Qt.TextFormat.RichText)
+        v.addWidget(foot)
+        buttons = QDialogButtonBox()
+        self.save = buttons.addButton("Save", QDialogButtonBox.ButtonRole.AcceptRole)
+        self.forget = None
+        if at_launch:
+            self.close = buttons.addButton("Ask me later", QDialogButtonBox.ButtonRole.RejectRole)
+        else:
+            self.forget = buttons.addButton("Forget my decision",
+                                            QDialogButtonBox.ButtonRole.ResetRole)
+            self.forget.setEnabled(current.state != "undecided")
+            self.close = buttons.addButton(QDialogButtonBox.StandardButton.Close)
+        self.save.setDefault(True)
+        self.clicked = None
+        buttons.clicked.connect(self._clicked)
+        v.addWidget(buttons)
+
+    def _set_all(self, checked: bool) -> None:
+        for box in self.boxes.values():
+            box.setChecked(checked)
+
+    def _sync_all(self, *_args) -> None:
+        from PyQt6.QtCore import Qt
+        n = sum(b.isChecked() for b in self.boxes.values())
+        state = (Qt.CheckState.Checked if n == len(self.boxes) else
+                 Qt.CheckState.Unchecked if n == 0 else Qt.CheckState.PartiallyChecked)
+        self.all_box.blockSignals(True)
+        self.all_box.setTristate(state == Qt.CheckState.PartiallyChecked)
+        self.all_box.setCheckState(state)
+        self.all_box.blockSignals(False)
+
+    def levels(self) -> tuple:
+        return tuple(n for n in LEVEL_NAMES if self.boxes[n].isChecked())
+
+    def _clicked(self, button) -> None:
+        self.clicked = button
+        self.dialog.accept() if button is self.save else self.dialog.reject()
+
+
 def show_consent_dialog(parent=None, prestus_root: Path | None = None,
                         at_launch: bool = False) -> Consent:
-    """Tools ▸ Usage statistics… (and the launch prompt, at_launch): show the notice and
-    the recorded decision; record what the user picks (Allow / Decline / Forget my
-    decision). Closing ('Ask me later' at launch) changes nothing."""
-    from PyQt6.QtCore import Qt
-    from PyQt6.QtWidgets import QLabel, QMessageBox
+    """Tools ▸ Usage statistics… (and the launch prompt, at_launch): show the notice with
+    the levels; Save records the ticked levels (none ticked: nothing is shared), Forget my
+    decision removes the record. Closing ('Ask me later' at launch) changes nothing."""
     path = consent_file()
-    current = read_consent(path)
-    box = QMessageBox(parent)
-    box.setWindowTitle("PRESTUS usage statistics")
-    box.setIcon(QMessageBox.Icon.Question)
-    box.setTextFormat(Qt.TextFormat.RichText)
-    box.setText(f"<b>{_headline(current)}</b>")
-    box.setInformativeText(_notes(current, path) + NOTICE + _footer(current, path))
-    for label in box.findChildren(QLabel):
-        label.setOpenExternalLinks(True)
-    allow = box.addButton("Allow", QMessageBox.ButtonRole.AcceptRole)
-    decline = box.addButton("Decline", QMessageBox.ButtonRole.RejectRole)
-    forget = None
-    if not at_launch:
-        forget = box.addButton("Forget my decision", QMessageBox.ButtonRole.ResetRole)
-        forget.setEnabled(current.state != "undecided")
-    if at_launch:
-        close = box.addButton("Ask me later", QMessageBox.ButtonRole.RejectRole)
-    else:
-        close = box.addButton(QMessageBox.StandardButton.Close)
-    box.setDefaultButton(close)
-    box.setEscapeButton(close)
-    box.exec()
-    clicked = box.clickedButton()
+    ui = ConsentDialog(parent, read_consent(path), path, at_launch)
+    ui.dialog.exec()
     try:
-        if clicked is allow:
-            set_consent(True, prestus_root, path)
-        elif clicked is decline:
-            set_consent(False, prestus_root, path)
-        elif forget is not None and clicked is forget:
+        if ui.clicked is ui.save:
+            set_consent(list(ui.levels()), prestus_root, path)
+        elif ui.forget is not None and ui.clicked is ui.forget:
             reset_consent(path)
     except OSError as exc:
         from .ui.errors import show_error
