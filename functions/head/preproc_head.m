@@ -100,6 +100,7 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         [pseudoCT_image, pseudoCT_header, tissues_mask_image, tissues_mask_header] = pct_load_ct(parameters);
         [pseudoCT_image, pseudoCT_header] = ensure_ras_plus(pseudoCT_image, pseudoCT_header);
         [tissues_mask_image, tissues_mask_header] = ensure_ras_plus(tissues_mask_image, tissues_mask_header);
+        pseudoCT_image = pct_apply_limits(parameters, 'hu', pseudoCT_image);   % pct.limits.hu_*, before resampling
     else
         % Load traditional SimNIBS segmentation
         tissues_mask_image = niftiread(filename_segmented);
@@ -294,8 +295,9 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
         
         %% [bone mask and pseudoCT]
 
-        % Binary skull mask is always derived from the segmentation labels.
-        bone_img = ismember(tissues_mask_image, charm_seg_labels().bonemask);
+        % Binary skull mask: the segmentation's skull labels, or a bone mask
+        % file with pct.bone_source 'mask' (PCT_LOAD_BONE_MASK)
+        bone_img = pct_load_bone_mask(parameters, tissues_mask_image, tissues_mask_header);
         [bone_mask_img_rr, ~, ~, ~, ~, ~, ~, bone_mask_montage] = ...
             preproc_fn(...
             bone_img, ...
@@ -308,6 +310,8 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
 
         % pseudoCT (HU values) is only available in the pCT pipeline variant.
         if parameters.pct.enabled == 1
+            p_ct = parameters;                  % the CT is resampled with pct.interpolation
+            p_ct.interpolation_override = char(get_field(parameters, {'pct', 'interpolation'}, 'linear'));
             [pseudoCT_img_rr, ~, ~, ~, ~, ~, ~, pseudoCT_montage] = ...
                 preproc_fn(...
                 pseudoCT_image, ...
@@ -315,7 +319,10 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
                 trans_pos_grid, ...
                 focus_pos_grid, ...
                 pseudoCT_header.PixelDimensions(1)/parameters.grid.resolution_mm, ...
-                parameters);
+                p_ct);
+            clear p_ct
+            % again on the grid: cubic and spline interpolation overshoot at bone edges
+            pseudoCT_img_rr = pct_apply_limits(parameters, 'hu', pseudoCT_img_rr);
         else
             pseudoCT_img_rr = [];
         end

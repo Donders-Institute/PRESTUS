@@ -108,38 +108,35 @@ end
                 temp_0(skull_idx) = parameters.thermal.temp_0.(label_name);
             end
 
-            % map skull bone density with the desired algorithm
-            if isfield(parameters, 'pct') && isfield(parameters.pct, 'mapping_density')
-                pct_mapping_density = char(parameters.pct.mapping_density);
-            else
-                pct_mapping_density = 'none';
+            % map skull density, sound speed and attenuation, with the HU and
+            % property limits (PCT_MAP_PROPERTIES, shared with the predictions)
+            hu_ref = [];
+            if pct_uses_hu_reference(parameters)
+                hu_ref = pct_hu_reference(parameters);
             end
-            [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx, pct_mapping_density);
-
-            % map skull bone sound speed with the desired algorithm
-            if isfield(parameters, 'pct') && isfield(parameters.pct, 'mapping_soundspeed')
-                pct_mapping_soundspeed = char(parameters.pct.mapping_soundspeed);
-            else
-                pct_mapping_soundspeed = 'none';
-            end
-            [sound_speed] = medium_pct_soundspeed(parameters, sound_speed, density, pseudoCT, skull_idx, pct_mapping_soundspeed);
-
-            % map skull bone attenuation with the desired algorithm
-            if isfield(parameters, 'pct') && isfield(parameters.pct, 'mapping_attenuation')
-                pct_mapping_attenuation = char(parameters.pct.mapping_attenuation);
-            else
-                pct_mapping_attenuation = 'none';
-            end
-            [alpha_coeff, alpha_power] = medium_pct_attenuation(parameters, alpha_coeff, alpha_power, pseudoCT, skull_idx, pct_mapping_attenuation, density);
+            hu_raw = pseudoCT(skull_idx);
+            [props, mapping, map_info] = pct_map_properties(parameters, hu_raw, 1:numel(skull_idx), hu_ref);
+            density(skull_idx)     = props.density;
+            sound_speed(skull_idx) = props.sound_speed;
+            alpha_coeff(skull_idx) = props.alpha_coeff;
+            alpha_power(skull_idx) = props.alpha_power;
+            pct_mapping_density     = mapping.density;
+            pct_mapping_soundspeed  = mapping.sound_speed;
+            pct_mapping_attenuation = mapping.attenuation;
 
             % kept for the medium_stats JSON written below (WRITE_MEDIUM_STATS)
-            pct_info.mapping = struct('density', pct_mapping_density, ...
-                                      'sound_speed', pct_mapping_soundspeed, ...
-                                      'attenuation', pct_mapping_attenuation);
+            pct_info.mapping = mapping;
             if strcmp(pct_mapping_density, 'k-plan')
                 [~, ~, pct_info.mapping.density_calibration] = medium_pct_density_calibration(parameters);
             end
-            pct_info.pseudoCT_HU = distribution_stats(pseudoCT(skull_idx));
+            pct_info.pseudoCT_HU = distribution_stats(props.hu);          % after the HU limits
+            pct_info.limits = rmfield(map_info, 'hu_reference');          % voxels clipped per quantity
+            pct_info.limits.hu.n_voxels = numel(hu_raw);
+            pct_info.limits.hu.input = distribution_stats(hu_raw);        % before the HU limits
+            if ~isempty(hu_ref)
+                [~, pct_info.hu_reference] = pct_hu_reference(parameters);
+            end
+            clear hu_raw props
 
             % [DEBUG] save pCT mapping overview
             if debug_on(parameters, 'medium', 'figures')
@@ -551,6 +548,12 @@ function write_medium_stats(parameters, medium, skull_dist, pct_info)
     ms.properties = skull_dist.properties;
     if isfield(pct_info, 'pseudoCT_HU')
         ms.properties.pseudoCT_HU = pct_info.pseudoCT_HU;
+    end
+    if isfield(pct_info, 'limits')
+        ms.limits = pct_info.limits;              % pct.limits: voxels raised (n_low) or lowered (n_high)
+    end
+    if isfield(pct_info, 'hu_reference')
+        ms.hu_reference = pct_info.hu_reference;  % PCT_HU_REFERENCE: layers, percentile, value
     end
     if isfield(skull_dist, 'beam_path')
         ms.beam_path = skull_dist.beam_path;

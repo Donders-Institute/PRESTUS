@@ -2,7 +2,7 @@ function [ct_image, ct_header, mask_image, mask_header, ct_file] = pct_load_ct(p
 % PCT_LOAD_CT  The CT image the skull mapping reads, with its tissue labels
 %
 % The skull mapping (pct.mapping_*) reads one CT image in Hounsfield units:
-%   - a measured CT (path.ct_pattern set): the CT is resampled (linear) onto
+%   - a measured CT (path.ct_pattern set): the CT is resampled (pct.interpolation) onto
 %     the SimNIBS segmentation grid through both images' world (RAS mm)
 %     affines, so it must already be co-registered to the subject's T1w.
 %     Voxels outside the CT are air (-1000 HU). Tissue labels come from the
@@ -70,7 +70,8 @@ end
     to1 = eye(4); to1(4, 1:3) =  1;
     M = to0 * ct_hdr.Transform.T / mask_header.Transform.T * to1;
     seg_size = mask_header.ImageSize(1:3);
-    ct_image = single(affine_resample_3d(ct_in, M, seg_size, 'linear', -1000));
+    ct_image = single(affine_resample_3d(ct_in, M, seg_size, ...
+        char(get_field(parameters, {'pct', 'interpolation'}, 'linear')), -1000));
 
     ct_header = mask_header;
     ct_header.Datatype = 'single';

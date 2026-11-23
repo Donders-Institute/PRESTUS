@@ -79,14 +79,17 @@ end
     newdims = ceil(2 * max(abs(bounds), [], 1)) + 2;
     M = forward' * S' * makehgtform('translate', (newdims + 1) / 2)';
     segmentation = affine_resample_3d(tissues_mask_image, M, newdims, 'nearest', 0);
-    bone_mask = affine_resample_3d(ismember(tissues_mask_image, charm_seg_labels().bonemask), M, newdims, 'nearest', 0);
+    bone_mask = affine_resample_3d(pct_load_bone_mask(parameters, tissues_mask_image, tissues_mask_header), ...
+        M, newdims, 'nearest', 0);
     pseudoCT = [];
     if ~isempty(pseudoCT_image)
         if ~isequal(size(pseudoCT_image, 1:3), sz)
             error('PRESTUS:headModel:pctGrid', ...
                 'The pseudo-CT and the segmentation must share a voxel grid for the shared head model.');
         end
-        pseudoCT = affine_resample_3d(pseudoCT_image, M, newdims, 'linear', 0);
+        pseudoCT = affine_resample_3d(pseudoCT_image, M, newdims, ...
+            char(get_field(parameters, {'pct', 'interpolation'}, 'linear')), 0);
+        pseudoCT = pct_apply_limits(parameters, 'hu', pseudoCT);   % cubic and spline overshoot at bone edges
     end
 
     % Medium masks: smoothing and skull hole filling (as HEAD_SMOOTH_AND_CROP)
@@ -96,8 +99,18 @@ end
     qc_grid = seg_qc('grid_note', parameters, 'headmodel');
     centre = round(size(medium_masks) / 2);
     seg_qc('add_mapping', parameters, segmentation, medium_masks, centre, qc_grid);
-    if any(contains(fieldnames(parameters.layers), 'skull'))
+    switch skull_bone_source(parameters)
+        case 'hu'
+            [medium_masks, bone_mask, pseudoCT] = skull_from_hu(parameters, medium_masks, pseudoCT);
+        case 'mask'
+            [medium_masks, bone_mask, pseudoCT] = skull_reconcile(parameters, medium_masks, bone_mask, pseudoCT, 'mask');
+    end
+    if strcmp(skull_bone_source(parameters), 'segmentation') && any(contains(fieldnames(parameters.layers), 'skull'))
         medium_masks = skull_fill_holes(parameters, medium_masks, centre, segmentation, qc_grid);
+    end
+    % Soft tissue against water from the CT (pct.soft_hu_threshold; off by default)
+    if ~isempty(get_field(parameters, {'pct', 'soft_hu_threshold'}, []))
+        medium_masks = tissue_from_hu(parameters, medium_masks, pseudoCT);
     end
 
     hm = struct('medium_masks', medium_masks, 'segmentation', segmentation, 'bone_mask', bone_mask, ...

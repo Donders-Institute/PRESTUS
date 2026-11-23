@@ -52,7 +52,11 @@ end
     % Same calls as MEDIUM_SETUP (PCT_MAP_PROPERTIES); arrays outside the skull are not read
     p = parameters;
     if ~isfield(p, 'simulation') || ~isfield(p.simulation, 'debug'); p.simulation.debug = 0; end
-    [props, mapping] = pct_map_properties(p, pseudoCT, skull_idx);
+    hu_ref = [];
+    if pct_uses_hu_reference(p)
+        hu_ref = pct_hu_reference(p);
+    end
+    [props, mapping] = pct_map_properties(p, pseudoCT, skull_idx, hu_ref);
     density = props.density; sound_speed = props.sound_speed; alpha_coeff = props.alpha_coeff;
     skull = p.medium_properties.skull;
 
@@ -68,7 +72,7 @@ end
     if strcmp(mapping.density, 'k-plan')
         [~, ~, stats.mapping.density_calibration] = medium_pct_density_calibration(p);
     end
-    stats.properties.pseudoCT_HU = distribution_stats(pseudoCT(skull_idx));
+    stats.properties.pseudoCT_HU = distribution_stats(props.hu(skull_idx));   % after the HU limits, as MEDIUM_SETUP
     stats.properties.density     = distribution_stats(density(skull_idx));
     stats.properties.sound_speed = distribution_stats(sound_speed(skull_idx));
     stats.properties.alpha_coeff = distribution_stats(alpha_coeff(skull_idx));

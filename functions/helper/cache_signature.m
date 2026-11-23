@@ -41,12 +41,29 @@ function sig = cache_signature(parameters, kind)
     for f = {'grid', 'layers', 'headmodel', 'pct'}
         sig.(f{1}) = get_field(parameters, f);
     end
+    % The bone-mask settings (SKULL_RECONCILE) count only with pct.bone_source
+    % 'hu' or 'mask', so caches of segmentation-skull runs keep their signature
+    bone_keys = {'bone_source', 'bone_hu_threshold', 'bone_median_mm', 'bone_open_mm', 'bone_close_mm', 'bone_soft_layer'};
+    if isstruct(sig.pct) && ~(isfield(sig.pct, 'bone_source') && any(strcmp(char(sig.pct.bone_source), {'hu', 'mask'})))
+        sig.pct = rmfield(sig.pct, intersect(fieldnames(sig.pct), bone_keys));
+    end
+    % CT interpolation and limits count only when they differ from linear and
+    % the water floors (the earlier fixed behaviour), and the HU reference only
+    % for mappings that scale by it, so existing caches keep their signature
+    if isstruct(sig.pct)
+        sig.pct = strip_default_pct(sig.pct, parameters);
+    end
     sig.transducer = strip_drive(get_field(parameters, {'transducer'}));
     % A measured CT (path.ct_pattern) replaces the pseudo-CT: identify the file
     % (field only when set, so caches of pseudo-CT and label runs keep their signature)
     ct = measured_ct_identity(parameters);
     if ~isempty(ct)
         sig.measured_ct = ct;
+    end
+    % A bone mask file (pct.bone_source 'mask'): identify the file
+    bm = bone_mask_identity(parameters);
+    if ~isempty(bm)
+        sig.bone_mask = bm;
     end
     % A phantom is read from path.seg/m2m_sub-*/final_tissues.nii.gz: a
     % regenerated phantom changes the grid, medium and field built from it
@@ -200,5 +217,35 @@ function t = strip_drive(t)
         if isfield(t, f{1})
             t = rmfield(t, f{1});
         end
+    end
+end
+
+function pct = strip_default_pct(pct, parameters)
+% Drop pct keys at values that reproduce the behaviour before they existed
+    if isfield(pct, 'interpolation') && strcmp(char(pct.interpolation), 'linear')
+        pct = rmfield(pct, 'interpolation');
+    end
+    if isfield(pct, 'limits') && isstruct(pct.limits)
+        def = struct('hu_min', [], 'hu_max', [], 'density_min', 'water', 'density_max', [], ...
+            'sound_speed_min', 'water', 'sound_speed_max', [], 'alpha_coeff_min', [], 'alpha_coeff_max', []);
+        same = true;
+        for f = fieldnames(pct.limits)'
+            v = pct.limits.(f{1}); if isstring(v), v = char(v); end
+            if ~isfield(def, f{1}) || ~isequal(v, def.(f{1})), same = false; break; end
+        end
+        if same, pct = rmfield(pct, 'limits'); end
+    end
+    if isfield(pct, 'hu_reference_resolution_mm') && isempty(pct.hu_reference_resolution_mm)
+        pct = rmfield(pct, 'hu_reference_resolution_mm');
+    end
+    if isfield(pct, 'bone_open_mm') && isequal(pct.bone_open_mm, 0)
+        pct = rmfield(pct, 'bone_open_mm');
+    end
+    if isfield(pct, 'soft_hu_threshold') && isempty(pct.soft_hu_threshold)
+        pct = rmfield(pct, 'soft_hu_threshold');
+    end
+    if ~pct_uses_hu_reference(parameters)
+        pct = rmfield(pct, intersect(fieldnames(pct), ...
+            {'hu_reference_layers', 'hu_reference_percentile', 'hu_reference_resolution_mm'}));
     end
 end

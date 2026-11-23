@@ -875,6 +875,7 @@ babelbrain_argv = [{python_bin, bb_runner, ...
     bb_no_tight_flag(tight_narrow_beam), ...
     bb_usect_flag(~isempty(bb.ct_mapping)), ...
     bb_ctmapping_flag(bb.ct_mapping), ...
+    bb_ct_hu_flags(parameters, bb), ...
     bb_petra_flag(bb.ct_use_petra), ...
     bb_air_flag(bb), ...
     bb_medium_json_flag(medium_json_path), ...
@@ -1252,6 +1253,20 @@ function flag = bb_ctmapping_flag(ct_mapping)
         flag = {'--ct_mapping', ct_mapping};
     else
         flag = {};
+    end
+end
+
+function flag = bb_ct_hu_flags(parameters, bb)
+    % CT path: the bone HU floor of a skull from a bone mask (pct.bone_source
+    % 'hu' or 'mask', SKULL_RECONCILE) and the whole-head HU reference
+    % (PCT_HU_REFERENCE), applied on BabelBrain's grid by run_babelbrain_case.py
+    flag = {};
+    if isempty(bb.ct_mapping), return; end
+    if any(strcmp(skull_bone_source(parameters), {'hu', 'mask'}))
+        flag = [flag, {'--ct_bone_hu_floor', sprintf('%g', get_field(parameters, {'pct', 'bone_hu_threshold'}, 300))}];
+    end
+    if isequal(get_field(parameters, {'pct', 'enabled'}, 0), 1)
+        flag = [flag, {'--ct_hu_max_reference', sprintf('%.6g', pct_hu_reference(parameters))}];
     end
 end
 

@@ -24,9 +24,11 @@ function out = affine_resample_3d(vol, M, out_size, method, fill)
 %   vol      - numeric array [D1 x D2 x D3] or [D1 x D2 x D3 x C]
 %   M        - 4×4 forward affine (row-vector convention) or maketform struct
 %   out_size - [1×3] output dimensions
-%   method   - 'nearest', 'linear' (default), or 'cubic' (griddedInterpolant
-%              cubic convolution; needs >= 4 voxels per dimension; can
-%              overshoot the input range near sharp edges)
+%   method   - 'nearest', 'linear' (default), 'cubic' (griddedInterpolant
+%              cubic convolution) or 'spline' (interpolating cubic spline, as
+%              scipy's order-3 spline with prefilter). 'cubic' and 'spline'
+%              need >= 4 voxels per dimension and overshoot the input range
+%              near sharp edges.
 %   fill     - scalar fill value for out-of-bounds voxels (default: 0)
 %
 % Output:

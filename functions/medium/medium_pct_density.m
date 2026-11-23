@@ -7,11 +7,13 @@ function [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx
 % pct.density_calibration (MEDIUM_PCT_DENSITY_CALIBRATION); 'k-wave' uses
 % hounsfield2density with a +1000 HU offset; 'marsac' uses the linear model from Marsac et al.
 % 2017; 'marsac-babelbrain' is BabelBrain's version of it (1000 + 1700*HU/max HU,
-% HU raised to 300); 'aubry' uses the porosity mixture model from Aubry et al. 2003;
+% HU raised to 300; max HU from MEDIUM_PCT_HU_MAX); 'aubry' uses the porosity mixture model from Aubry et al. 2003;
 % 'air-tissue' uses the linear air-to-bone model (Pichardo and McDannold
 % workflows); 'none' uses the fixed scalar from parameters.medium_properties.skull.
-% 'k-plan', 'k-wave' and 'air-tissue' clamp density to at least water density;
-% 'marsac' clamps HU to [300, 2000] HU (density from water to 2100 kg/m^3).
+% 'k-wave' caps density at 2100 kg/m^3 and 'marsac' clamps HU to [300, 2000] HU
+% (density from water to 2100 kg/m^3), as part of those models. Limits (by
+% default at least water density) are applied afterwards by
+% PCT_MAP_PROPERTIES (pct.limits.density_*).
 %
 % Use as:
 %   [density] = medium_pct_density(parameters, density, pseudoCT, skull_idx, algorithm)
@@ -78,8 +80,6 @@ switch algorithm
                 'HU to density: k-Plan piecewise-linear table and the skull voxels', 'Resolution', 150);
         end
 
-        % regularize minimum to density in water
-        density(skull_idx) = max(parameters.medium_properties.water.density, density(skull_idx));
 
     case 'k-wave'
 
@@ -101,9 +101,6 @@ switch algorithm
             debug_save_figure(parameters, 'medium', gcf, 'pCT_hounsfield-density_kwave', ...
                 'HU to density: k-Wave hounsfield2density and the skull voxels', 'Resolution', 150);
         end
-
-        % regularize minimum density to water density
-        density(skull_idx) = max(density(skull_idx),parameters.medium_properties.water.density);
 
         % regularize maximum density to rho_max
         density(skull_idx) = min(density(skull_idx),rho_max);
@@ -133,19 +130,22 @@ switch algorithm
 
     case 'marsac-babelbrain'
         % BabelBrain's CT-path density (HUtoDensityMarsac in BabelBrain 0.8.8):
-        % 1000 kg/m^3 plus 1700 kg/m^3 times HU over the largest skull HU.
+        % 1000 kg/m^3 plus 1700 kg/m^3 times HU over the largest skull HU
+        % (the whole-head reference, PCT_HU_REFERENCE; MEDIUM_PCT_HU_MAX).
         % BabelBrain applies it to voxels above its HU threshold (300 HU), so
-        % lower skull HU are raised to that threshold here.
+        % lower skull HU are raised to that threshold here. HU above the
+        % reference take the densest-bone value, as in the BabelBrain bridge.
         HU_thr = 300;
         hu = max(pseudoCT(skull_idx), HU_thr);
-        density(skull_idx) = 1000 + 1700 * hu / max(hu);
+        HU_ref = medium_pct_hu_max(parameters, hu);
+        density(skull_idx) = 1000 + 1700 * min(hu, HU_ref) / HU_ref;
 
     case 'aubry'
 
         rho_water = parameters.medium_properties.water.density;
         rho_bone = parameters.medium_properties.skull.density;
 
-        phi(skull_idx) = 1-(pseudoCT(skull_idx)/max(pseudoCT(skull_idx))); % [Aubry et al., 2003; Guo et al., 2019]
+        phi(skull_idx) = medium_pct_porosity(parameters, pseudoCT(skull_idx)); % [Aubry et al., 2003; Guo et al., 2019]
         density(skull_idx) = rho_water * phi(skull_idx) + ...
             rho_bone * (1-phi(skull_idx));
 
@@ -153,7 +153,6 @@ switch algorithm
         % Linear HU→density calibrated to air (HU≈-1000) and cortical bone (HU≈1000).
         % Coefficients: slope=1.01237293, intercept=1013.66593 kg/m³.
         density(skull_idx) = 1.01237293 * pseudoCT(skull_idx) + 1013.66593;
-        density(skull_idx) = max(parameters.medium_properties.water.density, density(skull_idx));
 
     case 'none'
 

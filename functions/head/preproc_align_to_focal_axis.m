@@ -41,7 +41,8 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
 %      trans_pos and focus_pos, centred on the input centre.
 %   6. forward = translate(-(sz+1)/2); backward = translate((newdims+1)/2).
 %   7. T = forward' * T_rs' * backward'; rotated_img = affine_resample_3d(nii_image, T)
-%      (nearest for images with fewer than 20 values, else linear).
+%      (parameters.interpolation_override if set, e.g. pct.interpolation for
+%      the CT; else nearest for images with fewer than 20 values, else linear).
 %
 % See also: PREPROC_HEAD, PREPROC_CROP_GRID
 
@@ -142,7 +143,9 @@ function [rotated_img, trans_pos_new, focus_pos_new, transformation_matrix, rota
     % Apply affine transformation to rotate and scale the image
     % (nii_image already ensured to be on CPU)
 
-    if numel(unique(nii_image))<20 % if the image is a mask use nearest neighbor
+    if isfield(parameters, 'interpolation_override') && ~isempty(parameters.interpolation_override)
+        parameters.interpolation = parameters.interpolation_override;   % e.g. the CT, pct.interpolation
+    elseif numel(unique(nii_image)) < 20 % if the image is a mask use nearest neighbor
         parameters.interpolation = 'nearest';
     else
         parameters.interpolation = 'linear';

@@ -69,11 +69,11 @@ switch algorithm
 
         % Finds maximum and minimum values
         HU_min = min(pseudoCT(skull_idx));
-        HU_max = max(pseudoCT(skull_idx));
+        HU_max = medium_pct_hu_max(parameters, pseudoCT(skull_idx));
 
         % estimate attenuation based on (pseudo-)HU
         alpha_pseudoCT(skull_idx) = alpha_min + (alpha_max - alpha_min) * ...
-            (1 - (pseudoCT(skull_idx) - HU_min) / (HU_max - HU_min)).^0.5;
+            max(0, 1 - (pseudoCT(skull_idx) - HU_min) / (HU_max - HU_min)).^0.5;   % HU above the reference (PCT_HU_REFERENCE): alpha_min
         alpha_power(skull_idx) = parameters.medium_properties.skull.alpha_power;
         % convert alpha at 500 kHz into prefactor alpha0 (dB/MHz/cm) according to specified alpha_power
         % (definition of lower and upper attenuation bounds is derived from 500kHz)
@@ -84,7 +84,7 @@ switch algorithm
         alpha_min     = 0.2;    % Aubry et al., 2003
         alpha_max     = 8;      % Aubry et al., 2003
 
-        phi(skull_idx) = 1-(pseudoCT(skull_idx)/max(pseudoCT(skull_idx)));
+        phi(skull_idx) = medium_pct_porosity(parameters, pseudoCT(skull_idx));   % HU above the reference (PCT_HU_REFERENCE): alpha_min
         alpha_coeff(skull_idx) = alpha_min + (alpha_max - alpha_min) * (phi(skull_idx).^0.5);
         alpha_power(skull_idx) = parameters.medium_properties.skull.alpha_power;
 

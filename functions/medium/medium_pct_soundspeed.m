@@ -14,7 +14,8 @@ function [sound_speed] = medium_pct_soundspeed(parameters, sound_speed, density,
 %               simulation frequency in parameters.transducer(1).freq_hz
 %   'mcdannold' polynomial ρ→c from McDannold et al.
 %   'none'      fixed scalar from parameters.medium_properties.skull
-% All algorithms except 'marsac' and 'none' clamp to at least water sound speed.
+% Limits (by default at least water sound speed) are applied afterwards by
+% PCT_MAP_PROPERTIES (pct.limits.sound_speed_*).
 %
 % Use as:
 %   [sound_speed] = medium_pct_soundspeed(parameters, sound_speed, density, pseudoCT, skull_idx, algorithm)
@@ -48,8 +49,6 @@ switch algorithm
 
         sound_speed(skull_idx) = 1.33.*density(skull_idx) + 167;
 
-        % regularize minimum to sound speed in water
-        sound_speed(skull_idx) = max(parameters.medium_properties.water.sound_speed, sound_speed(skull_idx));
 
     case 'marsac'
 
@@ -66,11 +65,9 @@ switch algorithm
         c_water = parameters.medium_properties.water.sound_speed;
         c_bone = parameters.medium_properties.skull.sound_speed;
 
-        phi(skull_idx) = 1-(pseudoCT(skull_idx)/max(pseudoCT(skull_idx)));
+        phi(skull_idx) = medium_pct_porosity(parameters, pseudoCT(skull_idx));
         sound_speed(skull_idx) = c_water * phi(skull_idx) + ...
             c_bone * (1-phi(skull_idx));
-        % regularize sound speed to a minimum of water
-        sound_speed(skull_idx) = max(sound_speed(skull_idx),c_water);
 
     case 'webb'
         % Linear HU→SoS from Webb et al. 2018 (Tables I/II).
@@ -87,7 +84,6 @@ switch algorithm
             if isfield(parameters.pct, 'webb_sos_intercept') && ~isempty(parameters.pct.webb_sos_intercept), intercept = parameters.pct.webb_sos_intercept; end
         end
         sound_speed(skull_idx) = slope * pseudoCT(skull_idx) + intercept * 1000;
-        sound_speed(skull_idx) = max(parameters.medium_properties.water.sound_speed, sound_speed(skull_idx));
 
     case 'pichardo'
         % Frequency-dependent ρ→SoS from Pichardo et al. 2D interpolation map.
@@ -95,7 +91,6 @@ switch algorithm
         freq_hz = parameters.transducer(1).freq_hz;
         [F_sos, ~] = medium_pct_pichardo_load(parameters);
         sound_speed(skull_idx) = F_sos(density(skull_idx), repmat(freq_hz / 1e6, size(density(skull_idx))));
-        sound_speed(skull_idx) = max(parameters.medium_properties.water.sound_speed, sound_speed(skull_idx));
 
     case 'mcdannold'
         % Polynomial ρ→SoS from McDannold et al.
@@ -103,7 +98,6 @@ switch algorithm
         % Reference: McDannold et al.
         p = [-2.79e-18, 5.31e-16, 1.69e-10, -7.63e-7, 1.24e-3];
         sound_speed(skull_idx) = 1 ./ polyval(p, density(skull_idx));
-        sound_speed(skull_idx) = max(parameters.medium_properties.water.sound_speed, sound_speed(skull_idx));
 
     case 'none'
 

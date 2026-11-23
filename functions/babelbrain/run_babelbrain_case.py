@@ -247,6 +247,18 @@ def parse_args():
                         'Valid: Webb-Marsac (default), Aubry, Pichardo, McDannold, '
                         'Marsac-Aubry, Pichardo-Marsac, McDannold-Marsac. '
                         'Only used when --use_ct is set.')
+    p.add_argument('--ct_bone_hu_floor',    type=float, default=None,
+                   help='CT path only: raise bone HU below this value to it before quantization, as '
+                        'BabelDatasetPreps.py does with its bone threshold (CTBone[CTBone<threshold]=threshold). '
+                        'PRESTUS passes pct.bone_hu_threshold with pct.bone_source hu; the resampling onto '
+                        "BabelBrain's grid otherwise mixes soft-tissue HU into bone-edge voxels. Default: no floor.")
+    p.add_argument('--ct_hu_max_reference', type=float, default=None,
+                   help="CT path only: HU that BabelBrain's max-normalised mappings take as the densest bone "
+                        '(HUtoDensityMarsac: 1000 + 1700*HU/max HU, max over the bone HU table). Added to the '
+                        'table as its last entry, so the scale does not depend on the domain crop; bone HU above '
+                        'it are lowered to it first, as PRESTUS maps them (medium_pct_porosity.m). PRESTUS '
+                        'passes its whole-head reference (pct_hu_reference.m). Default: largest bone HU in the '
+                        'domain.')
     p.add_argument('--air_regions',         action='store_true',
                    help='CT path only: write <target>_<f>kHz_<ppw>PPW_AirRegions.nii.gz from the raw-HU '
                         'CT.nii.gz (BabelBrain recipe: HU window, 3-voxel median filter, exterior air '
@@ -1214,7 +1226,10 @@ def _write_air_regions(basedir, subject_id, target, freq, ppw, hu_window=(-1200.
     return out, n_kept
 
 
-def _quantize_ct_for_babelbrain(basedir, subject_id, target, freq, ppw):
+_CT_INDEX_TAG = 'PRESTUS_BB_CT_INDEX'   # NIfTI descrip of a CT.nii.gz that is already an index map
+
+
+def _quantize_ct_for_babelbrain(basedir, subject_id, target, freq, ppw, hu_floor=None, hu_max_reference=None):
     """Convert the raw-HU CT.nii.gz written by write_babelbrain_input.m into the
     quantized index-map format + companion CT-cal.npz that BabelBrain's CT path
     actually requires.
@@ -1241,6 +1256,16 @@ def _quantize_ct_for_babelbrain(basedir, subject_id, target, freq, ppw):
     separate bone-segmentation mask of its own to reuse. Voxels outside the
     bone region map to index 0, matching BabelDatasetPreps.py's
     `ndataCTMap[nfct==False]=0`.
+
+    hu_floor: bone HU below it are raised to it first, as BabelDatasetPreps.py
+    does with its bone threshold. hu_max_reference: bone HU above it are
+    lowered to it (PRESTUS maps them as the densest bone, medium_pct_porosity.m);
+    a reference above the largest bone HU is appended to the HU table as its
+    last entry (no voxel points at it). Either way it sets the maximum that
+    BabelBrain's max-normalised mappings (HUtoDensityMarsac) scale by.
+
+    A CT.nii.gz that is already an index map (tagged in its NIfTI descrip, e.g.
+    when the free-water run follows the transcranial run) is left as it is.
     """
     import nibabel as nib
 
@@ -1256,6 +1281,11 @@ def _quantize_ct_for_babelbrain(basedir, subject_id, target, freq, ppw):
         raise FileNotFoundError(f'[run_babelbrain_case] CT quantization: {mask_path} not found.')
 
     ct_nii = nib.load(ct_path)
+    cal_path = ct_path[:ct_path.rindex('CT.nii.gz')] + 'CT-cal.npz'
+    descrip = bytes(ct_nii.header['descrip'].tobytes()).rstrip(b'\x00').decode('ascii', 'ignore')
+    if descrip.startswith(_CT_INDEX_TAG) and os.path.isfile(cal_path):
+        print(f'[run_babelbrain_case] CT quantization: {ct_path} is already an index map; kept.')
+        return
     ct_data = np.asarray(ct_nii.get_fdata(), dtype=np.float64)
     mask_data = np.asarray(nib.load(mask_path).get_fdata())
 
@@ -1267,6 +1297,16 @@ def _quantize_ct_for_babelbrain(basedir, subject_id, target, freq, ppw):
 
     CT_quantification = 10   # bits; matches BabelDatasetPreps.py's own default
     bone_vals = ct_data[bone]
+    if hu_floor is not None:
+        n_low = int(np.count_nonzero(bone_vals < hu_floor))
+        bone_vals = np.maximum(bone_vals, hu_floor)
+        print(f'[run_babelbrain_case] CT quantization: {n_low} of {bone_vals.size} bone voxels '
+              f'({100.0 * n_low / bone_vals.size:.2f} %) raised to the bone HU floor {hu_floor:g}.')
+    if hu_max_reference is not None and bone_vals.max() > hu_max_reference:
+        n_high = int(np.count_nonzero(bone_vals > hu_max_reference))
+        print(f'[run_babelbrain_case] CT quantization: {n_high} of {bone_vals.size} bone voxels '
+              f'(up to {bone_vals.max():.1f}) lowered to the HU reference {hu_max_reference:g}.')
+        bone_vals = np.minimum(bone_vals, hu_max_reference)
     min_data = bone_vals.min()
     max_data = bone_vals.max()
     a_range = max_data - min_data
@@ -1288,12 +1328,16 @@ def _quantize_ct_for_babelbrain(basedir, subject_id, target, freq, ppw):
         ct_map[ct_data == d] = n
     ct_map[~bone] = 0
 
-    cal_path = ct_path[:ct_path.rindex('CT.nii.gz')] + 'CT-cal.npz'
+    if hu_max_reference is not None and hu_max_reference > unique_hu[-1]:
+        unique_hu = np.append(unique_hu, float(hu_max_reference))
+        print(f'[run_babelbrain_case] CT quantization: HU reference maximum {hu_max_reference:g} appended '
+              f'to the table (largest bone HU in the domain: {max_data:.1f}).')
     np.savez_compressed(cal_path, UniqueHU=unique_hu)
     print(f'[run_babelbrain_case] CT calibration table written: {cal_path}')
 
     ct_map_img = nib.Nifti1Image(ct_map, ct_nii.affine)
     ct_map_img.header.set_data_dtype(np.uint32)
+    ct_map_img.header['descrip'] = _CT_INDEX_TAG.encode('ascii')
     ct_map_img.to_filename(ct_path)
     print(f'[run_babelbrain_case] CT index map written (overwriting raw-HU CT.nii.gz): {ct_path}')
 
@@ -1598,7 +1642,8 @@ def main():
               f'{"  bPETRA=True" if args.use_petra else ""}'
               f'{"  air regions=on" if use_air else ""}')
         _quantize_ct_for_babelbrain(args.basedir, args.subject_id, args.target,
-                                     args.freq, args.ppw)
+                                     args.freq, args.ppw, hu_floor=args.ct_bone_hu_floor,
+                                     hu_max_reference=args.ct_hu_max_reference)
     elif args.air_regions:
         print('[run_babelbrain_case] Warning: --air_regions needs --use_ct (pseudoCT path); ignored.',
               file=sys.stderr)

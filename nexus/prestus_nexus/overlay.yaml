@@ -142,6 +142,7 @@ fields:
   path.localite: {visible_if: {key: placement.mode, in: [localite, heuristic]}}
   path.pct: {kind: dir, visible_if: [{key: pct.enabled, in: [1, true]}, {key: path.ct_pattern, in: ['', null]}]}
   path.ct_pattern: {kind: str, visible_if: [{key: simulation.medium, in: [layered]}, {key: pct.enabled, in: [1, true]}]}
+  path.bone_mask_pattern: {kind: str, visible_if: [{key: simulation.medium, in: [layered]}, {key: pct.bone_source, in: [mask]}]}
   path.acoustic_input: {kind: file}
   startup.*_path: {kind: path}
   startup.modules_to_load: {kind: strlist}
@@ -320,6 +321,18 @@ fields:
   pct.density_calibration: {visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.mapping_density, in: [k-plan]}]}
   pct.mapping_soundspeed: {choices: [k-plan, marsac, aubry, webb, pichardo, mcdannold, none], visible_if: {key: pct.enabled, in: [1, true]}}
   pct.mapping_attenuation: {choices: [k-plan, mueller, aubry, webb, pichardo, mcdannold, none], visible_if: {key: pct.enabled, in: [1, true]}}
+  pct.interpolation: {choices: [linear, cubic, spline], visible_if: {key: pct.enabled, in: [1, true]}, advanced: true}
+  pct.limits.*: {visible_if: {key: pct.enabled, in: [1, true]}, advanced: true}
+  pct.hu_reference_layers: {visible_if: {key: pct.enabled, in: [1, true]}, advanced: true}
+  pct.hu_reference_percentile: {visible_if: {key: pct.enabled, in: [1, true]}, advanced: true}
+  pct.hu_reference_resolution_mm: {visible_if: {key: pct.enabled, in: [1, true]}, advanced: true}
+  pct.bone_source: {choices: [segmentation, hu, mask], visible_if: {key: pct.enabled, in: [1, true]}, advanced: true}
+  pct.bone_hu_threshold: {visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.bone_source, in: [hu, mask]}], advanced: true}
+  pct.bone_median_mm: {visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.bone_source, in: [hu, mask]}], advanced: true}
+  pct.bone_open_mm: {visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.bone_source, in: [hu, mask]}], advanced: true}
+  pct.bone_close_mm: {visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.bone_source, in: [hu, mask]}], advanced: true}
+  pct.bone_soft_layer: {visible_if: [{key: pct.enabled, in: [1, true]}, {key: pct.bone_source, in: [hu, mask]}], advanced: true}
+  pct.soft_hu_threshold: {visible_if: {key: pct.enabled, in: [1, true]}, advanced: true}
 
   layers.*: {kind: numbers}
 

@@ -53,6 +53,8 @@ path:
   t2_pattern: '' # T2 image path template relative to path.anat (optional; leave empty to skip T2)
   ct_pattern: '' # Measured CT (Hounsfield units, co-registered to the T1w) path template relative to path.anat, read by
                  # the skull mapping with pct.enabled. Empty = the pseudo-CT generated from the UTE image in path.t2_pattern
+  bone_mask_pattern: '' # pct.bone_source 'mask': bone mask file (nonzero = bone, co-registered to the T1w), relative to path.anat
+                        #   unless absolute; supports %03d-style subject ID substitution and globs
   # Localite neuronavigation (see doc_placement_neuronav.md, "Localite I/O")
   localite_raw: ''      # Raw Localite exports: <localite_raw>/sub-XXX/ses-XX/[<placement.localite.loc_folder>/]...
   localite_post: ''     # Ingested markers (neuronav_ingest_markers): <localite_post>/sub-XXX/ses-XX/InstrumentMarker_sub-XXX_ses-XX.xml/.json
@@ -594,6 +596,34 @@ pct:
                                 #   or a CSV path (two columns: HU, density [kg/m^3]; # comments)
   mapping_soundspeed: 'k-plan'  # pCT mapping algorithm for sound speed: k-plan/marsac/aubry/webb/pichardo/mcdannold/none
   mapping_attenuation: 'k-plan' # pCT mapping algorithm for attenuation: k-plan/mueller/aubry/webb/pichardo/mcdannold/none
+  interpolation: 'linear'       # Resampling of the CT onto the simulation grid: 'linear' | 'cubic' (cubic convolution) | 'spline' (interpolating
+                                #   cubic spline, as BabelBrain); cubic and spline overshoot at bone edges, which the HU limits then clip
+  limits:                       # Regularisation of the CT and of the skull properties mapped from it: a number, 'water' (the water value
+                                #   of that property; not for hu) or [] (no limit). HU limits act before the skull is defined and mapped
+    hu_min: []                  # [HU]
+    hu_max: []                  # [HU] (BabelBrain CT: 2100)
+    density_min: 'water'        # [kg/m^3]
+    density_max: []             # [kg/m^3]
+    sound_speed_min: 'water'    # [m/s]
+    sound_speed_max: []         # [m/s]
+    alpha_coeff_min: []         # [dB/(cm MHz^y)]
+    alpha_coeff_max: []         # [dB/(cm MHz^y)]
+  hu_reference_layers: ['skull'] # Mappings that scale by the densest bone (density marsac-babelbrain/aubry, sound speed aubry, attenuation
+                                #   mueller/aubry) take a percentile of the CT in these layers over the whole head (segmentation grid)
+  hu_reference_percentile: 99.9 # Percentile for hu_reference_layers (100 = the largest HU; below 100 keeps metal or artefacts from setting the scale)
+  hu_reference_resolution_mm: [] # [] = take the reference on the segmentation grid; a spacing [mm] = after resampling the whole-head CT onto
+                                #   that grid with pct.interpolation, as BabelBrain (spline overshoot raises it; for tool comparisons only)
+  bone_source: 'segmentation'   # Where the skull is: 'segmentation' (the segmentation's skull labels), 'hu' (HU above bone_hu_threshold
+                                #   on the simulation grid, as BabelBrain's CT path) or 'mask' (path.bone_mask_pattern); with 'hu' and 'mask'
+                                #   segmentation skull outside the bone joins bone_soft_layer
+  bone_hu_threshold: 300        # bone_source 'hu': bone = HU above this value. 'hu' and 'mask': bone HU below it are raised to it [HU]
+  bone_median_mm: 0             # bone_source 'hu'/'mask': width of the median filter of the bone mask [mm]; 0 = off (BabelBrain: 7 voxels, 2.6 mm at 6 PPW, 500 kHz)
+  bone_open_mm: 0               # bone_source 'hu'/'mask': edge of the cube that opens the bone mask (removes specks and spurs) before the closing [mm]; 0 = off
+  bone_close_mm: 0              # bone_source 'hu'/'mask': edge of the cube that closes holes in the bone mask [mm]; 0 = off (BabelBrain: 5)
+  bone_soft_layer: 'nearest'    # bone_source 'hu'/'mask': medium that segmentation skull voxels outside the bone join: 'nearest' (that of the
+                                #   nearest voxel outside both skull definitions: skin on the outer side, brain or CSF on the inner) or a layer name
+  soft_hu_threshold: []         # Soft tissue against water from the CT on the simulation grid: outside the skull, tissue below this HU becomes
+                                #   water and water at or above it takes the nearest soft tissue [HU]; [] = off (the segmentation decides)
 
 #------------ Simulation layers
 # Assign tissue compartments to model, with their SimNIBS segmentation label indices.

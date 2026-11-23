@@ -28,7 +28,8 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_pct_de
             % same densities as the former hard-coded table
             x = [-500 200 1000 1500 2500];
             d = run_kplan(params(''), x);
-            tc.verifyEqual(d, max(1000, fit_pairwiselinear(x, [-990 60 1000 1950], [1.2 1060 1530 2150])), 'AbsTol', 1e-9);
+            % the mapping itself; the water floor is a limit (pct.limits.density_min, PCT_MAP_PROPERTIES)
+            tc.verifyEqual(d, fit_pairwiselinear(x, [-990 60 1000 1950], [1.2 1060 1530 2150]), 'AbsTol', 1e-9);
         end
 
         function test_shipped_table_by_name(tc)

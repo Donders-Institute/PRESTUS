@@ -66,11 +66,25 @@ function [medium_masks, segmentation_crop, bone_mask_crop, pseudoCT_crop, trans_
     seg_qc('add_mapping', parameters, segmentation, medium_masks, focus_pos_grid, ...
         seg_qc('grid_note', parameters, 'placement'));
 
-    % Fill gaps in skull mask
+    % Skull: from the segmentation (gaps filled), by an HU threshold on the
+    % pseudo-CT (pct.bone_source 'hu', SKULL_FROM_HU), or from a bone mask file
+    % ('mask'); both reconciled with the segmentation by SKULL_RECONCILE, which
+    % closes holes itself
     requested_layers = fieldnames(parameters.layers);
-    if any(contains(requested_layers, 'skull'))        
+    switch skull_bone_source(parameters)
+        case 'hu'
+            [medium_masks, bone_mask_img, pseudoCT_img] = skull_from_hu(parameters, medium_masks, pseudoCT_img);
+        case 'mask'
+            [medium_masks, bone_mask_img, pseudoCT_img] = skull_reconcile(parameters, medium_masks, ...
+                bone_mask_img, pseudoCT_img, 'mask');
+    end
+    if strcmp(skull_bone_source(parameters), 'segmentation') && any(contains(requested_layers, 'skull'))
         [medium_masks, ~] = skull_fill_holes(parameters, ...
             medium_masks, focus_pos_grid, segmentation);
+    end
+    % Soft tissue against water from the CT (pct.soft_hu_threshold; off by default)
+    if ~isempty(get_field(parameters, {'pct', 'soft_hu_threshold'}, []))
+        medium_masks = tissue_from_hu(parameters, medium_masks, pseudoCT_img);
     end
 
     % [DEBUG] Plot segmentation and smoothed medium mask
