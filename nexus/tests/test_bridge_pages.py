@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PyQt6")
 
 from PyQt6.QtCore import QObject, Qt, pyqtSignal  # noqa: E402
-from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox, QSplitter  # noqa: E402
+from PyQt6.QtWidgets import QApplication, QFileDialog, QMessageBox, QSplitter, QWidget  # noqa: E402
 
 from prestus_nexus.equipment import EquipmentLibrary  # noqa: E402
 from prestus_nexus.model import ConfigModel  # noqa: E402
@@ -201,7 +201,23 @@ def test_calibration_steps_sit_below_the_plots_and_fit_the_minimum_width(window)
     QApplication.processEvents()
     for b in (page.load_btn, page.predict_btn, page.fit_btn, page.save_btn, page.kw_btn):
         right = b.mapTo(page, b.rect().topRight()).x()
-        assert right <= page.width(), b.text()              # nothing clipped at the narrowest window
+        assert right <= page.width(), f"{b.text()}\n{_width_report(page, b)}"   # nothing clipped
+
+
+def _width_report(page, widget) -> str:
+    """Why a widget sticks out: the minimum width of each container from it up to the page, and
+    the widest leaf widgets of the page (their minimum width forces the containers' width)."""
+    lines, w = ["chain (min hint / width):"], widget
+    while w is not None and w is not page.parentWidget():
+        lines.append(f"  {type(w).__name__} {w.objectName()!r}: {w.minimumSizeHint().width()} / {w.width()}")
+        w = w.parentWidget()
+    leaves = [c for c in page.findChildren(QWidget) if c.isVisible() and not c.findChildren(QWidget)]
+    leaves.sort(key=lambda c: -max(c.minimumSizeHint().width(), c.minimumWidth()))
+    lines.append("widest leaves (min hint, min width, text):")
+    for c in leaves[:10]:
+        text = c.text() if hasattr(c, "text") and callable(c.text) else getattr(c, "currentText", lambda: "")()
+        lines.append(f"  {type(c).__name__}: {c.minimumSizeHint().width()}, {c.minimumWidth()}, {str(text)[:50]!r}")
+    return "\n".join(lines)
 
 
 def test_cards_named_by_their_tab_drop_their_title(window):

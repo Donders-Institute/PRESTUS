@@ -31,6 +31,39 @@ def schema(prestus_root) -> Schema:
     return Schema(prestus_root / "config" / "config_default.yaml")
 
 
+def _delete_leftover_windows() -> None:
+    """Delete the top-level widgets tests created and left behind. Alive, a later
+    app.setStyleSheet repolishes them and Python's shutdown destroys them after the
+    QApplication: both crashed the process (segfault / bus error). Qt's own windows (tooltip
+    label, popups) are not Python-created and are kept."""
+    try:
+        from PyQt6 import sip
+        from PyQt6.QtCore import QCoreApplication, QEvent
+        from PyQt6.QtWidgets import QApplication
+    except ImportError:
+        return
+    app = QApplication.instance()
+    if not isinstance(app, QApplication):
+        return
+    for w in app.topLevelWidgets():
+        if sip.ispycreated(w) and not sip.isdeleted(w):
+            w.hide()                     # not close(): closeEvent may ask or save
+            w.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    app.processEvents()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _no_leftover_windows():
+    """Each test module starts without the previous modules' windows."""
+    yield
+    _delete_leftover_windows()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    _delete_leftover_windows()
+
+
 @pytest.fixture(autouse=True)
 def _fresh_caches(monkeypatch, tmp_path_factory):
     """Each test sees the file system as it is now, and nothing is cached outside tmp."""
