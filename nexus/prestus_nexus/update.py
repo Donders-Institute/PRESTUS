@@ -388,7 +388,7 @@ def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(errors="replace")
-        except (AttributeError, ValueError):
+        except (AttributeError, ValueError):  # best-effort: a stream without reconfigure (redirected or replaced) keeps its encoding
             pass
     root = Path(args.prestus_root).expanduser() if args.prestus_root else default_root()
     if not (root / "config" / "config_default.yaml").is_file():
