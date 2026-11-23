@@ -164,7 +164,7 @@ The Nexus runs where you edit configs and needs a display; the others run where 
 
 ### k-Wave C++ Binaries
 
-Only the `cpp_cpu` and `cpp_gpu` code types need these optional binaries: download the C++ binaries from the [k-Wave website](http://www.k-wave.org/download.php) and place them in `k-Wave/binaries/` ([k-Wave instructions](http://www.k-wave.org/documentation/kspaceFirstOrder3DC.php)). The [kspacefirstorder-unified](https://github.com/waltsims/kspacefirstorder-unified) repository is an alternative source for the same C++ code (OpenMP and CUDA variants, with macOS support). It also hosts the MLX port for Apple Silicon GPUs, which the `cpp_mlx` code type needs and which is not on the k-Wave website. Compiling and selecting binaries is described in [k-Wave](doc_kwave.md).
+Only the `cpp_cpu` and `cpp_gpu` code types need these optional binaries: download the C++ binaries from the [k-Wave website](http://www.k-wave.org/download.php) and place them in `PRESTUS/external/k-wave/k-Wave/binaries/` ([k-Wave instructions](http://www.k-wave.org/documentation/kspaceFirstOrder3DC.php)). Precompiled Linux binaries for the Donders HPC are in the [PRESTUS_bin repository](https://github.com/jkosciessa/PRESTUS_bin/tree/main/donders_kwave_bin) ([which binary is which](doc_kwave.md#solver-implementations-code_type)). The [kspacefirstorder-unified](https://github.com/waltsims/kspacefirstorder-unified) repository is an alternative source for the same C++ code (OpenMP and CUDA variants, with macOS support). It also hosts the MLX port for Apple Silicon GPUs, which the `cpp_mlx` code type needs and which is not on the k-Wave website. Compiling and selecting binaries is described in [k-Wave](doc_kwave.md).
 
 ### PlanTUS Dependencies
 

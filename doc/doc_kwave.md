@@ -24,14 +24,25 @@ On this page:
 | `cpp_gpu` | `kspaceFirstOrder3DG` wraps the C++/[CUDA](https://developer.nvidia.com/cuda-toolkit) binary `kspaceFirstOrder-CUDA`, offloading computation to NVIDIA GPUs | A CUDA-capable Nvidia GPU and the binary from [k-Wave downloads](http://www.k-wave.org/download.php) |
 | `cpp_mlx` | `kspaceFirstOrder3DG` wraps the C++/[MLX](https://github.com/ml-explore/mlx) binary `kspaceFirstOrder-MLX`, offloading computation to the Apple Silicon GPU | An Apple Silicon Mac (macOS 14 or later) and the binary with `mlx.metallib`, built as described below |
 
+**Recommended: the C++ codes.** Where the binaries are installed, use `cpp_gpu` on an NVIDIA GPU and `cpp_cpu` otherwise. They run several times faster than their MATLAB counterparts on the same hardware, keep peak memory low by streaming the source from disk ([Memory](doc_simulations-acoustic.md#memory-use)), and report their progress to the Nexus. In return they need a separate install and temporary disk space for their input and output files ([HPC](doc_hpc.md)). The configuration default is `matlab_gpu`, because it runs without the binaries.
+
+??? note "Precompiled binaries for the Donders HPC"
+    The [PRESTUS_bin repository](https://github.com/jkosciessa/PRESTUS_bin/tree/main/donders_kwave_bin) holds three Linux x86-64 binaries. Place the ones you need into `PRESTUS/external/k-wave/k-Wave/binaries/`.
+
+    | Binary | What it is | Used by |
+    |---|---|---|
+    | [`kspaceFirstOrder-OMP`](https://github.com/jkosciessa/PRESTUS_bin/raw/refs/heads/main/donders_kwave_bin/kspaceFirstOrder-OMP) | k-Wave C++ 1.3 CPU solver ([OpenMP](https://www.openmp.org/), multi-threaded) from the k-Wave website | `cpp_cpu` |
+    | [`kspaceFirstOrder-CUDA`](https://github.com/jkosciessa/PRESTUS_bin/raw/refs/heads/main/donders_kwave_bin/kspaceFirstOrder-CUDA) | k-Wave C++ 1.3 CUDA solver, compiled on the Donders HPC with CUDA 11.8 as described below. It loads cuFFT (CUDA 11) and HDF5 1.10 from the system, so it runs only where these libraries are installed. | `cpp_gpu` |
+    | [`acousticFieldPropagator-OMP`](https://github.com/jkosciessa/PRESTUS_bin/raw/refs/heads/main/donders_kwave_bin/acousticFieldPropagator-OMP) | C++ backend of k-Wave's `acousticFieldPropagatorC`, which computes the steady-state field of a continuous-wave source in a homogeneous medium | not used by PRESTUS |
+
 ??? note "Compiling the CUDA binary for your GPU"
     To use C++ with GPU support you may need to recompile the binary for your GPU version (for example the A100 GPUs on the Donders HPC).
 
     - Download the [Linux C++/CUDA source files](http://www.k-wave.org/download.php) (version 1.3; the C++ code is versioned separately from the k-Wave 1.4.1 MATLAB toolbox). This includes the Makefile to compile the binary.
     - Follow the compilation instructions by [TU Delft](https://qiweb.tudelft.nl/sysman/kwave_hpc.html). Include your GPU type in the Makefile.
     - Example scripts for compiling binaries on the Donders HPC are in `PRESTUS/examples/hpc_compile...`
-    - For the Donders HPC, a precompiled binary is available [here](https://github.com/jkosciessa/PRESTUS_bin/raw/refs/heads/main/donders_kwave_bin/kspaceFirstOrder-CUDA).
-    - Place the updated binary into `PRESTUS/external/k-Wave/binaries/`
+    - For the Donders HPC, a precompiled binary is available in the PRESTUS_bin repository (see above).
+    - Place the updated binary into `PRESTUS/external/k-wave/k-Wave/binaries/`
 
 ??? note "Building the MLX binary (macOS)"
     `cpp_mlx` is experimental and has not been validated on a PRESTUS head simulation. It runs the acoustic simulation on the Apple GPU; thermal simulations run on the CPU. Axisymmetric grids fall back to `matlab_cpu`, and `kwave_elastic` runs with `matlab_cpu`, because the port has no solver for either.
