@@ -114,6 +114,10 @@ fields:
     choices: [pulses, trains, custom]
     visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}]
     help: "Async coupling: when each transducer fires; heating follows each one's own on-time. 'pulses': all use the timing block and take turns within each PRI (needs N × PD ≤ PRI). 'trains': take turns within each PTRI (needs N × PTD ≤ PTRI). 'custom': each transducer's start delay and timing overrides."
+  timing.overlap_phase:
+    choices: [clock, burst]
+    visible_if: [{key: __n_transducers, not_in: [0, 1]}, {key: simulation.transducer_coupling, in: [async]}, {key: timing.async_schedule, in: [custom]}]
+    help: "Pulses of transducers at one frequency that partly overlap interfere while both are on. 'clock': the channels share one clock, so the simulated drive phases hold in every pulse. 'burst': each pulse starts its carrier at its own onset, so the phase also shifts with the delay between the pulses."
 
   # ── Paths & environment ──────────────────────────────────────────────
   path.sim: {kind: dir}
@@ -903,6 +907,7 @@ docs:
   grid.z_beyond_focus_mm: doc_partial-fov.md#fov-box-geometry
   grid.async_layout: doc_multitransducer_async.md#grid-geometry-mode
   timing.async_schedule: doc_multitransducer_async.md#firing-schedule
+  timing.overlap_phase: doc_multitransducer_async.md#firing-schedule
   transducer.timing_offset_s: doc_multitransducer_async.md#firing-schedule
   transducer.timing.*: doc_multitransducer_async.md#firing-schedule
   simulation.transducer_coupling: doc_multitransducer_async.md#async-configuration
@@ -946,6 +951,7 @@ display:
   simulation.transducer_coupling: {label: Coupling, group: coupling}
   grid.async_layout: {label: "Grid for async runs", advanced: true, group: coupling}
   timing.async_schedule: {label: Firing schedule, group: coupling}
+  timing.overlap_phase: {label: "Phase of overlapping pulses", group: coupling, advanced: true}
   transducer.timing_offset_s: {label: "Start delay", group: coupling, advanced: true}
   transducer.timing.pd: {label: "Pulse duration, this transducer", group: coupling, advanced: true}
   transducer.timing.pri: {label: "Pulse repetition interval, this transducer", group: coupling, advanced: true}
@@ -1382,6 +1388,7 @@ choice_labels:
   simulation.precision: {single: Single, double: Double}
   simulation.transducer_coupling: {coherent: Coherent, async: Asynchronous}
   timing.async_schedule: {pulses: "Pulses take turns", trains: "Pulse trains take turns", custom: "Custom offsets and timing"}
+  timing.overlap_phase: {clock: "Shared clock", burst: "Each pulse restarts the carrier"}
   grid.async_layout: {shared: Shared grid, per_transducer: One grid per transducer}
   io.overwrite_files: {never: Reuse existing outputs, always: Recompute outputs, force: Recompute outputs and intermediate stages, ask: Ask}
   io.cache_signature_check: {error: Stop on mismatch, warn: Warn and reuse, 'off': Do not check}

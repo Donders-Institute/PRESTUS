@@ -14,7 +14,13 @@ function jobs = async_transducer_pipeline(parameters, options)
 % transducers with the same timing_offset_s and timing fire together. Each
 % still runs on its own (with io.save_p_complex) and is scaled to its own
 % target; the combine stage sums their complex fields, so they interfere, and
-% the group heats in its own windows. Groups need grid.async_layout 'shared'.
+% the group heats in its own windows. On per-transducer grids the complex
+% fields are resampled with the carrier removed (REMAP_COMPLEX_FIELD).
+%
+% Partly overlapping pulses: transducers at one frequency whose pulses overlap
+% without starting together interfere while both are on (THERMAL_SCHEDULE
+% sched.overlap, timing.overlap_phase); the combine stage stores their
+% interference fields and the thermal stage adds them in those segments.
 %
 % Multi-ISPPA sweep: when any transducer carries a vector target
 % (transducer(i).target_isppa_wcm2 with more than one value), one
@@ -118,14 +124,29 @@ end
 % Firing groups (FIRING_GROUPS): transducers with the same start and timing
 % fire together; their complex fields are summed in the combine stage.
 fg = firing_groups(parameters);
-% The firing schedule (timing.async_schedule) errors on overlapping or
-% inconsistent timing: check it before any job is submitted.
-if isfield(parameters, 'modules') && isfield(parameters.modules, 'run_heating_sims') && ...
-        parameters.modules.run_heating_sims && isfield(parameters, 'timing') && ...
-        isfield(parameters.timing, 'pd') && parameters.timing.pd > 0
-    thermal_schedule(parameters, numel(fg.source_tx), ...
-        SourceTx=fg.source_tx, SourceFreq=fg.source_freq);
+% The firing schedule (timing.async_schedule) errors on inconsistent timing:
+% check it before any job is submitted. It also says which groups' pulses
+% partly overlap at one frequency (sched.overlap): the combine stage computes
+% their interference, also for acoustic-only runs (peak pressure).
+overlap = struct('pairs', zeros(0, 2), 'thetas', {{}});
+heating = isfield(parameters, 'modules') && isfield(parameters.modules, 'run_heating_sims') && ...
+          parameters.modules.run_heating_sims;
+if isfield(parameters, 'timing') && isfield(parameters.timing, 'pd') && parameters.timing.pd > 0
+    try
+        sched_plan = thermal_schedule(parameters, numel(fg.source_tx), ...
+            SourceTx=fg.source_tx, SourceFreq=fg.source_freq);
+        overlap = sched_plan.overlap;
+    catch ME
+        if heating
+            rethrow(ME);
+        end
+        warning('async_transducer_pipeline:schedule', ...
+            'Firing schedule not resolved (%s); acoustic-only run without overlap terms.', ME.message);
+    end
 end
+ov_groups = reshape(fg.source_group(overlap.pairs), [], 2);    % [K x 2] groups of each pair
+ov_freqs  = reshape(fg.source_freq(overlap.pairs(:, 1)), [], 1);
+ov_thetas = overlap.thetas;
 
 % =========================================================================
 %% Resolve options
@@ -223,17 +244,15 @@ if ~ismember(async_layout, {'shared', 'per_transducer'})
         async_layout);
 end
 per_transducer_grid = strcmp(async_layout, 'per_transducer');
-if per_transducer_grid && is_simultaneous_multifreq(parameters)
-    error('async_transducer_pipeline:simultaneousNeedsSharedGrid', ...
-        ['Coherent transducers at different frequencies combine complex fields, which are not ' ...
-         'interpolated between grids: use grid.async_layout: shared.']);
+% Complex fields on per-transducer grids are resampled onto transducer(1)'s grid
+% with the carrier removed (REMAP_COMPLEX_FIELD); the shared grid needs none.
+if per_transducer_grid && (any(fg.coherent) || ~isempty(ov_groups) || is_simultaneous_multifreq(parameters))
+    fprintf(['[async] Per-transducer grids: complex fields of transducers firing together or ' ...
+             'overlapping are resampled onto transducer 1''s grid (carrier removed).\n']);
 end
-if per_transducer_grid && any(fg.coherent)
-    g = find(fg.coherent, 1);
-    error('async_transducer_pipeline:groupNeedsSharedGrid', ...
-        ['Transducers %s fire together (same timing_offset_s and timing), so their complex fields ' ...
-         'are summed, which are not interpolated between grids: use grid.async_layout: shared.'], ...
-        mat2str(fg.members{g}));
+for kk = 1:size(ov_groups, 1)
+    fprintf('[async] Transducers %s and %s partly overlap at %g kHz: they interfere while both are on.\n', ...
+        mat2str(fg.members{ov_groups(kk, 1)}), mat2str(fg.members{ov_groups(kk, 2)}), ov_freqs(kk) / 1e3);
 end
 if is_simultaneous_multifreq(parameters)
     fprintf(['[async] Coherent transducers at different frequencies (%s kHz): one simulation per ' ...
@@ -244,8 +263,11 @@ else
             mat2str(fg.members{g}));
     end
 end
-% Transducers whose complex field the combine stage sums
-needs_complex = fg.coherent(fg.group);
+% Transducers whose complex field the combine stage needs: firing groups and
+% groups in an overlapping pair
+group_complex = fg.coherent;
+group_complex(ov_groups(:)) = true;
+needs_complex = group_complex(fg.group);
 
 % Preproc affix(es): shared mode builds one grid sized to fit every
 % transducer; per_transducer mode builds N independent grids, each aligned
@@ -436,7 +458,9 @@ switch platform
             if n_points > 1; label = [label, sprintf(' — sweep %d/%d', j, n_points)]; end %#ok<AGROW>
             run_stage(N + j, label, ...
                 @() combine_async_intensity(files_acoustic, files_combined{j}, ...
-                                            targets_matrix(:, j)', combine_mode(parameters), fg.group, pd_tx));
+                                            targets_matrix(:, j)', combine_mode(parameters), fg.group, pd_tx, ...
+                                            OverlapGroups=ov_groups, OverlapFreqs=ov_freqs, ...
+                                            OverlapThetas=ov_thetas));
         end
 
         for j = 1:n_points
@@ -560,13 +584,19 @@ switch platform
             else
                 fprintf('[%s] Combine\n', stage_label);
             end
+            % Reuse the combined cache only when nothing upstream is being recomputed
+            % in this call and it was scaled to the targets requested now
             if isfile(files_combined{j}) && ~ow.rerun_intermediates && ...
+                    isempty(pending_acoustic) && ...
                     has_per_transducer_fields(files_combined{j}) && ...
-                    has_same_groups(files_combined{j}, fg)
+                    has_same_targets(files_combined{j}, targets_matrix(:, j)') && ...
+                    has_same_groups(files_combined{j}, fg) && ...
+                    has_same_overlap(files_combined{j}, ov_groups, ov_freqs)
                 fprintf('           Cache exists — skipping.\n');
             else
                 p_comb = make_combine_params(parameters, files_acoustic, ...
-                                             files_combined{j}, targets_matrix(:,j)', fg.group, pd_tx);
+                                             files_combined{j}, targets_matrix(:,j)', fg.group, pd_tx, ...
+                                             ov_groups, ov_freqs, ov_thetas);
                 p_comb.hpc.timelimit = options.combine_timelimit;
                 p_comb.hpc.job_name  = sprintf('PRESTUS-%sat-cb%02d_%s', options.job_name_prefix, j, subj);
                 p_comb = apply_memorylimit(p_comb, options.combine_memorylimit);
@@ -667,6 +697,20 @@ function tf = has_per_transducer_fields(file)
     end
 end
 
+function prov = cached_provenance(file)
+% acoustic_provenance of a combined cache; struct() when the file holds none
+% (written before provenance was recorded), so the checks below combine again.
+% A file that exists but cannot be read stops the run (WHO and LOAD raise).
+    prov = struct();
+    if ~isfile(file) || ~ismember('acoustic_provenance', who('-file', file))
+        return
+    end
+    s = load(file, 'acoustic_provenance');
+    if isstruct(s.acoustic_provenance)
+        prov = s.acoustic_provenance;
+    end
+end
+
 function f = complex_file(results_file)
 % The complex field written next to an acoustic results file (WRITE_P_COMPLEX_FILES)
     [d, n, e] = fileparts(results_file);
@@ -690,6 +734,8 @@ function id = pending_job(results_file, platform)
     try
         candidate = strtrim(fileread(marker));
     catch
+        % The job deletes its marker when it ends; a marker that vanished
+        % after the ISFILE check means no job is pending.
         return
     end
     if hpc_job_active(platform, candidate)
@@ -707,6 +753,42 @@ function mark_pending(results_file, job_id)
     end
     fprintf(fid, '%s\n', num2str(job_id));
     fclose(fid);
+end
+
+function tf = has_same_targets(file, targets)
+% A combined cache scaled to other per-transducer ISPPA targets
+% (combination_targets) is combined again. A transducer without a target
+% (NaN: configured drive) is not compared.
+    prov = cached_provenance(file);
+    tf = false;
+    if isfield(prov, 'combination_targets') && isnumeric(prov.combination_targets)
+        cached = double(prov.combination_targets(:)');
+        want   = double(targets(:)');
+        if numel(cached) == numel(want)
+            cmp = isfinite(want);
+            tf  = all(abs(cached(cmp) - want(cmp)) <= 1e-6 * max(1, abs(want(cmp))));
+        end
+    end
+    if ~tf
+        fprintf('           Cache was combined for other ISPPA targets — combining again.\n');
+    end
+end
+
+function tf = has_same_overlap(file, ov_groups, ov_freqs)
+% A combined cache made with other overlapping pairs (combination_overlap; absent
+% without overlap) is combined again.
+    prov = cached_provenance(file);
+    if isfield(prov, 'combination_overlap')
+        c  = prov.combination_overlap;
+        tf = isstruct(c) && isfield(c, 'groups') && isfield(c, 'freqs_hz') && ...
+             isequal(c.groups, ov_groups) && numel(c.freqs_hz) == numel(ov_freqs) && ...
+             max([0; abs(c.freqs_hz(:) - ov_freqs(:))]) < 1e-3;
+    else
+        tf = isempty(ov_groups);
+    end
+    if ~tf
+        fprintf('           Cache was combined with other overlapping pulses — combining again.\n');
+    end
 end
 
 function tf = has_same_groups(file, fg)
@@ -820,7 +902,7 @@ function p = make_acoustic_params(base, transducer_idx, affix, affix_preproc, ow
     p.state.async_subjob             = true;        % (also for transducers at different frequencies)
 end
 
-function p = make_combine_params(base, files_in, file_out, targets_wcm2, groups, pd_s)
+function p = make_combine_params(base, files_in, file_out, targets_wcm2, groups, pd_s, ov_groups, ov_freqs, ov_thetas)
     p = base;
     % Targets travel in async_combine.targets_wcm2; clear the sweep vectors so
     % this job does not route into multi_isppa_pipeline.
@@ -841,6 +923,9 @@ function p = make_combine_params(base, files_in, file_out, targets_wcm2, groups,
     p.async_combine.mode             = combine_mode(base);
     p.async_combine.groups           = groups;
     p.async_combine.pd_s             = pd_s;
+    p.async_combine.overlap_groups   = ov_groups;   % pairs whose pulses partly overlap
+    p.async_combine.overlap_freqs    = ov_freqs;
+    p.async_combine.overlap_thetas   = ov_thetas;
     p.io.output_affix                = '';
     p.io.overwrite_files             = 'never';
     p.simulation.interactive         = 0;

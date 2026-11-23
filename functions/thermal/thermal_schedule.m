@@ -33,10 +33,12 @@ function sched = thermal_schedule(parameters, n_sources, opts)
 %                        last pulse train of any transducer (or timing.ptrd).
 % Time between pulse trains of every source is stepped at post_pt_timestep;
 % time inside any source's pulse train at pt_timestep (or one step per
-% segment). Overlapping on-windows of transducers at the same frequency are an
-% error: their fields interfere, which the incoherent sum does not model (fire
-% them together as a group, FIRING_GROUPS, or use transducer_coupling
-% 'coherent'). At different frequencies they warn.
+% segment). Transducers at the same frequency whose pulses overlap interfere
+% while both are on: sched.overlap lists the pairs, segments and phases
+% (THERMAL_OVERLAP_TERMS, timing.overlap_phase 'clock' (default) or 'burst'),
+% and THERMAL_SIMULATION adds their interference heat. Transducers that start
+% together with the same timing are better fired as one group (FIRING_GROUPS).
+% At different frequencies an overlap warns: their intensities are summed.
 %
 % Firing groups: by default source i fires in transducer i's windows. With
 % SourceTx, source i fires in transducer SourceTx(i)'s windows, so the fields
@@ -78,6 +80,8 @@ function sched = thermal_schedule(parameters, n_sources, opts)
 %     source(i)    pd, pri, ptd, ptri, ptrd, offset_s, n_pulses_per_pt,
 %                  n_ptri_reps, duty_cycle (overall), on_time_s,
 %                  pulse_windows [P x 2], train_windows [R x 2] [s]
+%     overlap      sources at one frequency that are on together
+%                  (THERMAL_OVERLAP_TERMS: pairs, active, theta, cos_w, sin_w, thetas)
 %
 % See also: THERMAL_PARAMETERS, THERMAL_SIMULATION, THERMAL_PLOT_PROTOCOL
 
@@ -293,27 +297,29 @@ for row = 1:numel(t0)
     n_groups_on(row) = numel(unique(source_tx(active(row, :))));
 end
 multi = n_groups_on > 1;
+mixed_f = false(numel(t0), 1);                   % overlap of sources at different frequencies
 if any(multi) && ~strcmp(mode, 'simultaneous')   % intended, at different frequencies
-    pairs = unique(active(multi, :), 'rows');
-    for row = 1:size(pairs, 1)
-        on = find(pairs(row, :));
-        f = source_freq(on);
-        if numel(unique(f(~isnan(f)))) < numel(f(~isnan(f))) || all(isnan(f))
-            error('thermal_schedule:coherentOverlap', ...
-                ['Transducers %s are on at the same time at the same frequency. Their fields ' ...
-                 'interfere, which async coupling (summed intensities) does not model. Give them ' ...
-                 'the same offset and timing to fire them together as one group, change the ' ...
-                 'offsets, or use simulation.transducer_coupling: coherent.'], ...
-                mat2str(unique(source_tx(on))));
+    for row = find(multi)'
+        f = source_freq(active(row, :));
+        if any(isnan(f))
+            error('thermal_schedule:overlapUnknownFrequency', ...
+                ['Transducers %s are on at the same time, but not every frequency is known, so ' ...
+                 'their interference cannot be modelled. Set transducer(i).freq_hz.'], ...
+                mat2str(unique(source_tx(active(row, :)))));
         end
+        mixed_f(row) = numel(unique(round(f))) > 1;
     end
+end
+if any(mixed_f) && ~strcmp(mode, 'simultaneous')
     warning('thermal_schedule:overlap', ...
         ['Transducers at different frequencies are on at the same time for %.4g s in total; ' ...
          'their intensities are summed (valid when the pulse is long against 1/|f1-f2|). ' ...
          'The peak pressure then reaches the sum of their amplitudes at the beat maxima, ' ...
          'more than the async p_max_all (per-voxel maximum) and MI report.'], ...
-        sum(dur(multi)));
+        sum(dur(mixed_f)));
 end
+% Overlap at one frequency (sources of different groups): they interfere while
+% both are on; sched.overlap holds the segments and phases (THERMAL_OVERLAP_TERMS)
 
 %% Time steps
 eq_steps = isfield(timing, 'equal_step_duration') && ~isempty(timing.equal_step_duration) && ...
@@ -346,6 +352,15 @@ sched.t_sonication = t_son;
 sched.t_end        = t_end;
 sched.total_steps  = sum(sched.n_steps);
 sched.source       = src;
+overlap_phase = 'clock';
+if isfield(timing, 'overlap_phase') && ~isempty(timing.overlap_phase)
+    overlap_phase = lower(char(timing.overlap_phase));
+end
+if ~ismember(overlap_phase, {'clock', 'burst'})
+    error('thermal_schedule:overlapPhase', ...
+        'timing.overlap_phase must be ''clock'' or ''burst'', got ''%s''.', overlap_phase);
+end
+sched.overlap      = thermal_overlap_terms(sched, source_freq, source_tx, overlap_phase);
 end
 
 function tf = inside(x, w)

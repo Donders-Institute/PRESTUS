@@ -229,7 +229,9 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_multit
             tc.verifyEqual(s.acoustic_provenance.combination_mode, 'async_dual_field');
         end
 
-        function test_combine_group_needs_shared_grid(tc)
+        function test_combine_group_other_grid_needs_affine(tc)
+            % negative control: a complex field on another grid without a recoverable
+            % grid-to-grid affine (no planimg sidecar) is not remapped
             d = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
             f1 = write_cache(fullfile(d, 'a_results.mat'), ones(6, 6, 6), [], []);
             write_pc(fullfile(d, 'a_p_complex.mat'), ones(6, 6, 6), [], [], 3e5);
@@ -237,7 +239,63 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_multit
             write_pc(fullfile(d, 'b_p_complex.mat'), ones(8, 8, 8), [], [], 3e5);
             out = fullfile(d, 'g.mat');
             tc.verifyError(@() combine_async_intensity({f1, f2}, out, [], 'async', [1 1]), ...
-                'combine_async_intensity:simultaneousGridMismatch');
+                'combine_async_intensity:complexNeedsAffine');
+        end
+
+        function test_combine_group_remapped_from_other_grid(tc)
+            % One plane wave simulated on the reference grid and on a grid shifted by
+            % one voxel (per_transducer layout): remapped with the carrier removed, the
+            % coherent sum is twice the wave at 6 points per wavelength
+            d = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            f = 1500 / (6 * 1e-3);                       % 6 PPW at 1 mm in water
+            k0 = 2 * pi / 6;
+            [~, ~, z1] = ndgrid(1:10, 1:10, 1:20);
+            [~, ~, z2] = ndgrid(1:10, 1:10, 1:22);
+            P1 = exp(-1i * k0 * z1);                     % world z = voxel z
+            P2 = exp(-1i * k0 * (z2 - 1));               % world z = voxel z - 1
+            f1 = write_cache_affine(d, 'a', abs(P1), eye(4));
+            write_pc(fullfile(d, 'a_p_complex.mat'), P1, [], [], f);
+            A2 = eye(4); A2(4, 3) = -1;
+            f2 = write_cache_affine(d, 'b', abs(P2), A2);
+            write_pc(fullfile(d, 'b_p_complex.mat'), P2, [], [], f);
+            out = fullfile(d, 'g.mat');
+            evalc('combine_async_intensity({f1, f2}, out, [], ''async'', [1 1]);');
+            s = load(out, 'sensor_data');
+            inner = s.sensor_data.p_max_async(3:8, 3:8, 3:18);
+            tc.verifyEqual(double(inner), 2 * ones(size(inner)), 'AbsTol', 1e-6);
+        end
+
+        function test_combine_overlap_pair(tc)
+            % Two transducers at one frequency whose pulses partly overlap: the
+            % interference A + iB = 2 P_a conj(P_b) is stored for the thermal stage, and
+            % the peak pressure is |P_a + P_b e^(i theta)| over the phases that occur
+            d = tc.applyFixture(matlab.unittest.fixtures.TemporaryFolderFixture).Folder;
+            full = [5 5 5];
+            f1 = write_cache(fullfile(d, 'a_results.mat'), ones(full), [], []);
+            write_pc(fullfile(d, 'a_p_complex.mat'), ones(full), [], [], 3e5);
+            f2 = write_cache(fullfile(d, 'b_results.mat'), ones(full), [], []);
+            write_pc(fullfile(d, 'b_p_complex.mat'), 1i * ones(full), [], [], 3e5);
+            out = fullfile(d, 'o.mat');
+            evalc(['combine_async_intensity({f1, f2}, out, [], ''async'', [1 2], [], ' ...
+                   'OverlapGroups=[1 2], OverlapFreqs=3e5, OverlapThetas={0});']);
+            s = load(out, 'sensor_data', 'acoustic_provenance');
+            tc.verifySize(s.sensor_data.p_async_cross, [full, 1, 2]);
+            tc.verifyEqual(double(s.sensor_data.p_async_cross(3, 3, 3, 1, 1)), 0, 'AbsTol', 1e-6);
+            tc.verifyEqual(double(s.sensor_data.p_async_cross(3, 3, 3, 1, 2)), -2, 'AbsTol', 1e-6);
+            tc.verifyEqual(s.sensor_data.p_async_cross_pairs, [1 2]);
+            tc.verifyEqual(s.sensor_data.p_max_async(3, 3, 3), sqrt(2), 'AbsTol', 1e-9);
+            tc.verifyEqual(double(s.sensor_data.p_intensity_equiv(3, 3, 3)), sqrt(2), 'AbsTol', 1e-6);
+            tc.verifyEqual(s.acoustic_provenance.combination_overlap.groups, [1 2]);
+            % burst phase -pi/2 aligns the two fields: peak 2
+            evalc(['combine_async_intensity({f1, f2}, out, [], ''async'', [1 2], [], ' ...
+                   'OverlapGroups=[1 2], OverlapFreqs=3e5, OverlapThetas={-pi/2});']);
+            s = load(out, 'sensor_data');
+            tc.verifyEqual(s.sensor_data.p_max_async(3, 3, 3), 2, 'AbsTol', 1e-9);
+            % negative control: without the pair, the fields do not interfere
+            evalc('combine_async_intensity({f1, f2}, out, [], ''async'', [1 2]);');
+            s = load(out, 'sensor_data');
+            tc.verifyFalse(isfield(s.sensor_data, 'p_async_cross'));
+            tc.verifyEqual(s.sensor_data.p_max_async(3, 3, 3), 1, 'AbsTol', 1e-9);
         end
     end
 
@@ -331,6 +389,20 @@ if ~isempty(offset)
 end
 acoustic_info.parameters.transducer = struct('target_isppa_wcm2', NaN); %#ok<STRNU>
 save(f, 'sensor_data', 'kgrid', 'kwave_medium', 'acoustic_provenance', 'acoustic_info');
+end
+
+function f = write_cache_affine(d, name, p, A)
+% Acoustic cache with a planimg sidecar (sim voxel -> world = A), as
+% resolve_affine_remap reads it; beam along z
+f = write_cache(fullfile(d, [name, '_results.mat']), p, [], []);
+s = load(f);
+s.acoustic_info.parameters = struct('subject_id', 1, 'simulation', struct('medium', 'layered'), ...
+    'io', struct('dir_cache', d, 'preproc_affix', ['_', name]), ...
+    'transducer', struct('target_isppa_wcm2', NaN, 'trans_pos', [5 5 1], 'focus_pos', [5 5 15], ...
+                         'freq_hz', 250e3));
+save(f, '-struct', 's');
+planimg = struct('inv_transf', A, 't1_header', struct('Transform', struct('T', eye(4)))); %#ok<NASGU>
+save(fullfile(d, sprintf('sub-001_layered_planimg_%s.mat', name)), 'planimg');
 end
 
 function f = write_pc(f, p, offset, full, freq)

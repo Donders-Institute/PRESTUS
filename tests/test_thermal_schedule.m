@@ -101,10 +101,28 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_therma
             tc.verifyError(@() thermal_schedule(p, 2), ?MException);
         end
 
-        function test_overlapping_stances_same_frequency_error(tc)
+        function test_overlapping_stances_same_frequency_interfere(tc)
+            % Same frequency, both on: the pair interferes in every segment where both
+            % are on, with the clock phase by default and the onset delay with 'burst'
+            p = tc.base;
+            p.transducer(2).timing_offset_s = 0.01 + 1 / (4 * 5e5);   % 10 ms + a quarter period
+            s = thermal_schedule(p, 2);
+            tc.verifyEqual(s.overlap.pairs, [1 2]);
+            both = s.active(:, 1) & s.active(:, 2);
+            tc.verifyEqual(s.overlap.active(:, 1), both);
+            tc.verifyEqual(s.overlap.thetas, {0});
+            p.timing.overlap_phase = 'burst';
+            s = thermal_schedule(p, 2);
+            tc.verifyEqual(s.overlap.thetas{1}, -pi / 2, 'AbsTol', 1e-6);
+            p.timing.overlap_phase = 'random';
+            tc.verifyError(@() thermal_schedule(p, 2), 'thermal_schedule:overlapPhase');
+        end
+
+        function test_overlap_needs_known_frequencies(tc)
             p = tc.base;
             p.transducer(2).timing_offset_s = 0;
-            tc.verifyError(@() thermal_schedule(p, 2), 'thermal_schedule:coherentOverlap');
+            p.transducer(2).freq_hz = [];
+            tc.verifyError(@() thermal_schedule(p, 2), 'thermal_schedule:overlapUnknownFrequency');
         end
 
         function test_group_sources_share_windows(tc)
@@ -129,12 +147,15 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_therma
             tc.verifyEqual(s.source.n_ptri_reps, 2);
         end
 
-        function test_groups_overlapping_at_same_frequency_error(tc)
-            % Negative control: sources of different groups at one frequency still error
+        function test_groups_overlapping_at_same_frequency_interfere(tc)
+            % Sources of different groups at one frequency form an interfering pair;
+            % sources of one group never do (negative control)
             p = tc.base;
             p.transducer(2).timing_offset_s = 0;
-            tc.verifyError(@() thermal_schedule(p, 2, SourceTx=[1 2], SourceFreq=[5e5 5e5]), ...
-                'thermal_schedule:coherentOverlap');
+            s = thermal_schedule(p, 2, SourceTx=[1 2], SourceFreq=[5e5 5e5]);
+            tc.verifyEqual(s.overlap.pairs, [1 2]);
+            s = thermal_schedule(p, 2, SourceTx=[1 1], SourceFreq=[3e5 5e5]);
+            tc.verifyEmpty(s.overlap.pairs);
         end
 
         function test_train_averaged_keeps_heat_and_drops_pulses(tc)

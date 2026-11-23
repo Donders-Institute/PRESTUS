@@ -109,25 +109,27 @@ def test_together_runs_jointly_on_the_shared_grid(schema):
     assert not any("same frequency" in p for p in sched.problems())
 
 
-def test_together_on_per_transducer_grids_needs_a_chain(schema):
-    # negative control: complex fields are not interpolated between grids
+def test_together_on_per_transducer_grids_runs_jointly_with_a_warning(schema):
+    # complex fields are resampled with the carrier removed (remap_complex_field.m):
+    # one joint run, with a warning that the shared grid needs no resampling
     m = _model(schema, 3)
     sq.join_previous(m, 2)
     m.set("grid.async_layout", "per_transducer")
-    assert sq.plan(m).backend == "chain" and not sq.plan(m).errors
-    joint = sq.plan(m, "joint")
-    assert joint.backend == "" and any(i.path == "grid.async_layout" for i in joint.errors)
+    pl = sq.plan(m)
+    assert pl.backend == "joint" and not pl.errors
+    assert any("carrier removed" in i.message for i in pl.issues if i.path == "grid.async_layout")
 
 
-def test_overlap_without_shared_timing_is_still_an_error(schema):
-    # negative control: same start, different timing is no group; overlapping at one
-    # frequency stays the timing panel's error (thermal_schedule.m, coherentOverlap)
+def test_overlap_without_shared_timing_interferes(schema):
+    # negative control: same start, different timing is no group; the pulses partly
+    # overlap at one frequency and interfere while both are on (thermal_overlap_terms.m)
     m = _model(schema, 3)
     sq.join_previous(m, 2)
     m.set("transducer.timing.pd", 0.04, 2)
     sched = tm.AsyncSchedule.from_model(m)
     assert sched.groups() == [0, 1, 2]
-    assert any("same frequency" in p for p in sched.problems())
+    assert not sched.problems()
+    assert any("interfere while both are on" in n for n in sched.notes())
 
 
 def test_separate_undoes_join(schema):
@@ -302,7 +304,7 @@ def test_launch_target(schema, tmp_path):
 def test_launch_target_refuses_errors(schema, tmp_path):
     m = _model(schema, 3)
     sq.join_previous(m, 2)
-    m.set("grid.async_layout", "per_transducer")     # a group needs the shared grid
+    m.set("transducer.timing.pd", 0.04, 2)          # starts with T2, other timing: an error
     m.save(tmp_path / "config_seq.yaml")
     with pytest.raises(sq.SequenceError):
         sq.launch_target(m, PipelineOptions(), "joint")

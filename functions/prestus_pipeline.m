@@ -121,10 +121,16 @@ function [parameters] = prestus_pipeline(parameters, options)
         if isfield(parameters.async_combine, 'pd_s')
             pd_s = parameters.async_combine.pd_s;
         end
+        ov = {};
+        if isfield(parameters.async_combine, 'overlap_groups') && ~isempty(parameters.async_combine.overlap_groups)
+            ov = {'OverlapGroups', parameters.async_combine.overlap_groups, ...
+                  'OverlapFreqs', parameters.async_combine.overlap_freqs(:), ...
+                  'OverlapThetas', parameters.async_combine.overlap_thetas};
+        end
         combine_async_intensity( ...
             parameters.async_combine.files_in, ...
             parameters.async_combine.file_out, ...
-            targets, mode, groups, pd_s);
+            targets, mode, groups, pd_s, ov{:});
         return;
     end
 

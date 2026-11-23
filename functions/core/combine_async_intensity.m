@@ -1,4 +1,4 @@
-function combine_async_intensity(files_in, file_out, targets_wcm2, mode, groups, pd_s)
+function combine_async_intensity(files_in, file_out, targets_wcm2, mode, groups, pd_s, opts)
 % COMBINE_ASYNC_INTENSITY  Scale and combine N independent acoustic results for async (non-simultaneous) transducer firing
 %
 % For asynchronously firing transducers the pressure fields are independent.
@@ -46,7 +46,19 @@ function combine_async_intensity(files_in, file_out, targets_wcm2, mode, groups,
 % source, and sensor_data.p_intensity_equiv the largest time-averaged
 % intensity of any group (ACOUSTIC_ANALYSIS takes Ipa/Ita from it). Group
 % members need their complex fields (io.save_p_complex of the acoustic runs,
-% phases referred to t = 0) and one shared grid (async_layout 'shared').
+% phases referred to t = 0). On another grid (async_layout 'per_transducer')
+% they are resampled with the carrier along the beam removed
+% (REMAP_COMPLEX_FIELD); the shared grid needs no resampling.
+%
+% Pulses that partly overlap (OverlapGroups)
+% ------------------------------------------
+% Two groups at one frequency whose pulses partly overlap interfere while both
+% are on (THERMAL_SCHEDULE sched.overlap). For each pair, A + iB = 2 P_a conj(P_b)
+% is stored (sensor_data.p_async_cross, [Nx Ny Nz K 2], with
+% p_async_cross_pairs naming the two heat sources); THERMAL_SIMULATION adds
+% cos(theta) A + sin(theta) B to the heat source while both are on. The peak
+% pressure |P_a + P_b e^(i theta)| over the phases that occur (OverlapThetas)
+% enters p_max_async / p_min_async and p_intensity_equiv.
 %
 % Simultaneous mode (mode = 'simultaneous') is one group of all transducers:
 % transducers at more than one frequency firing at the same time
@@ -89,8 +101,8 @@ function combine_async_intensity(files_in, file_out, targets_wcm2, mode, groups,
 %      spacing/extent, not rotation.
 % Regions of the source field that fall outside the reference extent are
 % zero-padded.  This avoids forcing a re-run when the grid change is
-% recoverable by interpolation. Complex fields of group members are not
-% remapped (a group needs one shared grid).
+% recoverable by interpolation. Complex fields are remapped with the carrier
+% removed (REMAP_COMPLEX_FIELD; the world-space affine is required).
 %
 % The target for each transducer is resolved in this order:
 %   1. targets_wcm2(i) argument (if supplied and finite)
@@ -110,6 +122,7 @@ function combine_async_intensity(files_in, file_out, targets_wcm2, mode, groups,
 %   combine_async_intensity(files_in, file_out, targets_wcm2, mode)
 %   combine_async_intensity(files_in, file_out, targets_wcm2, 'async', groups)
 %   combine_async_intensity(files_in, file_out, targets_wcm2, 'async', groups, pd_s)
+%   combine_async_intensity(..., OverlapGroups=G2, OverlapFreqs=f, OverlapThetas=th)
 %
 % Input:
 %   files_in     - cell array of paths to acoustic cache .mat files {N×1}
@@ -126,6 +139,10 @@ function combine_async_intensity(files_in, file_out, targets_wcm2, mode, groups,
 %                  which a group's peak pressure is sampled; NaN or [] = read
 %                  from the cache's parameters. files_in may name one file
 %                  several times (transducers with the same field).
+%   OverlapGroups - (optional) [K x 2] groups of each pair whose pulses partly
+%                  overlap at one frequency (numbered as groups)
+%   OverlapFreqs  - [K x 1] the pair's frequency [Hz]
+%   OverlapThetas - {1 x K} the phases of group b that occur [rad] (THERMAL_OVERLAP_TERMS)
 %
 % Notes:
 %   - Axisymmetric (2-D) results are not supported.
@@ -144,6 +161,16 @@ arguments
     mode         (1,:) char {mustBeMember(mode, {'async', 'simultaneous'})} = 'async'
     groups       (1,:) double = []
     pd_s         (1,:) double = []
+    opts.OverlapGroups (:,2) double = zeros(0, 2)
+    opts.OverlapFreqs  (:,1) double = zeros(0, 1)
+    opts.OverlapThetas cell = {}
+end
+% Pairs of groups whose pulses partly overlap at one frequency (THERMAL_SCHEDULE
+% sched.overlap): they interfere while both are on
+K_ov = size(opts.OverlapGroups, 1);
+if numel(opts.OverlapFreqs) ~= K_ov || (K_ov > 0 && numel(opts.OverlapThetas) ~= K_ov)
+    error('combine_async_intensity:badOverlap', ...
+        'OverlapGroups, OverlapFreqs and OverlapThetas must describe the same %d pair(s).', K_ov);
 end
 
 if ischar(files_in) || isstring(files_in)
@@ -180,6 +207,15 @@ G        = max(groups);
 n_in_g   = accumarray(groups(:), 1)';
 coherent = n_in_g > 1;                       % group of several transducers: complex sum
 any_coherent = any(coherent);
+% Overlap pairs name groups by the caller's numbering (FIRING_GROUPS: first appearance)
+in_pair = false(1, G);
+if K_ov > 0
+    if any(opts.OverlapGroups(:) < 1 | opts.OverlapGroups(:) > G)
+        error('combine_async_intensity:badOverlap', 'OverlapGroups must name groups 1..%d.', G);
+    end
+    in_pair(opts.OverlapGroups(:)) = true;
+end
+need_complex = coherent | in_pair;           % per group: its complex fields are needed
 
 % Pad or trim the external targets vector to length N.
 if numel(targets_wcm2) < N
@@ -233,6 +269,7 @@ for k = 1:N
                       'acoustic_grid_dims');
     end
     g   = groups(k);
+    f_k = transducer_freq(data_k.acoustic_info);   % the complex field's own, when loaded
     p_k = double(abs(data_k.sensor_data.p_max_all));
     if ndims(p_k) < 3 %#ok<ISMAT>
         error('combine_async_intensity:axisymmetricNotSupported', ...
@@ -249,14 +286,14 @@ for k = 1:N
     scale_k = p_k_scaled ./ max(p_k, eps('double'));
     s_k     = max(p_k_scaled(:)) / max(max(p_k(:)), eps('double'));   % uniform scale
     clear p_k;
-    if coherent(g)
-        if ~isequal(full_ac_dims_k, full_ac_dims)
-            error('combine_async_intensity:simultaneousGridMismatch', ...
-                ['File %d is on another grid; transducers firing together need one shared grid ' ...
-                 '(grid.async_layout: shared).'], k);
-        end
+    if need_complex(g)
         [P_k, f_k] = load_complex_field(files_in{k});
-        P_k = backproject_complex(P_k * s_k, fov_offset_k, full_ac_dims);
+        P_k = backproject_complex(P_k * s_k, fov_offset_k, full_ac_dims_k);
+        if ~isequal(full_ac_dims_k, full_ac_dims)
+            % Another grid (per_transducer layout): resample with the carrier removed
+            P_k = remap_complex_to_ref(P_k, k, data_k, data_ref.acoustic_info, full_ac_dims, ...
+                                       f_k, fov_offset_k);
+        end
         i_f = find(abs(F_acc{g} - f_k) <= 1e-6 * f_k, 1);
         if isempty(i_f)
             P_acc{g}{end+1} = P_k;
@@ -334,7 +371,7 @@ for k = 1:N
         p_max_safety = max(p_max_safety, p_k_full);
         p_min_safety = min(p_min_safety, backproject(p_min_k, fov_offset_k, full_ac_dims));
         src_field{end+1} = single(p_k_full);                    %#ok<AGROW>
-        src_freq(end+1)  = transducer_freq(data_k.acoustic_info); %#ok<AGROW>
+        src_freq(end+1)  = f_k;                                 %#ok<AGROW>
         src_tx(end+1)    = k;                                   %#ok<AGROW>
         src_group(end+1) = g;                                   %#ok<AGROW>
     end
@@ -354,6 +391,9 @@ for g = find(coherent)
     [F_acc{g}, order] = sort(F_acc{g});
     P_g = P_acc{g}(order);
     P_acc{g} = [];
+    if in_pair(g)
+        P_acc{g} = P_g;                            % kept for the overlap pairs below
+    end
     I_g = zeros(full_ac_dims);
     for i_f = 1:numel(P_g)
         I_g = I_g + abs(P_g{i_f}) .^ 2;
@@ -384,8 +424,41 @@ end
 src_field   = src_field(order);
 src_freq    = src_freq(order);
 src_tx      = src_tx(order);
+src_group   = src_group(order);
 p_async_tx  = cat(4, src_field{:});
 clear src_field;
+
+% =========================================================================
+%% Pulses that partly overlap: interference while both are on
+% =========================================================================
+% While both sources of a pair are on, the heat source gains
+% X(theta) = cos(theta) A + sin(theta) B, A + iB = 2 P_a conj(P_b)
+% (THERMAL_OVERLAP_TERMS); the peak pressure is |P_a + P_b e^(i theta)|.
+p_cross     = zeros([full_ac_dims, K_ov, 2], 'single');
+cross_pairs = zeros(K_ov, 2);
+for kk = 1:K_ov
+    ga = opts.OverlapGroups(kk, 1);  gb = opts.OverlapGroups(kk, 2);  f = opts.OverlapFreqs(kk);
+    [Pa, other_a] = group_tone(P_acc{ga}, F_acc{ga}, f, ga);
+    [Pb, other_b] = group_tone(P_acc{gb}, F_acc{gb}, f, gb);
+    C = 2 * Pa .* conj(Pb);
+    p_cross(:, :, :, kk, 1) = single(real(C));
+    p_cross(:, :, :, kk, 2) = single(imag(C));
+    clear C
+    cross_pairs(kk, :) = [find_source(src_group, src_freq, ga, f), find_source(src_group, src_freq, gb, f)];
+    for th = reshape(opts.OverlapThetas{kk}, 1, [])
+        S = abs(Pa + Pb * exp(1i * th));
+        % other tones of the two groups (several frequencies): their amplitudes add to
+        % the peak at most (upper bound), their intensities add to the time average
+        pk = S + other_a.amp + other_b.amp;
+        p_max_safety = max(p_max_safety, pk);
+        p_min_safety = min(p_min_safety, -pk);
+        p_ieq_sq     = max(p_ieq_sq, S .^ 2 + other_a.pow + other_b.pow);
+    end
+    fprintf('  Overlap: groups %d and %d at %g kHz interfere while both are on (phases %s rad)\n', ...
+        ga, gb, f / 1e3, mat2str(reshape(opts.OverlapThetas{kk}, 1, []), 3));
+    clear Pa Pb S pk other_a other_b
+end
+clear P_acc
 
 % =========================================================================
 %% Per-transducer ISPPA summary
@@ -394,8 +467,8 @@ fprintf('Per-transducer ISPPAs at the combined (target) scale:\n');
 for ti = 1:N
     fprintf('  Transducer %d: %.4f W/cm²\n', ti, isppa_per_t(ti));
 end
-if any_coherent
-    fprintf('  Joint ISPPA (largest time-averaged intensity of any group): %.4f W/cm²\n', ...
+if any_coherent || K_ov > 0
+    fprintf('  Joint ISPPA (largest time-averaged intensity of any group or overlap): %.4f W/cm²\n', ...
         max(p_ieq_sq(:)) / (2 * 1000 * 1500) * 1e-4);
 else
     fprintf('  Expected joint ISPPA (= max of above): %.4f W/cm²\n', max(isppa_per_t));
@@ -418,13 +491,17 @@ sensor_data.p_max_all    = p_thermal;    % thermal heat source (intensity sum)
 sensor_data.p_max_async  = p_max_safety; % acoustic safety: peak positive
 sensor_data.p_min_async  = p_min_safety; % acoustic safety: peak negative
 sensor_data.p_async_tx   = p_async_tx;   % scaled field per heat source [Nx Ny Nz S]: scheduled heat source
-if any_coherent
+if any_coherent || K_ov > 0
     % time-averaged intensity of the transducers firing together (ACOUSTIC_ANALYSIS: Ipa, Ita)
     sensor_data.p_intensity_equiv = single(sqrt(p_ieq_sq));
     sensor_data.p_async_freqs_hz  = src_freq;  % frequency of each heat source
     sensor_data.p_async_source_tx = src_tx;    % its windows: those of this transducer (THERMAL_SCHEDULE)
 end
-clear p_thermal p_max_safety p_min_safety p_async_tx p_ieq_sq;
+if K_ov > 0
+    sensor_data.p_async_cross       = p_cross;      % [Nx Ny Nz K 2]: A and B of each pair [Pa^2]
+    sensor_data.p_async_cross_pairs = cross_pairs;  % [K x 2] heat sources (p_async_tx) of each pair
+end
+clear p_thermal p_max_safety p_min_safety p_async_tx p_ieq_sq p_cross;
 
 acoustic_provenance                                        = data_ref.acoustic_provenance;
 acoustic_provenance.combined_from                          = files_in;
@@ -438,6 +515,11 @@ if any_coherent
     acoustic_provenance.combination_groups                 = groups;   % per transducer
     acoustic_provenance.combination_frequency_groups_hz    = src_freq; % fields of p_async_tx
     acoustic_provenance.combination_peak                   = peak_info;
+end
+if K_ov > 0
+    % pairs that interfere while both are on (sensor_data.p_async_cross)
+    acoustic_provenance.combination_overlap = struct('groups', opts.OverlapGroups, ...
+        'freqs_hz', opts.OverlapFreqs, 'thetas', {opts.OverlapThetas}, 'sources', cross_pairs);
 end
 acoustic_provenance.combination_targets                    = targets_log;
 acoustic_provenance.combination_baselines                  = baselines_log;
@@ -490,6 +572,59 @@ end
 % =========================================================================
 %% Local helpers
 % =========================================================================
+
+function [P, other] = group_tone(P_list, F_list, f, g)
+% A group's summed complex field at frequency f, and its other tones' amplitude
+% sum and power (a group firing at several frequencies)
+    i_f = find(abs(F_list - f) <= 1e-6 * f, 1);
+    if isempty(i_f)
+        error('combine_async_intensity:badOverlap', 'Group %d has no field at %g kHz.', g, f / 1e3);
+    end
+    P = P_list{i_f};
+    other = struct('amp', 0, 'pow', 0);
+    for j = setdiff(1:numel(P_list), i_f)
+        other.amp = other.amp + abs(P_list{j});
+        other.pow = other.pow + abs(P_list{j}) .^ 2;
+    end
+end
+
+function s = find_source(src_group, src_freq, g, f)
+% Heat source (p_async_tx) of group g at frequency f
+    s = find(src_group == g & abs(src_freq - f) <= 1e-6 * f, 1);
+    if isempty(s)
+        error('combine_async_intensity:badOverlap', 'No heat source of group %d at %g kHz.', g, f / 1e3);
+    end
+end
+
+function P = remap_complex_to_ref(P, k, data_k, info_ref, out_dims, f, fov_offset) %#ok<INUSD>
+% Complex field of file k (on its own full grid) onto the reference grid, with
+% the carrier along the transducer's beam axis removed (REMAP_COMPLEX_FIELD).
+% The carrier uses the water wavenumber; the origin on the axis cancels, so a
+% partial-FOV run's positions need no offset.
+    [M, ok] = resolve_affine_remap(data_k.acoustic_info, info_ref, data_k.kgrid);
+    if ~ok
+        error('combine_async_intensity:complexNeedsAffine', ...
+            ['File %d is on another grid and its grid-to-grid affine cannot be recovered ' ...
+             '(planimg sidecar); complex fields are not remapped without it.'], k);
+    end
+    tr = data_k.acoustic_info.parameters.transducer(1);
+    axis_v = double(tr.focus_pos(:)' - tr.trans_pos(:)');
+    if norm(axis_v) < eps
+        error('combine_async_intensity:noBeamAxis', 'File %d: transducer and focus coincide.', k);
+    end
+    c0 = 1500;                                  % water sound speed of the carrier [m/s]
+    dx = data_k.kgrid.dx;                       % [m]
+    ppw = c0 / (f * dx);
+    if ppw < 4
+        warning('combine_async_intensity:coarseRemap', ...
+            ['File %d: %.1f points per wavelength; the remapped field of transducers firing ' ...
+             'together or overlapping may be inaccurate. Prefer grid.async_layout: shared.'], k, ppw);
+    end
+    P = remap_complex_field(P, M, out_dims, KPerVoxel=2 * pi * f * dx / c0, Axis=axis_v, ...
+                            Origin=double(tr.trans_pos(:)'));
+    fprintf('[combine_async_intensity] File %d: complex field remapped onto the reference grid (carrier removed, %.1f PPW).\n', ...
+        k, ppw);
+end
 
 function f = transducer_freq(acoustic_info)
 % Frequency of a single-transducer run [Hz], NaN when the cache does not record it

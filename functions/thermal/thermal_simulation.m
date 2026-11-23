@@ -273,6 +273,33 @@ Q_src = (alpha_np .* p.^2) ./ (rho_source .* kwave_medium.sound_speed);
 n_src = size(Q_src, 4);
 source.Q = sum(Q_src, 4);
 source.T0 = kwave_medium.temp_0; %parameters.thermal.temp_0; % Initial temperature distribution
+% Pulses that partly overlap at one frequency interfere while both are on
+% (COMBINE_ASYNC_INTENSITY p_async_cross: A and B per pair [Pa^2]); their extra
+% heat alpha * (cos(theta) A + sin(theta) B) / (rho c) is added in those
+% segments below (THERMAL_OVERLAP_TERMS weights)
+Q_cross = [];
+if isstruct(sensor_data) && isfield(sensor_data, 'p_async_cross') && ~isempty(sensor_data.p_async_cross)
+    X = gather(sensor_data.p_async_cross);                % [Nx Ny Nz K 2]
+    if strcmp(char(parameters.simulation.precision), 'double')
+        X = double(X);
+    end
+    if ~isequal(size(X, 1:3), size(Q_src, 1:3))
+        error('thermal_simulation:asyncGridMismatch', ...
+            'Interference fields [%s] are not on the thermal grid [%s].', ...
+            num2str(size(X, 1:3)), num2str(size(Q_src, 1:3)));
+    end
+    Q_cross = zeros(size(X), 'like', X);
+    for kk = 1:size(X, 4)
+        a = sensor_data.p_async_cross_pairs(kk, 1);       % absorption at the pair's frequency
+        if size(alpha_np, 4) > 1
+            al = alpha_np(:, :, :, a);
+        else
+            al = alpha_np;
+        end
+        Q_cross(:, :, :, kk, :) = al .* X(:, :, :, kk, :) ./ (rho_source .* kwave_medium.sound_speed);
+    end
+    clear X al
+end
 clear alpha_np p rho_source;
 
 % remove unexpected fields from kWave_medium
@@ -389,6 +416,29 @@ sched = thermal_schedule(parameters, n_src, src_opts{:});
 % Ramped pulses (timing.pulse_ramp_dur > 0): each source's heat times its ramp
 % factor, from the pd of the transducer whose windows it follows (THERMAL_RAMP_FACTORS)
 ramp_eta = thermal_ramp_factors(params_thermal, sched);
+% Partly overlapping pulses: the schedule's pairs must be the cache's (same
+% sources, COMBINE_ASYNC_INTENSITY), and ramped pulses are not modelled for them
+ov = sched.overlap;
+K_ov = size(ov.pairs, 1);
+if K_ov > 0 || ~isempty(Q_cross)
+    if isempty(Q_cross)
+        error('thermal_simulation:overlapNoCross', ...
+            ['Heat sources %s partly overlap at one frequency, but the acoustic cache has no ' ...
+             'interference fields (p_async_cross): run the async pipeline, which combines them.'], ...
+            mat2str(ov.pairs(1, :)));
+    end
+    if ~isequal(ov.pairs, double(sensor_data.p_async_cross_pairs))
+        error('thermal_simulation:overlapMismatch', ...
+            ['The overlapping pulses of the schedule (%s) are not those of the acoustic cache (%s): ' ...
+             'combine the fields again with this timing.'], mat2str(ov.pairs), ...
+            mat2str(sensor_data.p_async_cross_pairs));
+    end
+    if any(ramp_eta ~= 1)
+        error('thermal_simulation:rampOverlap', ...
+            ['Ramped pulses (timing.pulse_ramp_dur) that partly overlap at one frequency are not ' ...
+             'modelled: their interference depends on both envelopes. Remove the ramp or the overlap.']);
+    end
+end
 for i = find(ramp_eta ~= 1)
     Q_src(:,:,:,i) = Q_src(:,:,:,i) * ramp_eta(i);
     fprintf('[thermal_simulation] Pulse ramp (%s, %.3g ms per edge, PD %.3g ms): heat source %d x %.3f\n', ...
@@ -486,22 +536,29 @@ timeseries = thermal_update_timeseries(parameters, ts_masks);
 % Heat source for each set of source weights that is on together (computed once).
 % Weights are 1 for a source that is on; with thermal.pulse_model 'train_averaged'
 % a pulse train is one segment and its source weighs PD/PRI (THERMAL_SCHEDULE).
-[patterns, ~, pattern_of_seg] = unique(sched.weight, 'rows');
+% Partly overlapping pulses add their interference with the weights
+% cos(theta) and sin(theta) of the segment (THERMAL_OVERLAP_TERMS).
+[patterns, ~, pattern_of_seg] = unique([sched.weight, ov.cos_w, ov.sin_w], 'rows');
 Q_pattern = cell(size(patterns, 1), 1);
 for j = 1:size(patterns, 1)
-    w = patterns(j, :);
+    w  = patterns(j, 1:n_src);
+    cw = patterns(j, n_src + (1:K_ov));
+    sw = patterns(j, n_src + K_ov + (1:K_ov));
     if any(w)
-        if n_src == 1 && w == 1
+        if n_src == 1 && w == 1 && K_ov == 0
             Q_pattern{j} = Q_src;       % shared copy, no extra memory
         else
             Q_pattern{j} = 0;
             for s = find(w)
                 Q_pattern{j} = Q_pattern{j} + w(s) * Q_src(:,:,:,s);
             end
+            for kk = find(cw ~= 0 | sw ~= 0)
+                Q_pattern{j} = Q_pattern{j} + cw(kk) * Q_cross(:,:,:,kk,1) + sw(kk) * Q_cross(:,:,:,kk,2);
+            end
         end
     end
 end
-clear Q_src;
+clear Q_src Q_cross;
 
 % Train-averaged segments last seconds: step them at the diffusion time step
 % CFL * dx^2 / max diffusivity (CFL 0.1, as k-Plan's thermal solver)

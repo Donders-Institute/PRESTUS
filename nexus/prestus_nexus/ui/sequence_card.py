@@ -237,9 +237,9 @@ class SequenceCard(QFrame):
         self.backend = QComboBox()
         for key in sq.BACKENDS:
             self.backend.addItem(sq.BACKEND_LABELS[key], key)
-        self.backend.setToolTip("Automatic: one joint run, or a chain of runs when a step fires "
-                                "several transducers together on per-transducer grids. Stored with "
-                                "the Nexus for this study.")
+        self.backend.setToolTip("Automatic: one joint run (one thermal simulation for the whole "
+                                "sequence). Chain of runs: one run per step. Stored with the Nexus "
+                                "for this study.")
         self.backend.currentIndexChanged.connect(self._backend_changed)
         brow.addWidget(self.backend)
         brow.addStretch(1)

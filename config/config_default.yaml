@@ -653,6 +653,9 @@ timing:
                          #   'pulses' — all use this block, taking turns within each PRI (N x PD <= PRI)
                          #   'trains' — all use this block, taking turns within each PTRI (N x PTD <= PTRI)
                          #   'custom' — transducer(i).timing_offset_s and transducer(i).timing set each one's timing
+  overlap_phase: clock   # Async pulses at one frequency that partly overlap interfere while both are on; their relative carrier phase:
+                         #   'clock' — the channels share one clock: the simulated drive phases hold in every pulse
+                         #   'burst' — each pulse starts its carrier at its own onset: the phase also shifts by 2*pi*f*delay
 
 #------------ Thermal parameters
 

@@ -12,7 +12,8 @@ Two ways to simulate a plan (plan() picks one and says why):
 - joint: the config runs as it is, one async run. Each stance gets its own acoustic
   simulation; one thermal simulation covers the whole sequence (async_transducer_pipeline.m).
   The transducers of a step fire together as a firing group (firing_groups.m): their complex
-  fields are summed, so they interfere, which needs the shared grid (grid.async_layout).
+  fields are summed, so they interfere (on per-transducer grids after resampling them with
+  the carrier removed, remap_complex_field.m).
 - chain: one config per step, run as sequential follow-ups (sequential_pipeline.m). A step
   with several transducers is one coherent run. Each step starts from the previous step's
   end temperature and CEM43 maps, written after its post_ptri_dur (thermal_simulation.m),
@@ -185,20 +186,10 @@ def plan(model: ConfigModel, preference: str = "auto") -> Plan | None:
     per_tx_grid = g("grid.async_layout") == "per_transducer"
 
     # what each backend needs: a step firing together is summed coherently in one joint
-    # run (firing_groups.m), which needs the shared grid; a chain runs it as one coherent run
-    if together and per_tx_grid and preference == "joint":
-        backend, reason = "", ""
-        issues.append(_issue("error", "grid.async_layout",
-                             f"Step {together[0] + 1} fires several transducers together. One joint "
-                             "run sums their complex fields, which needs the shared grid; set "
-                             "grid.async_layout to shared, or simulate the sequence as a chain of runs"))
-    elif preference == "chain" or (together and per_tx_grid):
+    # run (firing_groups.m); a chain runs it as one coherent run
+    if preference == "chain":
         backend = "chain"
-        reason = (f"Step {together[0] + 1} fires {len(stps[together[0]].transducers)} transducers "
-                  "together and each transducer has its own grid, so the steps run one after "
-                  "another: each starts from the previous step's end temperature and thermal dose"
-                  if preference != "chain" else
-                  "Chosen here: the steps run one after another, each on its own grid, and each "
+        reason = ("Chosen here: the steps run one after another, each on its own grid, and each "
                   "starts from the previous step's end temperature and thermal dose")
     else:
         backend = "joint"
@@ -249,11 +240,17 @@ def plan(model: ConfigModel, preference: str = "auto") -> Plan | None:
                                  f"ISPPAs (transducer {multi[0]}) makes a step a multi-ISPPA run",
                                  multi[0] - 1))
     elif backend == "joint":
-        if g("grid.async_layout") == "per_transducer":
+        if per_tx_grid:
             issues.append(_issue("warning", "grid.async_layout",
                                  "With one grid per transducer, the heat of later stances is "
                                  "resampled onto transducer 1's grid and dropped outside it. The "
                                  "shared grid, or a chain of runs, keeps it"))
+        if per_tx_grid and together:
+            issues.append(_issue("warning", "grid.async_layout",
+                                 f"Step {together[0] + 1} fires several transducers together: their "
+                                 "complex fields are resampled onto transducer 1's grid with the "
+                                 "carrier removed, which is accurate along the beam but less so in "
+                                 "the skull. The shared grid needs no resampling"))
 
     if not heating:
         issues.append(_issue("warning", "modules.run_heating_sims",

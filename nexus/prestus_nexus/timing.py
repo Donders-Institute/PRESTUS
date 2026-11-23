@@ -464,22 +464,24 @@ class AsyncSchedule:
                 out.append(f"'trains' fires the {n} transducers in turn within each PTRI: needs "
                            f"{n} × PTD ≤ PTRI ({n} × {base.ptd:.4g} s > {base.ptri:.4g} s). "
                            "Use 'pulses', a shorter PTD, or 'custom'.")
-        same, _ = self._overlap_pairs()
-        if same and not chained:
-            out.append(f"{', '.join(f'T{i + 1}/T{j + 1}' for i, j in same)} overlap at the same "
-                       "frequency: their fields interfere, which async coupling does not model. "
-                       "Give them the same start and timing to fire them together, change the "
-                       "offsets, or use coherent coupling.")
         return out
 
     def notes(self) -> list[str]:
-        """What thermal_schedule.m warns about without stopping the run."""
-        _, other = self._overlap_pairs()
-        if not other:
-            return []
-        return [f"{', '.join(f'T{i + 1}/T{j + 1}' for i, j in other)} overlap at different "
-                "frequencies: their intensities are summed (valid when a pulse is long against "
-                "1/|f1 − f2|)."]
+        """What thermal_schedule.m reports without stopping the run: pulses at one frequency
+        that partly overlap interfere while both are on (thermal_overlap_terms.m); at
+        different frequencies their intensities are summed."""
+        same, other = self._overlap_pairs()
+        out = []
+        if same:
+            out.append(f"{', '.join(f'T{i + 1}/T{j + 1}' for i, j in same)} partly overlap at the "
+                       "same frequency: they interfere while both are on (phase: "
+                       "timing.overlap_phase). To fire them together, give them the same start "
+                       "and timing.")
+        if other:
+            out.append(f"{', '.join(f'T{i + 1}/T{j + 1}' for i, j in other)} overlap at different "
+                       "frequencies: their intensities are summed (valid when a pulse is long "
+                       "against 1/|f1 − f2|).")
+        return out
 
     def groups(self) -> list[int]:
         """Firing group of each transducer (0-based), as firing_groups.m: on the 'custom'

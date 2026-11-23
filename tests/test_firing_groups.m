@@ -114,7 +114,9 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_firing
             fg = firing_groups(p);
             s = thermal_schedule(p, numel(fg.source_tx), SourceTx=fg.source_tx, SourceFreq=fg.source_freq);
             tc.verifyEqual([s.source.offset_s], [0 20]);
-            tc.verifyError(@() thermal_schedule(p, 3), 'thermal_schedule:coherentOverlap');
+            tc.verifyEmpty(s.overlap.pairs);              % the group is summed, not a pair
+            s3 = thermal_schedule(p, 3);                  % without the map: T1 and T2 interfere
+            tc.verifyEqual(s3.overlap.pairs, [1 2]);
         end
 
     end

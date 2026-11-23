@@ -216,9 +216,11 @@ def test_async_schedule_problems_match_thermal_schedule():
     ok = tm.Protocol(pd=0.02, pri=0.2, ptd=1, ptri=4, ptrd=12)
     over = tm.AsyncSchedule.build(ok, "pulses", 2, overrides=[{}, {"pd": 0.04}])
     assert "only the 'custom' schedule" in over.problems()[0]
-    # custom: same frequency overlap is an error, different frequencies a note
+    # custom: a partial overlap at one frequency interferes (a note, thermal_overlap_terms.m);
+    # different frequencies a note too
     same = tm.AsyncSchedule.build(ok, "custom", 2, offsets=[0, 0.01], freqs=[5e5, 5e5])
-    assert same.overlaps() == [(0, 1)] and "interfere" in same.problems()[0]
+    assert same.overlaps() == [(0, 1)] and same.problems() == []
+    assert "interfere while both are on" in same.notes()[0]
     diff = tm.AsyncSchedule.build(ok, "custom", 2, offsets=[0, 0.01], freqs=[5e5, 2.5e5])
     assert diff.problems() == [] and "different frequencies" in diff.notes()[0]
     apart = tm.AsyncSchedule.build(ok, "custom", 2, offsets=[0, 0.1],

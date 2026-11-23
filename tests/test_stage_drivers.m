@@ -60,6 +60,31 @@ classdef (SharedTestFixtures = {prestus_paths}, TestTags = {'unit'}) test_stage_
             tc.verifyEqual(size(res.focal_planeT, 3), numel(tss));
         end
 
+        function test_thermal_overlap_interference(tc)
+            % Two transducers at one frequency with the same pulses, as separate heat
+            % sources (not a firing group): with the interference field A = 2 P_a P_b
+            % (in phase, B = 0) they heat as one source of the coherent sum 2g;
+            % without it the stage refuses (negative control)
+            p = stage_params(tc.Dir);
+            p.thermal.pulse_model = 'pulse_resolved';
+            [kgrid, med, masks] = brain_medium(p);
+            g = gaussian_p(p, 5e5);
+            [~, ~, ref] = run_thermal(p, 2 * g, kgrid, med, masks);
+            q = p;
+            q.simulation.transducer_coupling = 'async';
+            q.timing.async_schedule = 'custom';
+            q.transducer(2) = q.transducer(1);
+            [q.transducer.timing_offset_s] = deal(0);
+            [q.transducer.timing] = deal(struct());
+            sd = struct('p_max_all', sqrt(2) * g, 'p_async_tx', cat(4, g, g), ...
+                        'p_async_freqs_hz', [5e5 5e5], 'p_async_source_tx', [1 2], ...
+                        'p_async_cross', cat(5, 2 * g .^ 2, zeros(size(g))), 'p_async_cross_pairs', [1 2]);
+            [~, ~, ov] = run_thermal(q, sd, kgrid, med, masks);
+            tc.verifyEqual(ov.maxT, ref.maxT, 'RelTol', 1e-9);
+            sd = rmfield(sd, {'p_async_cross', 'p_async_cross_pairs'});
+            tc.verifyError(@() run_thermal(q, sd, kgrid, med, masks), 'thermal_simulation:overlapNoCross');
+        end
+
         function test_thermal_early_rise_matches_analytic(tc)
             % Early heating at the focus ~ Q * t_on / (rho * c_p): diffusion length
             % over 0.4 s (~0.3 mm) << Gaussian width (2 mm), perfusion ~0.4 %.
@@ -684,7 +709,11 @@ function [obj, tss, res] = run_thermal(p, pr, kgrid, kwave_medium, masks, p_th)
     end
     sensor = struct('mask', ones(p.grid.dims));
     source = struct('Q', zeros(p.grid.dims));
-    [~, obj, tss, res] = evalc_out(@() thermal_simulation(p_th, struct('p_max_all', pr), kgrid, ...
+    sd = pr;                         % a sensor_data struct, or the p_max_all array
+    if ~isstruct(sd)
+        sd = struct('p_max_all', pr);
+    end
+    [~, obj, tss, res] = evalc_out(@() thermal_simulation(p_th, sd, kgrid, ...
         kwave_medium, sensor, source, eye(4), masks));
 end
 
