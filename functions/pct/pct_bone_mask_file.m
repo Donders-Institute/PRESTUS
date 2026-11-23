@@ -32,7 +32,9 @@ end
     elseif isempty(pattern)
         error('PRESTUS:pct:noBoneMask', 'pct.bone_source ''mask'' needs path.bone_mask_pattern.');
     end
-    pattern = sprintf(pattern, parameters.subject_id);
+    % sprintf reads backslashes as escapes (\t in C:\...\Temp\tp... is a tab), so a
+    % Windows path in the pattern keeps them only when they are doubled first
+    pattern = sprintf(strrep(pattern, '\', '\\'), parameters.subject_id);
     if ~is_absolute(pattern)
         pattern = fullfile(char(parameters.path.anat), pattern);
     end

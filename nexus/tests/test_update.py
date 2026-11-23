@@ -259,8 +259,9 @@ def test_cli_failures_exit_nonzero(upstream, tmp_path, capsys):
 
 
 def _no_qt_env() -> dict:
-    """A child whose imports of PyQt6 fail: proves the path is headless."""
-    return dict(GIT_ENV, QT_QPA_PLATFORM="", DISPLAY="")
+    """A child whose imports of PyQt6 fail: proves the path is headless. Its console is
+    cp1252 (a Windows default) on every platform, so the report must survive "▸" and "…"."""
+    return dict(GIT_ENV, QT_QPA_PLATFORM="", DISPLAY="", PYTHONIOENCODING="cp1252")
 
 
 BLOCK_QT = ("import sys\n"
@@ -275,10 +276,11 @@ def test_entry_point_updates_without_qt(upstream, tmp_path):
     code = BLOCK_QT + ("from prestus_nexus.app import main\n"
                        f"sys.exit(main(['--update', '--prestus-root', {str(c)!r}, "
                        f"'--remote', {str(upstream)!r}]))\n")
-    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, encoding="cp1252",
                          env=_no_qt_env(), cwd=Path(update.__file__).parents[1])
     assert out.returncode == 0, out.stdout + out.stderr
     assert (c / "VERSION").read_text().strip() == "v0.2.0"
+    assert "Update project defaults" in out.stdout      # the report got to the end
 
 
 def test_runs_as_a_plain_script(upstream, tmp_path):

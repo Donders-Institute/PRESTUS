@@ -340,10 +340,13 @@ def _step(number: int, title: str, sub: str = "") -> tuple[QFrame, QVBoxLayout]:
     v = QVBoxLayout(box)
     v.setContentsMargins(10, 8, 10, 10)
     v.setSpacing(6)
-    head = QLabel(f"{number}&nbsp;&nbsp;{title}" + (f"&nbsp;&nbsp;<span style='font-weight:400'>{sub}</span>"
+    # number and title stay together; the subtitle wraps, so its length never sets the
+    # step's minimum width (unbroken, it forced the page past its minimum with Windows fonts)
+    head = QLabel(f"{number}&nbsp;&nbsp;{title}" + (f"&nbsp; <span style='font-weight:400'>{sub}</span>"
                                                      if sub else ""))
     head.setObjectName("SubGroupTitle")
     head.setTextFormat(Qt.TextFormat.RichText)
+    head.setWordWrap(True)
     v.addWidget(head)
     return box, v
 

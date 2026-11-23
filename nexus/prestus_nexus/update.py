@@ -383,6 +383,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prestus-root", help="PRESTUS checkout (default: the one this file is in)")
     parser.add_argument("--remote", default=REPO_URL, help=f"repository to read (default: {REPO_URL})")
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    # a Windows console with a legacy code page (cp1252) cannot print "▸" or "…"; without
+    # this, the report after a finished update raised UnicodeEncodeError and exit 1
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
     root = Path(args.prestus_root).expanduser() if args.prestus_root else default_root()
     if not (root / "config" / "config_default.yaml").is_file():
         print(f"{root} is not a PRESTUS folder (no config/config_default.yaml).", file=sys.stderr)
